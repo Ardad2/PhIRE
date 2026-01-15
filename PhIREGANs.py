@@ -399,6 +399,95 @@ class PhIREGANs:
 
         print('Done.')
 
+
+    def test_paired(self, r, data_path, model_path, batch_size=100, save_inputs=True):
+        '''
+        This function loads a previously trained model and runs it on paired (LR, HR) data.
+        Similar to test(), but uses _parse_train_ to also load HR ground truth.
+
+        Saves:
+            idx.npy, dataIN.npy (LR), dataGT.npy (HR), dataSR.npy (SR prediction)
+        '''
+
+        tf.reset_default_graph()
+
+        assert self.mu_sig is not None, 'Value for mu_sig must be set first.'
+
+        # Determine LR shape and channels.
+        self.set_LR_data_shape(data_path)
+        h, w, C = self.LR_data_shape
+
+        print('Initializing network ...', end=' ')
+        x_LR = tf.placeholder(tf.float32, [None, None, None, C])
+        model = SR_NETWORK(x_LR, r=r, status='testing')
+
+        init = tf.global_variables_initializer()
+        g_saver = tf.train.Saver(var_list=model.g_variables, max_to_keep=10000)
+        print('Done.')
+
+        print('Building paired data pipeline ...', end=' ')
+        ds = tf.data.TFRecordDataset(data_path)
+        ds = ds.map(lambda xx: self._parse_train_(xx, self.mu_sig)).batch(batch_size)
+
+        iterator = tf.data.Iterator.from_structure(ds.output_types, ds.output_shapes)
+        idx_out, LR_out, HR_out = iterator.get_next()
+        init_iter = iterator.make_initializer(ds)
+        print('Done.')
+
+        with tf.Session() as sess:
+            print('Loading saved network ...', end=' ')
+            sess.run(init)
+            g_saver.restore(sess, model_path)
+            print('Done.')
+
+            print('Running paired test data ...')
+            sess.run(init_iter)
+
+            all_idx, all_LR, all_HR, all_SR = None, None, None, None
+
+            try:
+                while True:
+                    batch_idx, batch_LR, batch_HR = sess.run([idx_out, LR_out, HR_out])
+
+                    # G forward pass (batch_LR is normalized already).
+                    batch_SR = sess.run(model.x_SR, feed_dict={x_LR: batch_LR})
+
+                    # De-normalize back to physical units.
+                    batch_LR_phys = self.mu_sig[1]*batch_LR + self.mu_sig[0]
+                    batch_HR_phys = self.mu_sig[1]*batch_HR + self.mu_sig[0]
+                    batch_SR_phys = self.mu_sig[1]*batch_SR + self.mu_sig[0]
+
+                    # Accumulate.
+                    if all_SR is None:
+                        all_idx = batch_idx
+                        all_LR = batch_LR_phys
+                        all_HR = batch_HR_phys
+                        all_SR = batch_SR_phys
+                    else:
+                        all_idx = np.concatenate((all_idx, batch_idx), axis=0)
+                        all_LR  = np.concatenate((all_LR,  batch_LR_phys), axis=0)
+                        all_HR  = np.concatenate((all_HR,  batch_HR_phys), axis=0)
+                        all_SR  = np.concatenate((all_SR,  batch_SR_phys), axis=0)
+
+            except tf.errors.OutOfRangeError:
+                pass
+
+            if not os.path.exists(self.data_out_path):
+                os.makedirs(self.data_out_path)
+
+            np.save(self.data_out_path + '/idx.npy', all_idx)
+            np.save(self.data_out_path + '/dataSR.npy', all_SR)
+            if save_inputs:
+                np.save(self.data_out_path + '/dataIN.npy', all_LR)
+                np.save(self.data_out_path + '/dataGT.npy', all_HR)
+
+        print('Done.')
+
+
+
+
+
+
     def _parse_train_(self, serialized_example, mu_sig=None):
         '''
             Parser data from TFRecords for the models to read in for (pre)training
