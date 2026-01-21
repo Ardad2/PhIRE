@@ -63,3 +63,17 @@ python plot_metric_summary.py
 ls -lh psnr_bar.png chiL2_bar.png
 python plot_euler_curves_mrhr.py
 ls -l *.png
+clear
+exit
+cd /work
+ls
+python -V
+python -c "import tensorflow as tf; print(tf.__version__)"
+python run_paired_wind_mr_hr.py
+python run_paired_wind_mr_hr_cnn.py
+python quick_figs.py
+python topo_euler_eval_container.py
+python plot_euler_curves_mrhr.py
+python plot_metric_summary.py
+ls -1 figs_quick/*.png topo_euler_results_mrhr.csv euler_curve_* psnr_bar.png
+exit
