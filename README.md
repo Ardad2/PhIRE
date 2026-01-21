@@ -1,3 +1,11 @@
+# 1) Install + start Docker Desktop (must be running)
+docker info >/dev/null
+
+# 2) Run Phase A in the pinned TF1.15 container
+chmod +x reproduce_phase_a_docker.sh
+./reproduce_phase_a_docker.sh
+
+
 ## Physics-Informed Resolution-Enhancing GANs (PhIRE GANs)
 
 This repository contains code for the model described in 
