@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN python -m pip install --no-cache-dir --upgrade pip==24.0 setuptools wheel
 
+RUN python -m pip install --no-cache-dir \
     numpy==1.26.4 \
     scipy==1.11.4 \
     pandas==2.2.2 \
