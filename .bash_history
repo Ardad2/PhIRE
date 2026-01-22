@@ -77,3 +77,16 @@ python plot_euler_curves_mrhr.py
 python plot_metric_summary.py
 ls -1 figs_quick/*.png topo_euler_results_mrhr.csv euler_curve_* psnr_bar.png
 exit
+python plot_metric_summary.py
+ls -1 chi_bar.png
+clear
+clear
+python plot_metric_summary.py
+ls -1 chi_bar.png
+clear
+clear
+python plot_metric_summary.py
+clear
+python plot_metric_summary.py
+clear
+python plot_metric_summary.py
