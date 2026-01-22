@@ -84,14 +84,26 @@ def pd_from_field_superlevel(field01: np.ndarray):
                 diags[dim].append((float(b), float(d)))
     return diags
 
+
+def _as_diag(d):
+    a = np.asarray(d, dtype=np.float64)
+    if a.size == 0:
+        return np.empty((0, 2), dtype=np.float64)
+    return a.reshape(-1, 2)
+
+
 def distances(diag_a, diag_b):
     """
     Returns (w1, w2, bottleneck) for two diagrams (list of (b,d)).
     """
+
+    A = _as_diag(diag_a)
+    B = _as_diag(diag_b)
+
     # Gudhi expects list[(b,d)]
-    w1 = float(wasserstein_distance(diag_a, diag_b, order=1, internal_p=2))
-    w2 = float(wasserstein_distance(diag_a, diag_b, order=2, internal_p=2))
-    bn = float(bottleneck_distance(diag_a, diag_b))
+    w1 = float(wasserstein_distance(A, B, order=1, internal_p=2))
+    w2 = float(wasserstein_distance(A, B, order=2, internal_p=2))
+    bn = float(bottleneck_distance(A, B))
     return w1, w2, bn
 
 
