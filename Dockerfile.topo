@@ -1,0 +1,27 @@
+#Dockerfile.topo
+FROM python:3.10.13-slim-bullseye
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Adding minimal deps for basics (numpy/scipy/matplotlib)
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+#Pin the versions.
+
+RUN python -m pip install --no-cache-dir --upgrade pip==24.0 setuptools wheel
+
+    numpy==1.26.4 \
+    scipy==1.11.4 \
+    pandas==2.2.2 \
+    matplotlib==3.8.4 \
+    scikit-image==0.22.0 \
+    POT==0.9.3 \
+    gudhi==3.9.0
+
+WORKDIR /work
