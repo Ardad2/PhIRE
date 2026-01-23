@@ -178,13 +178,16 @@ def main():
             gt2 = gt_mag[i]
             sr2 = sr_mag[i]
 
-            # Bicubic baseline from MR input mag -> resize to HR
-            mr2 = in_mag[i]
-            bic2 = bicubic_resize_to(
-                target_hw=gt2.shape,
-                src_hw=mr2.shape,
-                src_field=mr2
-            )
+            # --- Bicubic baseline: resize u and v separately, then magnitude ---
+            mr_uv2 = in_uv[i]          # shape (Hm,Wm,2) because _to_uv_last made N,H,W,2
+            mr_u = mr_uv2[..., 0]
+            mr_v = mr_uv2[..., 1]
+
+            bic_u = bicubic_resize_to(gt2.shape, mr_u.shape, mr_u)
+            bic_v = bicubic_resize_to(gt2.shape, mr_v.shape, mr_v)
+
+            bic2 = np.sqrt(bic_u * bic_u + bic_v * bic_v)
+
 
             # Normalize SR and BIC using GT min/max (pairwise)
             gt_n, sr_n, mn, mx = normalize_pair(gt2, sr2)
