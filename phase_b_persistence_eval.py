@@ -91,14 +91,27 @@ def _as_diag(d):
         return np.empty((0, 2), dtype=np.float64)
     return a.reshape(-1, 2)
 
+def prune_diag(diag, min_pers=1e-3, max_pts=300):
+    a = np.asarray(diag, dtype=np.float64).reshape(-1, 2)
+    if a.size == 0:
+        return np.empty((0, 2), dtype=np.float64)
+    pers = np.abs(a[:, 1] - a[:, 0])
+    a = a[pers >= min_pers]
+    if a.shape[0] > max_pts:
+        pers = np.abs(a[:, 1] - a[:, 0])
+        idx = np.argsort(pers)[::-1][:max_pts]
+        a = a[idx]
+    return a
+
+
 
 def distances(diag_a, diag_b):
     """
     Returns (w1, w2, bottleneck) for two diagrams (list of (b,d)).
     """
 
-    A = _as_diag(diag_a)
-    B = _as_diag(diag_b)
+    A = prune_diag(diag_a, min_pers=1e-3, max_pts=300)
+    B = prune_diag(diag_b, min_pers=1e-3, max_pts=300)
 
     # Gudhi expects list[(b,d)]
     w1 = float(wasserstein_distance(A, B, order=1, internal_p=2))
