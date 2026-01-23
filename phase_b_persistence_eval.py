@@ -178,7 +178,7 @@ def main():
             gt2 = gt_mag[i]
             sr2 = sr_mag[i]
 
-            # --- Bicubic baseline: resize u and v separately, then magnitude ---
+            # Bicubic baseline: resize u and v separately, then magnitude
             mr_uv2 = in_uv[i]          # shape (Hm,Wm,2) because _to_uv_last made N,H,W,2
             mr_u = mr_uv2[..., 0]
             mr_v = mr_uv2[..., 1]

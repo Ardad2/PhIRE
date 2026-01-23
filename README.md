@@ -1,3 +1,5 @@
+Note for Apple Silicon: the topology container must be built/run as linux/amd64 since gudhi wheels may not be avaliable for linux/arm64.
+
 # 1) Install + start Docker Desktop (must be running)
 docker info >/dev/null
 

@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PLATFORM="${PLATFORM:-linux/amd64}"
+TF_PLATFORM="${TF_PLATFORM:-linux/amd64}"
+TOPO_PLATFORM="${TOPO_PLATFORM:-linux/amd64}"
 
 echo "== Phase B: SR generation (TF1.15.5 container) =="
 docker run -it --rm \
-  --platform "${PLATFORM}" \
+  --platform "${TF_PLATFORM}" \
   -u "$(id -u)":"$(id -g)" \
   -e HOME=/work \
   -e PIP_CACHE_DIR=/work/.cache/pip \
@@ -24,7 +25,7 @@ docker run -it --rm \
 
 echo "== Phase B: Topology container build (Gudhi) =="
 docker buildx build \
-  --platform "${PLATFORM}" \
+  --platform "${TOPO_PLATFORM}" \
   -f Dockerfile.topo \
   -t phire-topo:phaseb \
   --load \
@@ -32,7 +33,7 @@ docker buildx build \
 
 echo "== Phase B: Persistence eval + plots (topology container) =="
 docker run -it --rm \
-  --platform "${PLATFORM}" \
+  --platform "${TOPO_PLATFORM}" \
   -u "$(id -u)":"$(id -g)" \
   -e HOME=/work \
   -v "$PWD":/work \
