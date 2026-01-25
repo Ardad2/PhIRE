@@ -14,21 +14,31 @@ docker buildx version
 
 Runs the Phase A pipeline in a pinned TF1.15 container.
 
+It generates:
+
+* SR outputs under data_out
+* Qualitative figures under figs_quick/
+* Euler-curve plots in the repo root.
+
 ```bash
 chmod +x reproduce_phase_a_docker.sh
 ./reproduce_phase_a_docker.sh
 ```
 
 The expected outputs:
-* figs_quick/*.png
-* Euler curve plots such as euler_curve_speed_mrhr.png
-* CSVs.
+* figs_quick/error_*.png, figs_quick/triptych_*.png
+* euler_curve_speed_mrhr.png
+* euler_curve_absdiff_speed_mrhr.png
+* topo_euler_results_mrhr.csv
 
 ## Phase B.1 (Persistence Diagrams + Wasserstein/Bottleneck)
 Runs:
 1. SR generation (TF1.15.5 container)
-2. Topology container build (GUDHI + POT)
+    1. data_out/wind_mrhr_gan/ and data_out/wind_mrhr_cnn/
+2. Topology container build (Dockerfile.topo: GUDHI + POT etc.)
 3. Persistence evaluation + Plots
+    1. phase_b_persistence_eval.py -> phase_b_persistence_results.csv
+    2. plot_phase_b_summary.py -> figures in figs_phase_b/
 ```bash
 chmod +x reproduce_phase_b.sh
 TF_PLATFORM=linux/amd64 TOPO_PLATFORM=linux/amd64 ./reproduce_phase_b.sh
@@ -37,7 +47,10 @@ Expected outputs:
 * phase_b_persistence_results.csv
 * figs_phase_b/bar_mean_w1_pd0.png
 * figs_phase_b/bar_mean_w1_pd1.png
-* figs_phase_b/scatter_psnr_w1_pd*_*.png
+* figs_phase_b/scatter_psnr_w1_pd0_CNN_MRHR.png
+* figs_phase_b/scatter_psnr_w1_pd0_GAN_MRHR.png
+* figs_phase_b/scatter_psnr_w1_pd1_CNN_MRHR.png
+* figs_phase_b/scatter_psnr_w1_pd1_GAN_MRHR.png
 
 To keep in mind:
 * TF warnings due to deprecated TF1 APIs.
