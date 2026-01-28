@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Default: if running on Apple Silicon, force amd64 for both TF1.15 + gudhi wheels.
-#TF 1.15.5 images are effectively amd64-only and gudhi==3.9.0 isn't avaliable as a pip install for linux/arm64.
 ARCH="$(uname -m)"
 DEFAULT_PLATFORM="linux/amd64"
 TF_PLATFORM="${TF_PLATFORM:-$DEFAULT_PLATFORM}"
@@ -38,6 +36,7 @@ docker buildx build \
   .
 
 echo "== Phase B: Persistence eval + plots (topology container) =="
+rm -rf figs_phase_b
 docker run -it --rm \
   --platform "${TOPO_PLATFORM}" \
   -u "$(id -u)":"$(id -g)" \
@@ -49,11 +48,26 @@ docker run -it --rm \
     set -e
     python -V
     python -c "import gudhi; print(\"gudhi:\", gudhi.__version__)"
+
+    # Always recreate output dir inside container (prevents savefig failures)
+    mkdir -p figs_phase_b
+
     python phase_b_persistence_eval.py \
       --gan_dir data_out/wind_mrhr_gan \
       --cnn_dir data_out/wind_mrhr_cnn \
-      --out_csv phase_b_persistence_results.csv
+      --out_csv phase_b_persistence_results.csv \
+      --fields speed \
+      --min_pers 1e-2 \
+      --max_pts 120 \
+      --patch 160 \
+      --stride 160 \
+      --w2_audit_every 3
+
+    # Recreate again just in case anything nuked it
+    mkdir -p figs_phase_b
     python plot_phase_b_summary.py
+
     echo "DONE. Key outputs:"
-    ls -1 phase_b_persistence_results.csv figs_phase_b/*.png
+    ls -1 phase_b_persistence_results.csv figs_phase_b/*.png figs_phase_b/*.csv
   '
+
