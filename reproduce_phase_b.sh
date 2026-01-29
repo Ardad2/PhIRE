@@ -37,10 +37,13 @@ docker buildx build \
 
 echo "== Phase B: Persistence eval + plots (topology container) =="
 rm -rf figs_phase_b
+mkdir -p figs_phase_b
+
 docker run -it --rm \
   --platform "${TOPO_PLATFORM}" \
   -u "$(id -u)":"$(id -g)" \
   -e HOME=/work \
+  -e PHIRE_OUTDIR=/work/figs_phase_b \
   -v "$PWD":/work \
   -w /work \
   phire-topo:phaseb \
@@ -49,8 +52,7 @@ docker run -it --rm \
     python -V
     python -c "import gudhi; print(\"gudhi:\", gudhi.__version__)"
 
-    # Always recreate output dir inside container (prevents savefig failures)
-    mkdir -p figs_phase_b
+    mkdir -p /work/figs_phase_b
 
     python phase_b_persistence_eval.py \
       --gan_dir data_out/wind_mrhr_gan \
@@ -63,11 +65,12 @@ docker run -it --rm \
       --stride 160 \
       --w2_audit_every 3
 
-    # Recreate again just in case anything nuked it
-    mkdir -p figs_phase_b
+    mkdir -p /work/figs_phase_b
     python plot_phase_b_summary.py
 
-    echo "DONE. Key outputs:"
-    ls -1 phase_b_persistence_results.csv figs_phase_b/*.png figs_phase_b/*.csv
-  '
+    # Build professor-ready PDF brief
+    python make_phase_b_summary.py
 
+    echo "DONE. Key outputs:"
+    ls -1 /work/phase_b_persistence_results.csv /work/figs_phase_b/*.png /work/figs_phase_b/*.csv /work/figs_phase_b/*.pdf
+  '

@@ -1,16 +1,21 @@
 from pathlib import Path
+import os
 import re
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 CSV = "phase_b_persistence_results.csv"
-OUTDIR = Path("figs_phase_b")
 
-def ensure_outdir():
-    OUTDIR.mkdir(parents=True, exist_ok=True)
+# Use absolute path inside the container (most robust on Docker Desktop)
+OUTDIR = Path(os.environ.get("PHIRE_OUTDIR", "/work/figs_phase_b"))
 
-ensure_outdir()
+def savefig(path: Path):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)  # ensure directory exists RIGHT NOW
+    plt.tight_layout()
+    plt.savefig(str(path), dpi=200)
+    plt.close()
 
 df = pd.read_csv(CSV)
 runs = sorted(df["run"].unique())
@@ -32,12 +37,6 @@ def mean_std(x):
     if len(x) <= 1:
         return float(np.mean(x)) if len(x) else float("nan"), 0.0
     return float(np.mean(x)), float(np.std(x, ddof=1))
-
-def savefig(path: Path):
-    ensure_outdir()
-    plt.tight_layout()
-    plt.savefig(path, dpi=200)
-    plt.close()
 
 def scatter_plots(field):
     for run in runs:
@@ -142,7 +141,7 @@ def make_summary(field):
         })
 
     summary = pd.DataFrame(summary_rows)
-    ensure_outdir()
+    (OUTDIR / "dummy").parent.mkdir(parents=True, exist_ok=True)
     summary.to_csv(OUTDIR / f"phase_b_summary_stats_{field}.csv", index=False)
     return summary
 
@@ -171,7 +170,6 @@ def bar_plots(field, summary):
     plt.ylabel("PSNR (dB)")
     savefig(OUTDIR / f"bar_mean_psnr_{field}.png")
 
-    # W2 bars only if some values exist
     if np.isfinite(summary["w2_pd0_mean"]).any():
         plt.figure(figsize=(7.8, 4.2))
         plt.bar(x, summary["w2_pd0_mean"].values, yerr=summary["w2_pd0_std"].values, capsize=4)
