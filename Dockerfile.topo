@@ -1,28 +1,55 @@
-#Dockerfile.topo
+# Dockerfile.topo
+# Multi-arch (amd64/arm64) topo environment using micromamba + conda-forge
+# Works on Mac (Apple Silicon) and Spark (aarch64/arm64) without changing scripts.
+
 FROM python:3.10.13-slim-bullseye
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Adding minimal deps for basics (numpy/scipy/matplotlib)
+# Where micromamba/conda env will live
+ENV MAMBA_ROOT_PREFIX=/opt/conda
+ENV PATH=${MAMBA_ROOT_PREFIX}/bin:${PATH}
+
+ARG TARGETARCH
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    git \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    bzip2 \
+    git \
+    build-essential \
+    bash \
+  && rm -rf /var/lib/apt/lists/*
 
-#Pin the versions.
+# Install micromamba for the target architecture (BuildKit/buildx provides TARGETARCH)
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64)  MAMBA_ARCH="linux-64" ;; \
+      arm64)  MAMBA_ARCH="linux-aarch64" ;; \
+      *) echo "Unsupported TARGETARCH=${TARGETARCH}" && exit 1 ;; \
+    esac; \
+    curl -Ls "https://micro.mamba.pm/api/micromamba/${MAMBA_ARCH}/latest" \
+      | tar -xj -C /usr/local/bin --strip-components=1 bin/micromamba; \
+    chmod +x /usr/local/bin/micromamba
 
-RUN python -m pip install --no-cache-dir --upgrade pip==24.0 setuptools wheel
+# Create a conda-forge env with GUDHI + deps (reliable on amd64 + arm64)
+RUN micromamba create -y -n topo -c conda-forge \
+    python=3.10 \
+    numpy=1.26.4 \
+    scipy=1.11.4 \
+    pandas=2.2.2 \
+    matplotlib=3.8.4 \
+    scikit-image=0.22.0 \
+    pot=0.9.3 \
+    gudhi=3.9.0 \
+  && micromamba clean -a -y
 
-RUN python -m pip install --no-cache-dir \
-    numpy==1.26.4 \
-    scipy==1.11.4 \
-    pandas==2.2.2 \
-    matplotlib==3.8.4 \
-    scikit-image==0.22.0 \
-    POT==0.9.3 \
-    gudhi==3.9.0
+# Use env by default
+ENV CONDA_DEFAULT_ENV=topo
+ENV PATH=${MAMBA_ROOT_PREFIX}/envs/topo/bin:${PATH}
+
+# Quick sanity check during build
+RUN python -c "import numpy, scipy, pandas, matplotlib, skimage; import gudhi; import ot; print('OK topo env:', gudhi.__version__)"
 
 WORKDIR /work
