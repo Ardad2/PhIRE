@@ -2,75 +2,25 @@
 set -euo pipefail
 
 ARCH="$(uname -m)"
-DEFAULT_PLATFORM="linux/amd64"
+
+# Map uname arch -> docker platform
+case "${ARCH}" in
+  x86_64)  DEFAULT_PLATFORM="linux/amd64" ;;
+  aarch64|arm64) DEFAULT_PLATFORM="linux/arm64" ;;
+  *)
+    echo "Unknown arch: ${ARCH}. Defaulting to linux/amd64 (override with TF_PLATFORM/TOPO_PLATFORM)."
+    DEFAULT_PLATFORM="linux/amd64"
+    ;;
+esac
+
+# Allow overrides
 TF_PLATFORM="${TF_PLATFORM:-$DEFAULT_PLATFORM}"
 TOPO_PLATFORM="${TOPO_PLATFORM:-$DEFAULT_PLATFORM}"
 
 echo "Host arch: ${ARCH}"
+echo "Default platform: ${DEFAULT_PLATFORM}"
 echo "TF_PLATFORM: ${TF_PLATFORM}"
 echo "TOPO_PLATFORM: ${TOPO_PLATFORM}"
 
 echo "== Phase B: SR generation (TF1.15.5 container) =="
-docker run -it --rm \
-  --platform "${TF_PLATFORM}" \
-  -u "$(id -u)":"$(id -g)" \
-  -e HOME=/work \
-  -e PIP_CACHE_DIR=/work/.cache/pip \
-  -v "$PWD":/work \
-  -w /work \
-  tensorflow/tensorflow:1.15.5-py3 \
-  bash -lc '
-    set -e
-    python -V
-    python -c "import tensorflow as tf; print(tf.__version__)"
-    python run_paired_wind_mr_hr.py
-    python run_paired_wind_mr_hr_cnn.py
-  '
-
-echo "== Phase B: Topology container build (Gudhi) =="
-docker buildx build \
-  --platform "${TOPO_PLATFORM}" \
-  -f Dockerfile.topo \
-  -t phire-topo:phaseb \
-  --load \
-  .
-
-echo "== Phase B: Persistence eval + plots (topology container) =="
-rm -rf figs_phase_b
-mkdir -p figs_phase_b
-
-docker run -it --rm \
-  --platform "${TOPO_PLATFORM}" \
-  -u "$(id -u)":"$(id -g)" \
-  -e HOME=/work \
-  -e PHIRE_OUTDIR=/work/figs_phase_b \
-  -v "$PWD":/work \
-  -w /work \
-  phire-topo:phaseb \
-  bash -lc '
-    set -e
-    python -V
-    python -c "import gudhi; print(\"gudhi:\", gudhi.__version__)"
-
-    mkdir -p /work/figs_phase_b
-
-    python phase_b_persistence_eval.py \
-      --gan_dir data_out/wind_mrhr_gan \
-      --cnn_dir data_out/wind_mrhr_cnn \
-      --out_csv phase_b_persistence_results.csv \
-      --fields speed \
-      --min_pers 1e-2 \
-      --max_pts 120 \
-      --patch 160 \
-      --stride 160 \
-      --w2_audit_every 3
-
-    mkdir -p /work/figs_phase_b
-    python plot_phase_b_summary.py
-
-    # Build professor-ready PDF brief
-    python make_phase_b_summary.py
-
-    echo "DONE. Key outputs:"
-    ls -1 /work/phase_b_persistence_results.csv /work/figs_phase_b/*.png /work/figs_phase_b/*.csv /work/figs_phase_b/*.pdf
-  '
+# NOTE: TF 1.15 images are usually
