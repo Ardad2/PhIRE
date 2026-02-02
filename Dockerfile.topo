@@ -36,13 +36,13 @@ RUN set -eux; \
 # Create a conda-forge env with GUDHI + deps (reliable on amd64 + arm64)
 RUN micromamba create -y -n topo -c conda-forge \
     python=3.10 \
-    numpy=1.26.4 \
-    scipy=1.11.4 \
-    pandas=2.2.2 \
-    matplotlib=3.8.4 \
-    scikit-image=0.22.0 \
-    pot=0.9.6.post1 \
-    gudhi=3.11.0 \
+    numpy \
+    scipy \
+    pandas \
+    matplotlib \
+    scikit-image \
+    pot \
+    gudhi \
   && micromamba clean -a -y
 
 # Use env by default
