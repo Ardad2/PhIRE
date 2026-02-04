@@ -1,0 +1,31 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates curl git build-essential cmake ninja-build \
+    python3 python3-pip python3-dev \
+    libboost-system-dev \
+    libopengl-dev libxcursor-dev libx11-dev libxt-dev \
+    libglu1-mesa-dev libgl1-mesa-dev mesa-common-dev \
+    libvtk9-dev python3-vtk9 \
+  && rm -rf /var/lib/apt/lists/*
+
+# python deps needed to create .vti and load .npy
+RUN python3 -m pip install --no-cache-dir numpy
+
+# Build TTK from source (standalone apps ON)
+WORKDIR /opt
+RUN git clone --depth 1 https://github.com/topology-tool-kit/ttk.git
+WORKDIR /opt/ttk
+RUN mkdir -p build && cd build && cmake .. -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DTTK_BUILD_STANDALONE_APPS=ON \
+    -DTTK_BUILD_PARAVIEW_PLUGINS=OFF \
+    -DTTK_BUILD_VTK_WRAPPERS=ON \
+ && ninja \
+ && ninja install
+
+# Default: show versions
+WORKDIR /work
+CMD ["bash", "-lc", "python3 -c 'import numpy; import vtk; print(\"numpy\", numpy.__version__); print(\"vtk\", vtk.vtkVersion().GetVTKVersion())' && ttkHelloWorldCmd -h | head -n 10"]
+DOCKER
