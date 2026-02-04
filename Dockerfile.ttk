@@ -1,3 +1,4 @@
+DOCKER
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -28,4 +29,3 @@ RUN mkdir -p build && cd build && cmake .. -G Ninja \
 # Default: show versions
 WORKDIR /work
 CMD ["bash", "-lc", "python3 -c 'import numpy; import vtk; print(\"numpy\", numpy.__version__); print(\"vtk\", vtk.vtkVersion().GetVTKVersion())' && ttkHelloWorldCmd -h | head -n 10"]
-DOCKER
