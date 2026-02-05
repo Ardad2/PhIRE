@@ -17,8 +17,14 @@ try:
     from topologytoolkit import ttkPersistenceDiagram, ttkMergeTree
     TTK_AVAILABLE = True
 except ImportError:
-    print("WARNING: TTK Python bindings not available, will use workaround")
     TTK_AVAILABLE = False
+
+if TTK_AVAILABLE:
+    import topologytoolkit
+    print("topologytoolkit loaded from:", topologytoolkit.__file__)
+else:
+    print("WARNING: using fallback heuristics, NOT real TTK")
+
 
 sns.set_style("whitegrid")
 plt.rcParams['figure.figsize'] = (10, 6)
