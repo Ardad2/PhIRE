@@ -34,6 +34,6 @@ RUN mkdir -p build && cd build && cmake .. -G Ninja \
  && ninja && ninja install
 
 # Fix: Add both possible paths where TTK installs Python modules
-ENV PYTHONPATH="/usr/local/lib/python3/dist-packages:/usr/local/lib/python3.12/site-packages:${PYTHONPATH}"
+ENV PYTHONPATH=/usr/local/lib/python3/dist-packages:/usr/local/lib/python3.12/site-packages
 
 WORKDIR /work

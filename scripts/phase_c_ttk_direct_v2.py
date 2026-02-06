@@ -21,6 +21,19 @@ import numpy as np
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy
 
+
+import os, sys
+
+CANDIDATE_PATHS = [
+    "/usr/local/lib/python3/dist-packages",
+    "/usr/local/lib/python3.12/site-packages",
+    "/usr/local/lib/python3.12/dist-packages",
+]
+
+for p in CANDIDATE_PATHS:
+    if os.path.isdir(p) and p not in sys.path:
+        sys.path.insert(0, p)
+
 # --- TTK imports ---
 try:
     import topologytoolkit as ttkpkg
