@@ -22,7 +22,9 @@ def read_vtu(path):
 def extract_pd_metrics(vtu):
     """Extract persistence diagram metrics"""
     # Get PairType array to count by dimension
-    pair_type = vtu.GetCellData().GetArray("PairType")
+
+    pair_type = vtu.GetPointData().GetArray("PairType") or vtu.GetCellData().GetArray("PairType")
+
     if pair_type is None:
         return {'n_pd0': 0, 'n_pd1': 0, 'n_pd2': 0}
     
@@ -37,6 +39,7 @@ def extract_mt_metrics(vtu):
     """Extract merge tree metrics from port_0"""
     n_nodes = vtu.GetNumberOfPoints()
     n_cells = vtu.GetNumberOfCells()
+    n_branches = vtu.GetNumberOfCells()  # arcs ~ branches
     
     # Count branches (cells with specific types)
     cell_dim = vtu.GetCellData().GetArray("CellDimension")
@@ -89,7 +92,15 @@ def main():
         # Read and extract
         pd_vtu = read_vtu(pd_path)
         mt_vtu = read_vtu(mt_path)
+
+	if pd_vtu is None or vtu.GetNumberOfPoints() == 0:
+   		 raise RuntimeError(f"Failed to read or empty dataset: {path}")
+
         
+
+	if mt_vtu is None or vtu.GetNumberOfPoints() == 0:
+    		raise RuntimeError(f"Failed to read or empty dataset: {path}")
+
         pd_metrics = extract_pd_metrics(pd_vtu)
         mt_metrics = extract_mt_metrics(mt_vtu)
         
