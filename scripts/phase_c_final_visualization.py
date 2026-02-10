@@ -29,7 +29,7 @@ ax1.set_xlabel('Sample')
 
 ax2 = fig.add_subplot(gs[0, 1])
 ax2.bar(pd_dist['sample'], pd_dist['pd1_distance'], alpha=0.7, color='C1')
-ax2.set_title('PD1 Distance (Loops) ⭐', fontweight='bold')
+ax2.set_title('PD1 Distance (Loops)⭐', fontweight='bold')
 ax2.set_ylabel('Distance')
 ax1.set_xlabel('Sample')
 
@@ -55,7 +55,7 @@ ax5.set_xlabel('Sample')
 # Composite distance
 ax6 = fig.add_subplot(gs[2, :])
 ax6.bar(mt_dist['sample'], mt_dist['mt_composite_distance'], alpha=0.7, color='C5')
-ax6.set_title('MT Composite Distance (Normalized) ⭐', fontweight='bold', fontsize=14)
+ax6.set_title('MT Composite Distance (Normalized)⭐', fontweight='bold', fontsize=14)
 ax6.set_ylabel('Distance (0-1 scale)', fontsize=12)
 ax6.set_xlabel('Sample', fontsize=12)
 ax6.axhline(y=mt_sum['composite_distance_mean'].values[0], 
