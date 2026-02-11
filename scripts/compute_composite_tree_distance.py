@@ -1,149 +1,160 @@
 #!/usr/bin/env python3
 """
-Compute composite merge tree distance from multiple structural metrics.
+Compute a composite MERGE-TREE structural dissimilarity proxy from TTK-derived metrics.
 
-This is a principled approach when direct tree edit distance is unavailable.
-The composite distance captures multiple aspects of tree structure.
+Important framing:
+- This is a proxy / index, not a canonical merge-tree Wasserstein/edit distance.
+- We compute BOTH:
+  (1) mt_composite_minmax: min-max normalized within the evaluated set (relative rank)
+  (2) mt_composite_rel: per-sample relative composite (comparable across datasets)
 
-Reference: Yan et al. "Scalar field comparison with topological descriptors" (2011)
+Inputs:
+- ttk_outputs/phase_c_results.csv with columns:
+  sample, dataset, mt_nodes, mt_arcs, mt_branches
+Where dataset includes 'GT' and one or more methods (e.g., 'SR', 'BICUBIC', 'CNN').
+
+Outputs:
+- ttk_outputs/direct/mt_composite_distances.csv
+- ttk_outputs/direct/mt_composite_summary.csv
 """
-import pandas as pd
-import numpy as np
-from pathlib import Path
 
-def normalize_metric(values):
-    """Min-max normalization to [0,1] range"""
-    vmin, vmax = values.min(), values.max()
-    if vmax == vmin:
-        return np.zeros_like(values)
+from pathlib import Path
+import numpy as np
+import pandas as pd
+
+EPS = 1e-12
+
+def minmax(values: np.ndarray) -> np.ndarray:
+    vmin, vmax = np.min(values), np.max(values)
+    if vmax <= vmin + EPS:
+        return np.zeros_like(values, dtype=float)
     return (values - vmin) / (vmax - vmin)
 
-def composite_tree_distance(gt_row, sr_row):
-    """
-    Compute composite distance using multiple tree properties.
-    
-    This captures:
-    - Size differences (nodes)
-    - Complexity differences (branches)
-    - Structural differences (arcs/branches ratio)
-    
-    Each component is normalized and weighted equally.
-    """
-    # Extract metrics
-    gt_nodes = gt_row['mt_nodes'].values[0]
-    sr_nodes = sr_row['mt_nodes'].values[0]
-    gt_branches = gt_row['mt_branches'].values[0]
-    sr_branches = sr_row['mt_branches'].values[0]
-    gt_arcs = gt_row['mt_arcs'].values[0]
-    sr_arcs = sr_row['mt_arcs'].values[0]
-    
-    # Component 1: Node count difference (size)
-    node_diff = abs(sr_nodes - gt_nodes)
-    
-    # Component 2: Branch count difference (complexity)
-    branch_diff = abs(sr_branches - gt_branches)
-    
-    # Component 3: Structural ratio difference
-    # (branches/nodes ratio captures tree "bushiness")
-    gt_ratio = gt_branches / gt_nodes if gt_nodes > 0 else 0
-    sr_ratio = sr_branches / sr_nodes if sr_nodes > 0 else 0
-    ratio_diff = abs(sr_ratio - gt_ratio) * min(gt_nodes, sr_nodes)
-    
+def safe_div(a: float, b: float) -> float:
+    return a / (b + EPS)
+
+def compute_components(gt_row: pd.Series, m_row: pd.Series) -> dict:
+    """Return absolute + relative components."""
+    gt_nodes = float(gt_row["mt_nodes"])
+    gt_br   = float(gt_row["mt_branches"])
+    gt_arcs = float(gt_row["mt_arcs"])
+
+    m_nodes = float(m_row["mt_nodes"])
+    m_br    = float(m_row["mt_branches"])
+    m_arcs  = float(m_row["mt_arcs"])
+
+    # Absolute differences (scale-dependent)
+    abs_nodes = abs(m_nodes - gt_nodes)
+    abs_br    = abs(m_br - gt_br)
+    abs_arcs  = abs(m_arcs - gt_arcs)
+
+    # Unitless “shape/bushiness” difference
+    gt_ratio = safe_div(gt_br, gt_nodes) if gt_nodes > 0 else 0.0
+    m_ratio  = safe_div(m_br, m_nodes) if m_nodes > 0 else 0.0
+    abs_ratio = abs(m_ratio - gt_ratio)
+
+    # Relative (dataset-comparable) differences
+    rel_nodes = safe_div(abs_nodes, gt_nodes) if gt_nodes > 0 else 0.0
+    rel_br    = safe_div(abs_br, gt_br) if gt_br > 0 else 0.0
+    rel_arcs  = safe_div(abs_arcs, gt_arcs) if gt_arcs > 0 else 0.0
+    rel_ratio = abs_ratio  # already unitless
+
     return {
-        'node_distance': node_diff,
-        'branch_distance': branch_diff,
-        'structure_distance': ratio_diff,
+        "node_distance": abs_nodes,
+        "branch_distance": abs_br,
+        "arc_distance": abs_arcs,
+        "ratio_distance": abs_ratio,
+        "rel_nodes": rel_nodes,
+        "rel_branches": rel_br,
+        "rel_arcs": rel_arcs,
+        "rel_ratio": rel_ratio,
     }
 
 def main():
-    print("="*80)
-    print("COMPOSITE MERGE TREE DISTANCE")
-    print("="*80)
-    print("\nMethod: Multi-component structural distance")
-    print("Based on real TTK-computed tree metrics\n")
-    
-    # Load existing results
-    df = pd.read_csv('ttk_outputs/phase_c_results.csv')
-    
-    samples = df['sample'].unique()
-    results = []
-    
-    for sample in sorted(samples):
-        gt = df[(df['sample'] == sample) & (df['dataset'] == 'GT')]
-        sr = df[(df['sample'] == sample) & (df['dataset'] == 'SR')]
-        
-        if len(gt) == 0 or len(sr) == 0:
+    print("=" * 80)
+    print("COMPOSITE MERGE-TREE STRUCTURAL DISSIMILARITY (PROXY)")
+    print("=" * 80)
+
+    df = pd.read_csv("ttk_outputs/phase_c_results.csv")
+
+    required = {"sample", "dataset", "mt_nodes", "mt_arcs", "mt_branches"}
+    missing = required - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns: {sorted(missing)}")
+
+    methods = sorted([d for d in df["dataset"].unique() if d != "GT"])
+    if not methods:
+        raise ValueError("No methods found besides 'GT' in dataset column.")
+
+    rows = []
+    for sample in sorted(df["sample"].unique()):
+        gt = df[(df["sample"] == sample) & (df["dataset"] == "GT")]
+        if len(gt) != 1:
             continue
-        
-        # Compute distances
-        dist = composite_tree_distance(gt, sr)
-        
-        result = {
-            'sample': sample,
-            **dist
-        }
-        results.append(result)
-        
-        print(f"{sample}: node={dist['node_distance']:.0f}, "
-              f"branch={dist['branch_distance']:.0f}, "
-              f"structure={dist['structure_distance']:.2f}")
-    
-    # Convert to DataFrame for normalization
-    res_df = pd.DataFrame(results)
-    
-    # Normalize each component to [0,1]
-    node_norm = normalize_metric(res_df['node_distance'].values)
-    branch_norm = normalize_metric(res_df['branch_distance'].values)
-    struct_norm = normalize_metric(res_df['structure_distance'].values)
-    
-    # Composite distance = weighted sum (equal weights)
-    res_df['mt_composite_distance'] = (node_norm + branch_norm + struct_norm) / 3
-    
-    # Save
-    outdir = Path('ttk_outputs/direct')
-    
-    csv_path = outdir / 'mt_composite_distances.csv'
-    res_df.to_csv(csv_path, index=False)
-    print(f"\n✓ Saved: {csv_path}")
-    
-    # Summary
-    summary = {
-        'node_distance_mean': res_df['node_distance'].mean(),
-        'node_distance_std': res_df['node_distance'].std(),
-        'branch_distance_mean': res_df['branch_distance'].mean(),
-        'branch_distance_std': res_df['branch_distance'].std(),
-        'structure_distance_mean': res_df['structure_distance'].mean(),
-        'structure_distance_std': res_df['structure_distance'].std(),
-        'composite_distance_mean': res_df['mt_composite_distance'].mean(),
-        'composite_distance_std': res_df['mt_composite_distance'].std(),
-    }
-    
-    sum_df = pd.DataFrame([summary])
-    sum_path = outdir / 'mt_composite_summary.csv'
-    sum_df.to_csv(sum_path, index=False)
-    print(f"✓ Saved: {sum_path}")
-    
-    print("\n" + "="*80)
-    print("SUMMARY")
-    print("="*80)
-    print(f"\nNode distance: {summary['node_distance_mean']:.1f} ± {summary['node_distance_std']:.1f}")
-    print(f"Branch distance: {summary['branch_distance_mean']:.1f} ± {summary['branch_distance_std']:.1f}")
-    print(f"Structure distance: {summary['structure_distance_mean']:.2f} ± {summary['structure_distance_std']:.2f}")
-    print(f"\nComposite distance: {summary['composite_distance_mean']:.3f} ± {summary['composite_distance_std']:.3f}")
-    
-    print("\n" + "="*80)
-    print("INTERPRETATION")
-    print("="*80)
-    print("\nThis composite distance is:")
-    print("  • Based on real TTK merge tree computations")
-    print("  • Captures size, complexity, and structural differences")
-    print("  • Normalized for fair comparison across components")
-    print("  • Scientifically valid alternative to edit distance")
-    print("\nFor your paper:")
-    print('  "Merge tree dissimilarity quantified via multi-component')
-    print('   structural distance incorporating node counts, branch')
-    print('   complexity, and hierarchical organization"')
-    print("="*80)
+        gt_row = gt.iloc[0]
+
+        for method in methods:
+            m = df[(df["sample"] == sample) & (df["dataset"] == method)]
+            if len(m) != 1:
+                continue
+            m_row = m.iloc[0]
+
+            comps = compute_components(gt_row, m_row)
+            rows.append({"sample": sample, "method": method, **comps})
+
+    res = pd.DataFrame(rows)
+    if res.empty:
+        raise RuntimeError("No (sample, GT, method) pairs found to compare.")
+
+    # Composite (min-max): relative rank within this evaluation set
+    n_norm = minmax(res["node_distance"].to_numpy(dtype=float))
+    b_norm = minmax(res["branch_distance"].to_numpy(dtype=float))
+    r_norm = minmax(res["ratio_distance"].to_numpy(dtype=float))
+    res["mt_composite_minmax"] = (n_norm + b_norm + r_norm) / 3.0
+
+    # Composite (relative): comparable across datasets
+    res["mt_composite_rel"] = (res["rel_nodes"] + res["rel_branches"] + res["rel_ratio"]) / 3.0
+
+    outdir = Path("ttk_outputs/direct")
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    out_csv = outdir / "mt_composite_distances.csv"
+    res.to_csv(out_csv, index=False)
+    print(f"✓ Saved: {out_csv}")
+
+    # Summary by method
+    summary_rows = []
+    for method in methods:
+        sub = res[res["method"] == method].copy()
+        if sub.empty:
+            continue
+        summary_rows.append({
+            "method": method,
+
+            "node_distance_mean": sub["node_distance"].mean(),
+            "node_distance_std": sub["node_distance"].std(),
+
+            "branch_distance_mean": sub["branch_distance"].mean(),
+            "branch_distance_std": sub["branch_distance"].std(),
+
+            "ratio_distance_mean": sub["ratio_distance"].mean(),
+            "ratio_distance_std": sub["ratio_distance"].std(),
+
+            "mt_composite_minmax_mean": sub["mt_composite_minmax"].mean(),
+            "mt_composite_minmax_std": sub["mt_composite_minmax"].std(),
+
+            "mt_composite_rel_mean": sub["mt_composite_rel"].mean(),
+            "mt_composite_rel_std": sub["mt_composite_rel"].std(),
+        })
+
+    sum_df = pd.DataFrame(summary_rows)
+    out_sum = outdir / "mt_composite_summary.csv"
+    sum_df.to_csv(out_sum, index=False)
+    print(f"✓ Saved: {out_sum}")
+
+    print("\nNotes for reporting:")
+    print("- mt_composite_minmax is a within-run rank (depends on what samples/methods are included).")
+    print("- mt_composite_rel is per-sample relative and is comparable across datasets.")
 
 if __name__ == "__main__":
     main()
