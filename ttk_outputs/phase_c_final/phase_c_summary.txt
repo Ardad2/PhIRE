@@ -1,39 +1,26 @@
 ================================================================================
-PHASE C: TOPOLOGICAL DISTANCE ANALYSIS
+PHASE C: TOPOLOGICAL DIFFERENCE ANALYSIS (DEFENSIBLE PROXIES)
 ================================================================================
 
-METHOD:
-- Persistence Diagram distances: Feature count differences
-- Merge Tree distances: Multi-component structural distance
-- Based on real TTK computations (not heuristics)
+METHODS / DEFINITIONS:
+- PD distances: feature-count differences vs GT (Δ#components, Δ#loops)
+  (Not bottleneck/Wasserstein; no distributional-distance claim.)
+- MT distance: composite structural dissimilarity index (proxy)
+  built from real TTK merge-tree metrics (nodes/branches) + organization ratio.
+  Report mt_composite_rel for cross-dataset comparability.
 
-RESULTS:
+SUMMARY BY METHOD (mean ± std across samples):
 --------------------------------------------------------------------------------
-PD0 distance: 0.40 ± 0.89
-PD1 distance: 0.20 ± 0.45
-
-MT node distance: 6819.6 ± 2176.4
-MT branch distance: 1136.4 ± 362.5
-MT structure distance: 0.311 ± 0.116
-MT composite distance: 0.653 ± 0.385
-
-================================================================================
-INTERPRETATION:
-================================================================================
-
-1. GLOBAL TOPOLOGY (PD1): PRESERVED
-   - Loop distance: 0.20 (very small)
-   - GAN maintains global topological features
-
-2. HIERARCHICAL STRUCTURE (MT): DIFFERENT
-   - Composite distance: 0.653 (moderate)
-   - SR has ~1136 more branches
-   - SR has ~6820 more nodes
-   - GAN creates richer hierarchical organization
-
-3. SCIENTIFIC CONCLUSION:
-   The GAN preserves 'what' (global topology) but changes 'how'
-   (hierarchical organization). This suggests the SR captures
-   plausible fine-scale structure not present in GT.
+GAN:
+  PD1 Δcount: 0.20 ± 0.45
+  MT composite_rel: 0.357 ± 0.123
+  MT rel_nodes mean: 0.535
+  MT rel_branches mean: 0.535
+  MT rel_ratio mean: 0.000024
 
 ================================================================================
+NOTES:
+================================================================================
+- mt_composite_minmax (if present) is a within-run rank; use mt_composite_rel for reporting.
+- When you add BiCUBIC and CNN rows into phase_c_results.csv (dataset='SR'),
+  re-run compute_composite_tree_distance.py, then re-run this script.
