@@ -1,0 +1,57 @@
++ echo '=== DATE (UTC) ==='
+=== DATE (UTC) ===
++ date -u
+Thu Feb 12 22:21:48 UTC 2026
++ echo
+
++ echo '=== UNAME ==='
+=== UNAME ===
++ uname -a
+Linux 906344fe108c 6.14.0-1013-nvidia #13-Ubuntu SMP PREEMPT_DYNAMIC Wed Oct 29 06:01:19 UTC 2025 x86_64 GNU/Linux
++ uname -m
+x86_64
++ echo
+
++ echo '=== OS RELEASE ==='
+=== OS RELEASE ===
++ cat /etc/os-release
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+NAME="Debian GNU/Linux"
+VERSION_ID="13"
+VERSION="13 (trixie)"
+VERSION_CODENAME=trixie
+DEBIAN_VERSION_FULL=13.3
+ID=debian
+HOME_URL="https://www.debian.org/"
+SUPPORT_URL="https://www.debian.org/support"
+BUG_REPORT_URL="https://bugs.debian.org/"
++ echo
+
++ echo '=== PYTHON ==='
+=== PYTHON ===
++ python --version
+Python 3.11.14
++ command -v python
+/usr/local/bin/python
++ python -c 'import platform; print(platform.platform())'
+Linux-6.14.0-1013-nvidia-x86_64-with-glibc2.41
++ echo
+
++ echo '=== PIP FREEZE (TOP) ==='
+=== PIP FREEZE (TOP) ===
++ head -n 200
++ python -m pip freeze
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.61.1
+kiwisolver==1.4.9
+matplotlib==3.10.8
+numpy==2.4.2
+packaging==26.0
+pillow==12.1.1
+pyparsing==3.3.2
+python-dateutil==2.9.0.post0
+six==1.17.0
+vtk==9.6.0
++ echo
+
