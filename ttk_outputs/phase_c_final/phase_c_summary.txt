@@ -1,26 +1,9 @@
-================================================================================
-PHASE C: TOPOLOGICAL DIFFERENCE ANALYSIS (DEFENSIBLE PROXIES)
-================================================================================
+Phase C — REAL distances (TTK)
 
-METHODS / DEFINITIONS:
-- PD distances: feature-count differences vs GT (Δ#components, Δ#loops)
-  (Not bottleneck/Wasserstein; no distributional-distance claim.)
-- MT distance: composite structural dissimilarity index (proxy)
-  built from real TTK merge-tree metrics (nodes/branches) + organization ratio.
-  Report mt_composite_rel for cross-dataset comparability.
+Rows computed: 5
+PD distances:  5
+MT distances:  5
 
-SUMMARY BY METHOD (mean ± std across samples):
---------------------------------------------------------------------------------
-GAN:
-  PD1 Δcount: 0.20 ± 0.45
-  MT composite_rel: 0.357 ± 0.123
-  MT rel_nodes mean: 0.535
-  MT rel_branches mean: 0.535
-  MT rel_ratio mean: 0.000024
-
-================================================================================
-NOTES:
-================================================================================
-- mt_composite_minmax (if present) is a within-run rank; use mt_composite_rel for reporting.
-- When you add BiCUBIC and CNN rows into phase_c_results.csv (dataset='SR'),
-  re-run compute_composite_tree_distance.py, then re-run this script.
+[gan]
+  PD  n=5 mean=18.7714 median=17.9383 stdev=6.46585
+  MT  n=5 mean=6.37235 median=5.06386 stdev=2.22311
