@@ -68,10 +68,14 @@ class SampleFiles:
 
 
 def _normalize_name_for_key(name: str) -> str:
+    """Normalize filenames so GT/SR pairing is stable.
+
+    We strip common ParaView/TTK save-data suffixes and file extensions.
+    """
     # Remove common suffixes like .vtu_port_0.vtu etc.
     name = re.sub(r"\.vtu_port_\d+\.vtu$", ".vtu", name)
-    # Strip extension(s)
-    name = re.sub(r"\.vtu$", "", name)
+    # Strip one of the common VTK XML extensions.
+    name = re.sub(r"\.(vtu|vtm|vtmb|vti|vtp)$", "", name)
     return name
 
 
@@ -106,10 +110,51 @@ def parse_label_and_key(path: Path, kind: str) -> Optional[Tuple[str, str]]:
     return label, key
 
 
-def discover_vtu_files(root: Path) -> List[Path]:
+def discover_vtk_files(root: Path) -> List[Path]:
+    """Discover VTK XML files we might read (.vtu/.vtm/.vti/etc.)."""
     if not root.exists():
         return []
-    return sorted([p for p in root.rglob("*.vtu") if p.is_file()] + [p for p in root.rglob("*.vtu_port_*.vtu") if p.is_file()])
+    exts = (".vtu", ".vtm", ".vtmb", ".vti", ".vtp")
+    files = [p for p in root.rglob("*") if p.is_file() and p.suffix in exts]
+    # Also catch ParaView's annoying ".vtu_port_0.vtu" naming.
+    files += [p for p in root.rglob("*.vtu_port_*.vtu") if p.is_file()]
+    return sorted(set(files))
+
+
+def read_data_object(path: Path) -> "vtk.vtkDataObject":
+    """Read a VTK XML file into a vtkDataObject."""
+    ext = path.suffix.lower()
+    if path.name.endswith(".vtu"):
+        r = vtk.vtkXMLUnstructuredGridReader()
+    elif ext in (".vtm", ".vtmb"):
+        r = vtk.vtkXMLMultiBlockDataReader()
+    elif ext == ".vti":
+        r = vtk.vtkXMLImageDataReader()
+    elif ext == ".vtp":
+        r = vtk.vtkXMLPolyDataReader()
+    else:
+        # Best-effort fallback.
+        r = vtk.vtkXMLGenericDataObjectReader()
+    r.SetFileName(str(path))
+    r.Update()
+    out = r.GetOutputDataObject(0)
+    if out is None:
+        raise RuntimeError(f"Failed to read: {path}")
+    return out
+
+
+def read_unstructured_grid(path: Path) -> "vtk.vtkUnstructuredGrid":
+    obj = read_data_object(path)
+    if obj is None or not obj.IsA("vtkUnstructuredGrid"):
+        raise TypeError(f"Expected vtkUnstructuredGrid from {path}, got {type(obj).__name__}")
+    return obj  # type: ignore[return-value]
+
+
+def read_multiblock(path: Path) -> "vtk.vtkMultiBlockDataSet":
+    obj = read_data_object(path)
+    if obj is None or not obj.IsA("vtkMultiBlockDataSet"):
+        raise TypeError(f"Expected vtkMultiBlockDataSet from {path}, got {type(obj).__name__}")
+    return obj  # type: ignore[return-value]
 
 
 def read_unstructured_grid(path: Path) -> "vtk.vtkUnstructuredGrid":
@@ -229,7 +274,7 @@ def compute_pd_distance(pd_gt: Path, pd_sr: Path, debug: bool = False) -> float:
     Compute PD distance between 2 PD VTUs.
 
     Preference order:
-      1) ttkBottleneckDistance (pairwise, two input ports)
+      1) ttkBottleneckDistance (pairwise, **single** multiblock input with 2 PD blocks)
       2) ttkPersistenceDiagramDistanceMatrix (multiblock -> distance matrix)
       3) ttkPersistenceDiagramClustering (multiblock -> distances often in field data)
 
@@ -239,16 +284,58 @@ def compute_pd_distance(pd_gt: Path, pd_sr: Path, debug: bool = False) -> float:
     ug_sr = read_unstructured_grid(pd_sr)
 
     # 1) Bottleneck distance (most direct if available)
+    # NOTE: ttkBottleneckDistance has **one** input port and expects a vtkMultiBlockDataSet
+    # with *at least* two vtkUnstructuredGrid blocks (the 2 persistence diagrams).
     if hasattr(ttk, "ttkBottleneckDistance"):
+        mb_pair = vtk.vtkMultiBlockDataSet()
+        mb_pair.SetNumberOfBlocks(2)
+        mb_pair.SetBlock(0, ug_gt)
+        mb_pair.SetBlock(1, ug_sr)
+
         f = ttk.ttkBottleneckDistance()
-        # Some builds expose SetInputDataObject; others prefer SetInputData
+
+        # Force bottleneck metric ("inf") where possible
+        if hasattr(f, "SetWassersteinMetric"):
+            try:
+                f.SetWassersteinMetric("inf")
+            except Exception:
+                pass
+        elif hasattr(f, "SetWassersteinMetricToInf"):
+            try:
+                f.SetWassersteinMetricToInf()
+            except Exception:
+                pass
+
         if hasattr(f, "SetInputDataObject"):
-            f.SetInputDataObject(0, ug_gt)
-            f.SetInputDataObject(1, ug_sr)
+            f.SetInputDataObject(mb_pair)
         else:
-            f.SetInputData(0, ug_gt)
-            f.SetInputData(1, ug_sr)
+            f.SetInputData(mb_pair)
+
         f.Update()
+
+        # ttkBottleneckDistance stores the distance in the FieldData of output port #1
+        # (the matchings `vtkUnstructuredGrid`) as an array named either
+        # "BottleneckDistance" (if metric is inf) or "WassersteinDistance".
+        match = None
+        try:
+            match = f.GetOutputDataObject(1)
+        except Exception:
+            pass
+        if match is None:
+            try:
+                match = f.GetOutput(1)
+            except Exception:
+                pass
+
+        if match is not None and hasattr(match, "GetFieldData"):
+            fd = match.GetFieldData()
+            if fd is not None:
+                for nm in ("BottleneckDistance", "WassersteinDistance"):
+                    arr = fd.GetArray(nm)
+                    if arr is not None and arr.GetNumberOfTuples() > 0:
+                        return float(arr.GetTuple1(0))
+
+        # Fallback: heuristic extraction (covers odd wrapper variations)
         d = extract_distance_from_algorithm(f, debug=debug)
         if d is not None:
             return float(d)
@@ -298,36 +385,87 @@ def compute_mt_distance(mt_gt: Path, mt_sr: Path, debug: bool = False) -> float:
       1) ttkMergeTreeDistanceMatrix (multiblock -> distance matrix)
       2) ttkMergeTreeClustering (multiblock -> distances in field data)
     """
-    ug_gt = read_unstructured_grid(mt_gt)
-    ug_sr = read_unstructured_grid(mt_sr)
+    mt_gt_obj = read_data_object(mt_gt)
+    mt_sr_obj = read_data_object(mt_sr)
+
+    # ttkMergeTreeDistanceMatrix expects a vtkMultiBlockDataSet where each BLOCK is
+    # itself a vtkMultiBlockDataSet representing a merge tree produced by ttkMergeTree.
+    def as_merge_tree_mb(obj: vtk.vtkDataObject, src: Path) -> vtk.vtkMultiBlockDataSet:
+        if obj is None:
+            raise RuntimeError(f"Failed to read merge tree file: {src}")
+        if obj.IsA("vtkMultiBlockDataSet"):
+            return vtk.vtkMultiBlockDataSet.SafeDownCast(obj)
+        # Fallback: wrap single dataset as a 1-block multiblock.
+        if debug:
+            print(f"[debug] merge tree {src.name} is {obj.GetClassName()} (expected vtkMultiBlockDataSet); wrapping as 1-block multiblock", file=sys.stderr)
+        mb = vtk.vtkMultiBlockDataSet()
+        mb.SetNumberOfBlocks(1)
+        mb.SetBlock(0, obj)
+        return mb
+
+    tree_gt = as_merge_tree_mb(mt_gt_obj, mt_gt)
+    tree_sr = as_merge_tree_mb(mt_sr_obj, mt_sr)
+
+    trees = vtk.vtkMultiBlockDataSet()
+    trees.SetNumberOfBlocks(2)
+    trees.SetBlock(0, tree_gt)
+    trees.SetBlock(1, tree_sr)
+
+    def extract_01_from_table(table: vtk.vtkTable) -> Optional[float]:
+        if table is None or (not table.IsA("vtkTable")):
+            return None
+        if table.GetNumberOfRows() < 2 or table.GetNumberOfColumns() < 2:
+            return None
+        # Tables are stored as columns (vtkAbstractArray). Value at row i, col j.
+        col1 = table.GetColumn(1)
+        if col1 is None or col1.GetNumberOfTuples() < 1:
+            return None
+        try:
+            return float(col1.GetTuple1(0))
+        except Exception:
+            try:
+                return float(col1.GetValue(0))
+            except Exception:
+                return None
 
     if hasattr(ttk, "ttkMergeTreeDistanceMatrix"):
-        mb = vtk.vtkMultiBlockDataSet()
-        mb.SetNumberOfBlocks(2)
-        mb.SetBlock(0, ug_gt)
-        mb.SetBlock(1, ug_sr)
-
         f = ttk.ttkMergeTreeDistanceMatrix()
+        # Use only input port 0 (single list) -> 2x2 matrix. We take entry [0,1].
         if hasattr(f, "SetInputDataObject"):
-            f.SetInputDataObject(mb)
+            f.SetInputDataObject(0, trees)
         else:
-            f.SetInputData(mb)
+            f.SetInputData(0, trees)
         f.Update()
+
+        out0 = None
+        for getter in ("GetOutput", "GetOutputDataObject"):
+            if hasattr(f, getter):
+                try:
+                    out0 = getattr(f, getter)(0)
+                    break
+                except Exception:
+                    pass
+        if out0 is None and hasattr(f, "GetOutput"):
+            try:
+                out0 = f.GetOutput()
+            except Exception:
+                out0 = None
+
+        d01 = extract_01_from_table(out0) if (out0 is not None and out0.IsA("vtkTable")) else None
+        if d01 is not None:
+            return float(d01)
+
+        # fallback: heuristic extractor (may pick wrong entry)
         d = extract_distance_from_algorithm(f, debug=debug)
         if d is not None:
             return float(d)
 
     if hasattr(ttk, "ttkMergeTreeClustering"):
-        mb = vtk.vtkMultiBlockDataSet()
-        mb.SetNumberOfBlocks(2)
-        mb.SetBlock(0, ug_gt)
-        mb.SetBlock(1, ug_sr)
-
         f = ttk.ttkMergeTreeClustering()
         if hasattr(f, "SetInputDataObject"):
-            f.SetInputDataObject(mb)
+            f.SetInputDataObject(trees)
         else:
-            f.SetInputData(mb)
+            f.SetInputData(trees)
         f.Update()
         d = extract_distance_from_algorithm(f, debug=debug)
         if d is not None:
@@ -368,18 +506,18 @@ def build_pairs_from_dirs(
 
     # PD discovery
     if pd_gt and pd_sr:
-        for p in discover_vtu_files(pd_gt):
+        for p in discover_vtk_files(pd_gt):
             lk = parse_label_and_key(p, "pd")
             label = "GT"
             key = lk[1] if lk else _normalize_name_for_key(p.name)
             upsert(label, key, "pd", p)
-        for p in discover_vtu_files(pd_sr):
+        for p in discover_vtk_files(pd_sr):
             lk = parse_label_and_key(p, "pd")
             label = "SR"
             key = lk[1] if lk else _normalize_name_for_key(p.name)
             upsert(label, key, "pd", p)
     elif pd_dir:
-        for p in discover_vtu_files(pd_dir):
+        for p in discover_vtk_files(pd_dir):
             lk = parse_label_and_key(p, "pd")
             if not lk:
                 continue
@@ -388,18 +526,18 @@ def build_pairs_from_dirs(
 
     # MT discovery
     if mt_gt and mt_sr:
-        for p in discover_vtu_files(mt_gt):
+        for p in discover_vtk_files(mt_gt):
             lk = parse_label_and_key(p, "mt")
             label = "GT"
             key = lk[1] if lk else _normalize_name_for_key(p.name)
             upsert(label, key, "mt", p)
-        for p in discover_vtu_files(mt_sr):
+        for p in discover_vtk_files(mt_sr):
             lk = parse_label_and_key(p, "mt")
             label = "SR"
             key = lk[1] if lk else _normalize_name_for_key(p.name)
             upsert(label, key, "mt", p)
     elif mt_dir:
-        for p in discover_vtu_files(mt_dir):
+        for p in discover_vtk_files(mt_dir):
             lk = parse_label_and_key(p, "mt")
             if not lk:
                 continue
