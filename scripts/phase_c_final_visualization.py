@@ -1,163 +1,144 @@
 #!/usr/bin/env python3
 """
-Phase C Visualization for REAL distances computed by compute_composite_tree_distance.py
+Visualize the outputs produced by compute_composite_tree_distance.py
 
-Reads (from --outdir):
-- pd_pairwise_distances.csv
-- mt_pairwise_distances.csv
-- pd_summary_by_method.csv
-- mt_summary_by_method.csv
+Reads from --outdir:
+  - pd_pairwise_distances.csv  (method,key,port,distance)
+  - mt_pairwise_distances.csv  (method,key,distance)
+  - pd_summary_by_method.csv
+  - mt_summary_by_method.csv
 
-Writes (to same outdir):
-- phase_c_all_distances.png
-- phase_c_summary.png
-- phase_c_summary.txt
+Writes:
+  - phase_c_all_distances.png
+  - phase_c_summary.png
+
+This script tries to be dependency-light:
+  - uses only Python stdlib + matplotlib (if available)
+If matplotlib isn't available, it will still print a textual summary.
 """
+
+from __future__ import annotations
 
 import argparse
 import csv
 import math
+from collections import defaultdict
 from pathlib import Path
+from typing import Dict, List, Tuple
 
-try:
-    import matplotlib.pyplot as plt
-except Exception as e:
-    plt = None
-    _PLOT_IMPORT_ERROR = e
-
-
-
-def _read_csv(path: Path):
+def _read_csv(path: Path) -> List[dict]:
+    if not path.exists():
+        return []
     with path.open("r", newline="") as f:
         r = csv.DictReader(f)
         return list(r)
 
-
-def _to_float(x):
+def _to_float(x: str) -> float:
     try:
-        return float(x)
+        v = float(x)
+        return v
     except Exception:
         return float("nan")
 
+def _safe(vals: List[float]) -> List[float]:
+    return [v for v in vals if not (v is None or math.isnan(v))]
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--outdir", required=True, help="Same outdir used by compute script")
+    ap.add_argument("--outdir", type=Path, required=True)
     args = ap.parse_args()
 
-    outdir = Path(args.outdir)
-    pd_path = outdir / "pd_pairwise_distances.csv"
-    mt_path = outdir / "mt_pairwise_distances.csv"
-    pd_sum_path = outdir / "pd_summary_by_method.csv"
-    mt_sum_path = outdir / "mt_summary_by_method.csv"
+    outdir: Path = args.outdir
+    pd_rows = _read_csv(outdir / "pd_pairwise_distances.csv")
+    mt_rows = _read_csv(outdir / "mt_pairwise_distances.csv")
+    pd_summary = _read_csv(outdir / "pd_summary_by_method.csv")
+    mt_summary = _read_csv(outdir / "mt_summary_by_method.csv")
 
-    all_png = outdir / "phase_c_all_distances.png"
-    sum_png = outdir / "phase_c_summary.png"
-    pd_rows = _read_csv(pd_path) if pd_path.exists() else []
-    mt_rows = _read_csv(mt_path) if mt_path.exists() else []
-    pd_sum = _read_csv(pd_sum_path) if pd_sum_path.exists() else []
-    mt_sum = _read_csv(mt_sum_path) if mt_sum_path.exists() else []
+    print("Loaded:")
+    print("  PD rows:", len(pd_rows))
+    print("  MT rows:", len(mt_rows))
 
-    # Choose a PD column to plot (prefer port0)
-    pd_col = None
-    if pd_rows:
-        cols = list(pd_rows[0].keys())
-        if "pd_bottleneck_port0" in cols:
-            pd_col = "pd_bottleneck_port0"
-        else:
-            for c in cols:
-                if c.startswith("pd_bottleneck_port"):
-                    pd_col = c
-                    break
+    # If matplotlib isn't installed, stop after printing.
+    try:
+        import matplotlib.pyplot as plt  # type: ignore
+    except Exception as e:
+        print("\nmatplotlib not available:", e)
+        print("Skipping plots; CSV outputs are still ready.")
+        return 0
 
-    # ------------------ Plot: all distances (sorted) ------------------
-    if plt is None:
-        print("matplotlib not available; skipping PNG plots. Error:", _PLOT_IMPORT_ERROR)
-        # Still write the text summary below.
-    
-    if plt is not None:
-        fig = plt.figure(figsize=(14, 8))
-        ax1 = fig.add_subplot(2, 1, 1)
-        ax2 = fig.add_subplot(2, 1, 2)
+    # --- Plot 1: per-sample distances (scatter-ish using dots) ---
+    # Prepare PD by method+port
+    pd_by = defaultdict(list)  # (method,port) -> [dist]
+    for r in pd_rows:
+        m = r.get("method", "")
+        port = int(r.get("port", "0"))
+        d = _to_float(r.get("distance", "nan"))
+        if not math.isnan(d):
+            pd_by[(m, port)].append(d)
 
-        if pd_rows and pd_col:
-        vals = [_to_float(r.get(pd_col)) for r in pd_rows]
-        vals_sorted = sorted([v for v in vals if math.isfinite(v)])
-        ax1.plot(vals_sorted, marker="o", linestyle="-")
-        ax1.set_title(f"PD Bottleneck Distances ({pd_col})")
-        ax1.set_ylabel("Distance")
-        ax1.set_xlabel("Pairs (sorted)")
+    mt_by = defaultdict(list)  # method -> [dist]
+    for r in mt_rows:
+        m = r.get("method", "")
+        d = _to_float(r.get("distance", "nan"))
+        if not math.isnan(d):
+            mt_by[m].append(d)
 
-        if mt_rows:
-        vals = [_to_float(r.get("mt_distance")) for r in mt_rows]
-        vals_sorted = sorted([v for v in vals if math.isfinite(v)])
-        ax2.plot(vals_sorted, marker="o", linestyle="-")
-        ax2.set_title("Merge Tree Distances (ttkMergeTreeDistanceMatrix)")
+    # Make a simple figure: PD (port0) and MT side-by-side by method
+    methods = sorted(set([k[0] for k in pd_by.keys()] + list(mt_by.keys())))
+    pd_port0_means = []
+    mt_means = []
+    for m in methods:
+        pd0 = _safe(pd_by.get((m, 0), []))
+        mtv = _safe(mt_by.get(m, []))
+        pd_port0_means.append(sum(pd0)/len(pd0) if pd0 else float("nan"))
+        mt_means.append(sum(mtv)/len(mtv) if mtv else float("nan"))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    x = list(range(len(methods)))
+    # plot two series as points
+    ax.plot(x, pd_port0_means, marker="o", linestyle="None", label="PD mean (port0)")
+    ax.plot(x, mt_means, marker="s", linestyle="None", label="MT mean")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(methods, rotation=30, ha="right")
+    ax.set_ylabel("Distance")
+    ax.set_title("Phase C: Mean distances by method")
+    ax.legend()
+    fig.tight_layout()
+    out1 = outdir / "phase_c_summary.png"
+    fig.savefig(out1, dpi=200)
+    print("Wrote:", out1)
+
+    # --- Plot 2: distributions (boxplot) ---
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot(111)
+
+    # For each method, build two distributions: PD port0 and MT
+    labels = []
+    data = []
+    for m in methods:
+        pd0 = _safe(pd_by.get((m, 0), []))
+        if pd0:
+            labels.append(f"{m}\nPD0")
+            data.append(pd0)
+        mtv = _safe(mt_by.get(m, []))
+        if mtv:
+            labels.append(f"{m}\nMT")
+            data.append(mtv)
+
+    if data:
+        ax2.boxplot(data, labels=labels, showfliers=False)
         ax2.set_ylabel("Distance")
-        ax2.set_xlabel("Pairs (sorted)")
+        ax2.set_title("Phase C: Distance distributions (PD port0 vs MT)")
+        fig2.tight_layout()
+        out2 = outdir / "phase_c_all_distances.png"
+        fig2.savefig(out2, dpi=200)
+        print("Wrote:", out2)
+    else:
+        print("No finite distances found to plot distributions.")
 
-            fig.tight_layout()
-        all_png = outdir / "phase_c_all_distances.png"
-        fig.savefig(all_png, dpi=200)
-            plt.close(fig)
-
-    # ------------------ Plot: summary by method ------------------
-    if plt is not None:
-
-    # Simple bar plots of means
-        fig = plt.figure(figsize=(14, 5))
-        ax1 = fig.add_subplot(1, 2, 1)
-        ax2 = fig.add_subplot(1, 2, 2)
-
-        if pd_sum:
-        methods = [r["method"] for r in pd_sum]
-        means = [_to_float(r["mean"]) for r in pd_sum]
-        ax1.bar(methods, means)
-        ax1.set_title("PD mean bottleneck by method")
-        ax1.set_ylabel("Mean distance")
-        ax1.tick_params(axis="x", rotation=45)
-
-        if mt_sum:
-        methods = [r["method"] for r in mt_sum]
-        means = [_to_float(r["mean"]) for r in mt_sum]
-        ax2.bar(methods, means)
-        ax2.set_title("MT mean distance by method")
-        ax2.set_ylabel("Mean distance")
-        ax2.tick_params(axis="x", rotation=45)
-
-        fig.tight_layout()
-        sum_png = outdir / "phase_c_summary.png"
-        fig.savefig(sum_png, dpi=200)
-        plt.close(fig)
-
-    # ------------------ Text summary ------------------
-    txt = outdir / "phase_c_summary.txt"
-    with txt.open("w") as f:
-        f.write("Phase C REAL distances summary\n")
-        f.write("=" * 60 + "\n\n")
-        if pd_col:
-            f.write(f"PD column plotted: {pd_col}\n")
-        f.write(f"PD pairs: {len(pd_rows)}\n")
-        f.write(f"MT pairs: {len(mt_rows)}\n\n")
-
-            if pd_sum:
-            f.write("PD summary by method\n")
-            f.write("-" * 60 + "\n")
-            for r in pd_sum:
-                f.write(f"{r['method']}: n={r['n']} mean={r['mean']} median={r['median']} min={r['min']} max={r['max']}\n")
-            f.write("\n")
-
-            if mt_sum:
-            f.write("MT summary by method\n")
-            f.write("-" * 60 + "\n")
-            for r in mt_sum:
-                f.write(f"{r['method']}: n={r['n']} mean={r['mean']} median={r['median']} min={r['min']} max={r['max']}\n")
-
-    print("Wrote:")
-    print(" ", all_png)
-    print(" ", sum_png)
-    print(" ", txt)
-
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
