@@ -1,360 +1,271 @@
 #!/usr/bin/env python3
-"""compute_composite_tree_distance_real.py
-
-Compute **real** distances (not proxies) between GT and SR outputs using TTK:
-
-- Persistence diagram distance: `ttkBottleneckDistance` (bottleneck distance).
-- Merge tree distance: `ttkMergeTreeDistanceMatrix` (Wasserstein-type MT distance).
-
-This script is designed for your file layout where:
-  - PD outputs are VTU files (unstructured grids) produced by TTK.
-  - Merge tree outputs are produced as multiple "ports" per sample:
-      *_mt_port_0.vtu, *_mt_port_1.vtu, *_mt_port_2.vti (segmentation)
-    and the merge tree distance filter expects a vtkMultiBlockDataSet.
-
-Outputs (written to --outdir):
-  - pd_pairwise_distances.csv
-  - mt_pairwise_distances.csv
-  - phase_c_results.csv
-  - pd_summary_by_method.csv
-  - mt_summary_by_method.csv
-  - phase_c_summary.csv
-  - phase_c_summary.txt
-
-Example:
-  python3 compute_composite_tree_distance_real.py \
-    --pd-dir /home/adadhwal/PhIRE/ttk_outputs/direct/pd_vtu \
-    --mt-dir /home/adadhwal/PhIRE/ttk_outputs/mt \
-    --outdir /home/adadhwal/PhIRE/ttk_outputs/phase_c_final \
-    --max 5 --debug
-
-Notes:
-- If your TTK build is correctly matched to your VTK (9.6.0), imports should work.
-- This script avoids numpy/pandas; it uses only stdlib + VTK/TTK.
 """
+Compute REAL Persistence Diagram and Merge Tree distances with TTK.
 
-from __future__ import annotations
+What this does
+- PD: bottleneck distance via ttkBottleneckDistance
+- MT: merge tree distance via ttkMergeTreeDistanceMatrix
+
+Expected file naming (from your outputs)
+- PD: <method>_<GT|SR>_<sample>_pd.vtu_port_<p>.vtu
+- MT: <method>_<GT|SR>_<sample>_mt_port_<p>.<vtu|vti>
+
+Example
+- gan_GT_s0_speed_p160_x0_y0_pd.vtu_port_0.vtu
+- gan_SR_s0_speed_p160_x0_y0_mt_port_1.vtu
+
+This script is dependency-light: only needs VTK + TTK Python bindings.
+"""
 
 import argparse
 import csv
+import math
+import os
 import re
-import statistics
-from dataclasses import dataclass
+import subprocess
+import sys
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import vtk  # type: ignore
 import topologytoolkit as ttk  # type: ignore
 
 
-# -------------------------------
-# Parsing / discovery
-# -------------------------------
-
-_LABEL_RE = re.compile(r"_(GT|SR)_")
+PD_RE = re.compile(r"^(?P<method>[^_]+)_(?P<label>GT|SR)_(?P<sample>.+)_pd\.vtu_port_(?P<port>\d+)\.vtu$")
+MT_RE = re.compile(r"^(?P<method>[^_]+)_(?P<label>GT|SR)_(?P<sample>.+)_mt_port_(?P<port>\d+)\.(?P<ext>vtu|vti)$")
 
 
-@dataclass(frozen=True)
-class PDEntry:
-    key: str
-    method: str
-    label: str  # GT or SR
-    path: Path
-
-
-@dataclass(frozen=True)
-class MTEntry:
-    key: str
-    method: str
-    label: str  # GT or SR
-    port: int
-    path: Path
-
-
-def _extract_method_label_and_tail(stem: str) -> Optional[Tuple[str, str, str]]:
-    """Return (method, label, tail) from a file stem that contains _GT_ or _SR_."""
-    m = _LABEL_RE.search(stem)
-    if not m:
-        return None
-    label = m.group(1)
-    method = stem[: m.start()]  # everything before _GT_/_SR_
-    tail = stem[m.end() :]  # everything after
-    if not method or not tail:
-        return None
-    return method, label, tail
-
-
-def discover_pd(pd_dir: Path) -> Dict[Tuple[str, str], PDEntry]:
-    """Find PD VTU files and map (key,label)->entry.
-
-    If multiple ports exist, prefer port_0, else lowest port number.
-    """
-    best: Dict[Tuple[str, str], Tuple[int, PDEntry]] = {}
-
-    for p in pd_dir.rglob("*.vtu"):
-        stem = p.name
-        if "_pd" not in stem:
-            continue
-
-        # strip any trailing .vtu_port_X.vtu decorations for parsing
-        # e.g. gan_GT_..._pd.vtu_port_0.vtu
-        base = stem
-        if base.endswith(".vtu"):
-            base = base[:-4]
-        base = re.sub(r"\.vtu_port_\d+$", "", base)
-        base = re.sub(r"_port_\d+$", "", base)
-
-        parsed = _extract_method_label_and_tail(base)
-        if not parsed:
-            continue
-        method, label, tail = parsed
-
-        # tail still contains something like s0_..._pd.vtu OR ..._pd
-        tail = re.sub(r"_pd(\.vtu)?$", "", tail)
-        key = f"{method}_{tail}"
-
-        # pick port preference
-        port_m = re.search(r"port_(\d+)", stem)
-        port = int(port_m.group(1)) if port_m else 0
-
-        entry = PDEntry(key=key, method=method, label=label, path=p)
-        k = (key, label)
-        prev = best.get(k)
-        if prev is None:
-            best[k] = (port, entry)
-        else:
-            prev_port, _ = prev
-            # prefer port 0, then lower port
-            if (port == 0 and prev_port != 0) or (port < prev_port):
-                best[k] = (port, entry)
-
-    return {k: v for k, (_, v) in best.items()}
-
-
-def discover_mt(mt_dir: Path) -> Dict[Tuple[str, str], Dict[int, MTEntry]]:
-    """Find MT port files (vtu/vti) and map (key,label)->{port:entry}."""
-    out: Dict[Tuple[str, str], Dict[int, MTEntry]] = {}
-
-    for p in mt_dir.rglob("*"):
-        if not p.is_file():
-            continue
-        if "_mt_port_" not in p.name:
-            continue
-        if p.suffix not in {".vtu", ".vti", ".vtm", ".vtp", ".vtk"}:
-            continue
-
-        base = p.name
-        # strip extension for parsing
-        stem = base
-        if stem.endswith(p.suffix):
-            stem = stem[: -len(p.suffix)]
-
-        # remove trailing _mt_port_X
-        mport = re.search(r"_mt_port_(\d+)$", stem)
-        if not mport:
-            continue
-        port = int(mport.group(1))
-        stem_noport = stem[: mport.start()]
-
-        parsed = _extract_method_label_and_tail(stem_noport)
-        if not parsed:
-            continue
-        method, label, tail = parsed
-        tail = re.sub(r"_mt$", "", tail)
-        key = f"{method}_{tail}"
-
-        entry = MTEntry(key=key, method=method, label=label, port=port, path=p)
-        k = (key, label)
-        out.setdefault(k, {})[port] = entry
-
-    return out
-
-
-# -------------------------------
-# VTK readers / dataset helpers
-# -------------------------------
-
-
-def read_dataset(path: Path) -> vtk.vtkDataObject:
-    """Read a VTK XML dataset based on extension."""
-    suf = path.suffix.lower()
-
-    if suf == ".vtu":
-        r = vtk.vtkXMLUnstructuredGridReader()
-    elif suf == ".vti":
-        r = vtk.vtkXMLImageDataReader()
-    elif suf == ".vtp":
-        r = vtk.vtkXMLPolyDataReader()
-    elif suf == ".vtm":
-        r = vtk.vtkXMLMultiBlockDataReader()
-    elif suf == ".vtk":
-        r = vtk.vtkDataSetReader()
-    else:
-        raise ValueError(f"Unsupported extension: {path}")
-
-    r.SetFileName(str(path))
+def _read_vtu(path: str) -> "vtk.vtkUnstructuredGrid":
+    r = vtk.vtkXMLUnstructuredGridReader()
+    r.SetFileName(path)
     r.Update()
-    out = r.GetOutputDataObject(0)
-    if out is None:
-        raise RuntimeError(f"VTK reader produced None for {path}")
+    out = r.GetOutput()
     return out
 
 
-def make_multiblock_from_ports(port_map: Dict[int, MTEntry], debug: bool = False) -> Optional[vtk.vtkMultiBlockDataSet]:
-    """Build a vtkMultiBlockDataSet in port order (0,1,2,...) from a set of mt_port files.
+def _read_vti(path: str) -> "vtk.vtkImageData":
+    r = vtk.vtkXMLImageDataReader()
+    r.SetFileName(path)
+    r.Update()
+    out = r.GetOutput()
+    return out
 
-    Heuristics:
-      - Must contain at least one VTU (unstructured grid) (ports 0/1 usually).
-      - If only a port_2.vti exists, we skip (that's typically segmentation image only).
+
+def compute_pd_bottleneck(pd_a_vtu: str, pd_b_vtu: str, debug: bool = False) -> float:
     """
-    if not port_map:
-        return None
+    Bottleneck distance between two persistence diagrams (two .vtu grids).
+    """
+    a = _read_vtu(pd_a_vtu)
+    b = _read_vtu(pd_b_vtu)
 
-    # Ensure we have at least one unstructured grid
-    has_vtu = any(e.path.suffix.lower() == ".vtu" for e in port_map.values())
-    if not has_vtu:
-        if debug:
-            print(f"[debug] merge tree ports exist but no .vtu blocks: {[str(e.path) for e in port_map.values()]}")
-        return None
+    if a is None or a.GetNumberOfPoints() == 0:
+        raise RuntimeError(f"PD read failed or empty: {pd_a_vtu}")
+    if b is None or b.GetNumberOfPoints() == 0:
+        raise RuntimeError(f"PD read failed or empty: {pd_b_vtu}")
 
-    ports_sorted = sorted(port_map.keys())
-
-    mb = vtk.vtkMultiBlockDataSet()
-    mb.SetNumberOfBlocks(len(ports_sorted))
-
-    for i, port in enumerate(ports_sorted):
-        e = port_map[port]
-        ds = read_dataset(e.path)
-        mb.SetBlock(i, ds)
-        # put a readable name
-        md = mb.GetMetaData(i)
-        if md is not None:
-            md.Set(vtk.vtkCompositeDataSet.NAME(), f"port_{port}")
-
-        if debug:
-            print(f"[debug] mt block[{i}] port={port} type={ds.GetClassName()} path={e.path.name}")
-
-    return mb
-
-
-# -------------------------------
-# Distance computations
-# -------------------------------
-
-
-def _get_field_distance(ds: vtk.vtkDataObject) -> Optional[float]:
-    if not hasattr(ds, "GetFieldData"):
-        return None
-    fd = ds.GetFieldData()
-    if fd is None:
-        return None
-    for name in ("BottleneckDistance", "WassersteinDistance", "Distance"):
-        arr = fd.GetArray(name)
-        if arr is not None and arr.GetNumberOfTuples() > 0:
-            try:
-                return float(arr.GetTuple1(0))
-            except Exception:
-                pass
-    return None
-
-
-def compute_pd_bottleneck(pd_gt: Path, pd_sr: Path, debug: bool = False) -> float:
-    """Compute bottleneck distance between two PD VTU files."""
-    ug_gt = read_dataset(pd_gt)
-    ug_sr = read_dataset(pd_sr)
-
-    # BottleneckDistance expects a vtkMultiBlockDataSet with two blocks.
     mb = vtk.vtkMultiBlockDataSet()
     mb.SetNumberOfBlocks(2)
-    mb.SetBlock(0, ug_gt)
-    mb.SetBlock(1, ug_sr)
+    mb.SetBlock(0, a)
+    mb.SetBlock(1, b)
 
     bd = ttk.ttkBottleneckDistance()
+    # TTK expects a single MultiBlock input (not 2 separate inputs)
+    bd.SetInputDataObject(0, mb)
 
-    # REQUIRED in recent TTK: choose the assignment algorithm implementation.
-    # In TTK source, PVAlgorithm==0 corresponds to the "ttk" backend.
+    # REQUIRED on some TTK builds, otherwise you see:
+    # "[BottleneckDistance] [ERROR] You must specify a valid assignment algorithm."
     if hasattr(bd, "SetPVAlgorithm"):
-        bd.SetPVAlgorithm(0)
-    if hasattr(bd, "SetDistanceAlgorithm"):
-        try:
-            bd.SetDistanceAlgorithm("ttk")
-        except Exception:
-            pass
-
-    # Make sure we get the matching output (port 1) where distances are stored in field data.
-    if hasattr(bd, "SetUseOutputMatching"):
-        bd.SetUseOutputMatching(1)
-
-    # Prefer bottleneck distance (Wasserstein infinity) when available.
-    # Different TTK versions expose this differently.
-    if hasattr(bd, "SetWassersteinMetric"):
-        try:
-            bd.SetWassersteinMetric(-1)  # often encodes infinity
-        except Exception:
-            try:
-                bd.SetWassersteinMetric(0)  # fallback to bottleneck in some builds
-            except Exception:
-                pass
-
-    # Set input (single port)
-    if hasattr(bd, "SetInputDataObject"):
-        bd.SetInputDataObject(0, mb)
-    else:
-        bd.SetInputData(mb)
+        bd.SetPVAlgorithm(0)  # 0 = TTK approach (see ttk::BottleneckDistance docs)
+    # keep single-thread while debugging stability
+    if hasattr(bd, "SetThreadNumber"):
+        bd.SetThreadNumber(1)
 
     bd.Update()
 
-    # Distance is saved in output matchings field data
-    out_match = bd.GetOutputDataObject(1)
-    dist = _get_field_distance(out_match)
-    if dist is None:
-        # sometimes stored on port 0
-        dist = _get_field_distance(bd.GetOutputDataObject(0))
+    # Try to read the distance from output field data (varies across TTK versions)
+    out0 = bd.GetOutputDataObject(0)
+    # sometimes output0 is a vtkMultiBlockDataSet
+    fd = None
+    if out0 is not None and hasattr(out0, "GetFieldData"):
+        fd = out0.GetFieldData()
+    dist_candidates: List[float] = []
+    if fd is not None:
+        for name in ("BottleneckDistance", "Distance", "bottleneck", "Bottleneck"):
+            arr = fd.GetArray(name) if hasattr(fd, "GetArray") else None
+            if arr is not None and arr.GetNumberOfTuples() >= 1:
+                try:
+                    dist_candidates.append(float(arr.GetTuple1(0)))
+                except Exception:
+                    pass
 
-    if dist is None:
-        raise RuntimeError("Could not read distance from ttkBottleneckDistance outputs")
+    # fallback: if output1 is an unstructured grid with a scalar array
+    if not dist_candidates and bd.GetNumberOfOutputPorts() > 1:
+        out1 = bd.GetOutputDataObject(1)
+        if out1 is not None and hasattr(out1, "GetFieldData"):
+            fd1 = out1.GetFieldData()
+            if fd1 is not None:
+                for name in ("BottleneckDistance", "Distance"):
+                    arr = fd1.GetArray(name)
+                    if arr is not None and arr.GetNumberOfTuples() >= 1:
+                        dist_candidates.append(float(arr.GetTuple1(0)))
 
+    if not dist_candidates:
+        # last resort: look for any 1-tuple numeric field array
+        if fd is not None:
+            for i in range(fd.GetNumberOfArrays()):
+                arr = fd.GetAbstractArray(i)
+                if arr is None:
+                    continue
+                if hasattr(arr, "GetNumberOfTuples") and arr.GetNumberOfTuples() == 1:
+                    try:
+                        dist_candidates.append(float(arr.GetTuple1(0)))
+                    except Exception:
+                        continue
+
+    if not dist_candidates:
+        raise RuntimeError("Could not extract bottleneck distance from ttkBottleneckDistance output")
+
+    dist = dist_candidates[0]
     if debug:
-        print(f"[debug] PD bottleneck {pd_gt.name} vs {pd_sr.name} = {dist}")
-
+        print(f"[debug] bottleneck extracted={dist}")
     return float(dist)
 
 
-def compute_mt_distance(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEntry], debug: bool = False) -> float:
-    """Compute merge tree distance between two samples.
+def _load_mt_port(path: str, port: int):
+    if path.endswith(".vti"):
+        return _read_vti(path)
+    return _read_vtu(path)
 
-    We build vtkMultiBlockDataSet objects from the available ports (0/1/2...).
+
+def _build_merge_tree_stack(
+    gt_ports: Dict[int, str],
+    sr_ports: Dict[int, str],
+    debug: bool = False,
+) -> "vtk.vtkMultiBlockDataSet":
     """
-    mb_gt = make_multiblock_from_ports(mt_gt_ports, debug=debug)
-    mb_sr = make_multiblock_from_ports(mt_sr_ports, debug=debug)
-    if mb_gt is None or mb_sr is None:
-        raise RuntimeError("Missing required merge tree port blocks (.vtu) for MT distance")
+    Build the exact MultiBlock layout expected by ttkMergeTreeDistanceMatrix.
+
+    IMPORTANT: ttkMergeTreeDistanceMatrix expects a "stacked by port" layout:
+        top-level blocks = ports (0=nodes, 1=arcs, [2=segmentation optional])
+        each port-block is a MultiBlock whose blocks are the trees (GT, SR, ...)
+
+    For two trees:
+        top[0] = MultiBlock( nodesGT, nodesSR )
+        top[1] = MultiBlock( arcsGT,  arcsSR  )
+        (optionally) top[2] = MultiBlock( segGT, segSR )
+    """
+    # We only need ports 0 & 1 for distance; port 2 can be omitted.
+    needed = [0, 1]
+    for p in needed:
+        if p not in gt_ports or p not in sr_ports:
+            raise RuntimeError(f"Missing merge-tree port {p} for GT/SR (need ports 0 and 1).")
+
+    top = vtk.vtkMultiBlockDataSet()
+    top.SetNumberOfBlocks(2)
+
+    # port 0 (nodes)
+    mb0 = vtk.vtkMultiBlockDataSet()
+    mb0.SetNumberOfBlocks(2)
+    a0 = _load_mt_port(gt_ports[0], 0)
+    b0 = _load_mt_port(sr_ports[0], 0)
+    mb0.SetBlock(0, a0)
+    mb0.SetBlock(1, b0)
+    top.SetBlock(0, mb0)
+
+    # port 1 (arcs)
+    mb1 = vtk.vtkMultiBlockDataSet()
+    mb1.SetNumberOfBlocks(2)
+    a1 = _load_mt_port(gt_ports[1], 1)
+    b1 = _load_mt_port(sr_ports[1], 1)
+    mb1.SetBlock(0, a1)
+    mb1.SetBlock(1, b1)
+    top.SetBlock(1, mb1)
+
+    if debug:
+        print(f"[debug] MT stack built: top blocks={top.GetNumberOfBlocks()} (ports 0&1), each with 2 trees")
+    return top
+
+
+def _extract_distance_from_vtk_table(tbl) -> float:
+    """
+    Robustly extract the off-diagonal value from a 2x2 distance matrix vtkTable.
+    """
+    if tbl is None or tbl.GetNumberOfRows() < 2:
+        raise RuntimeError("DistanceMatrix output is empty (expected at least 2 rows).")
+    # Collect numeric columns (skip string id columns if any)
+    numeric_cols = []
+    for ci in range(tbl.GetNumberOfColumns()):
+        col = tbl.GetColumn(ci)
+        if col is None:
+            continue
+        # vtkStringArray has GetValue but not GetTuple1; numeric arrays do.
+        if hasattr(col, "GetTuple1"):
+            numeric_cols.append(ci)
+
+    if not numeric_cols:
+        raise RuntimeError("No numeric columns found in vtkTable output.")
+
+    # Build matrix: rows x numeric_cols
+    mat = []
+    for ri in range(tbl.GetNumberOfRows()):
+        row = []
+        for ci in numeric_cols:
+            col = tbl.GetColumn(ci)
+            try:
+                row.append(float(col.GetTuple1(ri)))
+            except Exception:
+                row.append(float("nan"))
+        mat.append(row)
+
+    # Off-diagonal for 2x2 is [0][1] in most cases; but numeric_cols may exclude a leading label col.
+    # If there are >=2 numeric cols, use mat[0][1] (second numeric col).
+    if len(numeric_cols) >= 2 and len(mat) >= 2:
+        d = mat[0][1]
+        if not math.isnan(d):
+            return float(d)
+
+    # Fallback: pick the first finite, non-zero off-diagonal candidate.
+    candidates = []
+    for i in range(min(10, len(mat))):
+        for j in range(min(10, len(mat[i]))):
+            if i == j:
+                continue
+            v = mat[i][j]
+            if math.isfinite(v) and v != 0.0:
+                candidates.append(v)
+    if not candidates:
+        # maybe the metric genuinely returns 0; accept first finite off-diagonal
+        for i in range(min(10, len(mat))):
+            for j in range(min(10, len(mat[i]))):
+                if i == j:
+                    continue
+                v = mat[i][j]
+                if math.isfinite(v):
+                    candidates.append(v)
+    if not candidates:
+        raise RuntimeError("Could not find any finite distance value in vtkTable output.")
+    return float(candidates[0])
+
+
+def compute_mt_distance_inprocess(
+    gt_ports: Dict[int, str],
+    sr_ports: Dict[int, str],
+    debug: bool = False,
+) -> float:
+    """
+    Merge tree distance between GT and SR using ttkMergeTreeDistanceMatrix.
+    """
+    stack = _build_merge_tree_stack(gt_ports, sr_ports, debug=debug)
 
     flt = ttk.ttkMergeTreeDistanceMatrix()
+    flt.SetInputDataObject(0, stack)
 
-    # Connect as two ports when available.
-    # Most builds have 2 ports (0: set A trees, 1: set B trees).
-    used_two_ports = False
-    if hasattr(flt, "SetInputDataObject"):
-        try:
-            flt.SetInputDataObject(0, mb_gt)
-            flt.SetInputDataObject(1, mb_sr)
-            used_two_ports = True
-        except Exception:
-            used_two_ports = False
-
-    if not used_two_ports:
-        # Fallback: many-vtk-connection style on port 0
-        try:
-            flt.AddInputDataObject(0, mb_gt)
-            flt.AddInputDataObject(0, mb_sr)
-        except Exception:
-            flt.SetInputData(mb_gt)
-
-    # Some versions require explicitly enabling computation
+    # Some builds expose knobs; set conservative defaults if present
     for meth, val in (
-        ("SetOutputDistanceMatrix", 1),
-        ("SetComputeDistanceMatrix", 1),
+        ("SetThreadNumber", 1),
+        ("SetAssignmentSolver", 0),
+        ("SetAssignmentAlgorithm", 0),
+        ("SetEpsilon", 1e-7),
     ):
         if hasattr(flt, meth):
             try:
@@ -365,207 +276,262 @@ def compute_mt_distance(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, 
     flt.Update()
 
     out0 = flt.GetOutputDataObject(0)
+    # Most builds output a vtkTable directly
+    if out0 is not None and out0.IsA("vtkTable"):
+        return _extract_distance_from_vtk_table(out0)
 
-    # Common case: vtkTable distance matrix
-    if isinstance(out0, vtk.vtkTable):
-        if out0.GetNumberOfRows() < 1 or out0.GetNumberOfColumns() < 1:
-            raise RuntimeError("MergeTreeDistanceMatrix produced empty vtkTable")
-        v = out0.GetValue(0, 0)
-        try:
-            dist = float(v.ToDouble())
-        except Exception:
-            dist = float(str(v))
-        if debug:
-            print(f"[debug] MT distance (table[0,0]) = {dist}")
-        return dist
+    # Some builds wrap it inside a multiblock
+    if out0 is not None and out0.IsA("vtkMultiBlockDataSet"):
+        mb = out0
+        # try first block that is a vtkTable
+        for i in range(mb.GetNumberOfBlocks()):
+            b = mb.GetBlock(i)
+            if b is not None and b.IsA("vtkTable"):
+                return _extract_distance_from_vtk_table(b)
 
-    # Fallback: look for distance in field data
-    dist = _get_field_distance(out0)
-    if dist is None and hasattr(flt, "GetOutputDataObject"):
-        for i in range(1, 4):
-            try:
-                dist = _get_field_distance(flt.GetOutputDataObject(i))
-            except Exception:
-                pass
-            if dist is not None:
-                break
+    raise RuntimeError(f"Unexpected output type from ttkMergeTreeDistanceMatrix: {out0.GetClassName() if out0 else 'None'}")
 
-    if dist is None:
-        raise RuntimeError(f"Could not extract MT distance from output type {out0.GetClassName()}")
 
+def compute_mt_distance_isolated(
+    gt_ports: Dict[int, str],
+    sr_ports: Dict[int, str],
+    debug: bool = False,
+) -> float:
+    """
+    Compute MT distance in a child process so a segfault doesn't kill the whole batch.
+    """
+    args = [
+        sys.executable, __file__, "--_mt_worker",
+        "--gt0", gt_ports.get(0, ""), "--gt1", gt_ports.get(1, ""),
+        "--sr0", sr_ports.get(0, ""), "--sr1", sr_ports.get(1, ""),
+    ]
     if debug:
-        print(f"[debug] MT distance = {dist}")
-
-    return float(dist)
-
-
-# -------------------------------
-# Summaries / output
-# -------------------------------
-
-
-def _stats(vals: List[float]) -> Dict[str, float]:
-    if not vals:
-        return {"n": 0}
-    v = sorted(vals)
-    n = len(v)
-    mean = sum(v) / n
-    median = v[n // 2] if n % 2 else 0.5 * (v[n // 2 - 1] + v[n // 2])
-    stdev = statistics.pstdev(v) if n >= 2 else 0.0
-    return {
-        "n": n,
-        "mean": mean,
-        "median": median,
-        "stdev": stdev,
-        "min": v[0],
-        "max": v[-1],
-    }
+        args.append("--debug")
+    cp = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if cp.returncode != 0:
+        if debug:
+            print("[debug] mt worker failed rc=", cp.returncode)
+            print(cp.stderr)
+        return float("nan")
+    try:
+        return float(cp.stdout.strip().splitlines()[-1])
+    except Exception:
+        if debug:
+            print("[debug] mt worker output parse failed:")
+            print(cp.stdout)
+            print(cp.stderr)
+        return float("nan")
 
 
-def write_csv(path: Path, fieldnames: List[str], rows: Iterable[Dict[str, object]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
+def _index_files(root: Path, regex: re.Pattern) -> List[Tuple[Tuple[str, str, str], Dict[int, str]]]:
+    """
+    Build an index mapping (method, label, sample) -> {port: path}
+    for both PD and MT file patterns.
+    """
+    tmp: Dict[Tuple[str, str, str], Dict[int, str]] = {}
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        m = regex.match(p.name)
+        if not m:
+            continue
+        method = m.group("method")
+        label = m.group("label")
+        sample = m.group("sample")
+        port = int(m.group("port"))
+        key = (method, label, sample)
+        tmp.setdefault(key, {})[port] = str(p)
+    return list(tmp.items())
 
 
-def main() -> int:
+def _pair_keys(pd_index: Dict[Tuple[str, str], Dict[str, Dict[int, str]]], max_items: Optional[int] = None) -> List[Tuple[str, str]]:
+    # pd_index: (method, sample) -> {"GT": {port:path}, "SR": {port:path}}
+    keys = sorted(pd_index.keys())
+    if max_items is not None:
+        keys = keys[:max_items]
+    return keys
+
+
+def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pd-dir", type=Path, required=True)
-    ap.add_argument("--mt-dir", type=Path, required=True)
-    ap.add_argument("--outdir", type=Path, required=True)
-    ap.add_argument("--max", type=int, default=0, help="limit number of keys (for quick testing)")
+    ap.add_argument("--pd-dir", required=False, help="Directory containing PD .vtu outputs")
+    ap.add_argument("--mt-dir", required=False, help="Directory containing MT outputs (ports 0,1,...)")
+    ap.add_argument("--outdir", required=True, help="Output directory for CSVs and logs")
+    ap.add_argument("--max", type=int, default=None, help="Limit number of (method,sample) pairs for quick tests")
     ap.add_argument("--debug", action="store_true")
-    args = ap.parse_args()
+    ap.add_argument("--no-mt", action="store_true", help="Skip merge tree distances")
+    ap.add_argument("--no-pd", action="store_true", help="Skip persistence diagram distances")
+    ap.add_argument("--isolate-mt", action="store_true", help="Compute each MT distance in a subprocess (survives segfaults)")
+    ap.add_argument("--_mt_worker", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--gt0", default="", help=argparse.SUPPRESS)
+    ap.add_argument("--gt1", default="", help=argparse.SUPPRESS)
+    ap.add_argument("--sr0", default="", help=argparse.SUPPRESS)
+    ap.add_argument("--sr1", default="", help=argparse.SUPPRESS)
+    args = ap.parse_args(argv)
 
-    pd_map = discover_pd(args.pd_dir)
-    mt_map = discover_mt(args.mt_dir)
+    if args._mt_worker:
+        gt_ports = {0: args.gt0, 1: args.gt1}
+        sr_ports = {0: args.sr0, 1: args.sr1}
+        d = compute_mt_distance_inprocess(gt_ports, sr_ports, debug=args.debug)
+        print(d)
+        return 0
 
-    # Determine keys that have both GT and SR PDs, and also MT port maps.
-    keys = sorted({k for (k, lab) in pd_map.keys()})
-    keys = [k for k in keys if (k, "GT") in pd_map and (k, "SR") in pd_map]
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
 
-    # For MT we require both GT and SR entries exist
-    keys = [k for k in keys if (k, "GT") in mt_map and (k, "SR") in mt_map]
+    # ------------------ Index PD files ------------------
+    pd_pairs: Dict[Tuple[str, str], Dict[str, Dict[int, str]]] = {}
+    if not args.no_pd:
+        if not args.pd_dir:
+            raise SystemExit("--pd-dir is required unless --no-pd is used")
+        pd_root = Path(args.pd_dir)
+        for (method, label, sample), ports in _index_files(pd_root, PD_RE):
+            pd_pairs.setdefault((method, sample), {})[label] = ports
 
-    if args.max and args.max > 0:
+    # ------------------ Index MT files ------------------
+    mt_pairs: Dict[Tuple[str, str], Dict[str, Dict[int, str]]] = {}
+    if not args.no_mt:
+        if not args.mt_dir:
+            raise SystemExit("--mt-dir is required unless --no-mt is used")
+        mt_root = Path(args.mt_dir)
+        for (method, label, sample), ports in _index_files(mt_root, MT_RE):
+            mt_pairs.setdefault((method, sample), {})[label] = ports
+
+    # Build the intersection of keys
+    keys = set()
+    if not args.no_pd:
+        keys |= set(pd_pairs.keys())
+    if not args.no_mt:
+        keys |= set(mt_pairs.keys())
+    keys = sorted(keys)
+
+    if args.max is not None:
         keys = keys[: args.max]
 
     if args.debug:
         print(f"[debug] discovered {len(keys)} keys")
 
-    rows_results: List[Dict[str, object]] = []
-    rows_pd: List[Dict[str, object]] = []
-    rows_mt: List[Dict[str, object]] = []
+    # ------------------ Compute distances ------------------
+    pd_rows: List[Dict[str, object]] = []
+    mt_rows: List[Dict[str, object]] = []
 
-    for key in keys:
-        pd_gt = pd_map[(key, "GT")]
-        pd_sr = pd_map[(key, "SR")]
-        mt_gt_ports = mt_map[(key, "GT")]
-        mt_sr_ports = mt_map[(key, "SR")]
+    for method, sample in keys:
+        if not args.no_pd:
+            if (method, sample) in pd_pairs and "GT" in pd_pairs[(method, sample)] and "SR" in pd_pairs[(method, sample)]:
+                gt_ports = pd_pairs[(method, sample)]["GT"]
+                sr_ports = pd_pairs[(method, sample)]["SR"]
+                # compute for all shared PD ports
+                common_ports = sorted(set(gt_ports.keys()) & set(sr_ports.keys()))
+                row = {"method": method, "sample": sample}
+                for p in common_ports:
+                    try:
+                        d = compute_pd_bottleneck(gt_ports[p], sr_ports[p], debug=args.debug)
+                        row[f"pd_bottleneck_port{p}"] = d
+                        if args.debug:
+                            print(f"[debug] PD bottleneck {Path(gt_ports[p]).name} vs {Path(sr_ports[p]).name} = {d}")
+                    except Exception as e:
+                        row[f"pd_bottleneck_port{p}"] = float("nan")
+                        if args.debug:
+                            print(f"[debug] PD failed for ({method},{sample},port={p}): {e}")
+                pd_rows.append(row)
 
-        method = pd_gt.method
-        pd_dist: Optional[float] = None
-        mt_dist: Optional[float] = None
-        err: str = ""
+        if not args.no_mt:
+            if (method, sample) in mt_pairs and "GT" in mt_pairs[(method, sample)] and "SR" in mt_pairs[(method, sample)]:
+                gt_ports = mt_pairs[(method, sample)]["GT"]
+                sr_ports = mt_pairs[(method, sample)]["SR"]
+                try:
+                    if args.isolate_mt:
+                        d = compute_mt_distance_isolated(gt_ports, sr_ports, debug=args.debug)
+                    else:
+                        d = compute_mt_distance_inprocess(gt_ports, sr_ports, debug=args.debug)
+                    mt_rows.append({"method": method, "sample": sample, "mt_distance": d})
+                    if args.debug:
+                        print(f"[debug] MT distance {method} {sample} = {d}")
+                except Exception as e:
+                    mt_rows.append({"method": method, "sample": sample, "mt_distance": float('nan')})
+                    if args.debug:
+                        print(f"[debug] MT failed for ({method},{sample}): {e}")
 
-        try:
-            pd_dist = compute_pd_bottleneck(pd_gt.path, pd_sr.path, debug=args.debug)
-        except Exception as e:
-            err = f"pd:{e}"
+    # ------------------ Write outputs ------------------
+    if pd_rows:
+        pd_path = outdir / "pd_pairwise_distances.csv"
+        with pd_path.open("w", newline="") as f:
+            cols = sorted({k for r in pd_rows for k in r.keys()})
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            for r in pd_rows:
+                w.writerow(r)
+        if args.debug:
+            print(f"[debug] wrote {pd_path}")
 
-        try:
-            mt_dist = compute_mt_distance(mt_gt_ports, mt_sr_ports, debug=args.debug)
-        except Exception as e:
-            err = (err + "; " if err else "") + f"mt:{e}"
+    if mt_rows:
+        mt_path = outdir / "mt_pairwise_distances.csv"
+        with mt_path.open("w", newline="") as f:
+            cols = ["method", "sample", "mt_distance"]
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            for r in mt_rows:
+                w.writerow(r)
+        if args.debug:
+            print(f"[debug] wrote {mt_path}")
 
-        if pd_dist is not None:
-            rows_pd.append({"key": key, "method": method, "pd_distance": pd_dist})
-        if mt_dist is not None:
-            rows_mt.append({"key": key, "method": method, "mt_distance": mt_dist})
+    # ------------------ Summaries by method ------------------
+    def _stats(vals: List[float]) -> Dict[str, float]:
+        finite = [v for v in vals if v is not None and math.isfinite(v)]
+        if not finite:
+            return {"n": 0, "mean": float("nan"), "median": float("nan"), "min": float("nan"), "max": float("nan")}
+        finite.sort()
+        n = len(finite)
+        mean = sum(finite) / n
+        med = finite[n // 2] if n % 2 == 1 else 0.5 * (finite[n // 2 - 1] + finite[n // 2])
+        return {"n": n, "mean": mean, "median": med, "min": finite[0], "max": finite[-1]}
 
-        rows_results.append(
-            {
-                "key": key,
-                "method": method,
-                "pd_distance": pd_dist if pd_dist is not None else "",
-                "mt_distance": mt_dist if mt_dist is not None else "",
-                "error": err,
-            }
-        )
+    # PD summary (use port0 if present, else first pd_bottleneck_port*)
+    if pd_rows:
+        by_method: Dict[str, List[float]] = {}
+        for r in pd_rows:
+            m = str(r["method"])
+            # prefer port0
+            v = None
+            if "pd_bottleneck_port0" in r:
+                v = r["pd_bottleneck_port0"]
+            else:
+                for k in sorted(r.keys()):
+                    if k.startswith("pd_bottleneck_port"):
+                        v = r[k]
+                        break
+            try:
+                v = float(v)
+            except Exception:
+                v = float("nan")
+            by_method.setdefault(m, []).append(v)
 
-    outdir = args.outdir
-    write_csv(outdir / "pd_pairwise_distances.csv", ["key", "method", "pd_distance"], rows_pd)
-    write_csv(outdir / "mt_pairwise_distances.csv", ["key", "method", "mt_distance"], rows_mt)
-    write_csv(outdir / "phase_c_results.csv", ["key", "method", "pd_distance", "mt_distance", "error"], rows_results)
+        pd_sum_path = outdir / "pd_summary_by_method.csv"
+        with pd_sum_path.open("w", newline="") as f:
+            cols = ["method", "n", "mean", "median", "min", "max"]
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            for m, vals in sorted(by_method.items()):
+                s = _stats(vals)
+                w.writerow({"method": m, **s})
+        if args.debug:
+            print(f"[debug] wrote {pd_sum_path}")
 
-    # Summaries by method
-    pd_by_method: Dict[str, List[float]] = {}
-    for r in rows_pd:
-        pd_by_method.setdefault(str(r["method"]), []).append(float(r["pd_distance"]))
+    if mt_rows:
+        by_method2: Dict[str, List[float]] = {}
+        for r in mt_rows:
+            by_method2.setdefault(str(r["method"]), []).append(float(r["mt_distance"]))
+        mt_sum_path = outdir / "mt_summary_by_method.csv"
+        with mt_sum_path.open("w", newline="") as f:
+            cols = ["method", "n", "mean", "median", "min", "max"]
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            for m, vals in sorted(by_method2.items()):
+                s = _stats(vals)
+                w.writerow({"method": m, **s})
+        if args.debug:
+            print(f"[debug] wrote {mt_sum_path}")
 
-    mt_by_method: Dict[str, List[float]] = {}
-    for r in rows_mt:
-        mt_by_method.setdefault(str(r["method"]), []).append(float(r["mt_distance"]))
-
-    pd_summary_rows: List[Dict[str, object]] = []
-    for m, vals in sorted(pd_by_method.items()):
-        s = _stats(vals)
-        pd_summary_rows.append({"method": m, **s})
-
-    mt_summary_rows: List[Dict[str, object]] = []
-    for m, vals in sorted(mt_by_method.items()):
-        s = _stats(vals)
-        mt_summary_rows.append({"method": m, **s})
-
-    write_csv(outdir / "pd_summary_by_method.csv", ["method", "n", "mean", "median", "stdev", "min", "max"], pd_summary_rows)
-    write_csv(outdir / "mt_summary_by_method.csv", ["method", "n", "mean", "median", "stdev", "min", "max"], mt_summary_rows)
-
-    # Combined summary
-    combined_rows: List[Dict[str, object]] = []
-    methods = sorted(set(pd_by_method.keys()) | set(mt_by_method.keys()))
-    for m in methods:
-        row: Dict[str, object] = {"method": m}
-        s_pd = _stats(pd_by_method.get(m, []))
-        s_mt = _stats(mt_by_method.get(m, []))
-        row.update({f"pd_{k}": v for k, v in s_pd.items()})
-        row.update({f"mt_{k}": v for k, v in s_mt.items()})
-        combined_rows.append(row)
-
-    # stable field order
-    comb_fields = ["method", "pd_n", "pd_mean", "pd_median", "pd_stdev", "pd_min", "pd_max", "mt_n", "mt_mean", "mt_median", "mt_stdev", "mt_min", "mt_max"]
-    write_csv(outdir / "phase_c_summary.csv", comb_fields, combined_rows)
-
-    # Text report
-    report_lines: List[str] = []
-    report_lines.append("Phase C — REAL distances (TTK)\n")
-    report_lines.append(f"Rows computed: {len(rows_results)}")
-    report_lines.append(f"PD distances:  {len(rows_pd)}")
-    report_lines.append(f"MT distances:  {len(rows_mt)}\n")
-
-    for m in methods:
-        s_pd = _stats(pd_by_method.get(m, []))
-        s_mt = _stats(mt_by_method.get(m, []))
-        report_lines.append(f"[{m}]")
-        if s_pd.get("n", 0):
-            report_lines.append(f"  PD  n={s_pd['n']} mean={s_pd['mean']:.6g} median={s_pd['median']:.6g} stdev={s_pd['stdev']:.6g}")
-        else:
-            report_lines.append("  PD  n=0")
-        if s_mt.get("n", 0):
-            report_lines.append(f"  MT  n={s_mt['n']} mean={s_mt['mean']:.6g} median={s_mt['median']:.6g} stdev={s_mt['stdev']:.6g}")
-        else:
-            report_lines.append("  MT  n=0")
-        report_lines.append("")
-
-    (outdir / "phase_c_summary.txt").write_text("\n".join(report_lines))
-
-    print(f"Wrote: {outdir/'phase_c_results.csv'}")
-    print(f"Wrote: {outdir/'pd_pairwise_distances.csv'}")
-    print(f"Wrote: {outdir/'mt_pairwise_distances.csv'}")
-    print(f"Wrote: {outdir/'phase_c_summary.csv'}")
-    print(f"Wrote: {outdir/'phase_c_summary.txt'}")
     return 0
 
 
