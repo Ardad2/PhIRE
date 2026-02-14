@@ -1,74 +1,7 @@
-# Reproduction notes
-
-## Apple Silicon (M1/M2) note
-On Apple Silicon, run **both** the TensorFlow 1.15.x container and the topology container as `linux/amd64`.
-TensorFlow 1.15.x is also most reliable under `linux/amd64` on Apple Silicon and gudhi wheels may not be avaliable for 'linux/arm64'.
-
-## 0) Prereq: Docker Desktop running
-```bash
-docker info >/dev/null
-docker buildx version
-```
-
-## Phase A (Euler characteristic curves)
-
-Runs the Phase A pipeline in a pinned TF1.15 container.
-
-It generates:
-
-* SR outputs under data_out
-* Qualitative figures under figs_quick/
-* Euler-curve plots in the repo root.
-
-```bash
-chmod +x reproduce_phase_a_docker.sh
-./reproduce_phase_a_docker.sh
-```
-
-The expected outputs:
-* figs_quick/error_*.png, figs_quick/triptych_*.png
-* euler_curve_speed_mrhr.png
-* euler_curve_absdiff_speed_mrhr.png
-* topo_euler_results_mrhr.csv
-
-## Phase B.1 (Persistence Diagrams + Wasserstein/Bottleneck)
-Runs:
-1. SR generation (TF1.15.5 container)
-    1. data_out/wind_mrhr_gan/ and data_out/wind_mrhr_cnn/
-2. Topology container build (Dockerfile.topo: GUDHI + POT etc.)
-3. Persistence evaluation + Plots
-    1. phase_b_persistence_eval.py -> phase_b_persistence_results.csv
-    2. plot_phase_b_summary.py -> figures in figs_phase_b/
-```bash
-chmod +x reproduce_phase_b.sh
-TF_PLATFORM=linux/amd64 TOPO_PLATFORM=linux/amd64 ./reproduce_phase_b.sh
-```
-Expected outputs:
-* phase_b_persistence_results.csv
-* figs_phase_b/bar_mean_w1_pd0.png
-* figs_phase_b/bar_mean_w1_pd1.png
-* figs_phase_b/scatter_psnr_w1_pd0_CNN_MRHR.png
-* figs_phase_b/scatter_psnr_w1_pd0_GAN_MRHR.png
-* figs_phase_b/scatter_psnr_w1_pd1_CNN_MRHR.png
-* figs_phase_b/scatter_psnr_w1_pd1_GAN_MRHR.png
-
-To keep in mind:
-* TF warnings due to deprecated TF1 APIs.
-* "Allocations exceeds 10% of system memory" warnings are quite common for the arrays.
-* Bicbuic baseline is computed by upsampling the wind components u and v separately and then recomputing the magnitude.
 
 
 
-Note for Apple Silicon: the topology container must be built/run as linux/amd64 since gudhi wheels may not be avaliable for linux/arm64.
-
-# 1) Install + start Docker Desktop (must be running)
-docker info >/dev/null
-
-# 2) Run Phase A in the pinned TF1.15 container
-chmod +x reproduce_phase_a_docker.sh
-./reproduce_phase_a_docker.sh
-
-
+________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
 ## Physics-Informed Resolution-Enhancing GANs (PhIRE GANs)
 
 This repository contains code for the model described in 
