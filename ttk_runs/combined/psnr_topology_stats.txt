@@ -1,0 +1,21 @@
+=== Correlations (PSNR vs topology; lower topology is better) ===
+global Pearson(PSNR, PD): -0.46674292701621645
+global Pearson(PSNR, MT): -0.6161392756834466
+global Spearman(PSNR, PD): -0.3696969696969697
+global Spearman(PSNR, MT): -0.6242424242424242
+
+[cnn] n=5
+  Pearson(PSNR, PD): -0.7059803948022403
+  Pearson(PSNR, MT): -0.7565426310022153
+  Spearman(PSNR, PD): -0.8999999999999998
+  Spearman(PSNR, MT): -0.7
+
+[gan] n=5
+  Pearson(PSNR, PD): -0.34999189695826505
+  Pearson(PSNR, MT): -0.48771099374044913
+  Spearman(PSNR, PD): 0.19999999999999998
+  Spearman(PSNR, MT): -0.49999999999999994
+
+=== Mean deltas (GAN - CNN); >0 means CNN lower/better ===
+PD delta: 1.8636  95% CI [-4.0433, 8.6641]
+MT delta: 1.7557  95% CI [-0.1537, 4.1173]
