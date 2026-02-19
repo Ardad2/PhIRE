@@ -16,6 +16,8 @@ WORKDIR="$(pwd)"
 VTI_ROOT="vtk_inputs"
 OUT_ROOT="ttk_runs"
 DEBUG=0
+RUN_PSNR_ANALYSIS=1
+CLEANUP_PER_METHOD=0
 
 usage() {
   cat <<EOF
@@ -33,8 +35,22 @@ Options:
   --vti-root DIR         VTI output root (default: vtk_inputs)
   --out-root DIR         Output root (default: ttk_runs)
   --debug                Enable debug mode for distance script
+  --skip-psnr-analysis   Skip PSNR-vs-topology analysis in combined step
+  --cleanup-per-method   Remove per-method phase_c_final folders after combine
   -h, --help             Show this help
 EOF
+}
+
+contains_method() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do
+    if [[ "$item" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -50,6 +66,8 @@ while [[ $# -gt 0 ]]; do
     --vti-root) VTI_ROOT="$2"; shift 2 ;;
     --out-root) OUT_ROOT="$2"; shift 2 ;;
     --debug) DEBUG=1; shift ;;
+    --skip-psnr-analysis) RUN_PSNR_ANALYSIS=0; shift ;;
+    --cleanup-per-method) CLEANUP_PER_METHOD=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1"; usage; exit 2 ;;
   esac
@@ -167,6 +185,21 @@ done
 if [[ ${#final_inputs[@]} -ge 2 ]]; then
   echo "\n================ COMBINED REPORT ================"
   python3 scripts/combine_phase_c_results.py --inputs "${final_inputs[@]}" --outdir "$OUT_ROOT/combined"
+
+  if [[ "$RUN_PSNR_ANALYSIS" -eq 1 ]] && contains_method gan "${METHODS[@]}" && contains_method cnn "${METHODS[@]}"; then
+    echo "\n================ PSNR vs TOPOLOGY ================"
+    python3 scripts/analyze_psnr_vs_ttk_topology.py \
+      --combined "$OUT_ROOT/combined/combined_pairwise_results.csv" \
+      --gan-dir data_out/wind_mrhr_gan \
+      --cnn-dir data_out/wind_mrhr_cnn \
+      --outdir "$OUT_ROOT/combined"
+  fi
+
+  if [[ "$CLEANUP_PER_METHOD" -eq 1 ]]; then
+    for method in "${METHODS[@]}"; do
+      rm -rf "$OUT_ROOT/$method/phase_c_final"
+    done
+  fi
 fi
 
 echo "\n[done] pipeline complete"
