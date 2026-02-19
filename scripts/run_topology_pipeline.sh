@@ -53,6 +53,22 @@ contains_method() {
   return 1
 }
 
+move_matches() {
+  local dest_dir="$1"
+  shift
+
+  shopt -s nullglob
+  local matches=("$@")
+  shopt -u nullglob
+
+  if [[ ${#matches[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  # Force overwrite and bypass interactive aliases/configurations that can block.
+  command mv -f -- "${matches[@]}" "$dest_dir"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --methods) read -r -a METHODS <<< "$2"; shift 2 ;;
@@ -136,10 +152,10 @@ run_ttk_extract() {
   done
 
   mkdir -p "$pd_dir/GT" "$pd_dir/SR" "$mt_dir/GT" "$mt_dir/SR"
-  mv "$pd_dir"/${method}_GT_* "$pd_dir/GT/" 2>/dev/null || true
-  mv "$pd_dir"/${method}_SR_* "$pd_dir/SR/" 2>/dev/null || true
-  mv "$mt_dir"/${method}_GT_* "$mt_dir/GT/" 2>/dev/null || true
-  mv "$mt_dir"/${method}_SR_* "$mt_dir/SR/" 2>/dev/null || true
+  move_matches "$pd_dir/GT/" "$pd_dir"/${method}_GT_*
+  move_matches "$pd_dir/SR/" "$pd_dir"/${method}_SR_*
+  move_matches "$mt_dir/GT/" "$mt_dir"/${method}_GT_*
+  move_matches "$mt_dir/SR/" "$mt_dir"/${method}_SR_*
 
   echo "[check] PD count: $(find "$pd_dir" -name '*.vtu' | wc -l)"
   echo "[check] MT port0 count: $(find "$mt_dir" -name '*_port_0.vtu' | wc -l)"
