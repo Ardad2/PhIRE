@@ -24,8 +24,8 @@ usage() {
 Usage: $0 [options]
 
 Options:
-  --methods "gan cnn"   Methods to run (default: "gan")
-  --samples "0 1 2 3 4" Sample indices (default: "0 1 2 3 4")
+  --methods gan cnn     Methods to run (default: gan); also accepts quoted list
+  --samples 0 1 2 3 4  Sample indices (default: 0 1 2 3 4); also accepts quoted list
   --scalar speed|u|v     Scalar for VTI generation (default: speed)
   --patch N              Patch size (default: 160)
   --x0 N                 Patch x offset (default: 0)
@@ -53,10 +53,50 @@ contains_method() {
   return 1
 }
 
+move_matches() {
+  local dest_dir="$1"
+  shift
+
+  shopt -s nullglob
+  local matches=("$@")
+  shopt -u nullglob
+
+  if [[ ${#matches[@]} -eq 0 ]]; then
+    return 0
+  fi
+
+  # Force overwrite and bypass interactive aliases/configurations that can block.
+  command mv -f -- "${matches[@]}" "$dest_dir"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --methods) read -r -a METHODS <<< "$2"; shift 2 ;;
-    --samples) read -r -a SAMPLES <<< "$2"; shift 2 ;;
+    --methods)
+      METHODS=()
+      shift
+      while [[ $# -gt 0 && "$1" != --* ]]; do
+        read -r -a _m <<< "$1"
+        METHODS+=("${_m[@]}")
+        shift
+      done
+      if [[ ${#METHODS[@]} -eq 0 ]]; then
+        echo "[error] --methods requires at least one method (e.g. --methods gan cnn)"
+        exit 2
+      fi
+      ;;
+    --samples)
+      SAMPLES=()
+      shift
+      while [[ $# -gt 0 && "$1" != --* ]]; do
+        read -r -a _s <<< "$1"
+        SAMPLES+=("${_s[@]}")
+        shift
+      done
+      if [[ ${#SAMPLES[@]} -eq 0 ]]; then
+        echo "[error] --samples requires at least one index (e.g. --samples 0 1 2)"
+        exit 2
+      fi
+      ;;
     --scalar) SCALAR="$2"; shift 2 ;;
     --patch) PATCH="$2"; shift 2 ;;
     --x0) X0="$2"; shift 2 ;;
@@ -74,6 +114,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 mkdir -p "$OUT_ROOT"
+
+echo "[config] methods: ${METHODS[*]}"
+echo "[config] samples: ${SAMPLES[*]}"
 
 run_convert() {
   local method="$1"
@@ -136,10 +179,10 @@ run_ttk_extract() {
   done
 
   mkdir -p "$pd_dir/GT" "$pd_dir/SR" "$mt_dir/GT" "$mt_dir/SR"
-  mv "$pd_dir"/${method}_GT_* "$pd_dir/GT/" 2>/dev/null || true
-  mv "$pd_dir"/${method}_SR_* "$pd_dir/SR/" 2>/dev/null || true
-  mv "$mt_dir"/${method}_GT_* "$mt_dir/GT/" 2>/dev/null || true
-  mv "$mt_dir"/${method}_SR_* "$mt_dir/SR/" 2>/dev/null || true
+  move_matches "$pd_dir/GT/" "$pd_dir"/${method}_GT_*
+  move_matches "$pd_dir/SR/" "$pd_dir"/${method}_SR_*
+  move_matches "$mt_dir/GT/" "$mt_dir"/${method}_GT_*
+  move_matches "$mt_dir/SR/" "$mt_dir"/${method}_SR_*
 
   echo "[check] PD count: $(find "$pd_dir" -name '*.vtu' | wc -l)"
   echo "[check] MT port0 count: $(find "$mt_dir" -name '*_port_0.vtu' | wc -l)"
