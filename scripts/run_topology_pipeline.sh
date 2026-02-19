@@ -229,6 +229,10 @@ if [[ ${#final_inputs[@]} -ge 2 ]]; then
   echo "\n================ COMBINED REPORT ================"
   python3 scripts/combine_phase_c_results.py --inputs "${final_inputs[@]}" --outdir "$OUT_ROOT/combined"
 
+  # Reuse Phase C visualization on the combined rows for report-ready combined plots.
+  cp "$OUT_ROOT/combined/combined_pairwise_results.csv" "$OUT_ROOT/combined/phase_c_results.csv"
+  python3 scripts/phase_c_final_visualization.py --indir "$OUT_ROOT/combined"
+
   if [[ "$RUN_PSNR_ANALYSIS" -eq 1 ]] && contains_method gan "${METHODS[@]}" && contains_method cnn "${METHODS[@]}"; then
     echo "\n================ PSNR vs TOPOLOGY ================"
     python3 scripts/analyze_psnr_vs_ttk_topology.py \
