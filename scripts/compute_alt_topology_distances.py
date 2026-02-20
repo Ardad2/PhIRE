@@ -2,7 +2,7 @@
 """Experimental alternate topology-distance pipeline (kept separate).
 
 This script mirrors the existing Phase-C pairing logic but uses alternate TTK filters:
-- PD: ttkPersistenceDiagramDistanceMatrix
+- PD: ttkPersistenceDiagramDistanceMatrix (configurable Wasserstein p)
 - MT: ttkMergeTreeDistance (fallback/error if unavailable)
 
 It is intended for comparison runs against the main pipeline outputs.
@@ -142,15 +142,37 @@ def _table_value(table: vtk.vtkTable, row: int, col: int) -> Optional[float]:
 
 
 def _extract_distance_from_table(table: vtk.vtkTable) -> Optional[float]:
+    """Extract a pairwise distance robustly from a vtkTable.
+
+    Prefer off-diagonal matrix entries first to avoid accidentally returning
+    diagonal zeros.
+    """
     nrows = table.GetNumberOfRows()
     ncols = table.GetNumberOfColumns()
     if nrows == 0 or ncols == 0:
         return None
-    candidates = [(0, 1), (1, 0), (0, 0), (1, 1)]
-    for r, c in candidates:
+
+    for r, c in ((0, 1), (1, 0)):
         v = _table_value(table, r, c)
-        if v is not None:
+        if v is not None and v != 0.0:
             return v
+
+    for r in range(nrows):
+        for c in range(ncols):
+            if r == c:
+                continue
+            v = _table_value(table, r, c)
+            if v is not None and v != 0.0:
+                return v
+
+    for r in range(nrows):
+        for c in range(ncols):
+            if r == c:
+                continue
+            v = _table_value(table, r, c)
+            if v is not None:
+                return v
+
     for r in range(nrows):
         for c in range(ncols):
             v = _table_value(table, r, c)
@@ -159,7 +181,43 @@ def _extract_distance_from_table(table: vtk.vtkTable) -> Optional[float]:
     return None
 
 
-def compute_pd_distance_matrix(pd_gt: Path, pd_sr: Path) -> float:
+
+
+def _configure_pd_metric(flt: object, wasserstein_p: str, debug: bool = False) -> bool:
+    """Best-effort configuration for PD Wasserstein order on varying TTK builds."""
+    configured = False
+
+    if wasserstein_p in {"1", "2"}:
+        p_val = int(wasserstein_p)
+        for meth in ("SetWasserstein", "SetWassersteinPower", "SetWassersteinMetric"):
+            if hasattr(flt, meth):
+                try:
+                    getattr(flt, meth)(p_val)
+                    configured = True
+                    break
+                except Exception:
+                    pass
+    elif wasserstein_p == "inf":
+        for meth, val in (("SetWassersteinMetric", -1), ("SetWasserstein", -1)):
+            if hasattr(flt, meth):
+                try:
+                    getattr(flt, meth)(val)
+                    configured = True
+                    break
+                except Exception:
+                    pass
+
+    if debug and not configured:
+        print(f"[debug] PD matrix metric setter unavailable; using TTK build defaults (requested p={wasserstein_p})")
+    return configured
+
+def compute_pd_distance_matrix(
+    pd_gt: Path,
+    pd_sr: Path,
+    wasserstein_p: str = "2",
+    debug: bool = False,
+    require_metric_setter: bool = False,
+) -> float:
     ug_gt = read_dataset(pd_gt)
     ug_sr = read_dataset(pd_sr)
     mb = vtk.vtkMultiBlockDataSet()
@@ -174,6 +232,11 @@ def compute_pd_distance_matrix(pd_gt: Path, pd_sr: Path) -> float:
         flt.SetInputData(0, mb)
     if hasattr(flt, "SetThreadNumber"):
         flt.SetThreadNumber(1)
+    configured = _configure_pd_metric(flt, wasserstein_p, debug=debug)
+    if require_metric_setter and not configured:
+        raise RuntimeError(
+            f"Requested PD Wasserstein p={wasserstein_p}, but this TTK Python build does not expose a compatible metric setter"
+        )
     flt.Update()
 
     out0 = flt.GetOutputDataObject(0)
@@ -203,8 +266,43 @@ def _make_tree(port_map: Dict[int, MTEntry]) -> vtk.vtkMultiBlockDataSet:
     return tree
 
 
-def _compute_mt_distance_direct(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEntry]) -> float:
+def _compute_mt_distance_matrix_fallback(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEntry]) -> float:
+    gt_tree = _make_tree(mt_gt_ports)
+    sr_tree = _make_tree(mt_sr_ports)
+
+    trees = vtk.vtkMultiBlockDataSet()
+    trees.SetNumberOfBlocks(2)
+    trees.SetBlock(0, gt_tree)
+    trees.SetBlock(1, sr_tree)
+
+    flt = ttk.ttkMergeTreeDistanceMatrix()
+    if hasattr(flt, "SetInputDataObject"):
+        flt.SetInputDataObject(0, trees)
+    else:
+        flt.SetInputData(0, trees)
+    if hasattr(flt, "SetThreadNumber"):
+        flt.SetThreadNumber(1)
+    flt.Update()
+
+    out0 = flt.GetOutputDataObject(0)
+    if isinstance(out0, vtk.vtkTable):
+        dist = _extract_distance_from_table(out0)
+        if dist is not None:
+            return dist
+    if isinstance(out0, vtk.vtkMultiBlockDataSet):
+        for i in range(out0.GetNumberOfBlocks()):
+            blk = out0.GetBlock(i)
+            if isinstance(blk, vtk.vtkTable):
+                dist = _extract_distance_from_table(blk)
+                if dist is not None:
+                    return dist
+    raise RuntimeError("Could not extract MT distance from ttkMergeTreeDistanceMatrix fallback")
+
+
+def _compute_mt_distance_direct(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEntry], allow_matrix_fallback: bool = True) -> float:
     if not hasattr(ttk, "ttkMergeTreeDistance"):
+        if allow_matrix_fallback:
+            return _compute_mt_distance_matrix_fallback(mt_gt_ports, mt_sr_ports)
         raise RuntimeError("This TTK build has no ttkMergeTreeDistance python wrapper")
 
     gt_tree = _make_tree(mt_gt_ports)
@@ -270,7 +368,8 @@ def _run_mt_worker(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEnt
         cmd.extend(["--gt-port2", str(mt_gt_ports[2].path), "--sr-port2", str(mt_sr_ports[2].path)])
 
     env = os.environ.copy()
-    env.setdefault("PYTHONFAULTHANDLER", "1")
+    if debug:
+        env.setdefault("PYTHONFAULTHANDLER", "1")
     cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     if cp.returncode != 0:
         detail = cp.stderr.strip()
@@ -284,6 +383,11 @@ def _run_mt_worker(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEnt
             except Exception:
                 if not detail:
                     detail = lines[-1]
+        if detail:
+            summary_lines = [ln for ln in detail.splitlines() if ln.strip()][:6]
+            detail = " | ".join(summary_lines)
+        if cp.returncode in (-11, 139):
+            detail = f"segfault in worker ({detail})"
         if debug:
             print(f"[debug] alt MT worker failed rc={cp.returncode}: {detail}")
         return None, f"worker failed rc={cp.returncode}: {detail}"
@@ -319,10 +423,13 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--outdir", type=Path, required=False)
     ap.add_argument("--max", type=int, default=0)
     ap.add_argument("--debug", action="store_true")
+    ap.add_argument("--pd-wasserstein-p", choices=["1", "2", "inf"], default="2", help="Wasserstein order for ttkPersistenceDiagramDistanceMatrix")
+    ap.add_argument("--require-pd-metric-setter", action="store_true", help="Fail if requested PD order cannot be explicitly set by this TTK build")
     mt_mode = ap.add_mutually_exclusive_group()
     mt_mode.add_argument("--isolate-mt", dest="isolate_mt", action="store_true", help="Run MT in worker subprocesses (default)")
     mt_mode.add_argument("--no-isolate-mt", dest="isolate_mt", action="store_false", help="Run MT direct in-process")
     ap.set_defaults(isolate_mt=True)
+    ap.add_argument("--fail-on-error", action="store_true", help="Return non-zero if any PD/MT pair fails")
 
     # worker mode
     ap.add_argument("--_mt-worker", action="store_true", help=argparse.SUPPRESS)
@@ -349,7 +456,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 gt_ports[2] = MTEntry("", "", "GT", 2, args.gt_port2)
             if str(args.sr_port2):
                 sr_ports[2] = MTEntry("", "", "SR", 2, args.sr_port2)
-            d = _compute_mt_distance_direct(gt_ports, sr_ports)
+            d = _compute_mt_distance_direct(gt_ports, sr_ports, allow_matrix_fallback=True)
             print(json.dumps({"ok": True, "distance": d}))
             return 0
         except Exception as e:
@@ -371,6 +478,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     rows_results: List[Dict[str, object]] = []
     rows_pd: List[Dict[str, object]] = []
     rows_mt: List[Dict[str, object]] = []
+    error_count = 0
 
     if args.debug:
         print(f"[debug] discovered {len(keys)} keys")
@@ -387,9 +495,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         err = ""
 
         try:
-            pd_dist = compute_pd_distance_matrix(pd_gt.path, pd_sr.path)
+            pd_dist = compute_pd_distance_matrix(
+                pd_gt.path,
+                pd_sr.path,
+                wasserstein_p=args.pd_wasserstein_p,
+                debug=args.debug,
+                require_metric_setter=args.require_pd_metric_setter,
+            )
             if args.debug:
-                print(f"[debug] alt PD matrix {pd_gt.path.name} vs {pd_sr.path.name} = {pd_dist}")
+                print(f"[debug] alt PD matrix (p={args.pd_wasserstein_p}) {pd_gt.path.name} vs {pd_sr.path.name} = {pd_dist}")
         except Exception as e:
             err = f"pd:{e}"
 
@@ -399,7 +513,7 @@ def main(argv: Optional[List[str]] = None) -> int:
                 if mt_dist is None:
                     raise RuntimeError(mt_err)
             else:
-                mt_dist = _compute_mt_distance_direct(mt_gt_ports, mt_sr_ports)
+                mt_dist = _compute_mt_distance_direct(mt_gt_ports, mt_sr_ports, allow_matrix_fallback=True)
             if args.debug:
                 print(f"[debug] alt MT direct {key} = {mt_dist}")
         except Exception as e:
@@ -419,6 +533,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                 "error": err,
             }
         )
+        if err:
+            error_count += 1
 
     outdir = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)
@@ -433,6 +549,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"Wrote: {outdir/'alt_pd_pairwise_distances.csv'}")
     print(f"Wrote: {outdir/'alt_mt_pairwise_distances.csv'}")
     print(f"Wrote: {outdir/'alt_phase_c_results.csv'}")
+    if args.fail_on_error and error_count > 0:
+        raise SystemExit(f"Encountered {error_count} failed pair(s); see alt_phase_c_results.csv error column")
     return 0
 
 
