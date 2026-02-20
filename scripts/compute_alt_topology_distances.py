@@ -303,7 +303,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description="Compute alternate TTK distances for comparison experiments")
     ap.add_argument("--pd-dir", type=Path, required=False)
     ap.add_argument("--mt-dir", type=Path, required=False)
-    ap.add_argument("--outdir", type=Path, required=True)
+    # Keep optional at argparse-level so hidden worker mode can run without it.
+    # We validate --outdir explicitly in normal (non-worker) mode below.
+    ap.add_argument("--outdir", type=Path, required=False)
     ap.add_argument("--max", type=int, default=0)
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--isolate-mt", action="store_true", default=True)
@@ -340,8 +342,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             print(json.dumps({"ok": False, "error": str(e)}))
             return 2
 
-    if args.pd_dir is None or args.mt_dir is None:
-        raise SystemExit("--pd-dir and --mt-dir are required in normal mode")
+    if args.pd_dir is None or args.mt_dir is None or args.outdir is None:
+        raise SystemExit("--pd-dir, --mt-dir, and --outdir are required in normal mode")
 
     pd_map = discover_pd(args.pd_dir)
     mt_map = discover_mt(args.mt_dir)
