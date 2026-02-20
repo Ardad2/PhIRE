@@ -273,9 +273,20 @@ def _run_mt_worker(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEnt
     env.setdefault("PYTHONFAULTHANDLER", "1")
     cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
     if cp.returncode != 0:
+        detail = cp.stderr.strip()
+        # Worker errors are commonly emitted as JSON on stdout.
+        lines = [ln for ln in cp.stdout.splitlines() if ln.strip()]
+        if lines:
+            try:
+                payload = json.loads(lines[-1])
+                if isinstance(payload, dict) and payload.get("error"):
+                    detail = str(payload.get("error"))
+            except Exception:
+                if not detail:
+                    detail = lines[-1]
         if debug:
-            print(f"[debug] alt MT worker failed rc={cp.returncode}\n{cp.stderr}")
-        return None, f"worker failed rc={cp.returncode}"
+            print(f"[debug] alt MT worker failed rc={cp.returncode}: {detail}")
+        return None, f"worker failed rc={cp.returncode}: {detail}"
     lines = [ln for ln in cp.stdout.splitlines() if ln.strip()]
     if not lines:
         return None, "worker returned empty output"
@@ -308,7 +319,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--outdir", type=Path, required=False)
     ap.add_argument("--max", type=int, default=0)
     ap.add_argument("--debug", action="store_true")
-    ap.add_argument("--isolate-mt", action="store_true", default=True)
+    mt_mode = ap.add_mutually_exclusive_group()
+    mt_mode.add_argument("--isolate-mt", dest="isolate_mt", action="store_true", help="Run MT in worker subprocesses (default)")
+    mt_mode.add_argument("--no-isolate-mt", dest="isolate_mt", action="store_false", help="Run MT direct in-process")
+    ap.set_defaults(isolate_mt=True)
 
     # worker mode
     ap.add_argument("--_mt-worker", action="store_true", help=argparse.SUPPRESS)
