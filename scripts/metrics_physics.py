@@ -5,7 +5,7 @@ Computes per-sample metrics from GT/SR arrays (N,H,W,C), focusing on:
 - Wind-power-density proxies via speed^3
 - Spectrum mismatch (radial PSD)
 - Gradient/intermittency mismatch
-- Exceedance-area mismatch at user-provided thresholds
+- Exceedance-area mismatch at fixed and percentile-based thresholds
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import argparse
 import csv
 import math
 from pathlib import Path
-from typing import Dict, Iterable, List, Sequence, Tuple
+from typing import Dict, List, Sequence, Tuple
 
 import numpy as np
 
@@ -58,12 +58,10 @@ def _radial_psd(img2d: np.ndarray, bins: int = 32) -> Tuple[np.ndarray, np.ndarr
     r = r / (r.max() + 1e-12)
     edges = np.linspace(0.0, 1.0, bins + 1)
     vals = np.zeros(bins, dtype=float)
-    cnt = np.zeros(bins, dtype=float)
     for i in range(bins):
         m = (r >= edges[i]) & (r < edges[i + 1])
         if np.any(m):
             vals[i] = float(np.mean(p[m]))
-            cnt[i] = float(np.sum(m))
     return 0.5 * (edges[:-1] + edges[1:]), vals
 
 
@@ -71,6 +69,7 @@ def compute_physics_metrics(
     gt: np.ndarray,
     sr: np.ndarray,
     exceedance_thresholds: Sequence[float] = (5.0, 10.0, 15.0),
+    percentile_thresholds: Sequence[float] = (90.0, 95.0, 99.0),
     psd_bins: int = 32,
 ) -> List[Dict[str, float]]:
     gt = _ensure_4d(gt)
@@ -95,7 +94,7 @@ def compute_physics_metrics(
 
         k, psd_gt = _radial_psd(sgt, bins=psd_bins)
         _, psd_sr = _radial_psd(ssr, bins=psd_bins)
-        log_l2 = float(np.sqrt(np.mean((np.log1p(psd_sr) - np.log1p(psd_gt)) ** 2)))
+        psd_log_l2 = float(np.sqrt(np.mean((np.log1p(psd_sr) - np.log1p(psd_gt)) ** 2)))
         fit_lo = max(2, psd_bins // 8)
         fit_hi = max(fit_lo + 2, psd_bins // 2)
         x = np.log(k[fit_lo:fit_hi] + 1e-8)
@@ -103,7 +102,7 @@ def compute_physics_metrics(
         y_sr = np.log(psd_sr[fit_lo:fit_hi] + 1e-8)
         slope_gt = float(np.polyfit(x, y_gt, 1)[0]) if len(x) >= 2 else float("nan")
         slope_sr = float(np.polyfit(x, y_sr, 1)[0]) if len(x) >= 2 else float("nan")
-        slope_delta = float(slope_sr - slope_gt) if not (math.isnan(slope_gt) or math.isnan(slope_sr)) else float("nan")
+        psd_slope_delta = float(slope_sr - slope_gt) if not (math.isnan(slope_gt) or math.isnan(slope_sr)) else float("nan")
 
         gy_gt, gx_gt = np.gradient(sgt)
         gy_sr, gx_sr = np.gradient(ssr)
@@ -113,6 +112,7 @@ def compute_physics_metrics(
         grad_w1 = _wasserstein_1d(gm_gt, gm_sr)
         kurt_gt = float(np.mean((gm_gt - gm_gt.mean()) ** 4) / (np.std(gm_gt) ** 4 + 1e-12))
         kurt_sr = float(np.mean((gm_sr - gm_sr.mean()) ** 4) / (np.std(gm_sr) ** 4 + 1e-12))
+        grad_kurtosis_delta = float(kurt_sr - kurt_gt)
 
         row: Dict[str, float] = {
             "sample_idx": float(i),
@@ -120,20 +120,38 @@ def compute_physics_metrics(
             "wpd_mae": wpd_mae,
             "wpd_rmse": wpd_rmse,
             "wpd_w1": wpd_w1,
-            "psd_log_l2": log_l2,
+            "psd_log_l2": psd_log_l2,
             "psd_slope_gt": slope_gt,
             "psd_slope_sr": slope_sr,
-            "psd_slope_delta": slope_delta,
+            "psd_slope_delta": psd_slope_delta,
+            "psd_slope_abs_delta": float(abs(psd_slope_delta)) if not math.isnan(psd_slope_delta) else float("nan"),
             "grad_mae": grad_mae,
             "grad_w1": grad_w1,
             "grad_kurtosis_gt": kurt_gt,
             "grad_kurtosis_sr": kurt_sr,
-            "grad_kurtosis_delta": float(kurt_sr - kurt_gt),
+            "grad_kurtosis_delta": grad_kurtosis_delta,
+            "grad_kurtosis_abs_delta": float(abs(grad_kurtosis_delta)),
         }
+
         for t in exceedance_thresholds:
-            row[f"exceed_frac_gt_t{t:g}"] = float(np.mean(sgt > t))
-            row[f"exceed_frac_sr_t{t:g}"] = float(np.mean(ssr > t))
-            row[f"exceed_frac_delta_t{t:g}"] = float(np.mean(ssr > t) - np.mean(sgt > t))
+            gt_frac = float(np.mean(sgt > t))
+            sr_frac = float(np.mean(ssr > t))
+            delta = sr_frac - gt_frac
+            row[f"exceed_frac_gt_t{t:g}"] = gt_frac
+            row[f"exceed_frac_sr_t{t:g}"] = sr_frac
+            row[f"exceed_frac_delta_t{t:g}"] = delta
+            row[f"exceed_frac_abs_delta_t{t:g}"] = float(abs(delta))
+
+        for p in percentile_thresholds:
+            thr = float(np.percentile(sgt, p))
+            gt_frac = float(np.mean(sgt > thr))
+            sr_frac = float(np.mean(ssr > thr))
+            delta = sr_frac - gt_frac
+            tag = f"p{int(p)}"
+            row[f"exceed_frac_gt_{tag}"] = gt_frac
+            row[f"exceed_frac_sr_{tag}"] = sr_frac
+            row[f"exceed_frac_delta_{tag}"] = delta
+            row[f"exceed_frac_abs_delta_{tag}"] = float(abs(delta))
 
         out.append(row)
 
@@ -152,19 +170,25 @@ def _write_csv(path: Path, rows: List[Dict[str, float]]) -> None:
             w.writerow(r)
 
 
+def _parse_list(vals: str) -> List[float]:
+    return [float(x.strip()) for x in vals.split(",") if x.strip()]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Compute physics metrics from GT/SR arrays")
     ap.add_argument("--gt", required=True, help="Path to dataGT.npy")
     ap.add_argument("--sr", required=True, help="Path to dataSR.npy")
     ap.add_argument("--out", required=True, help="Output CSV path")
-    ap.add_argument("--thresholds", default="5,10,15", help="Comma-separated exceedance thresholds")
+    ap.add_argument("--thresholds", default="5,10,15", help="Comma-separated fixed exceedance thresholds")
+    ap.add_argument("--percentiles", default="90,95,99", help="Comma-separated GT percentile exceedance thresholds")
     ap.add_argument("--psd-bins", type=int, default=32)
     args = ap.parse_args()
 
     gt = np.load(args.gt)
     sr = np.load(args.sr)
-    thresholds = [float(x.strip()) for x in str(args.thresholds).split(",") if x.strip()]
-    rows = compute_physics_metrics(gt, sr, thresholds, psd_bins=args.psd_bins)
+    thresholds = _parse_list(str(args.thresholds))
+    percentiles = _parse_list(str(args.percentiles))
+    rows = compute_physics_metrics(gt, sr, thresholds, percentiles, psd_bins=args.psd_bins)
     _write_csv(Path(args.out), rows)
     print(f"Wrote: {args.out}")
 
