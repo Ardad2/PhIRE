@@ -34,8 +34,8 @@ import utils
 # CONFIGURATION
 # ============================================================================
 
-N_SAMPLES = 5
-SAMPLE_INDICES = [0, 1, 2, 3, 4]
+N_SAMPLES = 168
+SAMPLE_INDICES = list(range(N_SAMPLES))
 
 # Exact extension target sizes
 LR_SIZE = 10
