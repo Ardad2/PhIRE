@@ -1,5 +1,6 @@
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import matplotlib.pyplot as plt
 
 def conv_layer_2d(x, filter_shape, stride, trainable=True):
@@ -7,13 +8,13 @@ def conv_layer_2d(x, filter_shape, stride, trainable=True):
         name='weight',
         shape=filter_shape,
         dtype=tf.float32,
-        initializer=tf.contrib.layers.xavier_initializer(),
+        initializer=tf.glorot_uniform_initializer(),
         trainable=trainable)
     b = tf.get_variable(
         name='bias',
         shape=[filter_shape[-1]],
         dtype=tf.float32,
-        initializer=tf.contrib.layers.xavier_initializer(),
+        initializer=tf.glorot_uniform_initializer(),
         trainable=trainable)
     x = tf.nn.bias_add(tf.nn.conv2d(
         input=x,
@@ -29,13 +30,13 @@ def deconv_layer_2d(x, filter_shape, output_shape, stride, trainable=True):
         name='weight',
         shape=filter_shape,
         dtype=tf.float32,
-        initializer=tf.contrib.layers.xavier_initializer(),
+        initializer=tf.glorot_uniform_initializer(),
         trainable=trainable)
     b = tf.get_variable(
         name='bias',
         shape=[output_shape[-1]],
         dtype=tf.float32,
-        initializer=tf.contrib.layers.xavier_initializer(),
+        initializer=tf.glorot_uniform_initializer(),
         trainable=trainable)
     x = tf.nn.bias_add(tf.nn.conv2d_transpose(
         value=x,
@@ -176,10 +177,10 @@ def generate_TFRecords(filename, data, mode='test', K=None):
                 h_LR, w_LR, c = data_LR[j, ...].shape
                 features = tf.train.Features(feature={
                                      'index': _int64_feature(j),
-                                   'data_LR': _bytes_feature(data_LR[j, ...].tostring()),
+                                   'data_LR': _bytes_feature(data_LR[j, ...].tobytes()),
                                       'h_LR': _int64_feature(h_LR),
                                       'w_LR': _int64_feature(w_LR),
-                                   'data_HR': _bytes_feature(data[j, ...].tostring()),
+                                   'data_HR': _bytes_feature(data[j, ...].tobytes()),
                                       'h_HR': _int64_feature(h_HR),
                                       'w_HR': _int64_feature(w_HR),
                                          'c': _int64_feature(c)})
@@ -187,7 +188,7 @@ def generate_TFRecords(filename, data, mode='test', K=None):
                 h_LR, w_LR, c = data[j, ...].shape
                 features = tf.train.Features(feature={
                                      'index': _int64_feature(j),
-                                   'data_LR': _bytes_feature(data[j, ...].tostring()),
+                                   'data_LR': _bytes_feature(data[j, ...].tobytes()),
                                       'h_LR': _int64_feature(h_LR),
                                       'w_LR': _int64_feature(w_LR),
                                          'c': _int64_feature(c)})
