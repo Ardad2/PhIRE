@@ -1,0 +1,146 @@
+PSNR + Topology + Physics report (generated from merged CSV)
+
+input: ttk_runs/combined/psnr_topology_physics_merged.csv
+rows: 336
+method counts:
+method
+cnn    168
+gan    168
+
+=== Correlations vs psnr (global) ===
+sample_idx                      pearson=-0.1785  spearman=-0.2778
+wpd_bias                        pearson=-0.7231  spearman=-0.7812
+wpd_mae                         pearson=-0.7054  spearman=-0.7853
+wpd_rmse                        pearson=-0.6523  spearman=-0.7296
+wpd_w1                          pearson=-0.7118  spearman=-0.7874
+psd_log_l2                      pearson=-0.5345  spearman=-0.5141
+psd_slope_gt                    pearson=-0.1887  spearman=-0.2518
+psd_slope_sr                    pearson= 0.4638  spearman= 0.2643
+psd_slope_delta                 pearson= 0.5523  spearman= 0.5337
+psd_slope_abs_delta             pearson=-0.5523  spearman=-0.5337
+grad_mae                        pearson=-0.3915  spearman=-0.3079
+grad_w1                         pearson=-0.1418  spearman=-0.0675
+grad_kurtosis_gt                pearson= 0.6947  spearman= 0.6310
+grad_kurtosis_sr                pearson= 0.3888  spearman= 0.3236
+grad_kurtosis_delta             pearson=-0.3805  spearman=-0.2692
+grad_kurtosis_abs_delta         pearson= 0.3788  spearman= 0.1724
+exceed_frac_gt_t5               pearson=-0.6410  spearman=-0.5093
+exceed_frac_sr_t5               pearson=-0.8424  spearman=-0.8663
+exceed_frac_delta_t5            pearson=-0.4437  spearman=-0.4042
+exceed_frac_abs_delta_t5        pearson= 0.5247  spearman= 0.6205
+exceed_frac_gt_t10              pearson=-0.5963  spearman=-0.5089
+exceed_frac_sr_t10              pearson=-0.8705  spearman=-0.8730
+exceed_frac_delta_t10           pearson=-0.5062  spearman=-0.5047
+exceed_frac_abs_delta_t10       pearson=-0.2290  spearman=-0.1989
+exceed_frac_gt_t15              pearson=-0.3090  spearman=-0.3299
+exceed_frac_sr_t15              pearson=-0.8760  spearman=-0.8673
+exceed_frac_delta_t15           pearson=-0.8184  spearman=-0.8227
+exceed_frac_abs_delta_t15       pearson=-0.8375  spearman=-0.8278
+exceed_frac_gt_p90              pearson= 0.0051  spearman=-0.0120
+exceed_frac_sr_p90              pearson=-0.7619  spearman=-0.7876
+exceed_frac_delta_p90           pearson=-0.7619  spearman=-0.7876
+exceed_frac_abs_delta_p90       pearson=-0.7819  spearman=-0.7882
+exceed_frac_gt_p95              pearson= 0.1065  spearman= 0.1185
+exceed_frac_sr_p95              pearson=-0.7669  spearman=-0.7865
+exceed_frac_delta_p95           pearson=-0.7669  spearman=-0.7865
+exceed_frac_abs_delta_p95       pearson=-0.7759  spearman=-0.7898
+exceed_frac_gt_p99              pearson= 0.0000  spearman= nan
+exceed_frac_sr_p99              pearson=-0.7969  spearman=-0.7896
+exceed_frac_delta_p99           pearson=-0.7969  spearman=-0.7896
+exceed_frac_abs_delta_p99       pearson=-0.7971  spearman=-0.7948
+pd_distance                     pearson=-0.3984  spearman=-0.4128
+mt_distance                     pearson=-0.3310  spearman=-0.3139
+
+=== Correlations vs psnr (method=cnn) ===
+sample_idx                      pearson=-0.1807  spearman=-0.2843
+wpd_bias                        pearson=-0.7164  spearman=-0.7742
+wpd_mae                         pearson=-0.6996  spearman=-0.7823
+wpd_rmse                        pearson=-0.6432  spearman=-0.7270
+wpd_w1                          pearson=-0.7055  spearman=-0.7817
+psd_log_l2                      pearson=-0.2043  spearman=-0.1628
+psd_slope_gt                    pearson=-0.1900  spearman=-0.2540
+psd_slope_sr                    pearson= 0.3412  spearman= 0.0359
+psd_slope_delta                 pearson= 0.5080  spearman= 0.4285
+psd_slope_abs_delta             pearson=-0.5080  spearman=-0.4285
+grad_mae                        pearson=-0.2036  spearman=-0.1458
+grad_w1                         pearson= 0.4474  spearman= 0.5419
+grad_kurtosis_gt                pearson= 0.6873  spearman= 0.6213
+grad_kurtosis_sr                pearson= 0.4128  spearman= 0.4436
+grad_kurtosis_delta             pearson=-0.3248  spearman=-0.1327
+grad_kurtosis_abs_delta         pearson= 0.4776  spearman= 0.3526
+exceed_frac_gt_t5               pearson=-0.6581  spearman=-0.5314
+exceed_frac_sr_t5               pearson=-0.8331  spearman=-0.8660
+exceed_frac_delta_t5            pearson=-0.4263  spearman=-0.3808
+exceed_frac_abs_delta_t5        pearson= 0.5209  spearman= 0.6296
+exceed_frac_gt_t10              pearson=-0.6148  spearman=-0.5339
+exceed_frac_sr_t10              pearson=-0.8637  spearman=-0.8697
+exceed_frac_delta_t10           pearson=-0.4863  spearman=-0.4827
+exceed_frac_abs_delta_t10       pearson=-0.2012  spearman=-0.1747
+exceed_frac_gt_t15              pearson=-0.3319  spearman=-0.3599
+exceed_frac_sr_t15              pearson=-0.8698  spearman=-0.8637
+exceed_frac_delta_t15           pearson=-0.8020  spearman=-0.8080
+exceed_frac_abs_delta_t15       pearson=-0.8211  spearman=-0.8128
+exceed_frac_gt_p90              pearson= 0.0073  spearman=-0.0136
+exceed_frac_sr_p90              pearson=-0.7418  spearman=-0.7688
+exceed_frac_delta_p90           pearson=-0.7418  spearman=-0.7688
+exceed_frac_abs_delta_p90       pearson=-0.7621  spearman=-0.7696
+exceed_frac_gt_p95              pearson= 0.1084  spearman= 0.1205
+exceed_frac_sr_p95              pearson=-0.7457  spearman=-0.7686
+exceed_frac_delta_p95           pearson=-0.7457  spearman=-0.7686
+exceed_frac_abs_delta_p95       pearson=-0.7547  spearman=-0.7718
+exceed_frac_gt_p99              pearson=-0.0000  spearman= nan
+exceed_frac_sr_p99              pearson=-0.7763  spearman=-0.7698
+exceed_frac_delta_p99           pearson=-0.7763  spearman=-0.7698
+exceed_frac_abs_delta_p99       pearson=-0.7764  spearman=-0.7743
+pd_distance                     pearson=-0.2132  spearman=-0.2957
+mt_distance                     pearson=-0.1142  spearman=-0.1624
+
+=== Correlations vs psnr (method=gan) ===
+sample_idx                      pearson=-0.1776  spearman=-0.2771
+wpd_bias                        pearson=-0.7270  spearman=-0.7781
+wpd_mae                         pearson=-0.7081  spearman=-0.7777
+wpd_rmse                        pearson=-0.6568  spearman=-0.7248
+wpd_w1                          pearson=-0.7152  spearman=-0.7823
+psd_log_l2                      pearson=-0.7365  spearman=-0.7149
+psd_slope_gt                    pearson=-0.1887  spearman=-0.2580
+psd_slope_sr                    pearson= 0.6370  spearman= 0.5656
+psd_slope_delta                 pearson= 0.6027  spearman= 0.6172
+psd_slope_abs_delta             pearson=-0.6027  spearman=-0.6172
+grad_mae                        pearson=-0.5847  spearman=-0.4442
+grad_w1                         pearson=-0.6211  spearman=-0.5861
+grad_kurtosis_gt                pearson= 0.7061  spearman= 0.6487
+grad_kurtosis_sr                pearson= 0.3749  spearman= 0.2195
+grad_kurtosis_delta             pearson=-0.4440  spearman=-0.3874
+grad_kurtosis_abs_delta         pearson= 0.2661  spearman= 0.0177
+exceed_frac_gt_t5               pearson=-0.6287  spearman=-0.4995
+exceed_frac_sr_t5               pearson=-0.8554  spearman=-0.8718
+exceed_frac_delta_t5            pearson=-0.4616  spearman=-0.4175
+exceed_frac_abs_delta_t5        pearson= 0.5301  spearman= 0.6169
+exceed_frac_gt_t10              pearson=-0.5824  spearman=-0.4963
+exceed_frac_sr_t10              pearson=-0.8804  spearman=-0.8757
+exceed_frac_delta_t10           pearson=-0.5257  spearman=-0.5154
+exceed_frac_abs_delta_t10       pearson=-0.2550  spearman=-0.2111
+exceed_frac_gt_t15              pearson=-0.2891  spearman=-0.3096
+exceed_frac_sr_t15              pearson=-0.8834  spearman=-0.8690
+exceed_frac_delta_t15           pearson=-0.8347  spearman=-0.8330
+exceed_frac_abs_delta_t15       pearson=-0.8536  spearman=-0.8378
+exceed_frac_gt_p90              pearson= 0.0031  spearman=-0.0136
+exceed_frac_sr_p90              pearson=-0.7813  spearman=-0.7983
+exceed_frac_delta_p90           pearson=-0.7813  spearman=-0.7983
+exceed_frac_abs_delta_p90       pearson=-0.8008  spearman=-0.7992
+exceed_frac_gt_p95              pearson= 0.1054  spearman= 0.1221
+exceed_frac_sr_p95              pearson=-0.7868  spearman=-0.7968
+exceed_frac_delta_p95           pearson=-0.7868  spearman=-0.7968
+exceed_frac_abs_delta_p95       pearson=-0.7957  spearman=-0.8004
+exceed_frac_gt_p99              pearson= 0.0000  spearman= nan
+exceed_frac_sr_p99              pearson=-0.8157  spearman=-0.8013
+exceed_frac_delta_p99           pearson=-0.8157  spearman=-0.8013
+exceed_frac_abs_delta_p99       pearson=-0.8160  spearman=-0.8072
+pd_distance                     pearson=-0.5340  spearman=-0.4966
+mt_distance                     pearson=-0.4762  spearman=-0.4820
+
+=== Mean deltas (GAN - CNN) with 95% bootstrap CI ===
+psnr        : -0.3464  95% CI [-0.3765, -0.3194]  (n=168)
+pd_distance :  4.8949  95% CI [ 4.1807,  5.6041]  (n=168)
+mt_distance :  6.0530  95% CI [ 5.2549,  6.9938]  (n=168)
+
