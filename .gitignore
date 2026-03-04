@@ -72,3 +72,29 @@ ttk_runs/**
 
 # Optional: logs
 topo_*.log
+
+# ------------------------------
+# PhIRE generated artifacts (HUGE)
+# ------------------------------
+data_out/
+vtk_inputs/
+ttk_outputs*/
+ttk_runs_test*/
+ttk_runs_*          # e.g., ttk_runs_testcnn, ttk_runs_testfix
+
+example_data_backup/
+example_data_clone*/
+example_data_clone_exact*/
+example_data_extension_500/
+
+# Large binary formats
+*.npy
+*.npz
+*.tfrecord
+*.vti
+*.vtu
+*.vtk
+*.vtp
+*.vts
+*.vtr
+
