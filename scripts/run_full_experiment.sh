@@ -265,14 +265,14 @@ if [[ "$DO_POST" -eq 1 ]]; then
     --out-report "${OUT_ROOT}/combined/psnr_topology_physics_report.txt" \
     --out-delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv"
 
-  python3 scripts/add_ssim_to_merged.py \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/add_ssim_to_merged.py \
     --in-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
     --out-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
     --method-dir gan=data_out/wind_mrhr_gan \
     --method-dir cnn=data_out/wind_mrhr_cnn \
     --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}"
 
-  python3 scripts/plot_topology_physics_analysis.py \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
     --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
     --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
     --outdir "${OUT_ROOT}/combined/figs_topology_physics"

@@ -309,7 +309,8 @@ def main() -> None:
     ap.add_argument("--out-delta-csv", default="", help="Optional CSV path for paired-delta table")
     ap.add_argument("--tie-eps", type=float, default=0.25)
     ap.add_argument("--topo-gap-z", type=float, default=1.0)
-    ap.add_argument("--bootstrap", type=int, default=2000)
+    ap.add_argument("--bootstrap", type=int, default=2000, help="Bootstrap iterations")
+    ap.add_argument("--nboot", type=int, default=None, help="Alias for --bootstrap")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -319,11 +320,12 @@ def main() -> None:
     merged = merge_rows(topo, metrics)
     write_csv(Path(args.out_csv), merged)
 
+    nboot = args.bootstrap if args.nboot is None else args.nboot
     report, delta_rows = summarize(
         merged,
         tie_eps=args.tie_eps,
         topo_gap_z=args.topo_gap_z,
-        nboot=args.bootstrap,
+        nboot=nboot,
         seed=args.seed,
     )
     Path(args.out_report).write_text(report)

@@ -22,7 +22,7 @@ try:
 except Exception as e:  # pragma: no cover
     raise SystemExit(f"matplotlib required: {e}")
 
-BASE_COLS = {"method", "key", "sample_idx", "psnr", "pd_distance", "mt_distance"}
+BASE_COLS = {"method", "key", "sample_idx", "psnr", "ssim", "pd_distance", "mt_distance"}
 
 
 def _to_float(x: object) -> Optional[float]:
@@ -67,7 +67,7 @@ def _corr(x: np.ndarray, y: np.ndarray) -> float:
 
 
 def _matrix(rows: List[Dict[str, str]], physics_cols: Sequence[str]) -> Tuple[np.ndarray, List[str], List[str]]:
-    targets = ["psnr", "pd_distance", "mt_distance"]
+    targets = ["psnr", "ssim", "pd_distance", "mt_distance"]
     m = np.zeros((len(physics_cols), len(targets)), dtype=float)
     m[:] = np.nan
     for i, pcol in enumerate(physics_cols):
@@ -99,6 +99,55 @@ def _plot_heatmap(mat: np.ndarray, ylabels: Sequence[str], xlabels: Sequence[str
     fig.savefig(out, dpi=220)
     plt.close(fig)
 
+
+
+
+def _scatter(ax, x: np.ndarray, y: np.ndarray, title: str, xlabel: str, ylabel: str) -> None:
+    n = min(len(x), len(y))
+    ax.scatter(x[:n], y[:n], s=34)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.grid(True, linestyle="--", alpha=0.3)
+
+
+def _plot_ssim_vs_topology_global(rows: List[Dict[str, str]], out: Path) -> None:
+    ssim = _arr(rows, "ssim")
+    pd = _arr(rows, "pd_distance")
+    mt = _arr(rows, "mt_distance")
+
+    fig = plt.figure(figsize=(10, 4.2))
+    ax1 = fig.add_subplot(1, 2, 1)
+    _scatter(ax1, ssim, pd, "Global: SSIM vs PD", "SSIM", "PD distance")
+    ax2 = fig.add_subplot(1, 2, 2)
+    _scatter(ax2, ssim, mt, "Global: SSIM vs MT", "SSIM", "MT distance")
+    fig.tight_layout()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, dpi=220)
+    plt.close(fig)
+
+
+def _plot_ssim_vs_topology_by_method(rows: List[Dict[str, str]], out: Path) -> None:
+    methods = sorted({str(r.get("method", "")) for r in rows if str(r.get("method", "")).strip()})
+    if not methods:
+        return
+
+    fig = plt.figure(figsize=(10, max(4.2, 3.2 * len(methods))))
+    for i, m in enumerate(methods, start=1):
+        sub = [r for r in rows if str(r.get("method", "")) == m]
+        ssim = _arr(sub, "ssim")
+        pd = _arr(sub, "pd_distance")
+        mt = _arr(sub, "mt_distance")
+
+        ax1 = fig.add_subplot(len(methods), 2, 2 * i - 1)
+        _scatter(ax1, ssim, pd, f"{m.upper()}: SSIM vs PD", "SSIM", "PD distance")
+        ax2 = fig.add_subplot(len(methods), 2, 2 * i)
+        _scatter(ax2, ssim, mt, f"{m.upper()}: SSIM vs MT", "SSIM", "MT distance")
+
+    fig.tight_layout()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out, dpi=220)
+    plt.close(fig)
 
 def _plot_delta_scatters(delta_rows: List[Dict[str, str]], physics_cols: Sequence[str], out: Path, top_n: int = 9) -> None:
     candidates = [c for c in physics_cols if c in {"wpd_rmse", "wpd_mae", "grad_mae", "psd_log_l2"}]
@@ -204,7 +253,7 @@ def main() -> int:
     physics_cols = [c for c in _num_cols(rows) if c not in BASE_COLS and not c.endswith("_gt") and not c.endswith("_sr")]
 
     mat, ylabels, xlabels = _matrix(rows, physics_cols)
-    _plot_heatmap(mat, ylabels, xlabels, "Global correlations: physics vs PSNR/PD/MT", args.outdir / "corr_heatmap_global.png")
+    _plot_heatmap(mat, ylabels, xlabels, "Global correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / "corr_heatmap_global.png")
 
     methods = sorted({str(r.get("method", "")) for r in rows if str(r.get("method", "")).strip()})
     for m in methods:
@@ -212,7 +261,10 @@ def main() -> int:
         if len(sub) < 2:
             continue
         mm, yy, xx = _matrix(sub, physics_cols)
-        _plot_heatmap(mm, yy, xx, f"{m.upper()} correlations: physics vs PSNR/PD/MT", args.outdir / f"corr_heatmap_{m}.png")
+        _plot_heatmap(mm, yy, xx, f"{m.upper()} correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / f"corr_heatmap_{m}.png")
+
+    _plot_ssim_vs_topology_global(rows, args.outdir / "ssim_vs_topology_global.png")
+    _plot_ssim_vs_topology_by_method(rows, args.outdir / "ssim_vs_topology_by_method.png")
 
     tie_rows = _top_tie_break_rows(rows, tie_eps=args.tie_eps, min_z=args.topo_gap_z, k=args.top_k)
     _plot_tie_table(tie_rows, args.outdir / "psnr_tie_topology_break_table.png")
@@ -227,6 +279,8 @@ def main() -> int:
         p = args.outdir / f"corr_heatmap_{m}.png"
         if p.exists():
             print(f"Wrote: {p}")
+    print(f"Wrote: {args.outdir/'ssim_vs_topology_global.png'}")
+    print(f"Wrote: {args.outdir/'ssim_vs_topology_by_method.png'}")
     print(f"Wrote: {args.outdir/'psnr_tie_topology_break_table.png'}")
     if args.delta_csv is not None:
         p = args.outdir / "paired_delta_scatter_grid.png"
@@ -237,4 +291,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
