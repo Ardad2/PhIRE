@@ -251,14 +251,14 @@ if [[ "$DO_POST" -eq 1 ]]; then
   cp -f "${OUT_ROOT}/combined/combined_pairwise_results.csv" "${OUT_ROOT}/combined/phase_c_results.csv"
   python3 scripts/phase_c_final_visualization.py --indir "${OUT_ROOT}/combined" || true
 
-  python3 scripts/analyze_psnr_vs_ttk_topology.py \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analyze_psnr_vs_ttk_topology.py \
     --combined "${OUT_ROOT}/combined/combined_pairwise_results.csv" \
     --gan-dir data_out/wind_mrhr_gan \
     --cnn-dir data_out/wind_mrhr_cnn \
     --outdir "${OUT_ROOT}/combined"
 
-  python3 scripts/analysis_compare.py \
-    --topology-csv "${O UT_ROOT}/combined/combined_pairwise_results.csv" \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analysis_compare.py \
+    --topology-csv "${OUT_ROOT}/combined/combined_pairwise_results.csv" \
     --method-dir gan=data_out/wind_mrhr_gan \
     --method-dir cnn=data_out/wind_mrhr_cnn \
     --out-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
