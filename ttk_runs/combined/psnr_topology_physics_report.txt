@@ -1,5 +1,6 @@
 === CONFIG ===
 rows=336 methods=['cnn', 'gan']
+metric_column=psnr
 physics_columns=35
 
 === GLOBAL correlations (physics vs PSNR/PD/MT) ===
@@ -432,22 +433,22 @@ delta_exceed_frac_abs_delta_p99 :: dPD: pearson=0.7339 CI[0.6429,0.8068] spearma
 delta_exceed_frac_abs_delta_p99 :: dMT: pearson=0.4306 CI[0.3068,0.5369] spearman=0.4222 CI[0.2773,0.5470]
 
 === PSNR-tie / topology-break candidates ===
-s0: cnn vs gan | ΔPSNR=0.160 dB | zΔPD=0.46, zΔMT=1.19
-s1: cnn vs gan | ΔPSNR=0.162 dB | zΔPD=0.38, zΔMT=1.07
-s2: cnn vs gan | ΔPSNR=0.183 dB | zΔPD=0.28, zΔMT=2.09
-s5: cnn vs gan | ΔPSNR=0.249 dB | zΔPD=0.58, zΔMT=1.26
-s6: cnn vs gan | ΔPSNR=0.249 dB | zΔPD=0.76, zΔMT=1.32
-s16: cnn vs gan | ΔPSNR=0.209 dB | zΔPD=1.01, zΔMT=0.89
-s17: cnn vs gan | ΔPSNR=0.202 dB | zΔPD=1.01, zΔMT=0.61
-s18: cnn vs gan | ΔPSNR=0.205 dB | zΔPD=1.15, zΔMT=1.46
-s19: cnn vs gan | ΔPSNR=0.207 dB | zΔPD=1.33, zΔMT=1.09
-s20: cnn vs gan | ΔPSNR=0.206 dB | zΔPD=1.27, zΔMT=1.50
-s21: cnn vs gan | ΔPSNR=0.229 dB | zΔPD=1.19, zΔMT=0.92
-s26: cnn vs gan | ΔPSNR=0.191 dB | zΔPD=0.01, zΔMT=1.31
-s29: cnn vs gan | ΔPSNR=0.143 dB | zΔPD=0.00, zΔMT=1.36
-s30: cnn vs gan | ΔPSNR=0.153 dB | zΔPD=0.03, zΔMT=1.11
-s31: cnn vs gan | ΔPSNR=0.125 dB | zΔPD=0.01, zΔMT=1.08
-s164: cnn vs gan | ΔPSNR=0.049 dB | zΔPD=0.05, zΔMT=1.95
-s165: cnn vs gan | ΔPSNR=0.033 dB | zΔPD=0.05, zΔMT=1.95
-s166: cnn vs gan | ΔPSNR=0.055 dB | zΔPD=0.42, zΔMT=1.91
-s167: cnn vs gan | ΔPSNR=0.079 dB | zΔPD=0.11, zΔMT=1.95
+s0: cnn vs gan | ΔPSNR=0.1597 | zΔPD=0.46, zΔMT=1.19
+s1: cnn vs gan | ΔPSNR=0.1622 | zΔPD=0.38, zΔMT=1.07
+s2: cnn vs gan | ΔPSNR=0.1832 | zΔPD=0.28, zΔMT=2.09
+s5: cnn vs gan | ΔPSNR=0.2493 | zΔPD=0.58, zΔMT=1.26
+s6: cnn vs gan | ΔPSNR=0.2488 | zΔPD=0.76, zΔMT=1.32
+s16: cnn vs gan | ΔPSNR=0.2094 | zΔPD=1.01, zΔMT=0.89
+s17: cnn vs gan | ΔPSNR=0.2020 | zΔPD=1.01, zΔMT=0.61
+s18: cnn vs gan | ΔPSNR=0.2054 | zΔPD=1.15, zΔMT=1.46
+s19: cnn vs gan | ΔPSNR=0.2073 | zΔPD=1.33, zΔMT=1.09
+s20: cnn vs gan | ΔPSNR=0.2059 | zΔPD=1.27, zΔMT=1.50
+s21: cnn vs gan | ΔPSNR=0.2292 | zΔPD=1.19, zΔMT=0.92
+s26: cnn vs gan | ΔPSNR=0.1914 | zΔPD=0.01, zΔMT=1.31
+s29: cnn vs gan | ΔPSNR=0.1427 | zΔPD=0.00, zΔMT=1.36
+s30: cnn vs gan | ΔPSNR=0.1529 | zΔPD=0.03, zΔMT=1.11
+s31: cnn vs gan | ΔPSNR=0.1251 | zΔPD=0.01, zΔMT=1.08
+s164: cnn vs gan | ΔPSNR=0.0494 | zΔPD=0.05, zΔMT=1.95
+s165: cnn vs gan | ΔPSNR=0.0333 | zΔPD=0.05, zΔMT=1.95
+s166: cnn vs gan | ΔPSNR=0.0545 | zΔPD=0.42, zΔMT=1.91
+s167: cnn vs gan | ΔPSNR=0.0789 | zΔPD=0.11, zΔMT=1.95

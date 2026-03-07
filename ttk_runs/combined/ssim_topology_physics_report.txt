@@ -1,21 +1,537 @@
-=== Correlations (SSIM vs topology) ===
-global Pearson(SSIM, PD): -0.370090287009616
-global Pearson(SSIM, MT): -0.28305737417683435
-global Spearman(SSIM, PD): -0.3670816118643746
-global Spearman(SSIM, MT): -0.33984612756480426
+=== CONFIG ===
+rows=336 methods=['cnn', 'gan']
+metric_column=ssim
+physics_columns=35
 
+=== GLOBAL correlations (physics vs SSIM/PD/MT) ===
+wpd_bias :: SSIM: pearson=0.2010 CI[0.1133,0.2839] spearman=0.1871 CI[0.0863,0.2823]
+wpd_bias :: PD: pearson=0.4799 CI[0.3847,0.5740] spearman=0.5002 CI[0.3943,0.5909]
+wpd_bias :: MT: pearson=0.1872 CI[0.0972,0.2847] spearman=0.2519 CI[0.1447,0.3527]
+wpd_mae :: SSIM: pearson=0.1349 CI[0.0457,0.2214] spearman=0.1084 CI[0.0111,0.2022]
+wpd_mae :: PD: pearson=0.5278 CI[0.4465,0.6083] spearman=0.6102 CI[0.5356,0.6717]
+wpd_mae :: MT: pearson=0.1696 CI[0.0782,0.2677] spearman=0.2700 CI[0.1627,0.3737]
+wpd_rmse :: SSIM: pearson=0.0561 CI[-0.0425,0.1574] spearman=0.0627 CI[-0.0412,0.1655]
+wpd_rmse :: PD: pearson=0.5480 CI[0.4697,0.6252] spearman=0.6076 CI[0.5286,0.6700]
+wpd_rmse :: MT: pearson=0.1572 CI[0.0692,0.2501] spearman=0.2597 CI[0.1515,0.3650]
+wpd_w1 :: SSIM: pearson=0.1546 CI[0.0672,0.2381] spearman=0.1300 CI[0.0348,0.2241]
+wpd_w1 :: PD: pearson=0.5323 CI[0.4500,0.6125] spearman=0.6076 CI[0.5303,0.6694]
+wpd_w1 :: MT: pearson=0.1789 CI[0.0879,0.2766] spearman=0.2702 CI[0.1617,0.3739]
+psd_log_l2 :: SSIM: pearson=0.0056 CI[-0.0811,0.0857] spearman=-0.0654 CI[-0.1655,0.0368]
+psd_log_l2 :: PD: pearson=0.4677 CI[0.3911,0.5411] spearman=0.4586 CI[0.3711,0.5359]
+psd_log_l2 :: MT: pearson=0.5850 CI[0.5157,0.6471] spearman=0.5677 CI[0.4815,0.6410]
+psd_slope_delta :: SSIM: pearson=-0.2379 CI[-0.3202,-0.1530] spearman=-0.2225 CI[-0.3153,-0.1270]
+psd_slope_delta :: PD: pearson=-0.3918 CI[-0.4649,-0.3167] spearman=-0.4491 CI[-0.5275,-0.3618]
+psd_slope_delta :: MT: pearson=-0.4462 CI[-0.5270,-0.3637] spearman=-0.4407 CI[-0.5180,-0.3518]
+psd_slope_abs_delta :: SSIM: pearson=0.2379 CI[0.1530,0.3202] spearman=0.2225 CI[0.1270,0.3153]
+psd_slope_abs_delta :: PD: pearson=0.3918 CI[0.3167,0.4649] spearman=0.4491 CI[0.3618,0.5275]
+psd_slope_abs_delta :: MT: pearson=0.4462 CI[0.3637,0.5270] spearman=0.4407 CI[0.3518,0.5180]
+grad_mae :: SSIM: pearson=-0.5363 CI[-0.5906,-0.4813] spearman=-0.5632 CI[-0.6216,-0.4907]
+grad_mae :: PD: pearson=0.7494 CI[0.7100,0.7858] spearman=0.7945 CI[0.7500,0.8291]
+grad_mae :: MT: pearson=0.6692 CI[0.6181,0.7180] spearman=0.6553 CI[0.5841,0.7135]
+grad_w1 :: SSIM: pearson=-0.5283 CI[-0.6083,-0.4542] spearman=-0.5408 CI[-0.6223,-0.4504]
+grad_w1 :: PD: pearson=0.5764 CI[0.5133,0.6320] spearman=0.5725 CI[0.5012,0.6359]
+grad_w1 :: MT: pearson=0.6218 CI[0.5552,0.6826] spearman=0.5231 CI[0.4253,0.6029]
+grad_kurtosis_delta :: SSIM: pearson=0.1053 CI[-0.0074,0.2228] spearman=0.0992 CI[-0.0123,0.2118]
+grad_kurtosis_delta :: PD: pearson=-0.0375 CI[-0.1507,0.0774] spearman=-0.0579 CI[-0.1763,0.0634]
+grad_kurtosis_delta :: MT: pearson=0.1283 CI[0.0356,0.2158] spearman=0.0369 CI[-0.0754,0.1474]
+grad_kurtosis_abs_delta :: SSIM: pearson=-0.1024 CI[-0.2133,-0.0030] spearman=-0.1139 CI[-0.2233,-0.0037]
+grad_kurtosis_abs_delta :: PD: pearson=-0.1058 CI[-0.1978,0.0072] spearman=-0.0715 CI[-0.1892,0.0436]
+grad_kurtosis_abs_delta :: MT: pearson=-0.1796 CI[-0.2549,-0.1020] spearman=-0.2015 CI[-0.3015,-0.0965]
+exceed_frac_gt_t5 :: SSIM: pearson=-0.2052 CI[-0.2976,-0.1118] spearman=-0.1867 CI[-0.2904,-0.0771]
+exceed_frac_gt_t5 :: PD: pearson=0.5156 CI[0.4646,0.5646] spearman=0.5815 CI[0.5113,0.6398]
+exceed_frac_gt_t5 :: MT: pearson=0.1594 CI[0.0648,0.2492] spearman=0.1275 CI[0.0258,0.2357]
+exceed_frac_sr_t5 :: SSIM: pearson=0.2478 CI[0.1627,0.3304] spearman=0.2547 CI[0.1577,0.3433]
+exceed_frac_sr_t5 :: PD: pearson=0.4118 CI[0.3140,0.5058] spearman=0.4180 CI[0.3162,0.5035]
+exceed_frac_sr_t5 :: MT: pearson=0.2769 CI[0.1858,0.3634] spearman=0.2598 CI[0.1560,0.3652]
+exceed_frac_delta_t5 :: SSIM: pearson=0.4422 CI[0.3517,0.5225] spearman=0.3844 CI[0.2824,0.4759]
+exceed_frac_delta_t5 :: PD: pearson=0.0569 CI[-0.0613,0.1794] spearman=0.0899 CI[-0.0309,0.2051]
+exceed_frac_delta_t5 :: MT: pearson=0.1865 CI[0.1011,0.2661] spearman=0.2193 CI[0.1149,0.3139]
+exceed_frac_abs_delta_t5 :: SSIM: pearson=-0.3364 CI[-0.4301,-0.2381] spearman=-0.2711 CI[-0.3683,-0.1629]
+exceed_frac_abs_delta_t5 :: PD: pearson=-0.1047 CI[-0.2291,0.0150] spearman=-0.1876 CI[-0.2905,-0.0787]
+exceed_frac_abs_delta_t5 :: MT: pearson=-0.1495 CI[-0.2306,-0.0640] spearman=-0.0815 CI[-0.1893,0.0313]
+exceed_frac_gt_t10 :: SSIM: pearson=-0.1986 CI[-0.2907,-0.0954] spearman=-0.1726 CI[-0.2721,-0.0640]
+exceed_frac_gt_t10 :: PD: pearson=0.6007 CI[0.5458,0.6482] spearman=0.6423 CI[0.5792,0.6980]
+exceed_frac_gt_t10 :: MT: pearson=0.1571 CI[0.0679,0.2460] spearman=0.1366 CI[0.0367,0.2402]
+exceed_frac_sr_t10 :: SSIM: pearson=0.2814 CI[0.1947,0.3627] spearman=0.2486 CI[0.1545,0.3341]
+exceed_frac_sr_t10 :: PD: pearson=0.4391 CI[0.3374,0.5358] spearman=0.4782 CI[0.3804,0.5661]
+exceed_frac_sr_t10 :: MT: pearson=0.3005 CI[0.2144,0.3864] spearman=0.2875 CI[0.1812,0.3902]
+exceed_frac_delta_t10 :: SSIM: pearson=0.4760 CI[0.3847,0.5563] spearman=0.3922 CI[0.2908,0.4867]
+exceed_frac_delta_t10 :: PD: pearson=0.0159 CI[-0.1062,0.1494] spearman=0.0805 CI[-0.0401,0.1991]
+exceed_frac_delta_t10 :: MT: pearson=0.2137 CI[0.1299,0.2945] spearman=0.2569 CI[0.1553,0.3471]
+exceed_frac_abs_delta_t10 :: SSIM: pearson=0.1670 CI[0.0546,0.2772] spearman=0.1589 CI[0.0468,0.2741]
+exceed_frac_abs_delta_t10 :: PD: pearson=0.2250 CI[0.1295,0.3193] spearman=0.2268 CI[0.1263,0.3232]
+exceed_frac_abs_delta_t10 :: MT: pearson=0.1818 CI[0.0953,0.2700] spearman=0.2180 CI[0.1175,0.3114]
+exceed_frac_gt_t15 :: SSIM: pearson=-0.1531 CI[-0.2522,-0.0439] spearman=-0.1801 CI[-0.2857,-0.0705]
+exceed_frac_gt_t15 :: PD: pearson=0.4489 CI[0.3732,0.5227] spearman=0.4433 CI[0.3530,0.5215]
+exceed_frac_gt_t15 :: MT: pearson=-0.1000 CI[-0.1855,-0.0060] spearman=-0.0409 CI[-0.1442,0.0599]
+exceed_frac_sr_t15 :: SSIM: pearson=0.2742 CI[0.1875,0.3559] spearman=0.2293 CI[0.1353,0.3161]
+exceed_frac_sr_t15 :: PD: pearson=0.4988 CI[0.3997,0.5940] spearman=0.5153 CI[0.4148,0.6017]
+exceed_frac_sr_t15 :: MT: pearson=0.3192 CI[0.2324,0.4032] spearman=0.3088 CI[0.2048,0.4060]
+exceed_frac_delta_t15 :: SSIM: pearson=0.3608 CI[0.2703,0.4428] spearman=0.2857 CI[0.1875,0.3771]
+exceed_frac_delta_t15 :: PD: pearson=0.3517 CI[0.2359,0.4682] spearman=0.4038 CI[0.2922,0.5064]
+exceed_frac_delta_t15 :: MT: pearson=0.3873 CI[0.3017,0.4691] spearman=0.3948 CI[0.2987,0.4775]
+exceed_frac_abs_delta_t15 :: SSIM: pearson=0.3165 CI[0.2316,0.3973] spearman=0.2536 CI[0.1555,0.3388]
+exceed_frac_abs_delta_t15 :: PD: pearson=0.4727 CI[0.3815,0.5574] spearman=0.5111 CI[0.4193,0.5900]
+exceed_frac_abs_delta_t15 :: MT: pearson=0.4113 CI[0.3203,0.4936] spearman=0.4111 CI[0.3137,0.4933]
+exceed_frac_gt_p90 :: SSIM: pearson=0.0514 CI[-0.0000,0.1008] spearman=0.0586 CI[0.0080,0.1248]
+exceed_frac_gt_p90 :: PD: pearson=-0.0023 CI[-0.0334,0.0270] spearman=-0.0084 CI[-0.0503,0.0326]
+exceed_frac_gt_p90 :: MT: pearson=0.0751 CI[-0.0000,0.1203] spearman=0.0953 CI[0.0527,0.1640]
+exceed_frac_sr_p90 :: SSIM: pearson=0.3798 CI[0.2945,0.4576] spearman=0.2942 CI[0.1984,0.3826]
+exceed_frac_sr_p90 :: PD: pearson=0.3838 CI[0.2707,0.4969] spearman=0.4378 CI[0.3303,0.5357]
+exceed_frac_sr_p90 :: MT: pearson=0.3532 CI[0.2668,0.4350] spearman=0.3682 CI[0.2703,0.4552]
+exceed_frac_delta_p90 :: SSIM: pearson=0.3798 CI[0.2945,0.4576] spearman=0.2942 CI[0.1984,0.3826]
+exceed_frac_delta_p90 :: PD: pearson=0.3838 CI[0.2707,0.4969] spearman=0.4378 CI[0.3303,0.5357]
+exceed_frac_delta_p90 :: MT: pearson=0.3532 CI[0.2668,0.4350] spearman=0.3682 CI[0.2703,0.4552]
+exceed_frac_abs_delta_p90 :: SSIM: pearson=0.3786 CI[0.2974,0.4555] spearman=0.3033 CI[0.2065,0.3894]
+exceed_frac_abs_delta_p90 :: PD: pearson=0.4257 CI[0.3194,0.5277] spearman=0.4734 CI[0.3714,0.5657]
+exceed_frac_abs_delta_p90 :: MT: pearson=0.3619 CI[0.2692,0.4502] spearman=0.3654 CI[0.2634,0.4561]
+exceed_frac_gt_p95 :: SSIM: pearson=-0.0352 CI[-0.1220,0.0382] spearman=-0.0339 CI[-0.1316,0.0495]
+exceed_frac_gt_p95 :: PD: pearson=0.0023 CI[-0.0557,0.0609] spearman=0.0020 CI[-0.0729,0.0764]
+exceed_frac_gt_p95 :: MT: pearson=-0.0432 CI[-0.1438,0.0367] spearman=-0.0399 CI[-0.1306,0.0327]
+exceed_frac_sr_p95 :: SSIM: pearson=0.3651 CI[0.2803,0.4418] spearman=0.2820 CI[0.1873,0.3721]
+exceed_frac_sr_p95 :: PD: pearson=0.4106 CI[0.3021,0.5180] spearman=0.4518 CI[0.3455,0.5478]
+exceed_frac_sr_p95 :: MT: pearson=0.3665 CI[0.2776,0.4502] spearman=0.3758 CI[0.2783,0.4628]
+exceed_frac_delta_p95 :: SSIM: pearson=0.3651 CI[0.2803,0.4418] spearman=0.2820 CI[0.1873,0.3721]
+exceed_frac_delta_p95 :: PD: pearson=0.4106 CI[0.3021,0.5180] spearman=0.4518 CI[0.3455,0.5478]
+exceed_frac_delta_p95 :: MT: pearson=0.3665 CI[0.2776,0.4502] spearman=0.3758 CI[0.2783,0.4628]
+exceed_frac_abs_delta_p95 :: SSIM: pearson=0.3658 CI[0.2821,0.4427] spearman=0.2937 CI[0.1984,0.3805]
+exceed_frac_abs_delta_p95 :: PD: pearson=0.4309 CI[0.3266,0.5335] spearman=0.4739 CI[0.3708,0.5644]
+exceed_frac_abs_delta_p95 :: MT: pearson=0.3704 CI[0.2785,0.4561] spearman=0.3752 CI[0.2738,0.4648]
+exceed_frac_gt_p99 :: SSIM: pearson=-0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+exceed_frac_gt_p99 :: PD: pearson=0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+exceed_frac_gt_p99 :: MT: pearson=-0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+exceed_frac_sr_p99 :: SSIM: pearson=0.3350 CI[0.2491,0.4122] spearman=0.2493 CI[0.1522,0.3407]
+exceed_frac_sr_p99 :: PD: pearson=0.4448 CI[0.3412,0.5448] spearman=0.4761 CI[0.3738,0.5660]
+exceed_frac_sr_p99 :: MT: pearson=0.3878 CI[0.2976,0.4715] spearman=0.4024 CI[0.3042,0.4886]
+exceed_frac_delta_p99 :: SSIM: pearson=0.3350 CI[0.2491,0.4122] spearman=0.2493 CI[0.1522,0.3407]
+exceed_frac_delta_p99 :: PD: pearson=0.4448 CI[0.3412,0.5448] spearman=0.4761 CI[0.3738,0.5660]
+exceed_frac_delta_p99 :: MT: pearson=0.3878 CI[0.2976,0.4715] spearman=0.4024 CI[0.3042,0.4886]
+exceed_frac_abs_delta_p99 :: SSIM: pearson=0.3361 CI[0.2509,0.4136] spearman=0.2584 CI[0.1616,0.3461]
+exceed_frac_abs_delta_p99 :: PD: pearson=0.4480 CI[0.3456,0.5471] spearman=0.4852 CI[0.3838,0.5737]
+exceed_frac_abs_delta_p99 :: MT: pearson=0.3884 CI[0.2986,0.4722] spearman=0.4027 CI[0.3048,0.4908]
+
+=== PER-METHOD correlations ===
 [cnn] n=168
-  Pearson(SSIM, PD): -0.43784291149216237
-  Pearson(SSIM, MT): -0.27772341000192796
-  Spearman(SSIM, PD): -0.33392977358891685
-  Spearman(SSIM, MT): -0.07652320042923452
+  wpd_bias :: SSIM: pearson=0.3317 CI[0.2089,0.4492] spearman=0.3616 CI[0.2104,0.4935]
+  wpd_bias :: PD: pearson=0.3590 CI[0.2053,0.5009] spearman=0.4191 CI[0.2574,0.5643]
+  wpd_bias :: MT: pearson=0.0287 CI[-0.1286,0.2113] spearman=0.1373 CI[-0.0323,0.2982]
+  wpd_mae :: SSIM: pearson=0.2358 CI[0.1167,0.3516] spearman=0.2777 CI[0.1322,0.4074]
+  wpd_mae :: PD: pearson=0.4358 CI[0.3126,0.5499] spearman=0.5409 CI[0.4261,0.6360]
+  wpd_mae :: MT: pearson=0.0724 CI[-0.0774,0.2437] spearman=0.2209 CI[0.0532,0.3815]
+  wpd_rmse :: SSIM: pearson=0.1365 CI[-0.0190,0.2862] spearman=0.2368 CI[0.0733,0.3888]
+  wpd_rmse :: PD: pearson=0.4755 CI[0.3474,0.5869] spearman=0.5312 CI[0.4123,0.6307]
+  wpd_rmse :: MT: pearson=0.1140 CI[-0.0434,0.2841] spearman=0.2117 CI[0.0379,0.3725]
+  wpd_w1 :: SSIM: pearson=0.2608 CI[0.1476,0.3726] spearman=0.2978 CI[0.1542,0.4270]
+  wpd_w1 :: PD: pearson=0.4373 CI[0.3126,0.5511] spearman=0.5373 CI[0.4244,0.6344]
+  wpd_w1 :: MT: pearson=0.0730 CI[-0.0775,0.2430] spearman=0.2221 CI[0.0563,0.3790]
+  psd_log_l2 :: SSIM: pearson=0.1930 CI[0.0717,0.3158] spearman=0.2417 CI[0.1006,0.3793]
+  psd_log_l2 :: PD: pearson=0.1119 CI[-0.0410,0.2521] spearman=-0.0045 CI[-0.1633,0.1499]
+  psd_log_l2 :: MT: pearson=0.1783 CI[0.0460,0.3077] spearman=0.1701 CI[0.0129,0.3214]
+  psd_slope_delta :: SSIM: pearson=-0.2611 CI[-0.3590,-0.1664] spearman=-0.2866 CI[-0.4139,-0.1488]
+  psd_slope_delta :: PD: pearson=-0.2573 CI[-0.3482,-0.1651] spearman=-0.3618 CI[-0.4758,-0.2368]
+  psd_slope_delta :: MT: pearson=-0.3756 CI[-0.4869,-0.2718] spearman=-0.4784 CI[-0.5836,-0.3608]
+  psd_slope_abs_delta :: SSIM: pearson=0.2611 CI[0.1664,0.3590] spearman=0.2866 CI[0.1488,0.4139]
+  psd_slope_abs_delta :: PD: pearson=0.2573 CI[0.1651,0.3482] spearman=0.3618 CI[0.2368,0.4758]
+  psd_slope_abs_delta :: MT: pearson=0.3756 CI[0.2718,0.4869] spearman=0.4784 CI[0.3608,0.5836]
+  grad_mae :: SSIM: pearson=-0.5217 CI[-0.6306,-0.3763] spearman=-0.3644 CI[-0.5059,-0.2174]
+  grad_mae :: PD: pearson=0.7598 CI[0.6828,0.8217] spearman=0.7721 CI[0.6841,0.8357]
+  grad_mae :: MT: pearson=0.5042 CI[0.3563,0.6269] spearman=0.3665 CI[0.2026,0.5106]
+  grad_w1 :: SSIM: pearson=-0.8454 CI[-0.8904,-0.7884] spearman=-0.6602 CI[-0.7558,-0.5498]
+  grad_w1 :: PD: pearson=0.3633 CI[0.1595,0.5138] spearman=0.1492 CI[-0.0291,0.3155]
+  grad_w1 :: MT: pearson=0.2092 CI[-0.0420,0.3897] spearman=-0.1008 CI[-0.2799,0.0734]
+  grad_kurtosis_delta :: SSIM: pearson=0.1506 CI[0.0053,0.3134] spearman=0.0768 CI[-0.0835,0.2262]
+  grad_kurtosis_delta :: PD: pearson=-0.0873 CI[-0.2367,0.0707] spearman=-0.0517 CI[-0.2197,0.1166]
+  grad_kurtosis_delta :: MT: pearson=-0.0433 CI[-0.1944,0.1214] spearman=-0.0065 CI[-0.1692,0.1577]
+  grad_kurtosis_abs_delta :: SSIM: pearson=-0.1485 CI[-0.2838,-0.0358] spearman=-0.1975 CI[-0.3377,-0.0534]
+  grad_kurtosis_abs_delta :: PD: pearson=-0.0869 CI[-0.2084,0.0609] spearman=-0.0874 CI[-0.2473,0.0720]
+  grad_kurtosis_abs_delta :: MT: pearson=-0.0841 CI[-0.2112,0.0495] spearman=-0.0905 CI[-0.2507,0.0692]
+  exceed_frac_gt_t5 :: SSIM: pearson=-0.2415 CI[-0.3483,-0.1170] spearman=-0.1985 CI[-0.3598,-0.0316]
+  exceed_frac_gt_t5 :: PD: pearson=0.5537 CI[0.5011,0.6030] spearman=0.6539 CI[0.5693,0.7161]
+  exceed_frac_gt_t5 :: MT: pearson=0.3289 CI[0.2094,0.4430] spearman=0.2773 CI[0.1074,0.4428]
+  exceed_frac_sr_t5 :: SSIM: pearson=0.4217 CI[0.3188,0.5248] spearman=0.4429 CI[0.3251,0.5468]
+  exceed_frac_sr_t5 :: PD: pearson=0.2554 CI[0.1041,0.4009] spearman=0.3408 CI[0.2031,0.4772]
+  exceed_frac_sr_t5 :: MT: pearson=0.1339 CI[-0.0119,0.2851] spearman=0.1720 CI[0.0129,0.3177]
+  exceed_frac_delta_t5 :: SSIM: pearson=0.6621 CI[0.5668,0.7476] spearman=0.6594 CI[0.5595,0.7378]
+  exceed_frac_delta_t5 :: PD: pearson=-0.1427 CI[-0.3216,0.0452] spearman=-0.0707 CI[-0.2351,0.1071]
+  exceed_frac_delta_t5 :: MT: pearson=-0.1048 CI[-0.2569,0.0664] spearman=0.0642 CI[-0.0911,0.2069]
+  exceed_frac_abs_delta_t5 :: SSIM: pearson=-0.4845 CI[-0.6047,-0.3527] spearman=-0.3310 CI[-0.4756,-0.1785]
+  exceed_frac_abs_delta_t5 :: PD: pearson=0.0430 CI[-0.1612,0.2273] spearman=-0.1524 CI[-0.3113,0.0034]
+  exceed_frac_abs_delta_t5 :: MT: pearson=0.0926 CI[-0.0977,0.2613] spearman=0.0416 CI[-0.1236,0.2084]
+  exceed_frac_gt_t10 :: SSIM: pearson=-0.2566 CI[-0.3695,-0.1204] spearman=-0.2308 CI[-0.3816,-0.0737]
+  exceed_frac_gt_t10 :: PD: pearson=0.6506 CI[0.5859,0.7078] spearman=0.7086 CI[0.6288,0.7659]
+  exceed_frac_gt_t10 :: MT: pearson=0.3726 CI[0.2402,0.4955] spearman=0.3032 CI[0.1324,0.4633]
+  exceed_frac_sr_t10 :: SSIM: pearson=0.4527 CI[0.3494,0.5502] spearman=0.4251 CI[0.3045,0.5298]
+  exceed_frac_sr_t10 :: PD: pearson=0.2811 CI[0.1203,0.4349] spearman=0.4023 CI[0.2548,0.5367]
+  exceed_frac_sr_t10 :: MT: pearson=0.1272 CI[-0.0311,0.2936] spearman=0.1848 CI[0.0141,0.3378]
+  exceed_frac_delta_t10 :: SSIM: pearson=0.7150 CI[0.6218,0.7971] spearman=0.7106 CI[0.6226,0.7764]
+  exceed_frac_delta_t10 :: PD: pearson=-0.2000 CI[-0.3840,0.0047] spearman=-0.0854 CI[-0.2485,0.0882]
+  exceed_frac_delta_t10 :: MT: pearson=-0.1526 CI[-0.3173,0.0512] spearman=0.0535 CI[-0.1062,0.2108]
+  exceed_frac_abs_delta_t10 :: SSIM: pearson=0.2742 CI[0.0873,0.4672] spearman=0.4035 CI[0.2328,0.5430]
+  exceed_frac_abs_delta_t10 :: PD: pearson=0.1604 CI[0.0008,0.3167] spearman=0.1118 CI[-0.0486,0.2559]
+  exceed_frac_abs_delta_t10 :: MT: pearson=0.2169 CI[0.0709,0.3632] spearman=0.2432 CI[0.0894,0.3843]
+  exceed_frac_gt_t15 :: SSIM: pearson=-0.2332 CI[-0.3720,-0.0948] spearman=-0.3001 CI[-0.4509,-0.1411]
+  exceed_frac_gt_t15 :: PD: pearson=0.5028 CI[0.4009,0.5976] spearman=0.4914 CI[0.3662,0.6023]
+  exceed_frac_gt_t15 :: MT: pearson=0.0811 CI[-0.0861,0.2388] spearman=0.0597 CI[-0.0944,0.2157]
+  exceed_frac_sr_t15 :: SSIM: pearson=0.4309 CI[0.3295,0.5271] spearman=0.3940 CI[0.2671,0.5043]
+  exceed_frac_sr_t15 :: PD: pearson=0.3509 CI[0.1944,0.5048] spearman=0.4413 CI[0.2881,0.5756]
+  exceed_frac_sr_t15 :: MT: pearson=0.1459 CI[-0.0182,0.3162] spearman=0.2075 CI[0.0357,0.3591]
+  exceed_frac_delta_t15 :: SSIM: pearson=0.5655 CI[0.4771,0.6455] spearman=0.4945 CI[0.3852,0.5950]
+  exceed_frac_delta_t15 :: PD: pearson=0.1675 CI[-0.0029,0.3552] spearman=0.3220 CI[0.1568,0.4756]
+  exceed_frac_delta_t15 :: MT: pearson=0.1238 CI[-0.0491,0.3221] spearman=0.2698 CI[0.1019,0.4280]
+  exceed_frac_abs_delta_t15 :: SSIM: pearson=0.4991 CI[0.4220,0.5696] spearman=0.4611 CI[0.3509,0.5554]
+  exceed_frac_abs_delta_t15 :: PD: pearson=0.3190 CI[0.1796,0.4626] spearman=0.4368 CI[0.3067,0.5503]
+  exceed_frac_abs_delta_t15 :: MT: pearson=0.2320 CI[0.0733,0.4056] spearman=0.3446 CI[0.1878,0.4851]
+  exceed_frac_gt_p90 :: SSIM: pearson=0.0720 CI[-0.0000,0.1431] spearman=0.0949 CI[0.0822,0.1793]
+  exceed_frac_gt_p90 :: PD: pearson=-0.0007 CI[-0.0134,0.0122] spearman=-0.0072 CI[-0.0353,0.0181]
+  exceed_frac_gt_p90 :: MT: pearson=0.0782 CI[-0.0000,0.1423] spearman=0.0917 CI[0.0790,0.1771]
+  exceed_frac_sr_p90 :: SSIM: pearson=0.5824 CI[0.4996,0.6574] spearman=0.4890 CI[0.3728,0.5887]
+  exceed_frac_sr_p90 :: PD: pearson=0.1994 CI[0.0222,0.3792] spearman=0.3502 CI[0.1775,0.5019]
+  exceed_frac_sr_p90 :: MT: pearson=0.1182 CI[-0.0504,0.3069] spearman=0.2416 CI[0.0767,0.3989]
+  exceed_frac_delta_p90 :: SSIM: pearson=0.5824 CI[0.4996,0.6574] spearman=0.4890 CI[0.3728,0.5887]
+  exceed_frac_delta_p90 :: PD: pearson=0.1994 CI[0.0222,0.3792] spearman=0.3502 CI[0.1775,0.5019]
+  exceed_frac_delta_p90 :: MT: pearson=0.1182 CI[-0.0504,0.3069] spearman=0.2416 CI[0.0767,0.3989]
+  exceed_frac_abs_delta_p90 :: SSIM: pearson=0.5767 CI[0.5011,0.6437] spearman=0.4969 CI[0.3782,0.5942]
+  exceed_frac_abs_delta_p90 :: PD: pearson=0.2499 CI[0.0912,0.4185] spearman=0.3841 CI[0.2279,0.5234]
+  exceed_frac_abs_delta_p90 :: MT: pearson=0.1504 CI[-0.0206,0.3352] spearman=0.2661 CI[0.1027,0.4194]
+  exceed_frac_gt_p95 :: SSIM: pearson=-0.0584 CI[-0.1072,0.0000] spearman=-0.0822 CI[-0.1578,-0.0679]
+  exceed_frac_gt_p95 :: PD: pearson=0.0357 CI[-0.0000,0.0718] spearman=0.0487 CI[0.0311,0.1017]
+  exceed_frac_gt_p95 :: MT: pearson=-0.0159 CI[-0.0384,0.0000] spearman=-0.0295 CI[-0.0709,-0.0113]
+  exceed_frac_sr_p95 :: SSIM: pearson=0.5651 CI[0.4855,0.6400] spearman=0.4840 CI[0.3682,0.5821]
+  exceed_frac_sr_p95 :: PD: pearson=0.2302 CI[0.0620,0.3990] spearman=0.3628 CI[0.2015,0.5117]
+  exceed_frac_sr_p95 :: MT: pearson=0.1468 CI[-0.0185,0.3293] spearman=0.2513 CI[0.0929,0.4050]
+  exceed_frac_delta_p95 :: SSIM: pearson=0.5651 CI[0.4855,0.6400] spearman=0.4840 CI[0.3682,0.5821]
+  exceed_frac_delta_p95 :: PD: pearson=0.2302 CI[0.0620,0.3990] spearman=0.3628 CI[0.2015,0.5117]
+  exceed_frac_delta_p95 :: MT: pearson=0.1468 CI[-0.0185,0.3293] spearman=0.2513 CI[0.0929,0.4050]
+  exceed_frac_abs_delta_p95 :: SSIM: pearson=0.5640 CI[0.4876,0.6343] spearman=0.4961 CI[0.3785,0.5936]
+  exceed_frac_abs_delta_p95 :: PD: pearson=0.2546 CI[0.0954,0.4207] spearman=0.3847 CI[0.2303,0.5257]
+  exceed_frac_abs_delta_p95 :: MT: pearson=0.1617 CI[-0.0044,0.3434] spearman=0.2718 CI[0.1121,0.4234]
+  exceed_frac_gt_p99 :: SSIM: pearson=-0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+  exceed_frac_gt_p99 :: PD: pearson=0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+  exceed_frac_gt_p99 :: MT: pearson=0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+  exceed_frac_sr_p99 :: SSIM: pearson=0.5356 CI[0.4508,0.6127] spearman=0.4757 CI[0.3665,0.5720]
+  exceed_frac_sr_p99 :: PD: pearson=0.2680 CI[0.1141,0.4248] spearman=0.3772 CI[0.2243,0.5206]
+  exceed_frac_sr_p99 :: MT: pearson=0.1924 CI[0.0312,0.3674] spearman=0.2923 CI[0.1328,0.4434]
+  exceed_frac_delta_p99 :: SSIM: pearson=0.5356 CI[0.4508,0.6127] spearman=0.4757 CI[0.3665,0.5720]
+  exceed_frac_delta_p99 :: PD: pearson=0.2680 CI[0.1141,0.4248] spearman=0.3772 CI[0.2243,0.5206]
+  exceed_frac_delta_p99 :: MT: pearson=0.1924 CI[0.0312,0.3674] spearman=0.2923 CI[0.1328,0.4434]
+  exceed_frac_abs_delta_p99 :: SSIM: pearson=0.5366 CI[0.4531,0.6126] spearman=0.4851 CI[0.3739,0.5806]
+  exceed_frac_abs_delta_p99 :: PD: pearson=0.2720 CI[0.1191,0.4291] spearman=0.3871 CI[0.2392,0.5276]
+  exceed_frac_abs_delta_p99 :: MT: pearson=0.1936 CI[0.0299,0.3691] spearman=0.3058 CI[0.1490,0.4540]
 
 [gan] n=168
-  Pearson(SSIM, PD): -0.055482868552169995
-  Pearson(SSIM, MT): 0.3169241887892498
-  Spearman(SSIM, PD): -0.023488947717413864
-  Spearman(SSIM, MT): 0.24940651241894915
+  wpd_bias :: SSIM: pearson=0.2711 CI[0.1307,0.4018] spearman=0.2166 CI[0.0488,0.3780]
+  wpd_bias :: PD: pearson=0.5774 CI[0.4627,0.6802] spearman=0.5687 CI[0.4204,0.6950]
+  wpd_bias :: MT: pearson=0.2641 CI[0.1350,0.4009] spearman=0.3605 CI[0.2111,0.4982]
+  wpd_mae :: SSIM: pearson=0.2099 CI[0.0716,0.3388] spearman=0.1476 CI[-0.0200,0.3091]
+  wpd_mae :: PD: pearson=0.6057 CI[0.5042,0.6962] spearman=0.6663 CI[0.5501,0.7528]
+  wpd_mae :: MT: pearson=0.2077 CI[0.0790,0.3482] spearman=0.3185 CI[0.1625,0.4588]
+  wpd_rmse :: SSIM: pearson=0.1172 CI[-0.0510,0.2785] spearman=0.0980 CI[-0.0791,0.2711]
+  wpd_rmse :: PD: pearson=0.6120 CI[0.5093,0.7006] spearman=0.6564 CI[0.5398,0.7502]
+  wpd_rmse :: MT: pearson=0.1607 CI[0.0330,0.3033] spearman=0.2796 CI[0.1132,0.4249]
+  wpd_w1 :: SSIM: pearson=0.2320 CI[0.0974,0.3576] spearman=0.1723 CI[0.0034,0.3315]
+  wpd_w1 :: PD: pearson=0.6137 CI[0.5142,0.7031] spearman=0.6645 CI[0.5448,0.7531]
+  wpd_w1 :: MT: pearson=0.2260 CI[0.0972,0.3637] spearman=0.3271 CI[0.1753,0.4644]
+  psd_log_l2 :: SSIM: pearson=0.3384 CI[0.2065,0.4694] spearman=0.3045 CI[0.1514,0.4456]
+  psd_log_l2 :: PD: pearson=0.5518 CI[0.4468,0.6495] spearman=0.4386 CI[0.2922,0.5680]
+  psd_log_l2 :: MT: pearson=0.6211 CI[0.5425,0.6937] spearman=0.6840 CI[0.5926,0.7601]
+  psd_slope_delta :: SSIM: pearson=-0.2898 CI[-0.4092,-0.1683] spearman=-0.2898 CI[-0.4372,-0.1347]
+  psd_slope_delta :: PD: pearson=-0.5504 CI[-0.6368,-0.4552] spearman=-0.5747 CI[-0.6842,-0.4480]
+  psd_slope_delta :: MT: pearson=-0.6723 CI[-0.7354,-0.6008] spearman=-0.6610 CI[-0.7363,-0.5694]
+  psd_slope_abs_delta :: SSIM: pearson=0.2898 CI[0.1683,0.4092] spearman=0.2898 CI[0.1347,0.4372]
+  psd_slope_abs_delta :: PD: pearson=0.5504 CI[0.4552,0.6368] spearman=0.5747 CI[0.4480,0.6842]
+  psd_slope_abs_delta :: MT: pearson=0.6723 CI[0.6008,0.7354] spearman=0.6610 CI[0.5694,0.7363]
+  grad_mae :: SSIM: pearson=-0.0951 CI[-0.2341,0.0566] spearman=0.0138 CI[-0.1459,0.1602]
+  grad_mae :: PD: pearson=0.7172 CI[0.6523,0.7724] spearman=0.7236 CI[0.6239,0.7968]
+  grad_mae :: MT: pearson=0.5654 CI[0.4814,0.6476] spearman=0.5932 CI[0.4883,0.6822]
+  grad_w1 :: SSIM: pearson=0.2977 CI[0.1671,0.4209] spearman=0.2479 CI[0.0997,0.3818]
+  grad_w1 :: PD: pearson=0.6355 CI[0.5545,0.7115] spearman=0.5797 CI[0.4639,0.6814]
+  grad_w1 :: MT: pearson=0.6774 CI[0.5926,0.7525] spearman=0.7280 CI[0.6368,0.7976]
+  grad_kurtosis_delta :: SSIM: pearson=0.1857 CI[-0.0468,0.4191] spearman=0.1353 CI[-0.0361,0.3135]
+  grad_kurtosis_delta :: PD: pearson=-0.0211 CI[-0.1985,0.1516] spearman=-0.0475 CI[-0.2151,0.1121]
+  grad_kurtosis_delta :: MT: pearson=0.2434 CI[0.1018,0.3745] spearman=0.1499 CI[-0.0145,0.3164]
+  grad_kurtosis_abs_delta :: SSIM: pearson=-0.1329 CI[-0.3398,0.0703] spearman=-0.1339 CI[-0.2954,0.0286]
+  grad_kurtosis_abs_delta :: PD: pearson=-0.1284 CI[-0.2837,0.0352] spearman=-0.0620 CI[-0.2248,0.0916]
+  grad_kurtosis_abs_delta :: MT: pearson=-0.3072 CI[-0.4239,-0.1774] spearman=-0.3109 CI[-0.4429,-0.1678]
+  exceed_frac_gt_t5 :: SSIM: pearson=-0.2937 CI[-0.4070,-0.1676] spearman=-0.1556 CI[-0.3181,0.0114]
+  exceed_frac_gt_t5 :: PD: pearson=0.5362 CI[0.4585,0.6093] spearman=0.5809 CI[0.4767,0.6597]
+  exceed_frac_gt_t5 :: MT: pearson=0.1321 CI[-0.0052,0.2602] spearman=0.0374 CI[-0.1141,0.1918]
+  exceed_frac_sr_t5 :: SSIM: pearson=0.1751 CI[0.0257,0.3252] spearman=0.2043 CI[0.0428,0.3643]
+  exceed_frac_sr_t5 :: PD: pearson=0.5720 CI[0.4603,0.6703] spearman=0.5271 CI[0.3961,0.6351]
+  exceed_frac_sr_t5 :: MT: pearson=0.4388 CI[0.3105,0.5547] spearman=0.4560 CI[0.3173,0.5881]
+  exceed_frac_delta_t5 :: SSIM: pearson=0.4355 CI[0.2831,0.5789] spearman=0.3042 CI[0.1497,0.4524]
+  exceed_frac_delta_t5 :: PD: pearson=0.2152 CI[0.0539,0.3653] spearman=0.1981 CI[0.0376,0.3599]
+  exceed_frac_delta_t5 :: MT: pearson=0.3904 CI[0.2788,0.4889] spearman=0.4499 CI[0.3219,0.5573]
+  exceed_frac_abs_delta_t5 :: SSIM: pearson=-0.3707 CI[-0.5286,-0.2018] spearman=-0.2838 CI[-0.4403,-0.1203]
+  exceed_frac_abs_delta_t5 :: PD: pearson=-0.2269 CI[-0.3822,-0.0660] spearman=-0.2463 CI[-0.3886,-0.0854]
+  exceed_frac_abs_delta_t5 :: MT: pearson=-0.3155 CI[-0.4232,-0.1823] spearman=-0.2129 CI[-0.3648,-0.0524]
+  exceed_frac_gt_t10 :: SSIM: pearson=-0.2485 CI[-0.3684,-0.1131] spearman=-0.1438 CI[-0.3036,0.0160]
+  exceed_frac_gt_t10 :: PD: pearson=0.6203 CI[0.5391,0.6879] spearman=0.6553 CI[0.5593,0.7277]
+  exceed_frac_gt_t10 :: MT: pearson=0.1059 CI[-0.0216,0.2375] spearman=0.0124 CI[-0.1304,0.1527]
+  exceed_frac_sr_t10 :: SSIM: pearson=0.2454 CI[0.0956,0.3873] spearman=0.2336 CI[0.0730,0.3905]
+  exceed_frac_sr_t10 :: PD: pearson=0.5979 CI[0.4810,0.6993] spearman=0.5875 CI[0.4548,0.6971]
+  exceed_frac_sr_t10 :: MT: pearson=0.4804 CI[0.3586,0.5869] spearman=0.4718 CI[0.3341,0.5967]
+  exceed_frac_delta_t10 :: SSIM: pearson=0.4758 CI[0.3193,0.6199] spearman=0.3121 CI[0.1524,0.4644]
+  exceed_frac_delta_t10 :: PD: pearson=0.1770 CI[0.0209,0.3405] spearman=0.1863 CI[0.0246,0.3445]
+  exceed_frac_delta_t10 :: MT: pearson=0.4567 CI[0.3592,0.5408] spearman=0.5270 CI[0.4155,0.6163]
+  exceed_frac_abs_delta_t10 :: SSIM: pearson=0.1387 CI[-0.0337,0.3143] spearman=0.1446 CI[-0.0260,0.3005]
+  exceed_frac_abs_delta_t10 :: PD: pearson=0.2908 CI[0.1627,0.4209] spearman=0.2793 CI[0.1432,0.4111]
+  exceed_frac_abs_delta_t10 :: MT: pearson=0.2196 CI[0.0938,0.3409] spearman=0.2570 CI[0.1118,0.3954]
+  exceed_frac_gt_t15 :: SSIM: pearson=-0.1359 CI[-0.2823,0.0049] spearman=-0.1201 CI[-0.2679,0.0347]
+  exceed_frac_gt_t15 :: PD: pearson=0.4504 CI[0.3503,0.5425] spearman=0.4281 CI[0.3074,0.5308]
+  exceed_frac_gt_t15 :: MT: pearson=-0.2270 CI[-0.3409,-0.0995] spearman=-0.1762 CI[-0.3045,-0.0435]
+  exceed_frac_sr_t15 :: SSIM: pearson=0.2820 CI[0.1366,0.4142] spearman=0.2220 CI[0.0538,0.3838]
+  exceed_frac_sr_t15 :: PD: pearson=0.6454 CI[0.5368,0.7413] spearman=0.6194 CI[0.4835,0.7303]
+  exceed_frac_sr_t15 :: MT: pearson=0.4904 CI[0.3761,0.5949] spearman=0.4757 CI[0.3435,0.5965]
+  exceed_frac_delta_t15 :: SSIM: pearson=0.3612 CI[0.2111,0.4982] spearman=0.2487 CI[0.0948,0.4006]
+  exceed_frac_delta_t15 :: PD: pearson=0.5104 CI[0.3863,0.6371] spearman=0.5143 CI[0.3607,0.6529]
+  exceed_frac_delta_t15 :: MT: pearson=0.6244 CI[0.5304,0.7009] spearman=0.6420 CI[0.5347,0.7298]
+  exceed_frac_abs_delta_t15 :: SSIM: pearson=0.3251 CI[0.1889,0.4462] spearman=0.2335 CI[0.0798,0.3777]
+  exceed_frac_abs_delta_t15 :: PD: pearson=0.6174 CI[0.5144,0.7073] spearman=0.6121 CI[0.4848,0.7139]
+  exceed_frac_abs_delta_t15 :: MT: pearson=0.6122 CI[0.5057,0.6998] spearman=0.6106 CI[0.4929,0.7090]
+  exceed_frac_gt_p90 :: SSIM: pearson=0.0555 CI[-0.0000,0.1122] spearman=0.0886 CI[0.0745,0.1703]
+  exceed_frac_gt_p90 :: PD: pearson=-0.0038 CI[-0.0176,0.0083] spearman=0.0008 CI[-0.0249,0.0270]
+  exceed_frac_gt_p90 :: MT: pearson=0.1007 CI[-0.0000,0.1833] spearman=0.1189 CI[0.1109,0.2270]
+  exceed_frac_sr_p90 :: SSIM: pearson=0.3985 CI[0.2633,0.5221] spearman=0.2917 CI[0.1365,0.4341]
+  exceed_frac_sr_p90 :: PD: pearson=0.5451 CI[0.4139,0.6652] spearman=0.5544 CI[0.3976,0.6859]
+  exceed_frac_sr_p90 :: MT: pearson=0.5632 CI[0.4579,0.6556] spearman=0.5811 CI[0.4623,0.6843]
+  exceed_frac_delta_p90 :: SSIM: pearson=0.3985 CI[0.2633,0.5221] spearman=0.2917 CI[0.1365,0.4341]
+  exceed_frac_delta_p90 :: PD: pearson=0.5451 CI[0.4139,0.6652] spearman=0.5544 CI[0.3976,0.6859]
+  exceed_frac_delta_p90 :: MT: pearson=0.5632 CI[0.4579,0.6556] spearman=0.5811 CI[0.4623,0.6843]
+  exceed_frac_abs_delta_p90 :: SSIM: pearson=0.4069 CI[0.2795,0.5188] spearman=0.3171 CI[0.1663,0.4518]
+  exceed_frac_abs_delta_p90 :: PD: pearson=0.5826 CI[0.4655,0.6902] spearman=0.5877 CI[0.4440,0.7043]
+  exceed_frac_abs_delta_p90 :: MT: pearson=0.5608 CI[0.4485,0.6597] spearman=0.5566 CI[0.4334,0.6657]
+  exceed_frac_gt_p95 :: SSIM: pearson=-0.0239 CI[-0.0478,0.0000] spearman=-0.0199 CI[-0.0564,-0.0008]
+  exceed_frac_gt_p95 :: PD: pearson=-0.0238 CI[-0.0508,0.0000] spearman=-0.0247 CI[-0.0640,-0.0060]
+  exceed_frac_gt_p95 :: MT: pearson=-0.0726 CI[-0.1384,0.0000] spearman=-0.0774 CI[-0.1546,-0.0630]
+  exceed_frac_sr_p95 :: SSIM: pearson=0.3847 CI[0.2529,0.5032] spearman=0.2765 CI[0.1223,0.4210]
+  exceed_frac_sr_p95 :: PD: pearson=0.5688 CI[0.4443,0.6823] spearman=0.5677 CI[0.4157,0.6962]
+  exceed_frac_sr_p95 :: MT: pearson=0.5697 CI[0.4628,0.6621] spearman=0.5828 CI[0.4640,0.6852]
+  exceed_frac_delta_p95 :: SSIM: pearson=0.3847 CI[0.2529,0.5032] spearman=0.2765 CI[0.1223,0.4210]
+  exceed_frac_delta_p95 :: PD: pearson=0.5688 CI[0.4443,0.6823] spearman=0.5677 CI[0.4157,0.6962]
+  exceed_frac_delta_p95 :: MT: pearson=0.5697 CI[0.4628,0.6621] spearman=0.5828 CI[0.4640,0.6852]
+  exceed_frac_abs_delta_p95 :: SSIM: pearson=0.3905 CI[0.2631,0.5047] spearman=0.3003 CI[0.1535,0.4366]
+  exceed_frac_abs_delta_p95 :: PD: pearson=0.5870 CI[0.4674,0.6963] spearman=0.5881 CI[0.4391,0.7073]
+  exceed_frac_abs_delta_p95 :: MT: pearson=0.5682 CI[0.4591,0.6636] spearman=0.5665 CI[0.4462,0.6719]
+  exceed_frac_gt_p99 :: SSIM: pearson=-0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+  exceed_frac_gt_p99 :: PD: pearson=0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+  exceed_frac_gt_p99 :: MT: pearson=0.0000 CI[-0.0000,0.0000] spearman=nan CI[nan,nan]
+  exceed_frac_sr_p99 :: SSIM: pearson=0.3449 CI[0.2078,0.4695] spearman=0.2429 CI[0.0890,0.3921]
+  exceed_frac_sr_p99 :: PD: pearson=0.5985 CI[0.4832,0.7013] spearman=0.5837 CI[0.4359,0.7051]
+  exceed_frac_sr_p99 :: MT: pearson=0.5787 CI[0.4719,0.6720] spearman=0.5826 CI[0.4636,0.6833]
+  exceed_frac_delta_p99 :: SSIM: pearson=0.3449 CI[0.2078,0.4695] spearman=0.2429 CI[0.0890,0.3921]
+  exceed_frac_delta_p99 :: PD: pearson=0.5985 CI[0.4832,0.7013] spearman=0.5837 CI[0.4359,0.7051]
+  exceed_frac_delta_p99 :: MT: pearson=0.5787 CI[0.4719,0.6720] spearman=0.5826 CI[0.4636,0.6833]
+  exceed_frac_abs_delta_p99 :: SSIM: pearson=0.3477 CI[0.2105,0.4709] spearman=0.2555 CI[0.1023,0.4005]
+  exceed_frac_abs_delta_p99 :: PD: pearson=0.6011 CI[0.4877,0.7040] spearman=0.5912 CI[0.4470,0.7097]
+  exceed_frac_abs_delta_p99 :: MT: pearson=0.5790 CI[0.4721,0.6726] spearman=0.5755 CI[0.4582,0.6779]
 
-=== Mean deltas (GAN - CNN); >0 means CNN lower/better topology ===
-PD delta: 4.8949  95% CI [3.2164, 6.5633]
-MT delta: 6.0530  95% CI [5.0613, 7.1335]
+=== PAIRED-DELTA correlations (cnn - gan) ===
+delta_wpd_bias :: dSSIM: pearson=-0.3753 CI[-0.4808,-0.2635] spearman=-0.3589 CI[-0.4788,-0.2125]
+delta_wpd_bias :: dPD: pearson=0.6460 CI[0.5591,0.7267] spearman=0.6378 CI[0.5324,0.7207]
+delta_wpd_bias :: dMT: pearson=0.3909 CI[0.2834,0.5029] spearman=0.4358 CI[0.3029,0.5519]
+delta_wpd_mae :: dSSIM: pearson=-0.4039 CI[-0.5074,-0.2948] spearman=-0.3912 CI[-0.5117,-0.2421]
+delta_wpd_mae :: dPD: pearson=0.6583 CI[0.5741,0.7368] spearman=0.6447 CI[0.5435,0.7248]
+delta_wpd_mae :: dMT: pearson=0.4087 CI[0.3019,0.5196] spearman=0.4545 CI[0.3179,0.5711]
+delta_wpd_rmse :: dSSIM: pearson=-0.4247 CI[-0.5283,-0.3101] spearman=-0.3689 CI[-0.4947,-0.2253]
+delta_wpd_rmse :: dPD: pearson=0.6781 CI[0.6002,0.7506] spearman=0.6255 CI[0.5266,0.7045]
+delta_wpd_rmse :: dMT: pearson=0.4767 CI[0.3743,0.5830] spearman=0.5157 CI[0.3930,0.6214]
+delta_wpd_w1 :: dSSIM: pearson=-0.4129 CI[-0.5180,-0.3044] spearman=-0.3872 CI[-0.5083,-0.2361]
+delta_wpd_w1 :: dPD: pearson=0.6630 CI[0.5786,0.7426] spearman=0.6428 CI[0.5408,0.7245]
+delta_wpd_w1 :: dMT: pearson=0.4176 CI[0.3082,0.5302] spearman=0.4562 CI[0.3202,0.5721]
+delta_psd_log_l2 :: dSSIM: pearson=-0.6483 CI[-0.7057,-0.5890] spearman=-0.5730 CI[-0.6539,-0.4601]
+delta_psd_log_l2 :: dPD: pearson=0.7797 CI[0.7328,0.8257] spearman=0.8367 CI[0.7843,0.8737]
+delta_psd_log_l2 :: dMT: pearson=0.6150 CI[0.5492,0.6790] spearman=0.6548 CI[0.5504,0.7344]
+delta_psd_slope_delta :: dSSIM: pearson=-0.0162 CI[-0.1909,0.1479] spearman=-0.0614 CI[-0.2247,0.1011]
+delta_psd_slope_delta :: dPD: pearson=-0.2115 CI[-0.4061,-0.0366] spearman=-0.2439 CI[-0.4011,-0.0774]
+delta_psd_slope_delta :: dMT: pearson=-0.2892 CI[-0.4060,-0.1665] spearman=-0.2685 CI[-0.4102,-0.1076]
+delta_psd_slope_abs_delta :: dSSIM: pearson=0.0162 CI[-0.1479,0.1909] spearman=0.0614 CI[-0.1011,0.2247]
+delta_psd_slope_abs_delta :: dPD: pearson=0.2115 CI[0.0366,0.4061] spearman=0.2439 CI[0.0774,0.4011]
+delta_psd_slope_abs_delta :: dMT: pearson=0.2892 CI[0.1665,0.4060] spearman=0.2685 CI[0.1076,0.4102]
+delta_grad_mae :: dSSIM: pearson=-0.8023 CI[-0.8455,-0.7541] spearman=-0.7483 CI[-0.8042,-0.6660]
+delta_grad_mae :: dPD: pearson=0.8198 CI[0.7878,0.8500] spearman=0.7385 CI[0.6650,0.7913]
+delta_grad_mae :: dMT: pearson=0.7259 CI[0.6498,0.7923] spearman=0.7413 CI[0.6459,0.8112]
+delta_grad_w1 :: dSSIM: pearson=-0.8008 CI[-0.8472,-0.7474] spearman=-0.7481 CI[-0.8061,-0.6641]
+delta_grad_w1 :: dPD: pearson=0.8571 CI[0.8282,0.8818] spearman=0.7859 CI[0.7228,0.8277]
+delta_grad_w1 :: dMT: pearson=0.6851 CI[0.6009,0.7598] spearman=0.7020 CI[0.6025,0.7823]
+delta_grad_kurtosis_delta :: dSSIM: pearson=0.0033 CI[-0.1440,0.1614] spearman=0.0446 CI[-0.1161,0.2046]
+delta_grad_kurtosis_delta :: dPD: pearson=-0.0511 CI[-0.2039,0.0999] spearman=-0.0475 CI[-0.1970,0.1131]
+delta_grad_kurtosis_delta :: dMT: pearson=0.0904 CI[-0.0445,0.2068] spearman=-0.0109 CI[-0.1687,0.1382]
+delta_grad_kurtosis_abs_delta :: dSSIM: pearson=0.0209 CI[-0.1197,0.1845] spearman=0.0895 CI[-0.0747,0.2403]
+delta_grad_kurtosis_abs_delta :: dPD: pearson=0.0463 CI[-0.1023,0.1925] spearman=0.0310 CI[-0.1334,0.1894]
+delta_grad_kurtosis_abs_delta :: dMT: pearson=0.0111 CI[-0.1380,0.1523] spearman=-0.0305 CI[-0.1832,0.1237]
+delta_exceed_frac_gt_t5 :: dSSIM: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_t5 :: dPD: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_t5 :: dMT: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_sr_t5 :: dSSIM: pearson=0.6463 CI[0.5826,0.7097] spearman=0.5926 CI[0.4860,0.6679]
+delta_exceed_frac_sr_t5 :: dPD: pearson=-0.6327 CI[-0.7175,-0.5492] spearman=-0.6357 CI[-0.7112,-0.5398]
+delta_exceed_frac_sr_t5 :: dMT: pearson=-0.5966 CI[-0.6793,-0.4970] spearman=-0.5955 CI[-0.6989,-0.4748]
+delta_exceed_frac_delta_t5 :: dSSIM: pearson=0.6463 CI[0.5826,0.7097] spearman=0.5926 CI[0.4860,0.6679]
+delta_exceed_frac_delta_t5 :: dPD: pearson=-0.6327 CI[-0.7175,-0.5492] spearman=-0.6357 CI[-0.7112,-0.5398]
+delta_exceed_frac_delta_t5 :: dMT: pearson=-0.5966 CI[-0.6793,-0.4970] spearman=-0.5955 CI[-0.6989,-0.4748]
+delta_exceed_frac_abs_delta_t5 :: dSSIM: pearson=-0.6035 CI[-0.7043,-0.4945] spearman=-0.5482 CI[-0.6646,-0.4075]
+delta_exceed_frac_abs_delta_t5 :: dPD: pearson=0.5582 CI[0.4482,0.6645] spearman=0.5174 CI[0.3797,0.6287]
+delta_exceed_frac_abs_delta_t5 :: dMT: pearson=0.4413 CI[0.3140,0.5507] spearman=0.3430 CI[0.1802,0.4811]
+delta_exceed_frac_gt_t10 :: dSSIM: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_t10 :: dPD: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_t10 :: dMT: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_sr_t10 :: dSSIM: pearson=0.1750 CI[0.0072,0.3302] spearman=0.1143 CI[-0.0611,0.2714]
+delta_exceed_frac_sr_t10 :: dPD: pearson=-0.2917 CI[-0.4213,-0.1564] spearman=-0.3107 CI[-0.4503,-0.1635]
+delta_exceed_frac_sr_t10 :: dMT: pearson=-0.3513 CI[-0.4734,-0.2134] spearman=-0.3064 CI[-0.4449,-0.1566]
+delta_exceed_frac_delta_t10 :: dSSIM: pearson=0.1750 CI[0.0072,0.3302] spearman=0.1143 CI[-0.0611,0.2714]
+delta_exceed_frac_delta_t10 :: dPD: pearson=-0.2917 CI[-0.4213,-0.1564] spearman=-0.3107 CI[-0.4503,-0.1635]
+delta_exceed_frac_delta_t10 :: dMT: pearson=-0.3513 CI[-0.4734,-0.2134] spearman=-0.3064 CI[-0.4449,-0.1566]
+delta_exceed_frac_abs_delta_t10 :: dSSIM: pearson=-0.6199 CI[-0.7207,-0.5037] spearman=-0.5804 CI[-0.6980,-0.4524]
+delta_exceed_frac_abs_delta_t10 :: dPD: pearson=0.4061 CI[0.2651,0.5339] spearman=0.3038 CI[0.1475,0.4425]
+delta_exceed_frac_abs_delta_t10 :: dMT: pearson=0.3440 CI[0.1855,0.4832] spearman=0.2488 CI[0.0791,0.3915]
+delta_exceed_frac_gt_t15 :: dSSIM: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_t15 :: dPD: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_t15 :: dMT: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_sr_t15 :: dSSIM: pearson=-0.4548 CI[-0.5670,-0.3377] spearman=-0.4816 CI[-0.5879,-0.3664]
+delta_exceed_frac_sr_t15 :: dPD: pearson=0.4529 CI[0.3023,0.5892] spearman=0.4467 CI[0.2908,0.5780]
+delta_exceed_frac_sr_t15 :: dMT: pearson=0.2919 CI[0.1767,0.4105] spearman=0.3117 CI[0.1572,0.4461]
+delta_exceed_frac_delta_t15 :: dSSIM: pearson=-0.4548 CI[-0.5670,-0.3377] spearman=-0.4816 CI[-0.5879,-0.3664]
+delta_exceed_frac_delta_t15 :: dPD: pearson=0.4529 CI[0.3023,0.5892] spearman=0.4467 CI[0.2908,0.5780]
+delta_exceed_frac_delta_t15 :: dMT: pearson=0.2919 CI[0.1767,0.4105] spearman=0.3117 CI[0.1572,0.4461]
+delta_exceed_frac_abs_delta_t15 :: dSSIM: pearson=-0.5399 CI[-0.6498,-0.4185] spearman=-0.5239 CI[-0.6333,-0.3989]
+delta_exceed_frac_abs_delta_t15 :: dPD: pearson=0.5075 CI[0.3698,0.6331] spearman=0.4701 CI[0.3206,0.5965]
+delta_exceed_frac_abs_delta_t15 :: dMT: pearson=0.3988 CI[0.2574,0.5300] spearman=0.3492 CI[0.1900,0.4862]
+delta_exceed_frac_gt_p90 :: dSSIM: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_p90 :: dPD: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_p90 :: dMT: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_sr_p90 :: dSSIM: pearson=-0.3998 CI[-0.5110,-0.2772] spearman=-0.3947 CI[-0.5108,-0.2517]
+delta_exceed_frac_sr_p90 :: dPD: pearson=0.5673 CI[0.4430,0.6772] spearman=0.5826 CI[0.4645,0.6782]
+delta_exceed_frac_sr_p90 :: dMT: pearson=0.2875 CI[0.1573,0.4027] spearman=0.3125 CI[0.1592,0.4522]
+delta_exceed_frac_delta_p90 :: dSSIM: pearson=-0.3998 CI[-0.5110,-0.2772] spearman=-0.3947 CI[-0.5108,-0.2517]
+delta_exceed_frac_delta_p90 :: dPD: pearson=0.5673 CI[0.4430,0.6772] spearman=0.5826 CI[0.4645,0.6782]
+delta_exceed_frac_delta_p90 :: dMT: pearson=0.2875 CI[0.1573,0.4027] spearman=0.3125 CI[0.1592,0.4522]
+delta_exceed_frac_abs_delta_p90 :: dSSIM: pearson=-0.4808 CI[-0.5875,-0.3638] spearman=-0.4247 CI[-0.5481,-0.2797]
+delta_exceed_frac_abs_delta_p90 :: dPD: pearson=0.6273 CI[0.5077,0.7283] spearman=0.6046 CI[0.4787,0.6992]
+delta_exceed_frac_abs_delta_p90 :: dMT: pearson=0.3090 CI[0.1747,0.4310] spearman=0.3040 CI[0.1518,0.4438]
+delta_exceed_frac_gt_p95 :: dSSIM: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_p95 :: dPD: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_p95 :: dMT: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_sr_p95 :: dSSIM: pearson=-0.4524 CI[-0.5508,-0.3450] spearman=-0.4278 CI[-0.5425,-0.2881]
+delta_exceed_frac_sr_p95 :: dPD: pearson=0.6529 CI[0.5479,0.7446] spearman=0.6442 CI[0.5353,0.7340]
+delta_exceed_frac_sr_p95 :: dMT: pearson=0.3444 CI[0.2186,0.4532] spearman=0.3492 CI[0.1945,0.4823]
+delta_exceed_frac_delta_p95 :: dSSIM: pearson=-0.4524 CI[-0.5508,-0.3450] spearman=-0.4278 CI[-0.5425,-0.2881]
+delta_exceed_frac_delta_p95 :: dPD: pearson=0.6529 CI[0.5479,0.7446] spearman=0.6442 CI[0.5353,0.7340]
+delta_exceed_frac_delta_p95 :: dMT: pearson=0.3444 CI[0.2186,0.4532] spearman=0.3492 CI[0.1945,0.4823]
+delta_exceed_frac_abs_delta_p95 :: dSSIM: pearson=-0.4754 CI[-0.5702,-0.3693] spearman=-0.4302 CI[-0.5448,-0.2903]
+delta_exceed_frac_abs_delta_p95 :: dPD: pearson=0.6706 CI[0.5664,0.7619] spearman=0.6492 CI[0.5388,0.7414]
+delta_exceed_frac_abs_delta_p95 :: dMT: pearson=0.3492 CI[0.2202,0.4611] spearman=0.3391 CI[0.1823,0.4744]
+delta_exceed_frac_gt_p99 :: dSSIM: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_p99 :: dPD: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_gt_p99 :: dMT: pearson=nan CI[nan,nan] spearman=nan CI[nan,nan]
+delta_exceed_frac_sr_p99 :: dSSIM: pearson=-0.5119 CI[-0.6033,-0.4134] spearman=-0.4489 CI[-0.5595,-0.3084]
+delta_exceed_frac_sr_p99 :: dPD: pearson=0.7337 CI[0.6422,0.8058] spearman=0.6860 CI[0.5836,0.7664]
+delta_exceed_frac_sr_p99 :: dMT: pearson=0.4312 CI[0.3092,0.5363] spearman=0.4312 CI[0.2882,0.5531]
+delta_exceed_frac_delta_p99 :: dSSIM: pearson=-0.5119 CI[-0.6033,-0.4134] spearman=-0.4489 CI[-0.5595,-0.3084]
+delta_exceed_frac_delta_p99 :: dPD: pearson=0.7337 CI[0.6422,0.8058] spearman=0.6860 CI[0.5836,0.7664]
+delta_exceed_frac_delta_p99 :: dMT: pearson=0.4312 CI[0.3092,0.5363] spearman=0.4312 CI[0.2882,0.5531]
+delta_exceed_frac_abs_delta_p99 :: dSSIM: pearson=-0.5144 CI[-0.6062,-0.4162] spearman=-0.4494 CI[-0.5632,-0.3080]
+delta_exceed_frac_abs_delta_p99 :: dPD: pearson=0.7339 CI[0.6429,0.8068] spearman=0.6847 CI[0.5830,0.7644]
+delta_exceed_frac_abs_delta_p99 :: dMT: pearson=0.4306 CI[0.3068,0.5369] spearman=0.4222 CI[0.2773,0.5470]
+
+=== SSIM-tie / topology-break candidates ===
+s0: cnn vs gan | ΔSSIM=0.0469 | zΔPD=0.46, zΔMT=1.19
+s1: cnn vs gan | ΔSSIM=0.0342 | zΔPD=0.38, zΔMT=1.07
+s2: cnn vs gan | ΔSSIM=0.0277 | zΔPD=0.28, zΔMT=2.09
+s4: cnn vs gan | ΔSSIM=0.0387 | zΔPD=0.29, zΔMT=2.61
+s5: cnn vs gan | ΔSSIM=0.0637 | zΔPD=0.58, zΔMT=1.26
+s6: cnn vs gan | ΔSSIM=0.0796 | zΔPD=0.76, zΔMT=1.32
+s7: cnn vs gan | ΔSSIM=0.1024 | zΔPD=1.02, zΔMT=2.39
+s8: cnn vs gan | ΔSSIM=0.0863 | zΔPD=1.16, zΔMT=1.79
+s9: cnn vs gan | ΔSSIM=0.0874 | zΔPD=0.85, zΔMT=1.13
+s11: cnn vs gan | ΔSSIM=0.0665 | zΔPD=0.79, zΔMT=1.03
+s12: cnn vs gan | ΔSSIM=0.0736 | zΔPD=0.53, zΔMT=1.12
+s13: cnn vs gan | ΔSSIM=0.1019 | zΔPD=0.68, zΔMT=1.39
+s16: cnn vs gan | ΔSSIM=0.1484 | zΔPD=1.01, zΔMT=0.89
+s17: cnn vs gan | ΔSSIM=0.1451 | zΔPD=1.01, zΔMT=0.61
+s18: cnn vs gan | ΔSSIM=0.1682 | zΔPD=1.15, zΔMT=1.46
+s19: cnn vs gan | ΔSSIM=0.1456 | zΔPD=1.33, zΔMT=1.09
+s20: cnn vs gan | ΔSSIM=0.1400 | zΔPD=1.27, zΔMT=1.50
+s21: cnn vs gan | ΔSSIM=0.1093 | zΔPD=1.19, zΔMT=0.92
+s26: cnn vs gan | ΔSSIM=0.0067 | zΔPD=0.01, zΔMT=1.31
+s29: cnn vs gan | ΔSSIM=0.0335 | zΔPD=0.00, zΔMT=1.36
+s30: cnn vs gan | ΔSSIM=0.0276 | zΔPD=0.03, zΔMT=1.11
+s31: cnn vs gan | ΔSSIM=0.0173 | zΔPD=0.01, zΔMT=1.08
+s55: cnn vs gan | ΔSSIM=0.1466 | zΔPD=0.66, zΔMT=1.02
+s58: cnn vs gan | ΔSSIM=0.1374 | zΔPD=0.91, zΔMT=1.14
+s59: cnn vs gan | ΔSSIM=0.1438 | zΔPD=0.94, zΔMT=1.06
+s60: cnn vs gan | ΔSSIM=0.1404 | zΔPD=0.96, zΔMT=1.72
+s61: cnn vs gan | ΔSSIM=0.1443 | zΔPD=1.01, zΔMT=2.22
+s62: cnn vs gan | ΔSSIM=0.1535 | zΔPD=0.87, zΔMT=1.99
+s63: cnn vs gan | ΔSSIM=0.1345 | zΔPD=0.67, zΔMT=2.02
+s64: cnn vs gan | ΔSSIM=0.1744 | zΔPD=0.91, zΔMT=1.87
+s65: cnn vs gan | ΔSSIM=0.1816 | zΔPD=0.97, zΔMT=1.37
+s66: cnn vs gan | ΔSSIM=0.1816 | zΔPD=0.91, zΔMT=1.11
+s67: cnn vs gan | ΔSSIM=0.1737 | zΔPD=0.95, zΔMT=1.15
+s69: cnn vs gan | ΔSSIM=0.1588 | zΔPD=0.74, zΔMT=1.20
+s70: cnn vs gan | ΔSSIM=0.1614 | zΔPD=0.75, zΔMT=1.66
+s71: cnn vs gan | ΔSSIM=0.1408 | zΔPD=0.87, zΔMT=1.66
+s72: cnn vs gan | ΔSSIM=0.1213 | zΔPD=0.57, zΔMT=2.61
+s73: cnn vs gan | ΔSSIM=0.1125 | zΔPD=0.67, zΔMT=1.88
+s74: cnn vs gan | ΔSSIM=0.1286 | zΔPD=0.64, zΔMT=1.70
+s75: cnn vs gan | ΔSSIM=0.1316 | zΔPD=0.90, zΔMT=2.00
+s76: cnn vs gan | ΔSSIM=0.1230 | zΔPD=0.96, zΔMT=1.73
+s77: cnn vs gan | ΔSSIM=0.1358 | zΔPD=0.90, zΔMT=1.45
+s78: cnn vs gan | ΔSSIM=0.1317 | zΔPD=1.00, zΔMT=2.10
+s79: cnn vs gan | ΔSSIM=0.1369 | zΔPD=0.98, zΔMT=1.27
+s80: cnn vs gan | ΔSSIM=0.1414 | zΔPD=1.01, zΔMT=1.76
+s81: cnn vs gan | ΔSSIM=0.1368 | zΔPD=1.01, zΔMT=2.75
+s82: cnn vs gan | ΔSSIM=0.1389 | zΔPD=0.98, zΔMT=2.72
+s83: cnn vs gan | ΔSSIM=0.1289 | zΔPD=1.03, zΔMT=1.94
+s84: cnn vs gan | ΔSSIM=0.1313 | zΔPD=1.05, zΔMT=2.18
+s85: cnn vs gan | ΔSSIM=0.1199 | zΔPD=0.98, zΔMT=1.56
+s86: cnn vs gan | ΔSSIM=0.1270 | zΔPD=0.99, zΔMT=1.10
+s87: cnn vs gan | ΔSSIM=0.1344 | zΔPD=0.95, zΔMT=1.17
+s88: cnn vs gan | ΔSSIM=0.1506 | zΔPD=0.82, zΔMT=1.33
+s90: cnn vs gan | ΔSSIM=0.1721 | zΔPD=1.07, zΔMT=1.50
+s91: cnn vs gan | ΔSSIM=0.1876 | zΔPD=1.15, zΔMT=0.61
+s92: cnn vs gan | ΔSSIM=0.1725 | zΔPD=1.07, zΔMT=0.57
+s93: cnn vs gan | ΔSSIM=0.1328 | zΔPD=0.83, zΔMT=1.85
+s94: cnn vs gan | ΔSSIM=0.1257 | zΔPD=0.81, zΔMT=1.78
+s95: cnn vs gan | ΔSSIM=0.1201 | zΔPD=0.71, zΔMT=1.69
+s96: cnn vs gan | ΔSSIM=0.1203 | zΔPD=0.69, zΔMT=1.48
+s97: cnn vs gan | ΔSSIM=0.1332 | zΔPD=0.77, zΔMT=1.68
+s98: cnn vs gan | ΔSSIM=0.1248 | zΔPD=0.90, zΔMT=1.41
+s99: cnn vs gan | ΔSSIM=0.1201 | zΔPD=0.68, zΔMT=1.24
+s100: cnn vs gan | ΔSSIM=0.1144 | zΔPD=0.83, zΔMT=1.76
+s101: cnn vs gan | ΔSSIM=0.1312 | zΔPD=0.99, zΔMT=2.24
+s102: cnn vs gan | ΔSSIM=0.1288 | zΔPD=1.00, zΔMT=1.54
+s103: cnn vs gan | ΔSSIM=0.1213 | zΔPD=0.86, zΔMT=2.61
+s104: cnn vs gan | ΔSSIM=0.1377 | zΔPD=0.99, zΔMT=2.69
+s105: cnn vs gan | ΔSSIM=0.1256 | zΔPD=0.99, zΔMT=3.29
+s106: cnn vs gan | ΔSSIM=0.1325 | zΔPD=1.12, zΔMT=2.95
+s107: cnn vs gan | ΔSSIM=0.1384 | zΔPD=1.14, zΔMT=4.12
+s108: cnn vs gan | ΔSSIM=0.1380 | zΔPD=1.21, zΔMT=2.17
+s109: cnn vs gan | ΔSSIM=0.1421 | zΔPD=1.20, zΔMT=2.07
+s110: cnn vs gan | ΔSSIM=0.1378 | zΔPD=1.21, zΔMT=1.52
+s111: cnn vs gan | ΔSSIM=0.1346 | zΔPD=1.26, zΔMT=1.61
+s112: cnn vs gan | ΔSSIM=0.1528 | zΔPD=1.16, zΔMT=2.52
+s113: cnn vs gan | ΔSSIM=0.1494 | zΔPD=1.30, zΔMT=1.95
+s114: cnn vs gan | ΔSSIM=0.1628 | zΔPD=1.32, zΔMT=2.78
+s115: cnn vs gan | ΔSSIM=0.1476 | zΔPD=0.98, zΔMT=2.82
+s116: cnn vs gan | ΔSSIM=0.1525 | zΔPD=0.95, zΔMT=2.80
+s117: cnn vs gan | ΔSSIM=0.1278 | zΔPD=0.87, zΔMT=2.82
+s118: cnn vs gan | ΔSSIM=0.1021 | zΔPD=1.11, zΔMT=1.22
+s119: cnn vs gan | ΔSSIM=0.1133 | zΔPD=1.27, zΔMT=1.77
+s120: cnn vs gan | ΔSSIM=0.1251 | zΔPD=1.47, zΔMT=1.75
+s121: cnn vs gan | ΔSSIM=0.1340 | zΔPD=1.61, zΔMT=0.60
+s122: cnn vs gan | ΔSSIM=0.1139 | zΔPD=1.40, zΔMT=1.10
+s123: cnn vs gan | ΔSSIM=0.1067 | zΔPD=1.57, zΔMT=0.87
+s124: cnn vs gan | ΔSSIM=0.0985 | zΔPD=1.42, zΔMT=0.55
+s125: cnn vs gan | ΔSSIM=0.1007 | zΔPD=1.56, zΔMT=1.53
+s126: cnn vs gan | ΔSSIM=0.1185 | zΔPD=1.56, zΔMT=1.76
+s127: cnn vs gan | ΔSSIM=0.0956 | zΔPD=1.46, zΔMT=1.72
+s128: cnn vs gan | ΔSSIM=0.0943 | zΔPD=1.37, zΔMT=0.68
+s129: cnn vs gan | ΔSSIM=0.1014 | zΔPD=1.16, zΔMT=0.78
+s133: cnn vs gan | ΔSSIM=0.0874 | zΔPD=0.89, zΔMT=1.19
+s136: cnn vs gan | ΔSSIM=0.1356 | zΔPD=0.54, zΔMT=1.10
+s137: cnn vs gan | ΔSSIM=0.1112 | zΔPD=0.60, zΔMT=1.68
+s142: cnn vs gan | ΔSSIM=0.0784 | zΔPD=0.70, zΔMT=1.28
+s143: cnn vs gan | ΔSSIM=0.0860 | zΔPD=0.44, zΔMT=1.49
+s164: cnn vs gan | ΔSSIM=0.0664 | zΔPD=0.05, zΔMT=1.95
+s165: cnn vs gan | ΔSSIM=0.0547 | zΔPD=0.05, zΔMT=1.95
+s166: cnn vs gan | ΔSSIM=0.0538 | zΔPD=0.42, zΔMT=1.91
+s167: cnn vs gan | ΔSSIM=0.0489 | zΔPD=0.11, zΔMT=1.95
