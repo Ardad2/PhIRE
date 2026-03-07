@@ -199,7 +199,7 @@ def main() -> int:
     physics_cols = [c for c in _num_cols(rows) if c not in BASE_COLS and not c.endswith("_gt") and not c.endswith("_sr")]
 
     mat, ylabels, xlabels = _matrix(rows, physics_cols)
-    _plot_heatmap(mat, ylabels, xlabels, "Global correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / "corr_heatmap_global.png")
+    _plot_heatmap(mat, ylabels, xlabels, "Global correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / f"{args.metric_column}_corr_heatmap_global.png")
 
     methods = sorted({str(r.get("method", "")) for r in rows if str(r.get("method", "")).strip()})
     for m in methods:
@@ -207,7 +207,7 @@ def main() -> int:
         if len(sub) < 2:
             continue
         mm, yy, xx = _matrix(sub, physics_cols)
-        _plot_heatmap(mm, yy, xx, f"{m.upper()} correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / f"corr_heatmap_{m}.png")
+        _plot_heatmap(mm, yy, xx, f"{m.upper()} correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / f"{args.metric_column}_corr_heatmap_{m}.png")
 
     tie_rows = _top_tie_break_rows(rows, metric_col=args.metric_column, tie_eps=args.tie_eps, min_z=args.topo_gap_z, k=args.top_k)
     tie_png = args.outdir / f"{args.metric_column}_tie_topology_break_table.png"
@@ -216,16 +216,16 @@ def main() -> int:
     if args.delta_csv is not None and args.delta_csv.exists():
         drows = _read_csv(args.delta_csv)
         if drows:
-            _plot_delta_scatters(drows, physics_cols, args.outdir / "paired_delta_scatter_grid.png")
+            _plot_delta_scatters(drows, physics_cols, args.outdir / f"{args.metric_column}_paired_delta_scatter_grid.png")
 
-    print(f"Wrote: {args.outdir/'corr_heatmap_global.png'}")
+    print(f"Wrote: {args.outdir/f'{args.metric_column}_corr_heatmap_global.png'}")
     for m in methods:
-        p = args.outdir / f"corr_heatmap_{m}.png"
+        p = args.outdir / f"{args.metric_column}_corr_heatmap_{m}.png"
         if p.exists():
             print(f"Wrote: {p}")
     print(f"Wrote: {tie_png}")
     if args.delta_csv is not None:
-        p = args.outdir / "paired_delta_scatter_grid.png"
+        p = args.outdir / f"{args.metric_column}_paired_delta_scatter_grid.png"
         if p.exists():
             print(f"Wrote: {p}")
     return 0

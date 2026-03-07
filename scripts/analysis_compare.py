@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-"""Compare PSNR, topology distances, and physics metrics.
+"""Compare quality metric, topology distances, and physics metrics.
 
-Inputs:
-- combined pairwise topology CSV (method,key,sample_idx,pd_distance,mt_distance)
-- one or more method directories containing dataGT.npy/dataSR.npy
-
-Outputs:
-- merged CSV for downstream plotting
-- optional paired-delta CSV (across methods for each sample index)
-- text report with global/per-method/paired correlations and tie-break candidates
+Two modes:
+1) Build merged table from topology CSV + method data dirs (original mode).
+2) Re-analyze an existing merged CSV (new mode via --in-csv), useful for SSIM report parity.
 """
 
 from __future__ import annotations
@@ -18,14 +13,14 @@ import csv
 import math
 import re
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from metrics_physics import compute_physics_metrics
 
 
-BASE_NUMERIC_COLS = {"sample_idx", "psnr", "pd_distance", "mt_distance"}
+BASE_NUMERIC_COLS = {"sample_idx", "psnr", "ssim", "pd_distance", "mt_distance"}
 
 
 def _to_float(x: object) -> Optional[float]:
@@ -193,32 +188,33 @@ def _corr_line(x: np.ndarray, y: np.ndarray, label: str, nboot: int, seed: int) 
     s = spearman(xx, yy)
     plo, phi = bootstrap_corr_ci(xx, yy, "pearson", nboot=nboot, seed=seed)
     slo, shi = bootstrap_corr_ci(xx, yy, "spearman", nboot=nboot, seed=seed + 17)
-    return (
-        f"{label}: pearson={p:.4f} CI[{plo:.4f},{phi:.4f}] "
-        f"spearman={s:.4f} CI[{slo:.4f},{shi:.4f}]"
-    )
+    return f"{label}: pearson={p:.4f} CI[{plo:.4f},{phi:.4f}] spearman={s:.4f} CI[{slo:.4f},{shi:.4f}]"
 
 
-def summarize(rows: List[Dict[str, object]], tie_eps: float = 0.25, topo_gap_z: float = 1.0, nboot: int = 2000, seed: int = 0) -> Tuple[str, List[Dict[str, object]]]:
+def summarize(rows: List[Dict[str, object]], metric_column: str = "psnr", tie_eps: float = 0.25, topo_gap_z: float = 1.0, nboot: int = 2000, seed: int = 0) -> Tuple[str, List[Dict[str, object]]]:
     if not rows:
         return "No merged rows", []
+    if metric_column not in rows[0]:
+        raise ValueError(f"metric-column {metric_column} not found in merged rows")
 
     methods = sorted({str(r["method"]) for r in rows})
     physics_cols = [c for c in _numeric_columns(rows) if c not in BASE_NUMERIC_COLS and not c.endswith("_gt") and not c.endswith("_sr")]
 
+    mtag = metric_column.upper()
     lines: List[str] = []
     lines.append("=== CONFIG ===")
     lines.append(f"rows={len(rows)} methods={methods}")
+    lines.append(f"metric_column={metric_column}")
     lines.append(f"physics_columns={len(physics_cols)}")
     lines.append("")
 
-    lines.append("=== GLOBAL correlations (physics vs PSNR/PD/MT) ===")
+    lines.append(f"=== GLOBAL correlations (physics vs {mtag}/PD/MT) ===")
     for col in physics_cols:
         vals = _arr(rows, col)
-        ps = _arr(rows, "psnr")
+        q = _arr(rows, metric_column)
         pd = _arr(rows, "pd_distance")
         mt = _arr(rows, "mt_distance")
-        lines.append(_corr_line(ps, vals, f"{col} :: PSNR", nboot, seed))
+        lines.append(_corr_line(q, vals, f"{col} :: {mtag}", nboot, seed))
         lines.append(_corr_line(pd, vals, f"{col} :: PD", nboot, seed + 1))
         lines.append(_corr_line(mt, vals, f"{col} :: MT", nboot, seed + 2))
     lines.append("")
@@ -229,23 +225,24 @@ def summarize(rows: List[Dict[str, object]], tie_eps: float = 0.25, topo_gap_z: 
         lines.append(f"[{m}] n={len(sub)}")
         for col in physics_cols:
             vals = _arr(sub, col)
-            lines.append(_corr_line(_arr(sub, "psnr"), vals, f"  {col} :: PSNR", nboot, seed + 3))
-            lines.append(_corr_line(_arr(sub, "pd_distance"), vals, f"  {col} :: PD", nboot, seed + 4))
-            lines.append(_corr_line(_arr(sub, "mt_distance"), vals, f"  {col} :: MT", nboot, seed + 5))
+            lines.append(_corr_line(_arr(sub, metric_column), vals, f"  {col} :: {mtag}", nboot, seed + 3))
+            lines.append(_corr_line(_arr(sub, "pd_distance"), vals, "  {col} :: PD".format(col=col), nboot, seed + 4))
+            lines.append(_corr_line(_arr(sub, "mt_distance"), vals, "  {col} :: MT".format(col=col), nboot, seed + 5))
         lines.append("")
 
     delta_rows = _paired_delta_rows(rows, methods)
     if delta_rows:
+        dmetric = f"delta_{metric_column}"
         lines.append(f"=== PAIRED-DELTA correlations ({methods[0]} - {methods[1]}) ===")
         for col in physics_cols:
             dphys = _arr(delta_rows, f"delta_{col}")
-            lines.append(_corr_line(_arr(delta_rows, "delta_psnr"), dphys, f"delta_{col} :: dPSNR", nboot, seed + 6))
+            lines.append(_corr_line(_arr(delta_rows, dmetric), dphys, f"delta_{col} :: d{mtag}", nboot, seed + 6))
             lines.append(_corr_line(_arr(delta_rows, "delta_pd_distance"), dphys, f"delta_{col} :: dPD", nboot, seed + 7))
             lines.append(_corr_line(_arr(delta_rows, "delta_mt_distance"), dphys, f"delta_{col} :: dMT", nboot, seed + 8))
         lines.append("")
 
     if len(methods) >= 2:
-        lines.append("=== PSNR-tie / topology-break candidates ===")
+        lines.append(f"=== {mtag}-tie / topology-break candidates ===")
         by_idx: Dict[int, List[Dict[str, object]]] = {}
         for r in rows:
             by_idx.setdefault(int(r["sample_idx"]), []).append(r)
@@ -260,15 +257,13 @@ def summarize(rows: List[Dict[str, object]], tie_eps: float = 0.25, topo_gap_z: 
             for i in range(len(rr)):
                 for j in range(i + 1, len(rr)):
                     a, b = rr[i], rr[j]
-                    dps = abs(float(a["psnr"]) - float(b["psnr"]))
-                    if dps > tie_eps:
+                    dq = abs(float(a[metric_column]) - float(b[metric_column]))
+                    if dq > tie_eps:
                         continue
                     dpd = abs(float(a["pd_distance"]) - float(b["pd_distance"])) / pd_std
                     dmt = abs(float(a["mt_distance"]) - float(b["mt_distance"])) / mt_std
                     if max(dpd, dmt) >= topo_gap_z:
-                        lines.append(
-                            f"s{si}: {a['method']} vs {b['method']} | ΔPSNR={dps:.3f} dB | zΔPD={dpd:.2f}, zΔMT={dmt:.2f}"
-                        )
+                        lines.append(f"s{si}: {a['method']} vs {b['method']} | Δ{mtag}={dq:.4f} | zΔPD={dpd:.2f}, zΔMT={dmt:.2f}")
 
     return "\n".join(lines), delta_rows
 
@@ -290,6 +285,12 @@ def write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
         w.writerows(rows)
 
 
+def read_merged_csv(path: Path) -> List[Dict[str, object]]:
+    with path.open("r", newline="") as f:
+        r = csv.DictReader(f)
+        return [dict(row) for row in r]
+
+
 def parse_method_dirs(values: List[str]) -> Dict[str, Path]:
     out: Dict[str, Path] = {}
     for x in values:
@@ -301,10 +302,12 @@ def parse_method_dirs(values: List[str]) -> Dict[str, Path]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Compare PSNR + topology + physics metrics")
-    ap.add_argument("--topology-csv", required=True)
-    ap.add_argument("--method-dir", action="append", required=True, help="method=/path/to/data_out_dir")
-    ap.add_argument("--out-csv", required=True)
+    ap = argparse.ArgumentParser(description="Compare quality metric + topology + physics metrics")
+    ap.add_argument("--topology-csv", default="", help="Build mode: topology CSV")
+    ap.add_argument("--method-dir", action="append", default=[], help="Build mode: method=/path/to/data_out_dir")
+    ap.add_argument("--in-csv", default="", help="Analysis mode: existing merged CSV")
+    ap.add_argument("--metric-column", choices=["psnr", "ssim"], default="psnr", help="Metric used in report/tie-break")
+    ap.add_argument("--out-csv", default="", help="Optional output merged CSV path")
     ap.add_argument("--out-report", required=True)
     ap.add_argument("--out-delta-csv", default="", help="Optional CSV path for paired-delta table")
     ap.add_argument("--tie-eps", type=float, default=0.25)
@@ -314,27 +317,31 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
-    topo = load_topology(Path(args.topology_csv))
-    methods = parse_method_dirs(args.method_dir)
-    metrics = build_metric_rows(methods)
-    merged = merge_rows(topo, metrics)
-    write_csv(Path(args.out_csv), merged)
+    if args.in_csv:
+        merged = read_merged_csv(Path(args.in_csv))
+        if args.out_csv:
+            write_csv(Path(args.out_csv), merged)
+    else:
+        if not args.topology_csv:
+            raise SystemExit("Either --in-csv or --topology-csv must be provided")
+        if not args.method_dir:
+            raise SystemExit("Build mode requires one or more --method-dir")
+        topo = load_topology(Path(args.topology_csv))
+        methods = parse_method_dirs(args.method_dir)
+        metrics = build_metric_rows(methods)
+        merged = merge_rows(topo, metrics)
+        if args.out_csv:
+            write_csv(Path(args.out_csv), merged)
 
     nboot = args.bootstrap if args.nboot is None else args.nboot
-    report, delta_rows = summarize(
-        merged,
-        tie_eps=args.tie_eps,
-        topo_gap_z=args.topo_gap_z,
-        nboot=nboot,
-        seed=args.seed,
-    )
+    report, delta_rows = summarize(merged, metric_column=args.metric_column, tie_eps=args.tie_eps, topo_gap_z=args.topo_gap_z, nboot=nboot, seed=args.seed)
     Path(args.out_report).write_text(report)
 
     if args.out_delta_csv:
         write_csv(Path(args.out_delta_csv), delta_rows)
         print(f"Wrote: {args.out_delta_csv}")
-
-    print(f"Wrote: {args.out_csv}")
+    if args.out_csv:
+        print(f"Wrote: {args.out_csv}")
     print(f"Wrote: {args.out_report}")
 
 

@@ -258,7 +258,7 @@ if [[ "$DO_POST" -eq 1 ]]; then
     --outdir "${OUT_ROOT}/combined"
 
   python3 scripts/analysis_compare.py \
-    --topology-csv "${OUT_ROOT}/combined/combined_pairwise_results.csv" \
+    --topology-csv "${O UT_ROOT}/combined/combined_pairwise_results.csv" \
     --method-dir gan=data_out/wind_mrhr_gan \
     --method-dir cnn=data_out/wind_mrhr_cnn \
     --out-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
@@ -272,14 +272,17 @@ if [[ "$DO_POST" -eq 1 ]]; then
     --method-dir cnn=data_out/wind_mrhr_cnn \
     --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}"
 
-  python3 scripts/derive_metric_topology_physics.py \
-    --in-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
-    --metric ssim \
-    --outdir "${OUT_ROOT}/combined"
+  cp -f "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv"
+
+  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analysis_compare.py \
+    --in-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
+    --metric-column ssim \
+    --out-report "${OUT_ROOT}/combined/ssim_topology_physics_report.txt" \
+    --out-delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv"
 
   PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analyze_psnr_vs_ttk_topology.py \
     --combined "${OUT_ROOT}/combined/combined_pairwise_results.csv" \
-    --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
     --metric ssim \
     --outdir "${OUT_ROOT}/combined"
 
