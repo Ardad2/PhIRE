@@ -57,11 +57,23 @@ def _arr(rows: List[Dict[str, str]], col: str) -> np.ndarray:
     return np.asarray(clean, dtype=float)
 
 
+def _paired_arrays(rows: List[Dict[str, str]], x_col: str, y_col: str) -> Tuple[np.ndarray, np.ndarray]:
+    xs: List[float] = []
+    ys: List[float] = []
+    for r in rows:
+        xv = _to_float(r.get(x_col))
+        yv = _to_float(r.get(y_col))
+        if xv is None or yv is None:
+            continue
+        xs.append(xv)
+        ys.append(yv)
+    return np.asarray(xs, dtype=float), np.asarray(ys, dtype=float)
+
+
 def _corr(x: np.ndarray, y: np.ndarray) -> float:
-    n = min(len(x), len(y))
-    if n < 2:
+    if len(x) < 2 or len(y) < 2:
         return float("nan")
-    return float(np.corrcoef(x[:n], y[:n])[0, 1])
+    return float(np.corrcoef(x, y)[0, 1])
 
 
 def _matrix(rows: List[Dict[str, str]], physics_cols: Sequence[str]) -> Tuple[np.ndarray, List[str], List[str]]:
@@ -69,9 +81,8 @@ def _matrix(rows: List[Dict[str, str]], physics_cols: Sequence[str]) -> Tuple[np
     m = np.zeros((len(physics_cols), len(targets)), dtype=float)
     m[:] = np.nan
     for i, pcol in enumerate(physics_cols):
-        yp = _arr(rows, pcol)
         for j, t in enumerate(targets):
-            xt = _arr(rows, t)
+            xt, yp = _paired_arrays(rows, t, pcol)
             m[i, j] = _corr(xt, yp)
     return m, list(physics_cols), targets
 
@@ -104,18 +115,15 @@ def _plot_delta_scatters(delta_rows: List[Dict[str, str]], physics_cols: Sequenc
         candidates = list(physics_cols[:top_n])
     fig, axes = plt.subplots(len(candidates), 2, figsize=(10, max(4.5, 2.7 * len(candidates))), squeeze=False)
     for i, c in enumerate(candidates):
-        y = _arr(delta_rows, f"delta_{c}")
-        x1 = _arr(delta_rows, "delta_pd_distance")
-        x2 = _arr(delta_rows, "delta_mt_distance")
-        n1 = min(len(x1), len(y))
-        n2 = min(len(x2), len(y))
-        axes[i, 0].scatter(x1[:n1], y[:n1], s=36)
+        x1, y1 = _paired_arrays(delta_rows, "delta_pd_distance", f"delta_{c}")
+        x2, y2 = _paired_arrays(delta_rows, "delta_mt_distance", f"delta_{c}")
+        axes[i, 0].scatter(x1, y1, s=36)
         axes[i, 0].set_xlabel("ΔPD")
         axes[i, 0].set_ylabel(f"Δ{c}")
         axes[i, 0].set_title(f"ΔPD vs Δ{c}")
         axes[i, 0].grid(True, linestyle="--", alpha=0.3)
 
-        axes[i, 1].scatter(x2[:n2], y[:n2], s=36)
+        axes[i, 1].scatter(x2, y2, s=36)
         axes[i, 1].set_xlabel("ΔMT")
         axes[i, 1].set_ylabel(f"Δ{c}")
         axes[i, 1].set_title(f"ΔMT vs Δ{c}")
@@ -247,3 +255,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
