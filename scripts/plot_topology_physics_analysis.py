@@ -181,6 +181,16 @@ def _plot_tie_table(rows: List[List[str]], metric_col: str, out: Path) -> None:
     plt.close(fig)
 
 
+def _write_tie_csv(rows: List[List[str]], metric_col: str, out: Path) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    headers = ["sample", "method_a", "method_b", f"delta_{metric_col}", "z_delta_pd", "z_delta_mt"]
+    with out.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(headers)
+        for r in rows:
+            w.writerow(r)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Visualize merged topology/physics analysis outputs")
     ap.add_argument("--merged-csv", type=Path, required=True, help="CSV from analysis_compare.py --out-csv")
@@ -190,6 +200,8 @@ def main() -> int:
     ap.add_argument("--tie-eps", type=float, default=0.25)
     ap.add_argument("--topo-gap-z", type=float, default=1.0)
     ap.add_argument("--top-k", type=int, default=10)
+    ap.add_argument("--skip-heatmaps", action="store_true", help="Skip generic joint heatmaps")
+    ap.add_argument("--only-heatmaps", action="store_true", help="Generate only generic joint heatmaps")
     args = ap.parse_args()
 
     rows = _read_csv(args.merged_csv)
@@ -197,36 +209,38 @@ def main() -> int:
         raise SystemExit(f"No rows in {args.merged_csv}")
 
     physics_cols = [c for c in _num_cols(rows) if c not in BASE_COLS and not c.endswith("_gt") and not c.endswith("_sr")]
-
-    mat, ylabels, xlabels = _matrix(rows, physics_cols)
-    _plot_heatmap(mat, ylabels, xlabels, "Global correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / f"{args.metric_column}_corr_heatmap_global.png")
-
     methods = sorted({str(r.get("method", "")) for r in rows if str(r.get("method", "")).strip()})
-    for m in methods:
-        sub = [r for r in rows if str(r.get("method", "")) == m]
-        if len(sub) < 2:
-            continue
-        mm, yy, xx = _matrix(sub, physics_cols)
-        _plot_heatmap(mm, yy, xx, f"{m.upper()} correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / f"{args.metric_column}_corr_heatmap_{m}.png")
+
+    if not args.skip_heatmaps:
+        mat, ylabels, xlabels = _matrix(rows, physics_cols)
+        _plot_heatmap(mat, ylabels, xlabels, "Global correlations: physics vs PSNR/SSIM/PD/MT", args.outdir / "corr_heatmap_global.png")
+        print(f"Wrote: {args.outdir/'corr_heatmap_global.png'}")
+        for m in methods:
+            sub = [r for r in rows if str(r.get("method", "")) == m]
+            if len(sub) < 2:
+                continue
+            mm, yy, xx = _matrix(sub, physics_cols)
+            p = args.outdir / f"corr_heatmap_{m}.png"
+            _plot_heatmap(mm, yy, xx, f"{m.upper()} correlations: physics vs PSNR/SSIM/PD/MT", p)
+            print(f"Wrote: {p}")
+
+    if args.only_heatmaps:
+        return 0
 
     tie_rows = _top_tie_break_rows(rows, metric_col=args.metric_column, tie_eps=args.tie_eps, min_z=args.topo_gap_z, k=args.top_k)
     tie_png = args.outdir / f"{args.metric_column}_tie_topology_break_table.png"
     _plot_tie_table(tie_rows, metric_col=args.metric_column, out=tie_png)
+    print(f"Wrote: {tie_png}")
+
+    tie_csv = args.outdir.parent / f"{args.metric_column}_tie_break_candidates.csv"
+    _write_tie_csv(tie_rows, metric_col=args.metric_column, out=tie_csv)
+    print(f"Wrote: {tie_csv}")
 
     if args.delta_csv is not None and args.delta_csv.exists():
         drows = _read_csv(args.delta_csv)
         if drows:
-            _plot_delta_scatters(drows, physics_cols, args.outdir / f"{args.metric_column}_paired_delta_scatter_grid.png")
-
-    print(f"Wrote: {args.outdir/f'{args.metric_column}_corr_heatmap_global.png'}")
-    for m in methods:
-        p = args.outdir / f"{args.metric_column}_corr_heatmap_{m}.png"
-        if p.exists():
-            print(f"Wrote: {p}")
-    print(f"Wrote: {tie_png}")
-    if args.delta_csv is not None:
-        p = args.outdir / f"{args.metric_column}_paired_delta_scatter_grid.png"
-        if p.exists():
+            p = args.outdir / f"{args.metric_column}_paired_delta_scatter_grid.png"
+            _plot_delta_scatters(drows, physics_cols, p)
             print(f"Wrote: {p}")
     return 0
 

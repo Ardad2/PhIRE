@@ -21,6 +21,7 @@ RESUME=0
 DO_MODELS=1
 DO_TOPO=1
 DO_POST=1
+DO_CASE_PANELS=1
 
 usage() {
   cat <<EOF
@@ -38,6 +39,7 @@ Options:
   --skip-models            Skip GAN/CNN inference stage
   --skip-topology          Skip VTI/PD/MT extraction stage
   --skip-post              Skip distance/combine/analysis/plot stage
+  --skip-case-panels       Skip qualitative tie-break case-study panel generation
   -h, --help               Show this help
 EOF
 }
@@ -55,6 +57,7 @@ while [[ $# -gt 0 ]]; do
     --skip-models) DO_MODELS=0; shift ;;
     --skip-topology) DO_TOPO=0; shift ;;
     --skip-post) DO_POST=0; shift ;;
+    --skip-case-panels) DO_CASE_PANELS=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown arg: $1"; usage; exit 1 ;;
   esac
@@ -290,13 +293,44 @@ if [[ "$DO_POST" -eq 1 ]]; then
     --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
     --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
     --metric-column psnr \
+    --only-heatmaps \
+    --outdir "${OUT_ROOT}/combined/figs_topology_physics"
+
+  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
+    --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
+    --metric-column psnr \
+    --skip-heatmaps \
     --outdir "${OUT_ROOT}/combined/figs_topology_physics"
 
   PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
     --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
     --delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
     --metric-column ssim \
+    --skip-heatmaps \
     --outdir "${OUT_ROOT}/combined/figs_topology_physics"
+
+  if [[ "$DO_CASE_PANELS" -eq 1 ]]; then
+    PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/make_tie_break_case_panels.py \
+      --metric psnr \
+      --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+      --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
+      --cnn-dir data_out/wind_mrhr_cnn \
+      --gan-dir data_out/wind_mrhr_gan \
+      --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}" \
+      --outdir "${OUT_ROOT}/combined" \
+      --samples 2 165 166
+
+    PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/make_tie_break_case_panels.py \
+      --metric ssim \
+      --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
+      --delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
+      --cnn-dir data_out/wind_mrhr_cnn \
+      --gan-dir data_out/wind_mrhr_gan \
+      --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}" \
+      --outdir "${OUT_ROOT}/combined" \
+      --samples 107 105 115
+  fi
 fi
 
 echo
