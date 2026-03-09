@@ -290,12 +290,21 @@ if [[ "$DO_POST" -eq 1 ]]; then
     --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
     --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
     --metric-column psnr \
+    --only-heatmaps \
+    --outdir "${OUT_ROOT}/combined/figs_topology_physics"
+
+  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
+    --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
+    --metric-column psnr \
+    --skip-heatmaps \
     --outdir "${OUT_ROOT}/combined/figs_topology_physics"
 
   PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
     --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
     --delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
     --metric-column ssim \
+    --skip-heatmaps \
     --outdir "${OUT_ROOT}/combined/figs_topology_physics"
 fi
 
