@@ -202,9 +202,9 @@ def _plot_panel(
 
     topo_better = "mixed"
     if float(case["delta_pd"]) < 0 and float(case["delta_mt"]) < 0:
-        topo_better = "gan"
-    elif float(case["delta_pd"]) > 0 and float(case["delta_mt"]) > 0:
         topo_better = "cnn"
+    elif float(case["delta_pd"]) > 0 and float(case["delta_mt"]) > 0:
+        topo_better = "gan"
 
     fig.suptitle(
         f"[{label_mode}] sample={si} | Δ{metric.upper()}={float(case['delta_metric']):.4f} | "
@@ -332,9 +332,9 @@ def main() -> int:
 
         pref = "mixed"
         if float(case["delta_pd"]) < 0 and float(case["delta_mt"]) < 0:
-            pref = "gan"
-        elif float(case["delta_pd"]) > 0 and float(case["delta_mt"]) > 0:
             pref = "cnn"
+        elif float(case["delta_pd"]) > 0 and float(case["delta_mt"]) > 0:
+            pref = "gan"
         lines.append(
             f"rank {rank} sample {si}: |Δ{args.metric.upper()}|={float(case['abs_delta_metric']):.4f}, "
             f"ΔPD={float(case['delta_pd']):.4f}, ΔMT={float(case['delta_mt']):.4f}, "
