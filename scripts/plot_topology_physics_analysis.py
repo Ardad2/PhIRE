@@ -134,7 +134,15 @@ def _plot_delta_scatters(delta_rows: List[Dict[str, str]], physics_cols: Sequenc
     plt.close(fig)
 
 
-def _top_tie_break_rows(rows: List[Dict[str, str]], metric_col: str, tie_eps: float, min_z: float, k: int) -> List[List[str]]:
+def _top_tie_break_rows(
+    rows: List[Dict[str, str]],
+    metric_col: str,
+    tie_eps: float,
+    min_z: float,
+    k: int,
+    require_consistent_topology: bool = False,
+    topology_score: str = "max",
+) -> List[List[str]]:
     by_idx: Dict[int, List[Dict[str, str]]] = {}
     for r in rows:
         si = _to_float(r.get("sample_idx"))
@@ -166,7 +174,14 @@ def _top_tie_break_rows(rows: List[Dict[str, str]], metric_col: str, tie_eps: fl
                     continue
                 zpd = abs(pd_a - pd_b) / pd_std
                 zmt = abs(mt_a - mt_b) / mt_std
-                score = max(zpd, zmt)
+                sign_pd = pd_a - pd_b
+                sign_mt = mt_a - mt_b
+                if require_consistent_topology and sign_pd * sign_mt <= 0:
+                    continue
+                if topology_score == "l2":
+                    score = float(math.sqrt(zpd * zpd + zmt * zmt))
+                else:
+                    score = max(zpd, zmt)
                 if score < min_z:
                     continue
                 out.append((score, [str(si), str(a.get("method", "?")), str(b.get("method", "?")), f"{dq:.3f}", f"{zpd:.2f}", f"{zmt:.2f}"]))
@@ -206,8 +221,11 @@ def main() -> int:
     ap.add_argument("--outdir", type=Path, required=True)
     ap.add_argument("--metric-column", choices=["psnr", "ssim"], default="psnr", help="Metric used for tie/break table")
     ap.add_argument("--tie-eps", type=float, default=0.25)
+    ap.add_argument("--tie-thresh", type=float, default=None, help="Alias/override for --tie-eps")
     ap.add_argument("--topo-gap-z", type=float, default=1.0)
     ap.add_argument("--top-k", type=int, default=10)
+    ap.add_argument("--topology-score", choices=["max", "l2"], default="max", help="Topology gap score used for ranking")
+    ap.add_argument("--require-consistent-topology", action="store_true", help="Require sign(ΔPD) == sign(ΔMT)")
     ap.add_argument("--skip-heatmaps", action="store_true", help="Skip generic joint heatmaps")
     ap.add_argument("--only-heatmaps", action="store_true", help="Generate only generic joint heatmaps")
     args = ap.parse_args()
@@ -235,7 +253,16 @@ def main() -> int:
     if args.only_heatmaps:
         return 0
 
-    tie_rows = _top_tie_break_rows(rows, metric_col=args.metric_column, tie_eps=args.tie_eps, min_z=args.topo_gap_z, k=args.top_k)
+    tie_thresh = args.tie_eps if args.tie_thresh is None else args.tie_thresh
+    tie_rows = _top_tie_break_rows(
+        rows,
+        metric_col=args.metric_column,
+        tie_eps=tie_thresh,
+        min_z=args.topo_gap_z,
+        k=args.top_k,
+        require_consistent_topology=args.require_consistent_topology,
+        topology_score=args.topology_score,
+    )
     tie_png = args.outdir / f"{args.metric_column}_tie_topology_break_table.png"
     _plot_tie_table(tie_rows, metric_col=args.metric_column, out=tie_png)
     print(f"Wrote: {tie_png}")
@@ -255,4 +282,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

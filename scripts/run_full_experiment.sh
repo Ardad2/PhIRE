@@ -307,6 +307,8 @@ if [[ "$DO_POST" -eq 1 ]]; then
     --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
     --delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
     --metric-column ssim \
+    --tie-thresh 0.075 \
+    --require-consistent-topology \
     --skip-heatmaps \
     --outdir "${OUT_ROOT}/combined/figs_topology_physics"
 
@@ -328,8 +330,10 @@ if [[ "$DO_POST" -eq 1 ]]; then
       --cnn-dir data_out/wind_mrhr_cnn \
       --gan-dir data_out/wind_mrhr_gan \
       --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}" \
-      --outdir "${OUT_ROOT}/combined" \
-      --samples 107 105 115
+      --tie-thresh 0.075 \
+      --report-thresholds 0.05,0.075,0.10 \
+      --require-consistent-topology \
+      --outdir "${OUT_ROOT}/combined"
   fi
 fi
 
