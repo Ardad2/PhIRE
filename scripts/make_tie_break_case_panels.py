@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Generate qualitative tie-break case-study panels for PSNR/SSIM.
-
-Selects samples where quality metric deltas are small but topology deltas are large,
-and renders GT/CNN/GAN speed/error panels with metric annotations.
-"""
+"""Generate qualitative tie-break case-study panels for PSNR/SSIM."""
 
 from __future__ import annotations
 
@@ -11,7 +7,7 @@ import argparse
 import csv
 import math
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence
 
 import numpy as np
 
@@ -59,58 +55,6 @@ def _group_by_sample(merged_rows: List[Dict[str, str]]) -> Dict[int, Dict[str, D
     return out
 
 
-def _score_candidates(delta_rows: List[Dict[str, str]], metric: str, top_k: int, explicit_samples: Optional[Sequence[int]]) -> List[Dict[str, object]]:
-    if not delta_rows:
-        return []
-
-    sample_col = _pick_col(delta_rows[0], ["sample_idx", "sample", "sidx", "index", "idx"])
-    if sample_col is None:
-        raise SystemExit("Delta CSV missing sample index column")
-
-    dmetric_col = f"delta_{metric}"
-    if dmetric_col not in delta_rows[0]:
-        raise SystemExit(f"Delta CSV missing required column: {dmetric_col}")
-
-    dpd = np.asarray([abs(_to_float(r.get("delta_pd_distance")) or np.nan) for r in delta_rows], dtype=float)
-    dmt = np.asarray([abs(_to_float(r.get("delta_mt_distance")) or np.nan) for r in delta_rows], dtype=float)
-    pd_std = float(np.nanstd(dpd) + 1e-12)
-    mt_std = float(np.nanstd(dmt) + 1e-12)
-
-    out: List[Dict[str, object]] = []
-    explicit_set = set(explicit_samples or [])
-    for r in delta_rows:
-        si = _to_float(r.get(sample_col))
-        dm = _to_float(r.get(dmetric_col))
-        dpd_v = _to_float(r.get("delta_pd_distance"))
-        dmt_v = _to_float(r.get("delta_mt_distance"))
-        if None in (si, dm, dpd_v, dmt_v):
-            continue
-        zpd = abs(dpd_v) / pd_std
-        zmt = abs(dmt_v) / mt_std
-        topo_signal = max(zpd, zmt)
-        # prioritize strong topology disagreement under tied quality metric
-        score = topo_signal / (abs(dm) + 1e-6)
-        chosen = int(si) in explicit_set
-        out.append(
-            {
-                "sample_idx": int(si),
-                "delta_metric": float(dm),
-                "delta_pd": float(dpd_v),
-                "delta_mt": float(dmt_v),
-                "z_delta_pd": float(zpd),
-                "z_delta_mt": float(zmt),
-                "topology_signal": float(topo_signal),
-                "selection_score": float(score),
-                "selected_by_explicit": chosen,
-            }
-        )
-
-    if explicit_set:
-        out = [r for r in out if r["sample_idx"] in explicit_set]
-    out.sort(key=lambda r: (not bool(r["selected_by_explicit"]), -float(r["selection_score"])))
-    return out[:top_k] if not explicit_set else out
-
-
 def _speed(arr_uv: np.ndarray) -> np.ndarray:
     return np.sqrt(arr_uv[..., 0] ** 2 + arr_uv[..., 1] ** 2)
 
@@ -132,7 +76,107 @@ def _annot(row: Dict[str, str], metric: str) -> str:
     return ", ".join(vals)
 
 
-def _plot_panel(out_png: Path, si: int, cnn_row: Dict[str, str], gan_row: Dict[str, str], cnn_gt: np.ndarray, cnn_sr: np.ndarray, gan_sr: np.ndarray, case: Dict[str, object], metric: str) -> None:
+def _write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not rows:
+        # still write headerless empty file marker for traceability
+        path.write_text("\n")
+        return
+    keys = list(rows[0].keys())
+    with path.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=keys)
+        w.writeheader()
+        w.writerows(rows)
+
+
+def _topology_score(zpd: float, zmt: float, mode: str) -> float:
+    if mode == "l2":
+        return float(math.sqrt(zpd * zpd + zmt * zmt))
+    return float(max(zpd, zmt))
+
+
+def _build_candidates(
+    delta_rows: List[Dict[str, str]],
+    metric: str,
+    score_mode: str,
+) -> List[Dict[str, object]]:
+    if not delta_rows:
+        return []
+
+    sample_col = _pick_col(delta_rows[0], ["sample_idx", "sample", "sidx", "index", "idx"])
+    if sample_col is None:
+        raise SystemExit("Delta CSV missing sample index column")
+
+    dmetric_col = f"delta_{metric}"
+    if dmetric_col not in delta_rows[0]:
+        raise SystemExit(f"Delta CSV missing required column: {dmetric_col}")
+
+    pd_vals = np.asarray([_to_float(r.get("delta_pd_distance")) for r in delta_rows], dtype=float)
+    mt_vals = np.asarray([_to_float(r.get("delta_mt_distance")) for r in delta_rows], dtype=float)
+    pd_std = float(np.nanstd(np.abs(pd_vals)) + 1e-12)
+    mt_std = float(np.nanstd(np.abs(mt_vals)) + 1e-12)
+
+    out: List[Dict[str, object]] = []
+    for r in delta_rows:
+        si = _to_float(r.get(sample_col))
+        dm = _to_float(r.get(dmetric_col))
+        dpd = _to_float(r.get("delta_pd_distance"))
+        dmt = _to_float(r.get("delta_mt_distance"))
+        if None in (si, dm, dpd, dmt):
+            continue
+        zpd = abs(float(dpd)) / pd_std
+        zmt = abs(float(dmt)) / mt_std
+        topo_consistent = float(dpd) * float(dmt) > 0.0
+        out.append(
+            {
+                "sample_idx": int(si),
+                "delta_metric": float(dm),
+                "abs_delta_metric": abs(float(dm)),
+                "delta_pd": float(dpd),
+                "delta_mt": float(dmt),
+                "z_delta_pd": float(zpd),
+                "z_delta_mt": float(zmt),
+                "topology_score": _topology_score(zpd, zmt, score_mode),
+                "topology_consistent": topo_consistent,
+            }
+        )
+
+    out.sort(key=lambda r: (-float(r["topology_score"]), float(r["abs_delta_metric"]), int(r["sample_idx"])))
+    return out
+
+
+def _filtered_candidates(
+    ranked: List[Dict[str, object]],
+    tie_thresh: float,
+    require_consistent: bool,
+    explicit_samples: Optional[Sequence[int]],
+) -> List[Dict[str, object]]:
+    explicit_set = set(explicit_samples or [])
+    out: List[Dict[str, object]] = []
+    for r in ranked:
+        if float(r["abs_delta_metric"]) > tie_thresh:
+            continue
+        if require_consistent and not bool(r["topology_consistent"]):
+            continue
+        if explicit_set and int(r["sample_idx"]) not in explicit_set:
+            continue
+        out.append(r)
+    out.sort(key=lambda r: (-float(r["topology_score"]), float(r["abs_delta_metric"]), int(r["sample_idx"])))
+    return out
+
+
+def _plot_panel(
+    out_png: Path,
+    si: int,
+    cnn_row: Dict[str, str],
+    gan_row: Dict[str, str],
+    cnn_gt: np.ndarray,
+    cnn_sr: np.ndarray,
+    gan_sr: np.ndarray,
+    case: Dict[str, object],
+    metric: str,
+    label_mode: str,
+) -> None:
     err_cnn = np.abs(cnn_gt - cnn_sr)
     err_gan = np.abs(cnn_gt - gan_sr)
     g_gt = _gradmag(cnn_gt)
@@ -163,9 +207,10 @@ def _plot_panel(out_png: Path, si: int, cnn_row: Dict[str, str], gan_row: Dict[s
         topo_better = "cnn"
 
     fig.suptitle(
-        f"sample={si} | Δ{metric.upper()}={float(case['delta_metric']):.4f} | "
+        f"[{label_mode}] sample={si} | Δ{metric.upper()}={float(case['delta_metric']):.4f} | "
         f"ΔPD={float(case['delta_pd']):.4f} (z={float(case['z_delta_pd']):.2f}) | "
-        f"ΔMT={float(case['delta_mt']):.4f} (z={float(case['z_delta_mt']):.2f}) | topology-closer={topo_better}\n"
+        f"ΔMT={float(case['delta_mt']):.4f} (z={float(case['z_delta_mt']):.2f}) | "
+        f"topology_score={float(case['topology_score']):.2f} | topology-closer={topo_better}\n"
         f"CNN: {_annot(cnn_row, metric)}\nGAN: {_annot(gan_row, metric)}",
         fontsize=10,
     )
@@ -175,15 +220,8 @@ def _plot_panel(out_png: Path, si: int, cnn_row: Dict[str, str], gan_row: Dict[s
     plt.close(fig)
 
 
-def _write_csv(path: Path, rows: Sequence[Dict[str, object]]) -> None:
-    if not rows:
-        return
-    keys = list(rows[0].keys())
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=keys)
-        w.writeheader()
-        w.writerows(rows)
+def _threshold_tag(v: float) -> str:
+    return f"{v:.3f}".replace(".", "p")
 
 
 def main() -> int:
@@ -199,28 +237,86 @@ def main() -> int:
     ap.add_argument("--patch", type=int, default=160)
     ap.add_argument("--x0", type=int, default=0)
     ap.add_argument("--y0", type=int, default=0)
+    ap.add_argument("--tie-thresh", type=float, default=None, help="Require |Δmetric| <= tie threshold")
+    ap.add_argument("--topology-score", choices=["max", "l2"], default="max", help="Topology ranking score")
+    ap.add_argument("--require-consistent-topology", action="store_true", help="Require sign(ΔPD) == sign(ΔMT)")
+    ap.add_argument("--report-thresholds", default="0.05,0.075,0.10", help="Comma-separated thresholds for summary/exports")
     args = ap.parse_args()
 
     merged_rows = _read_csv(args.merged_csv)
     delta_rows = _read_csv(args.delta_csv)
     by_sample = _group_by_sample(merged_rows)
-    selected = _score_candidates(delta_rows, args.metric, args.top_k, args.samples)
+
+    ranked = _build_candidates(delta_rows, args.metric, args.topology_score)
+    if not ranked:
+        raise SystemExit("No valid candidate rows in delta CSV")
+
+    report_thresholds = [float(x.strip()) for x in args.report_thresholds.split(",") if x.strip()]
+    tie_thresh = args.tie_thresh
+    if tie_thresh is None:
+        tie_thresh = 0.075 if args.metric == "ssim" else 0.25
+
+    all_ranked_csv = args.outdir / f"{args.metric}_tie_break_all_ranked_candidates.csv"
+    _write_csv(all_ranked_csv, ranked)
+
+    filtered_for_thresh: Dict[float, List[Dict[str, object]]] = {}
+    for th in report_thresholds:
+        frows = _filtered_candidates(ranked, tie_thresh=th, require_consistent=args.require_consistent_topology, explicit_samples=None)
+        filtered_for_thresh[th] = frows
+        _write_csv(args.outdir / f"{args.metric}_tie_break_candidates_thresh_{_threshold_tag(th)}.csv", frows)
+
+    selected = _filtered_candidates(
+        ranked,
+        tie_thresh=tie_thresh,
+        require_consistent=args.require_consistent_topology,
+        explicit_samples=args.samples,
+    )
+    selected = selected[: args.top_k] if not args.samples else selected
+
+    top_cases_csv = args.outdir / f"{args.metric}_tie_break_top_cases.csv"
+    summary_txt = args.outdir / f"{args.metric}_tie_break_summary.txt"
+    case_dir = args.outdir / "tie_break_cases" / args.metric
+
+    abs_dm = np.asarray([float(r["abs_delta_metric"]) for r in ranked], dtype=float)
+    consistent_count = sum(bool(r["topology_consistent"]) for r in ranked)
+    lines: List[str] = [f"=== {args.metric.upper()} tie-break case summary ==="]
+    lines.append(f"total_paired_samples={len(ranked)}")
+    lines.append(
+        f"abs_delta_{args.metric}: min={float(np.min(abs_dm)):.6f}, median={float(np.median(abs_dm)):.6f}, max={float(np.max(abs_dm)):.6f}"
+    )
+    lines.append(f"topology_consistent_count={consistent_count} / {len(ranked)}")
+    for th in report_thresholds:
+        base = sum(float(r["abs_delta_metric"]) <= th for r in ranked)
+        cons = sum(float(r["abs_delta_metric"]) <= th and bool(r["topology_consistent"]) for r in ranked)
+        lines.append(f"count(|Δ{args.metric.upper()}| <= {th:.3f})={base}")
+        lines.append(f"count(|Δ{args.metric.upper()}| <= {th:.3f} and consistent_topology)={cons}")
+
+    strict = 0.05
+    strict_pass = sum(float(r["abs_delta_metric"]) <= strict for r in ranked)
+    if args.metric == "ssim" and strict_pass == 0:
+        lines.append("NOTE: No rows pass strict SSIM tie threshold (0.05).")
+        lines.append("Interpret selected rows as close-SSIM topology-separation / agreement cases, not strict tie-breaks.")
+
+    label_mode = "tie-break"
+    if args.metric == "ssim" and strict_pass == 0:
+        label_mode = "close-SSIM topology-separation"
+
+    rows_for_csv: List[Dict[str, object]] = []
     if not selected:
-        raise SystemExit("No tie-break candidates selected")
+        lines.append("No selected cases after tie threshold + consistency filters.")
+        _write_csv(top_cases_csv, rows_for_csv)
+        summary_txt.write_text("\n".join(lines) + "\n")
+        print(f"Wrote: {all_ranked_csv}")
+        print(f"Wrote: {top_cases_csv}")
+        print(f"Wrote: {summary_txt}")
+        return 0
 
     cnn_gt = np.load(args.cnn_dir / "dataGT.npy", mmap_mode="r")
     cnn_sr = np.load(args.cnn_dir / "dataSR.npy", mmap_mode="r")
     gan_sr = np.load(args.gan_dir / "dataSR.npy", mmap_mode="r")
 
-    case_dir = args.outdir / "tie_break_cases" / args.metric
-    top_cases_csv = args.outdir / f"{args.metric}_tie_break_top_cases.csv"
-    summary_txt = args.outdir / f"{args.metric}_tie_break_summary.txt"
-
-    summary_lines: List[str] = [f"=== {args.metric.upper()} tie-break case summary ==="]
-    rows_for_csv: List[Dict[str, object]] = []
-
-    for rank, c in enumerate(selected, start=1):
-        si = int(c["sample_idx"])
+    for rank, case in enumerate(selected, start=1):
+        si = int(case["sample_idx"])
         rec = by_sample.get(si, {})
         cnn_row = rec.get("cnn")
         gan_row = rec.get("gan")
@@ -232,26 +328,33 @@ def main() -> int:
         gan_spd = _speed(_extract_patch(np.asarray(gan_sr[si]), args.patch, args.x0, args.y0))
 
         out_png = case_dir / f"{args.metric}_tie_case_rank{rank:02d}_s{si}.png"
-        _plot_panel(out_png, si, cnn_row, gan_row, gt_spd, cnn_spd, gan_spd, c, args.metric)
+        _plot_panel(out_png, si, cnn_row, gan_row, gt_spd, cnn_spd, gan_spd, case, args.metric, label_mode)
 
-        preferred = "gan" if float(c["delta_pd"]) < 0 and float(c["delta_mt"]) < 0 else "cnn" if float(c["delta_pd"]) > 0 and float(c["delta_mt"]) > 0 else "mixed"
-        reason = (
-            f"small |Δ{args.metric.upper()}|={abs(float(c['delta_metric'])):.4f} with "
-            f"large topology gap max(zΔPD,zΔMT)={float(c['topology_signal']):.2f}"
-        )
-        summary_lines.append(
-            f"rank {rank} sample {si}: {reason}; ΔPD={float(c['delta_pd']):.4f}, ΔMT={float(c['delta_mt']):.4f}, "
-            f"zΔPD={float(c['z_delta_pd']):.2f}, zΔMT={float(c['z_delta_mt']):.2f}, topology-closer={preferred}"
+        pref = "mixed"
+        if float(case["delta_pd"]) < 0 and float(case["delta_mt"]) < 0:
+            pref = "gan"
+        elif float(case["delta_pd"]) > 0 and float(case["delta_mt"]) > 0:
+            pref = "cnn"
+        lines.append(
+            f"rank {rank} sample {si}: |Δ{args.metric.upper()}|={float(case['abs_delta_metric']):.4f}, "
+            f"ΔPD={float(case['delta_pd']):.4f}, ΔMT={float(case['delta_mt']):.4f}, "
+            f"zΔPD={float(case['z_delta_pd']):.2f}, zΔMT={float(case['z_delta_mt']):.2f}, "
+            f"score={float(case['topology_score']):.2f}, consistent={bool(case['topology_consistent'])}, topology-closer={pref}"
         )
 
-        row = dict(c)
+        row = dict(case)
         row["rank"] = rank
         row["panel_png"] = str(out_png)
-        row["topology_closer"] = preferred
+        row["topology_closer"] = pref
+        row["label_mode"] = label_mode
         rows_for_csv.append(row)
 
     _write_csv(top_cases_csv, rows_for_csv)
-    summary_txt.write_text("\n".join(summary_lines) + "\n")
+    summary_txt.write_text("\n".join(lines) + "\n")
+
+    print(f"Wrote: {all_ranked_csv}")
+    for th in report_thresholds:
+        print(f"Wrote: {args.outdir / f'{args.metric}_tie_break_candidates_thresh_{_threshold_tag(th)}.csv'}")
     print(f"Wrote: {top_cases_csv}")
     print(f"Wrote: {summary_txt}")
     print(f"Wrote case panels under: {case_dir}")
