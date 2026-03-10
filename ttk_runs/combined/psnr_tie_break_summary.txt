@@ -1,4 +1,13 @@
 === PSNR tie-break case summary ===
-rank 1 sample 165: small |ΔPSNR|=0.0333 with large topology gap max(zΔPD,zΔMT)=2.48; ΔPD=0.3707, ΔMT=-11.1701, zΔPD=0.11, zΔMT=2.48, topology-closer=mixed
-rank 2 sample 166: small |ΔPSNR|=0.0545 with large topology gap max(zΔPD,zΔMT)=2.43; ΔPD=3.4301, ΔMT=-10.9632, zΔPD=1.00, zΔMT=2.43, topology-closer=mixed
-rank 3 sample 2: small |ΔPSNR|=0.1832 with large topology gap max(zΔPD,zΔMT)=2.65; ΔPD=2.3346, ΔMT=-11.9622, zΔPD=0.68, zΔMT=2.65, topology-closer=mixed
+total_paired_samples=168
+abs_delta_psnr: min=0.017198, median=0.362060, max=0.780946
+topology_consistent_count=140 / 168
+count(|ΔPSNR| <= 0.050)=6
+count(|ΔPSNR| <= 0.050 and consistent_topology)=3
+count(|ΔPSNR| <= 0.075)=15
+count(|ΔPSNR| <= 0.075 and consistent_topology)=8
+count(|ΔPSNR| <= 0.100)=19
+count(|ΔPSNR| <= 0.100 and consistent_topology)=10
+rank 1 sample 2: |ΔPSNR|=0.1832, ΔPD=2.3346, ΔMT=-11.9622, zΔPD=0.68, zΔMT=2.65, score=2.65, consistent=False, topology-closer=mixed
+rank 2 sample 165: |ΔPSNR|=0.0333, ΔPD=0.3707, ΔMT=-11.1701, zΔPD=0.11, zΔMT=2.48, score=2.48, consistent=False, topology-closer=mixed
+rank 3 sample 166: |ΔPSNR|=0.0545, ΔPD=3.4301, ΔMT=-10.9632, zΔPD=1.00, zΔMT=2.43, score=2.43, consistent=False, topology-closer=mixed
