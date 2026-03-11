@@ -1,0 +1,18 @@
+metric=dual threshold=0.10000
+near_ties=3
+mt_select_cnn=0
+mt_select_gan=3
+dual_psnr_threshold=0.1
+dual_ssim_threshold=0.03
+
+agreement_with_mt:
+  agree_mt_winner_lr_group: 0/3 (0.0000)
+  agree_mt_winner_extreme_group: 3/3 (1.0000)
+  agree_mt_winner_physics_group: 2/2 (1.0000)
+  agree_mt_winner_lr_mae: 0/3 (0.0000)
+  agree_mt_winner_lr_mse: 0/3 (0.0000)
+  agree_mt_winner_lr_psnr: 0/3 (0.0000)
+  agree_mt_winner_extreme_abs_max: 2/3 (0.6667)
+  agree_mt_winner_tail_mae: 3/3 (1.0000)
+NOTE: very small near-tie sample size; interpret proportions cautiously.
+physics_cols_used=wpd_rmse,wpd_mae,psd_log_l2,grad_mae

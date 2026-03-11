@@ -1,0 +1,15 @@
+metric=psnr threshold=0.05000
+near_ties=6
+mt_select_cnn=5
+mt_select_gan=1
+
+agreement_with_mt:
+  agree_mt_winner_lr_group: 5/6 (0.8333)
+  agree_mt_winner_extreme_group: 4/6 (0.6667)
+  agree_mt_winner_physics_group: 4/5 (0.8000)
+  agree_mt_winner_lr_mae: 5/6 (0.8333)
+  agree_mt_winner_lr_mse: 5/6 (0.8333)
+  agree_mt_winner_lr_psnr: 5/6 (0.8333)
+  agree_mt_winner_extreme_abs_max: 4/6 (0.6667)
+  agree_mt_winner_tail_mae: 1/6 (0.1667)
+physics_cols_used=wpd_rmse,wpd_mae,psd_log_l2,grad_mae
