@@ -201,6 +201,58 @@ def _load_rows(merged_csv: Path) -> Dict[int, Dict[str, MethodRow]]:
     return out
 
 
+
+
+def _validate_alignment(
+    sample_rows: Dict[int, Dict[str, MethodRow]],
+    cnn_dir: Path,
+    gan_dir: Path,
+    in_cnn: np.ndarray,
+    sr_cnn: np.ndarray,
+    gt_cnn: np.ndarray,
+    sr_gan: np.ndarray,
+) -> None:
+    cnn_idx_path = cnn_dir / "idx.npy"
+    gan_idx_path = gan_dir / "idx.npy"
+    if not cnn_idx_path.exists() or not gan_idx_path.exists():
+        raise SystemExit(
+            "Alignment check failed: expected idx.npy in both cnn-dir and gan-dir. "
+            f"Missing: cnn={not cnn_idx_path.exists()} gan={not gan_idx_path.exists()}"
+        )
+
+    cnn_idx = np.load(cnn_idx_path)
+    gan_idx = np.load(gan_idx_path)
+    if cnn_idx.shape != gan_idx.shape or not np.array_equal(cnn_idx, gan_idx):
+        raise SystemExit(
+            "Alignment check failed: cnn idx.npy and gan idx.npy differ. "
+            "Sample ordering mismatch would invalidate per-sample comparisons."
+        )
+
+    n = int(sr_cnn.shape[0])
+    if not (int(in_cnn.shape[0]) == n == int(gt_cnn.shape[0]) == int(sr_gan.shape[0]) == int(cnn_idx.shape[0])):
+        raise SystemExit(
+            "Alignment check failed: array first dimensions differ among cnn/gan IN/SR/GT/idx. "
+            f"in_cnn={in_cnn.shape[0]} sr_cnn={sr_cnn.shape[0]} gt_cnn={gt_cnn.shape[0]} "
+            f"sr_gan={sr_gan.shape[0]} idx={cnn_idx.shape[0]}"
+        )
+
+    gan_in_path = gan_dir / "dataIN.npy"
+    if gan_in_path.exists():
+        gan_in = np.load(gan_in_path, mmap_mode="r")
+        if gan_in.shape != in_cnn.shape:
+            raise SystemExit(
+                "Alignment check failed: gan dataIN.npy shape does not match cnn dataIN.npy shape. "
+                f"cnn={in_cnn.shape} gan={gan_in.shape}"
+            )
+
+    sample_idxs = sorted(sample_rows.keys())
+    if sample_idxs:
+        max_si = int(sample_idxs[-1])
+        if max_si >= n:
+            raise SystemExit(
+                "Alignment check failed: merged CSV sample_idx exceeds available array length. "
+                f"max_sample_idx={max_si} array_len={n}"
+            )
 def _pick_physics_cols(sample_rows: Dict[int, Dict[str, MethodRow]]) -> List[str]:
     cols = set()
     for by_method in sample_rows.values():
@@ -380,13 +432,23 @@ def _agreement(rows: List[Dict[str, object]], key: str) -> Tuple[int, int, float
     return k, n, k / n
 
 
-def _summarize(rows: List[Dict[str, object]], metric: str, thresh: float, out_txt: Path, physics_cols: Sequence[str]) -> Dict[str, object]:
+def _summarize(
+    rows: List[Dict[str, object]],
+    metric: str,
+    thresh: float,
+    out_txt: Path,
+    physics_cols: Sequence[str],
+    extra_summary_fields: Optional[Dict[str, object]] = None,
+) -> Dict[str, object]:
     lines: List[str] = []
     n = len(rows)
     lines.append(f"metric={metric} threshold={thresh:.5f}")
     lines.append(f"near_ties={n}")
     lines.append(f"mt_select_cnn={_count(rows, 'winner_mt', 'cnn')}")
     lines.append(f"mt_select_gan={_count(rows, 'winner_mt', 'gan')}")
+    if extra_summary_fields:
+        for k, v in extra_summary_fields.items():
+            lines.append(f"{k}={v}")
 
     agree_keys = [
         "agree_mt_winner_lr_group",
@@ -405,6 +467,8 @@ def _summarize(rows: List[Dict[str, object]], metric: str, thresh: float, out_tx
         "mt_select_cnn": _count(rows, "winner_mt", "cnn"),
         "mt_select_gan": _count(rows, "winner_mt", "gan"),
     }
+    if extra_summary_fields:
+        summary.update(extra_summary_fields)
 
     lines.append("")
     lines.append("agreement_with_mt:")
@@ -542,6 +606,16 @@ def main() -> int:
     gt_cnn = np.load(args.cnn_dir / "dataGT.npy", mmap_mode="r")
     sr_gan = np.load(args.gan_dir / "dataSR.npy", mmap_mode="r")
 
+    _validate_alignment(
+        sample_rows=sample_rows,
+        cnn_dir=args.cnn_dir,
+        gan_dir=args.gan_dir,
+        in_cnn=in_cnn,
+        sr_cnn=sr_cnn,
+        gt_cnn=gt_cnn,
+        sr_gan=sr_gan,
+    )
+
     physics_cols = _pick_physics_cols(sample_rows)
 
     per_sample: List[Dict[str, object]] = []
@@ -599,7 +673,19 @@ def main() -> int:
         out_txt = dual_dir / f"near_tie_dual_psnr_{args.dual_psnr:.3f}_ssim_{args.dual_ssim:.3f}_summary.txt"
         out_top = dual_dir / f"near_tie_dual_psnr_{args.dual_psnr:.3f}_ssim_{args.dual_ssim:.3f}_top_cases.csv"
         _write_csv(out_csv, rows)
-        summary_rows.append(_summarize(rows, "dual", float(args.dual_psnr), out_txt, physics_cols))
+        summary_rows.append(
+            _summarize(
+                rows,
+                "dual",
+                float(args.dual_psnr),
+                out_txt,
+                physics_cols,
+                extra_summary_fields={
+                    "dual_psnr_threshold": float(args.dual_psnr),
+                    "dual_ssim_threshold": float(args.dual_ssim),
+                },
+            )
+        )
         _top_cases(rows, "dual", float(args.dual_psnr), out_top, top_n=args.top_cases)
 
     summary_rows = sorted(summary_rows, key=lambda x: (str(x["metric"]), float(x["threshold"])))
