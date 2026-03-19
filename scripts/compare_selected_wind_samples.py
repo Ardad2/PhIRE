@@ -32,10 +32,10 @@ try:  # optional
 except Exception:  # pragma: no cover
     ssim = None
 
-# Repo-observed showcase/default sample ids:
+# Repo-observed reference/default sample ids:
 # - quick_figs.py renders sample 0
 # - scripts/run_full_experiment.sh highlights 2, 165, 166 in tie-break panels
-REPO_SHOWCASE_SAMPLES = (0, 2, 165, 166)
+REPO_REFERENCE_SAMPLES = (0, 2, 165, 166)
 
 
 @dataclass
@@ -156,9 +156,9 @@ def _write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
 
 def _load_run(path: Path, label: str, is_scalar: bool) -> RunData:
     idx = np.load(path / "idx.npy")
-    lr = np.load(path / "dataIN.npy")
-    gt = np.load(path / "dataGT.npy")
-    sr = np.load(path / "dataSR.npy")
+    lr = np.load(path / "dataIN.npy", mmap_mode="r")
+    gt = np.load(path / "dataGT.npy", mmap_mode="r")
+    sr = np.load(path / "dataSR.npy", mmap_mode="r")
     if is_scalar:
         lr = _to_scalar_last(lr)
         gt = _to_scalar_last(gt)
@@ -189,10 +189,10 @@ def _validate_alignment(cnn: RunData, gan: RunData, scalar: Optional[RunData]) -
             raise SystemExit("Scalar and vector runs have different numbers of samples")
 
 
-def _selected_ids(cnn: RunData, requested: Sequence[int], include_showcase: bool) -> List[int]:
+def _selected_ids(cnn: RunData, requested: Sequence[int], include_reference: bool) -> List[int]:
     ids = list(requested)
-    if include_showcase:
-        ids.extend(REPO_SHOWCASE_SAMPLES)
+    if include_reference:
+        ids.extend(REPO_REFERENCE_SAMPLES)
     seen = set()
     out = []
     valid = set(int(x) for x in cnn.idx.tolist())
@@ -232,18 +232,21 @@ def _panel_limits(images: Iterable[np.ndarray]) -> Tuple[float, float]:
 
 
 def _save_speed_panel(out_png: Path, views: SampleViews) -> None:
-    errors = [np.abs(views.cnn_speed - views.gt_speed), np.abs(views.gan_speed - views.gt_speed)]
+    cnn_err = np.abs(views.cnn_speed - views.gt_speed)
+    gan_err = np.abs(views.gan_speed - views.gt_speed)
+    scalar_err = np.abs(views.scalar_speed - views.gt_speed) if views.scalar_speed is not None else None
     titles = ["LR speed", "GT speed", "Vector CNN speed", "Vector GAN speed", "|CNN-GT|", "|GAN-GT|"]
-    images: List[np.ndarray] = [views.lr_speed, views.gt_speed, views.cnn_speed, views.gan_speed, errors[0], errors[1]]
+    images: List[np.ndarray] = [views.lr_speed, views.gt_speed, views.cnn_speed, views.gan_speed, cnn_err, gan_err]
     if views.scalar_speed is not None:
         titles.extend(["Scalar CNN speed", "|Scalar-GT|"])
-        images.extend([views.scalar_speed, np.abs(views.scalar_speed - views.gt_speed)])
+        images.extend([views.scalar_speed, scalar_err])
     n = len(images)
     ncols = 4
     nrows = int(math.ceil(n / ncols))
     fig, axes = plt.subplots(nrows, ncols, figsize=(4.6 * ncols, 4.2 * nrows), squeeze=False)
     speed_min, speed_max = _panel_limits([views.gt_speed, views.cnn_speed, views.gan_speed, views.scalar_speed, views.lr_speed])
-    err_max = float(max(np.max(img) for img in images if img is not None and img.shape == views.gt_speed.shape and np.min(img) >= 0.0))
+    error_images = [cnn_err, gan_err] + ([scalar_err] if scalar_err is not None else [])
+    err_max = float(max(np.max(img) for img in error_images))
 
     for ax in axes.ravel():
         ax.axis("off")
@@ -270,7 +273,7 @@ def _save_speed_panel(out_png: Path, views: SampleViews) -> None:
 def _save_velocity_panel(out_png: Path, sample_id: int, component_name: str, gt: np.ndarray, cnn: np.ndarray, gan: np.ndarray, lr: np.ndarray) -> None:
     err_cnn = np.abs(cnn - gt)
     err_gan = np.abs(gan - gt)
-    value_min, value_max = _panel_limits([gt, cnn, gan, lr])
+    max_abs = float(max(np.max(np.abs(gt)), np.max(np.abs(cnn)), np.max(np.abs(gan)), np.max(np.abs(lr))))
     err_max = float(max(np.max(err_cnn), np.max(err_gan)))
 
     fig, axes = plt.subplots(2, 3, figsize=(13.5, 8.5), squeeze=False)
@@ -279,7 +282,7 @@ def _save_velocity_panel(out_png: Path, sample_id: int, component_name: str, gt:
     for row_axes, row_items in zip(axes, [top, bot]):
         for ax, (img, title) in zip(row_axes, row_items):
             is_err = title.startswith("|")
-            im = ax.imshow(img, cmap="magma" if is_err else "coolwarm", vmin=(0.0 if is_err else value_min), vmax=(err_max if is_err else value_max), origin="lower")
+            im = ax.imshow(img, cmap="magma" if is_err else "coolwarm", vmin=(0.0 if is_err else -max_abs), vmax=(err_max if is_err else max_abs), origin="lower")
             ax.set_title(f"s{sample_id}: {title}")
             ax.set_xticks([])
             ax.set_yticks([])
@@ -317,12 +320,12 @@ def _metrics_row(views: SampleViews) -> Dict[str, object]:
     return row
 
 
-def _summary_markdown(out_path: Path, rows: List[Dict[str, object]], selected: Sequence[int], include_showcase: bool, patch: int, x0: int, y0: int, scalar_present: bool) -> None:
+def _summary_markdown(out_path: Path, rows: List[Dict[str, object]], selected: Sequence[int], include_reference: bool, patch: int, x0: int, y0: int, scalar_present: bool) -> None:
     lines: List[str] = []
     lines.append("# Wind SR diagnostic summary\n")
     lines.append(f"Selected sample IDs: {', '.join(str(x) for x in selected)}.\n")
-    if include_showcase:
-        lines.append(f"Repo showcase/sample defaults included when present: {', '.join(str(x) for x in REPO_SHOWCASE_SAMPLES)}.\n")
+    if include_reference:
+        lines.append(f"Repo reference/default sample IDs included when present: {', '.join(str(x) for x in REPO_REFERENCE_SAMPLES)}.\n")
     lines.append(f"Comparison crop: {'full frame' if patch <= 0 else f'patch={patch}, x0={x0}, y0={y0}'}.\n")
     lines.append(f"Direct scalar CNN available: {'yes' if scalar_present else 'no'}.\n")
     lines.append("\n## Per-sample speed metrics\n")
@@ -358,19 +361,28 @@ def main() -> int:
     ap.add_argument("--gan-dir", type=Path, default=Path("data_out/wind_mrhr_gan"))
     ap.add_argument("--scalar-dir", type=Path, default=None, help="Optional scalar-speed CNN paired output dir")
     ap.add_argument("--samples", nargs="+", type=int, required=True, help="Original sample IDs to compare")
-    ap.add_argument("--include-repo-showcase", action="store_true", help="Also include repo-observed showcase/default sample IDs when present")
+    ap.add_argument("--include-repo-reference", action="store_true", help="Also include repo-observed reference/default sample IDs when present")
     ap.add_argument("--patch", type=int, default=0, help="Patch size in HR pixels; 0 means full frame")
     ap.add_argument("--x0", type=int, default=0)
     ap.add_argument("--y0", type=int, default=0)
     ap.add_argument("--outdir", type=Path, default=Path("analysis/wind_diagnostics"))
     args = ap.parse_args()
 
+    if args.patch < 0:
+        raise SystemExit("--patch must be >= 0")
+    if args.patch > 0 and args.patch % 5 != 0:
+        raise SystemExit("--patch must be divisible by 5 for LR/HR-aligned 5x crops")
+    if args.patch > 0 and args.x0 % 5 != 0:
+        raise SystemExit("--x0 must be divisible by 5 for LR/HR-aligned 5x crops")
+    if args.patch > 0 and args.y0 % 5 != 0:
+        raise SystemExit("--y0 must be divisible by 5 for LR/HR-aligned 5x crops")
+
     cnn = _load_run(args.cnn_dir, "vector_cnn", is_scalar=False)
     gan = _load_run(args.gan_dir, "vector_gan", is_scalar=False)
     scalar = _load_run(args.scalar_dir, "scalar_cnn", is_scalar=True) if args.scalar_dir is not None else None
     _validate_alignment(cnn, gan, scalar)
 
-    selected = _selected_ids(cnn, args.samples, args.include_repo_showcase)
+    selected = _selected_ids(cnn, args.samples, args.include_repo_reference)
     if not selected:
         raise SystemExit("None of the requested sample IDs were found in the provided idx.npy")
 
@@ -389,7 +401,7 @@ def main() -> int:
 
     rows.sort(key=lambda r: int(r["sample_id"]))
     _write_csv(outdir / "selected_sample_metrics.csv", rows)
-    _summary_markdown(outdir / "summary.md", rows, found, args.include_repo_showcase, args.patch, args.x0, args.y0, scalar is not None)
+    _summary_markdown(outdir / "summary.md", rows, found, args.include_repo_reference, args.patch, args.x0, args.y0, scalar is not None)
     print(f"[OK] wrote figures/metrics to {outdir}")
     print(f"[OK] compared sample IDs: {found}")
     return 0
