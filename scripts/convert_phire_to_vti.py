@@ -21,31 +21,55 @@ import vtk
 from vtk.util.numpy_support import numpy_to_vtk
 
 
-def infer_uv(sample: np.ndarray):
+def infer_field(sample: np.ndarray, scalar: str):
     """
-    Given a sample tensor, return (u, v) as 2D arrays [H, W].
-    Handles (H,W,C) or (C,H,W).
-    """
-    if sample.ndim != 3:
-        raise ValueError(f"Expected a 3D sample after indexing; got shape {sample.shape}")
+    Return a 2D scalar field from one sample.
 
-    # Case A: (H, W, C)
+    Supported inputs:
+    - vector sample: (H,W,C>=2) or (C,H,W) for scalar in {"speed","u","v"}
+    - scalar sample: (H,W), (H,W,1), or (1,H,W) for scalar="speed"
+    """
+    sample = np.asarray(sample)
+
+    # Native scalar cases
+    if sample.ndim == 2:
+        if scalar != "speed":
+            raise ValueError("Scalar input only supports --scalar speed")
+        return sample.astype(np.float32), "wind_speed"
+
+    if sample.ndim != 3:
+        raise ValueError(f"Expected sample ndim 2 or 3, got shape {sample.shape}")
+
+    # Scalar with singleton channel last: (H,W,1)
+    if sample.shape[-1] == 1:
+        if scalar != "speed":
+            raise ValueError("Scalar input only supports --scalar speed")
+        return sample[..., 0].astype(np.float32), "wind_speed"
+
+    # Scalar with singleton channel first: (1,H,W)
+    if sample.shape[0] == 1:
+        if scalar != "speed":
+            raise ValueError("Scalar input only supports --scalar speed")
+        return sample[0, ...].astype(np.float32), "wind_speed"
+
+    # Existing vector behavior: (H,W,C)
     if sample.shape[-1] >= 2:
         u = sample[..., 0]
         v = sample[..., 1]
-        return u, v
-
-    # Case B: (C, H, W)
-    if sample.shape[0] >= 2:
+    # Existing vector behavior: (C,H,W)
+    elif sample.shape[0] >= 2:
         u = sample[0, ...]
         v = sample[1, ...]
-        return u, v
+    else:
+        raise ValueError(
+            f"Could not infer scalar/vector channels from sample shape {sample.shape}"
+        )
 
-    raise ValueError(
-        f"Could not infer (u,v) channels from sample shape {sample.shape}. "
-        "Expected last dim>=2 or first dim>=2."
-    )
-
+    if scalar == "u":
+        return u.astype(np.float32), "wind_u"
+    if scalar == "v":
+        return v.astype(np.float32), "wind_v"
+    return np.sqrt(u.astype(np.float32) ** 2 + v.astype(np.float32) ** 2), "wind_speed"
 
 def load_sample(npy_path: str, idx: int) -> np.ndarray:
     arr = np.load(npy_path)
@@ -142,18 +166,7 @@ def main():
 
     for sidx in args.samples:
         sample = load_sample(in_path, sidx)
-        u, v = infer_uv(sample)
-
-        # compute requested scalar
-        if args.scalar == "u":
-            field = u.astype(np.float32)
-            array_name = "wind_u"
-        elif args.scalar == "v":
-            field = v.astype(np.float32)
-            array_name = "wind_v"
-        else:
-            field = np.sqrt(u.astype(np.float32) ** 2 + v.astype(np.float32) ** 2)
-            array_name = "wind_speed"
+        field, array_name = infer_field(sample, args.scalar)
 
         H, W = field.shape
         if args.patch and args.patch > 0:
