@@ -6,7 +6,7 @@ r = [5]
 
 # Scalar speed stats should be estimated from the scalar TFRecord itself.
 # Leave mu_sig=None for the first run so PhIREGANs computes them directly.
-mu_sig = None
+mu_sig = [9.627784358464595, 4.296151331224189]
 
 if __name__ == "__main__":
     phiregans = PhIREGANs(data_type=data_type, mu_sig=mu_sig)
