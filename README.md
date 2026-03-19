@@ -130,3 +130,17 @@ An example of how to use the PhIRE GANs model for training and testing can be fo
 We acknowledge the World Climate Research Program’s Working Group on Coupled Modelling, which is responsible for CMIP, and we thank the climate modeling groups (listed CCSM section) for producing and making available their model output. For CMIP the U.S. Department of Energy’s Program for Climate Model Diagnosis and Intercomparison provides coordinating support and led development of software infrastructure in partnership with the Global Organization for Earth System Science Portals.
 
 This work was authored by the National Renewable Energy Laboratory (NREL), operated by Alliance for Sustainable Energy, LLC, for the U.S. Department of Energy (DOE) under Contract No. DE-AC36-08GO28308. This work was supported by the Laboratory Directed Research and Development (LDRD) Program at NREL. The research was performed using computational resources sponsored by the Department of Energy's Office of Energy Efficiency and Renewable Energy and located at the National Renewable Energy Laboratory. The views expressed in the article do not necessarily represent the views of the DOE or the U.S. Government. The U.S. Government retains and the publisher, by accepting the article for publication, acknowledges that the U.S. Government retains a nonexclusive, paid-up, irrevocable, worldwide license to publish or reproduce the published form of this work, or allow others to do so, for U.S. Government purposes.
+
+### Near-tie validation study (post-processing only)
+To validate whether topology (MT distance) selects a meaningfully better model when PSNR/SSIM are near-tied, run:
+
+```bash
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/run_near_tie_study.py \
+  --combined-csv ttk_runs/combined/combined_pairwise_results.csv \
+  --merged-csv ttk_runs/combined/psnr_topology_physics_merged.csv \
+  --cnn-dir data_out/wind_mrhr_cnn \
+  --gan-dir data_out/wind_mrhr_gan \
+  --out-root ttk_runs/near_tie_study
+```
+
+This stage reuses existing outputs only (no GAN/CNN re-inference, no TTK reruns) and writes per-threshold CSV/TXT reports plus compact summary plots under `ttk_runs/near_tie_study/`.
