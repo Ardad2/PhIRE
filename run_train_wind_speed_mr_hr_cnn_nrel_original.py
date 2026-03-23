@@ -11,3 +11,4 @@ if __name__ == '__main__':
     saved_model = phiregans.pretrain(r=r, data_path=data_path, batch_size=8)
     print('Saved model:', saved_model)
     print('Computed scalar mu_sig:', phiregans.mu_sig)
+
