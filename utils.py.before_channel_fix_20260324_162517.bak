@@ -136,42 +136,20 @@ def _int64_feature(value):
     return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
 
 def downscale_image(x, K):
-    import numpy as np
-    import tensorflow as tf
-
-    tf.compat.v1.reset_default_graph()
-
-    x = np.asarray(x, dtype=np.float64)
+    tf.reset_default_graph()
 
     if x.ndim == 3:
-        x = x[None, ...]
-    elif x.ndim != 4:
-        raise ValueError(f"Expected 3D or 4D input, got shape {x.shape}")
+        x = x.reshape((1, x.shape[0], x.shape[1], x.shape[2]))
 
-    n, h, w, c = x.shape
+    x_in = tf.placeholder(tf.float64, [None, x.shape[1], x.shape[2], x.shape[3]])
 
-    x_in = tf.compat.v1.placeholder(tf.float64, shape=[None, h, w, c])
+    weight = tf.constant(1.0/K**2, shape=[K, K, x.shape[3], x.shape[3]], dtype=tf.float64)
+    downscaled = tf.nn.conv2d(x_in, filter=weight, strides=[1, K, K, 1], padding='SAME')
 
-    # Channel-preserving averaging kernel:
-    # output channel ch only sees input channel ch
-    weight = np.zeros((K, K, c, c), dtype=np.float64)
-    for ch in range(c):
-        weight[:, :, ch, ch] = 1.0 / (K * K)
+    with tf.Session() as sess:
+        ds_out = sess.run(downscaled, feed_dict={x_in: x})
 
-    weight_tf = tf.constant(weight, dtype=tf.float64)
-
-    y = tf.nn.conv2d(
-        input=x_in,
-        filters=weight_tf,
-        strides=[1, K, K, 1],
-        padding="SAME",
-    )
-
-    with tf.compat.v1.Session() as sess:
-        out = sess.run(y, feed_dict={x_in: x})
-
-    return out
-
+    return ds_out
 
 def generate_TFRecords(filename, data, mode='test', K=None):
     '''

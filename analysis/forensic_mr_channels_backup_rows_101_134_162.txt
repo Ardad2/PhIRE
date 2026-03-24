@@ -1,0 +1,64 @@
+=== TFRecord schema check ===
+file: example_data_backup/wind_MR-HR.tfrecord
+keys: ['c', 'data_HR', 'data_LR', 'h_HR', 'h_LR', 'index', 'w_HR', 'w_LR']
+kinds: {'c': 'int64_list', 'data_HR': 'bytes_list', 'data_LR': 'bytes_list', 'h_HR': 'int64_list', 'h_LR': 'int64_list', 'index': 'int64_list', 'w_HR': 'int64_list', 'w_LR': 'int64_list'}
+required keys present: yes
+
+=== Per-record forensic summary ===
+
+-- row=101 index=101 --
+raw byte lengths: data_LR=160000 data_HR=4000000
+declared shapes/channels: LR=(100,100,2) HR=(500,500,2)
+dtype assumptions tested: float64 baseline (+ float32/int16 alternatives)
+expected bytes if float64: LR=160000 HR=4000000
+byte-length match float64? LR=True HR=True
+parsed baseline shapes: MR=(100, 100, 2) HR=(500, 500, 2)
+MR ch0 vs ch1: exact_equal=True nearly_equal=True corr=1 mean_abs_diff=0 max_abs_diff=0
+HR ch0 vs ch1: exact_equal=False nearly_equal=False corr=0.0352247 mean_abs_diff=6.02961 max_abs_diff=16.8714
+alternative LR parsing hypotheses:
+  - float64_HWC: parsable shape=(100, 100, 2) exact=True near=True corr=1 mean|d|=0 max|d|=0
+  - float32_HWC: not parsable (size mismatch arr.size=40000 need=20000)
+  - int16_HWC: not parsable (size mismatch arr.size=80000 need=20000)
+  - float64_CHW_to_HWC: parsable shape=(100, 100, 2) exact=False near=False corr=-0.0253039 mean|d|=4.93854 max|d|=19.5125
+  - float64_HWC_fortran: parsable shape=(100, 100, 2) exact=False near=False corr=-0.0253039 mean|d|=4.93854 max|d|=19.5125
+  - float64_single_channel_dup: parsable shape=(100, 100, 2) exact=False near=False corr=-0.0253039 mean|d|=4.93854 max|d|=19.5125
+
+-- row=134 index=134 --
+raw byte lengths: data_LR=160000 data_HR=4000000
+declared shapes/channels: LR=(100,100,2) HR=(500,500,2)
+dtype assumptions tested: float64 baseline (+ float32/int16 alternatives)
+expected bytes if float64: LR=160000 HR=4000000
+byte-length match float64? LR=True HR=True
+parsed baseline shapes: MR=(100, 100, 2) HR=(500, 500, 2)
+MR ch0 vs ch1: exact_equal=True nearly_equal=True corr=1 mean_abs_diff=0 max_abs_diff=0
+HR ch0 vs ch1: exact_equal=False nearly_equal=False corr=-0.151649 mean_abs_diff=6.05576 max_abs_diff=35.4369
+alternative LR parsing hypotheses:
+  - float64_HWC: parsable shape=(100, 100, 2) exact=True near=True corr=1 mean|d|=0 max|d|=0
+  - float32_HWC: not parsable (size mismatch arr.size=40000 need=20000)
+  - int16_HWC: not parsable (size mismatch arr.size=80000 need=20000)
+  - float64_CHW_to_HWC: parsable shape=(100, 100, 2) exact=False near=False corr=0.473689 mean|d|=5.32152 max|d|=27.0536
+  - float64_HWC_fortran: parsable shape=(100, 100, 2) exact=False near=False corr=0.473689 mean|d|=5.32152 max|d|=27.0536
+  - float64_single_channel_dup: parsable shape=(100, 100, 2) exact=False near=False corr=0.473689 mean|d|=5.32152 max|d|=27.0536
+
+-- row=162 index=162 --
+raw byte lengths: data_LR=160000 data_HR=4000000
+declared shapes/channels: LR=(100,100,2) HR=(500,500,2)
+dtype assumptions tested: float64 baseline (+ float32/int16 alternatives)
+expected bytes if float64: LR=160000 HR=4000000
+byte-length match float64? LR=True HR=True
+parsed baseline shapes: MR=(100, 100, 2) HR=(500, 500, 2)
+MR ch0 vs ch1: exact_equal=True nearly_equal=True corr=1 mean_abs_diff=0 max_abs_diff=0
+HR ch0 vs ch1: exact_equal=False nearly_equal=False corr=-0.243877 mean_abs_diff=4.79668 max_abs_diff=26.9797
+alternative LR parsing hypotheses:
+  - float64_HWC: parsable shape=(100, 100, 2) exact=True near=True corr=1 mean|d|=0 max|d|=0
+  - float32_HWC: not parsable (size mismatch arr.size=40000 need=20000)
+  - int16_HWC: not parsable (size mismatch arr.size=80000 need=20000)
+  - float64_CHW_to_HWC: parsable shape=(100, 100, 2) exact=False near=False corr=0.20055 mean|d|=5.65737 max|d|=14.0895
+  - float64_HWC_fortran: parsable shape=(100, 100, 2) exact=False near=False corr=0.20055 mean|d|=5.65737 max|d|=14.0895
+  - float64_single_channel_dup: parsable shape=(100, 100, 2) exact=False near=False corr=0.20055 mean|d|=5.65737 max|d|=14.0895
+
+=== Short conclusion scaffold ===
+1) Parser-schema consistency: see required keys/kinds and float64 byte-length matches above.
+2) MR channel duplication signal: check exact/nearly-equal/high-correlation and |diff| stats above.
+3) If MR channels look duplicated while HR channels do not, likely issue is in LR content generation, not orientation.
+4) If baseline float64-HWC parses cleanly and alternatives do not improve plausibility, parser is likely correct.
