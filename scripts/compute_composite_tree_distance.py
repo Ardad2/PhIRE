@@ -37,8 +37,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
+import os
 import re
 import statistics
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
@@ -200,43 +204,6 @@ def read_dataset(path: Path) -> vtk.vtkDataObject:
     return out
 
 
-def make_multiblock_from_ports(port_map: Dict[int, MTEntry], debug: bool = False) -> Optional[vtk.vtkMultiBlockDataSet]:
-    """Build a vtkMultiBlockDataSet in port order (0,1,2,...) from a set of mt_port files.
-
-    Heuristics:
-      - Must contain at least one VTU (unstructured grid) (ports 0/1 usually).
-      - If only a port_2.vti exists, we skip (that's typically segmentation image only).
-    """
-    if not port_map:
-        return None
-
-    # Ensure we have at least one unstructured grid
-    has_vtu = any(e.path.suffix.lower() == ".vtu" for e in port_map.values())
-    if not has_vtu:
-        if debug:
-            print(f"[debug] merge tree ports exist but no .vtu blocks: {[str(e.path) for e in port_map.values()]}")
-        return None
-
-    ports_sorted = sorted(port_map.keys())
-
-    mb = vtk.vtkMultiBlockDataSet()
-    mb.SetNumberOfBlocks(len(ports_sorted))
-
-    for i, port in enumerate(ports_sorted):
-        e = port_map[port]
-        ds = read_dataset(e.path)
-        mb.SetBlock(i, ds)
-        # put a readable name
-        md = mb.GetMetaData(i)
-        if md is not None:
-            md.Set(vtk.vtkCompositeDataSet.NAME(), f"port_{port}")
-
-        if debug:
-            print(f"[debug] mt block[{i}] port={port} type={ds.GetClassName()} path={e.path.name}")
-
-    return mb
-
-
 # -------------------------------
 # Distance computations
 # -------------------------------
@@ -320,41 +287,159 @@ def compute_pd_bottleneck(pd_gt: Path, pd_sr: Path, debug: bool = False) -> floa
     return float(dist)
 
 
-def compute_mt_distance(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEntry], debug: bool = False) -> float:
-    """Compute merge tree distance between two samples.
+def _read_port_dataset(port_map: Dict[int, MTEntry], port: int, debug: bool = False) -> Optional[vtk.vtkDataObject]:
+    e = port_map.get(port)
+    if e is None:
+        return None
+    ds = read_dataset(e.path)
+    if debug:
+        print(f"[debug] mt port={port} type={ds.GetClassName()} path={e.path.name}")
+    return ds
 
-    We build vtkMultiBlockDataSet objects from the available ports (0/1/2...).
+
+def _build_mt_stack_port_major(
+    gt_ports: Dict[int, MTEntry], sr_ports: Dict[int, MTEntry], debug: bool = False
+) -> vtk.vtkMultiBlockDataSet:
+    """Build merge-tree stack in a port-major layout.
+
+    top[0] -> mb(gt_port0, sr_port0)
+    top[1] -> mb(gt_port1, sr_port1)
+    top[2] -> mb(gt_port2, sr_port2) optional
     """
-    mb_gt = make_multiblock_from_ports(mt_gt_ports, debug=debug)
-    mb_sr = make_multiblock_from_ports(mt_sr_ports, debug=debug)
-    if mb_gt is None or mb_sr is None:
-        raise RuntimeError("Missing required merge tree port blocks (.vtu) for MT distance")
+    gt0 = _read_port_dataset(gt_ports, 0, debug=debug)
+    sr0 = _read_port_dataset(sr_ports, 0, debug=debug)
+    gt1 = _read_port_dataset(gt_ports, 1, debug=debug)
+    sr1 = _read_port_dataset(sr_ports, 1, debug=debug)
+
+    if gt0 is None or sr0 is None or gt1 is None or sr1 is None:
+        raise RuntimeError("Missing required merge tree ports 0 and 1 for GT/SR")
+
+    top = vtk.vtkMultiBlockDataSet()
+    top.SetNumberOfBlocks(3)
+
+    mb0 = vtk.vtkMultiBlockDataSet()
+    mb0.SetNumberOfBlocks(2)
+    mb0.SetBlock(0, gt0)
+    mb0.SetBlock(1, sr0)
+    top.SetBlock(0, mb0)
+
+    mb1 = vtk.vtkMultiBlockDataSet()
+    mb1.SetNumberOfBlocks(2)
+    mb1.SetBlock(0, gt1)
+    mb1.SetBlock(1, sr1)
+    top.SetBlock(1, mb1)
+
+    gt2 = _read_port_dataset(gt_ports, 2, debug=debug)
+    sr2 = _read_port_dataset(sr_ports, 2, debug=debug)
+    if gt2 is not None and sr2 is not None:
+        mb2 = vtk.vtkMultiBlockDataSet()
+        mb2.SetNumberOfBlocks(2)
+        mb2.SetBlock(0, gt2)
+        mb2.SetBlock(1, sr2)
+        top.SetBlock(2, mb2)
+
+    return top
+
+
+def _build_mt_stack_sample_major(
+    gt_ports: Dict[int, MTEntry], sr_ports: Dict[int, MTEntry], debug: bool = False
+) -> vtk.vtkMultiBlockDataSet:
+    """Build merge-tree stack in a sample-major layout.
+
+    trees[0] -> mb(gt_port0, gt_port1[, gt_port2])
+    trees[1] -> mb(sr_port0, sr_port1[, sr_port2])
+    """
+    gt0 = _read_port_dataset(gt_ports, 0, debug=debug)
+    sr0 = _read_port_dataset(sr_ports, 0, debug=debug)
+    gt1 = _read_port_dataset(gt_ports, 1, debug=debug)
+    sr1 = _read_port_dataset(sr_ports, 1, debug=debug)
+
+    if gt0 is None or sr0 is None or gt1 is None or sr1 is None:
+        raise RuntimeError("Missing required merge tree ports 0 and 1 for GT/SR")
+
+    gt_tree = vtk.vtkMultiBlockDataSet()
+    gt_tree.SetNumberOfBlocks(3)
+    gt_tree.SetBlock(0, gt0)
+    gt_tree.SetBlock(1, gt1)
+
+    sr_tree = vtk.vtkMultiBlockDataSet()
+    sr_tree.SetNumberOfBlocks(3)
+    sr_tree.SetBlock(0, sr0)
+    sr_tree.SetBlock(1, sr1)
+
+    gt2 = _read_port_dataset(gt_ports, 2, debug=debug)
+    sr2 = _read_port_dataset(sr_ports, 2, debug=debug)
+    if gt2 is not None and sr2 is not None:
+        gt_tree.SetBlock(2, gt2)
+        sr_tree.SetBlock(2, sr2)
+
+    trees = vtk.vtkMultiBlockDataSet()
+    trees.SetNumberOfBlocks(2)
+    trees.SetBlock(0, gt_tree)
+    trees.SetBlock(1, sr_tree)
+    return trees
+
+
+def _table_value(table: vtk.vtkTable, row: int, col: int) -> Optional[float]:
+    if table is None:
+        return None
+    if row < 0 or col < 0:
+        return None
+    if table.GetNumberOfRows() <= row or table.GetNumberOfColumns() <= col:
+        return None
+    try:
+        v = table.GetValue(row, col)
+        try:
+            return float(v.ToDouble())
+        except Exception:
+            return float(str(v))
+    except Exception:
+        return None
+
+
+def _extract_mt_distance_from_table(table: vtk.vtkTable) -> Optional[float]:
+    # Preferred index for 2x2 matrix output
+    d = _table_value(table, 0, 1)
+    if d is not None:
+        return d
+
+    # Some builds use named columns (Tree0/Tree1) with rows as tree ids.
+    if table is not None:
+        for col_name in ("Tree0", "tree0", "Tree1", "tree1"):
+            col = table.GetColumnByName(col_name)
+            if col is not None and col.GetNumberOfTuples() > 1:
+                try:
+                    return float(col.GetTuple1(1))
+                except Exception:
+                    pass
+
+    # Diagonal fallback (often zero).
+    return _table_value(table, 0, 0)
+
+
+def _compute_mt_distance_once(
+    mt_gt_ports: Dict[int, MTEntry],
+    mt_sr_ports: Dict[int, MTEntry],
+    layout: str,
+    debug: bool = False,
+) -> float:
+    if layout == "port":
+        stack = _build_mt_stack_port_major(mt_gt_ports, mt_sr_ports, debug=debug)
+    elif layout == "sample":
+        stack = _build_mt_stack_sample_major(mt_gt_ports, mt_sr_ports, debug=debug)
+    else:
+        raise ValueError(f"Unknown MT layout: {layout}")
 
     flt = ttk.ttkMergeTreeDistanceMatrix()
-
-    # Connect as two ports when available.
-    # Most builds have 2 ports (0: set A trees, 1: set B trees).
-    used_two_ports = False
     if hasattr(flt, "SetInputDataObject"):
-        try:
-            flt.SetInputDataObject(0, mb_gt)
-            flt.SetInputDataObject(1, mb_sr)
-            used_two_ports = True
-        except Exception:
-            used_two_ports = False
+        flt.SetInputDataObject(0, stack)
+    else:
+        flt.SetInputData(0, stack)
 
-    if not used_two_ports:
-        # Fallback: many-vtk-connection style on port 0
-        try:
-            flt.AddInputDataObject(0, mb_gt)
-            flt.AddInputDataObject(0, mb_sr)
-        except Exception:
-            flt.SetInputData(mb_gt)
-
-    # Some versions require explicitly enabling computation
     for meth, val in (
         ("SetOutputDistanceMatrix", 1),
         ("SetComputeDistanceMatrix", 1),
+        ("SetThreadNumber", 1),
     ):
         if hasattr(flt, meth):
             try:
@@ -363,40 +448,104 @@ def compute_mt_distance(mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, 
                 pass
 
     flt.Update()
-
     out0 = flt.GetOutputDataObject(0)
 
-    # Common case: vtkTable distance matrix
     if isinstance(out0, vtk.vtkTable):
-        if out0.GetNumberOfRows() < 1 or out0.GetNumberOfColumns() < 1:
-            raise RuntimeError("MergeTreeDistanceMatrix produced empty vtkTable")
-        v = out0.GetValue(0, 0)
-        try:
-            dist = float(v.ToDouble())
-        except Exception:
-            dist = float(str(v))
-        if debug:
-            print(f"[debug] MT distance (table[0,0]) = {dist}")
-        return dist
+        dist = _extract_mt_distance_from_table(out0)
+        if dist is not None:
+            if debug:
+                print(f"[debug] MT distance ({layout} layout) = {dist}")
+            return float(dist)
 
-    # Fallback: look for distance in field data
+    if isinstance(out0, vtk.vtkMultiBlockDataSet):
+        for i in range(out0.GetNumberOfBlocks()):
+            blk = out0.GetBlock(i)
+            if isinstance(blk, vtk.vtkTable):
+                dist = _extract_mt_distance_from_table(blk)
+                if dist is not None:
+                    if debug:
+                        print(f"[debug] MT distance ({layout} layout wrapped table[{i}]) = {dist}")
+                    return float(dist)
+
     dist = _get_field_distance(out0)
-    if dist is None and hasattr(flt, "GetOutputDataObject"):
-        for i in range(1, 4):
-            try:
-                dist = _get_field_distance(flt.GetOutputDataObject(i))
-            except Exception:
-                pass
-            if dist is not None:
-                break
+    if dist is not None:
+        return float(dist)
 
-    if dist is None:
-        raise RuntimeError(f"Could not extract MT distance from output type {out0.GetClassName()}")
+    raise RuntimeError(f"Could not extract MT distance from output type {out0.GetClassName()}")
 
-    if debug:
-        print(f"[debug] MT distance = {dist}")
 
-    return float(dist)
+def _run_mt_worker(
+    mt_gt_ports: Dict[int, MTEntry], mt_sr_ports: Dict[int, MTEntry], layout: str, debug: bool = False
+) -> Tuple[Optional[float], str]:
+    cmd = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--_mt-worker",
+        "--worker-layout",
+        layout,
+        "--gt-port0",
+        str(mt_gt_ports[0].path),
+        "--gt-port1",
+        str(mt_gt_ports[1].path),
+        "--sr-port0",
+        str(mt_sr_ports[0].path),
+        "--sr-port1",
+        str(mt_sr_ports[1].path),
+    ]
+    if 2 in mt_gt_ports and 2 in mt_sr_ports:
+        cmd.extend(["--gt-port2", str(mt_gt_ports[2].path), "--sr-port2", str(mt_sr_ports[2].path)])
+
+    env = os.environ.copy()
+    env.setdefault("PYTHONFAULTHANDLER", "1")
+    cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
+    if cp.returncode != 0:
+        msg = f"worker layout={layout} failed rc={cp.returncode}"
+        if debug:
+            print(f"[debug] {msg}")
+            if cp.stderr.strip():
+                print(cp.stderr.strip())
+        return None, msg
+
+    lines = [ln for ln in cp.stdout.splitlines() if ln.strip()]
+    if not lines:
+        return None, f"worker layout={layout} returned empty output"
+    try:
+        payload = json.loads(lines[-1])
+    except Exception:
+        return None, f"worker layout={layout} returned non-json output"
+
+    if not payload.get("ok", False):
+        return None, f"worker layout={layout} error: {payload.get('error', 'unknown')}"
+
+    try:
+        return float(payload["distance"]), ""
+    except Exception:
+        return None, f"worker layout={layout} returned invalid distance"
+
+
+def compute_mt_distance(
+    mt_gt_ports: Dict[int, MTEntry],
+    mt_sr_ports: Dict[int, MTEntry],
+    debug: bool = False,
+    isolate_mt: bool = False,
+) -> float:
+    if 0 not in mt_gt_ports or 1 not in mt_gt_ports or 0 not in mt_sr_ports or 1 not in mt_sr_ports:
+        raise RuntimeError("Missing required MT ports 0/1 for GT/SR")
+
+    layouts = ["port", "sample"]
+
+    if not isolate_mt:
+        # In-process: try the historically safer layout first.
+        return _compute_mt_distance_once(mt_gt_ports, mt_sr_ports, layout="port", debug=debug)
+
+    errs: List[str] = []
+    for layout in layouts:
+        dist, err = _run_mt_worker(mt_gt_ports, mt_sr_ports, layout=layout, debug=debug)
+        if dist is not None:
+            return dist
+        errs.append(err)
+
+    raise RuntimeError("; ".join(e for e in errs if e))
 
 
 # -------------------------------
@@ -433,12 +582,47 @@ def write_csv(path: Path, fieldnames: List[str], rows: Iterable[Dict[str, object
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--pd-dir", type=Path, required=True)
-    ap.add_argument("--mt-dir", type=Path, required=True)
-    ap.add_argument("--outdir", type=Path, required=True)
+    ap.add_argument("--pd-dir", type=Path, required=False)
+    ap.add_argument("--mt-dir", type=Path, required=False)
+    ap.add_argument("--outdir", type=Path, required=False)
     ap.add_argument("--max", type=int, default=0, help="limit number of keys (for quick testing)")
     ap.add_argument("--debug", action="store_true")
+    ap.add_argument("--isolate-mt", action="store_true", help="Run MT distance in a worker process; retry multiple layouts.")
+    ap.add_argument("--_mt-worker", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--worker-layout", choices=["port", "sample"], default="port", help=argparse.SUPPRESS)
+    ap.add_argument("--gt-port0", type=Path, default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--gt-port1", type=Path, default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--gt-port2", type=Path, default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--sr-port0", type=Path, default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--sr-port1", type=Path, default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--sr-port2", type=Path, default=None, help=argparse.SUPPRESS)
     args = ap.parse_args()
+
+    if args._mt_worker:
+        try:
+            if args.gt_port0 is None or args.gt_port1 is None or args.sr_port0 is None or args.sr_port1 is None:
+                raise RuntimeError("Missing required worker ports")
+            gt_ports = {
+                0: MTEntry(key="worker", method="worker", label="GT", port=0, path=args.gt_port0),
+                1: MTEntry(key="worker", method="worker", label="GT", port=1, path=args.gt_port1),
+            }
+            sr_ports = {
+                0: MTEntry(key="worker", method="worker", label="SR", port=0, path=args.sr_port0),
+                1: MTEntry(key="worker", method="worker", label="SR", port=1, path=args.sr_port1),
+            }
+            if args.gt_port2 is not None and args.sr_port2 is not None:
+                gt_ports[2] = MTEntry(key="worker", method="worker", label="GT", port=2, path=args.gt_port2)
+                sr_ports[2] = MTEntry(key="worker", method="worker", label="SR", port=2, path=args.sr_port2)
+
+            d = _compute_mt_distance_once(gt_ports, sr_ports, layout=args.worker_layout, debug=args.debug)
+            print(json.dumps({"ok": True, "distance": d}))
+            return 0
+        except Exception as e:
+            print(json.dumps({"ok": False, "error": str(e)}))
+            return 2
+
+    if args.pd_dir is None or args.mt_dir is None or args.outdir is None:
+        ap.error("--pd-dir, --mt-dir, and --outdir are required unless running --_mt-worker")
 
     pd_map = discover_pd(args.pd_dir)
     mt_map = discover_mt(args.mt_dir)
@@ -477,7 +661,7 @@ def main() -> int:
             err = f"pd:{e}"
 
         try:
-            mt_dist = compute_mt_distance(mt_gt_ports, mt_sr_ports, debug=args.debug)
+            mt_dist = compute_mt_distance(mt_gt_ports, mt_sr_ports, debug=args.debug, isolate_mt=args.isolate_mt)
         except Exception as e:
             err = (err + "; " if err else "") + f"mt:{e}"
 
