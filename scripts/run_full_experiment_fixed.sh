@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+cd "${ROOT_DIR}"
+
 # Full end-to-end experiment runner with optional resume behavior.
 # Stages:
-#  0) Ensure 500x500 TFRecords are staged in example_data/
-#  1) Run paired GAN/CNN inference and snapshot to stable dirs data_out/wind_mrhr_{gan,cnn}
+#  0) Use repaired fixed vector outputs
+#  1) Optionally run paired GAN/CNN inference
 #  2) Generate VTI files for selected samples
-#  3) Extract PD/MT using TTK docker image (resume-friendly per-sample checks)
+#  3) Extract PD/MT using TTK docker image
 #  4) Compute distances, combine reports, PSNR/topology analysis, physics merge, add SSIM, and visualize
 
 METHODS=(gan cnn)
@@ -33,9 +37,10 @@ Options:
   --x0 N                   Crop x0 (default: 0)
   --y0 N                   Crop y0 (default: 0)
   --threads N              TTK threads (default: 20)
-  --out-root DIR           Output root (default: ttk_runs)
+  --out-root DIR           Output root (default: ttk_runs_fixed)
   --docker-image IMG       Docker image (default: phire-ttk:latest)
   --resume                 Skip already-created artifacts where possible
+  --run-models             Run GAN/CNN inference stage
   --skip-models            Skip GAN/CNN inference stage
   --skip-topology          Skip VTI/PD/MT extraction stage
   --skip-post              Skip distance/combine/analysis/plot stage
@@ -54,6 +59,7 @@ while [[ $# -gt 0 ]]; do
     --out-root) OUT_ROOT="$2"; shift 2 ;;
     --docker-image) DOCKER_IMAGE="$2"; shift 2 ;;
     --resume) RESUME=1; shift ;;
+    --run-models) DO_MODELS=1; shift ;;
     --skip-models) DO_MODELS=0; shift ;;
     --skip-topology) DO_TOPO=0; shift ;;
     --skip-post) DO_POST=0; shift ;;
@@ -75,6 +81,7 @@ done
 
 echo "============================================================"
 echo "PhIRE full experiment"
+echo "root-dir     : ${ROOT_DIR}"
 echo "methods      : ${METHODS[*]}"
 echo "samples      : ${SAMPLES[*]} (max=$max_s)"
 echo "patch/x0/y0  : ${PATCH}/${X0}/${Y0}"
@@ -84,51 +91,40 @@ echo "docker-image : ${DOCKER_IMAGE}"
 echo "resume       : ${RESUME}"
 echo "============================================================"
 
-
 echo
 echo "[0] Using repaired fixed vector outputs; no TFRecord staging"
-[[ -f data_out_fixed/wind_mrhr_cnn/dataSR.npy ]] || { echo "Missing data_out_fixed/wind_mrhr_cnn/dataSR.npy"; exit 1; }
-[[ -f data_out_fixed/wind_mrhr_gan/dataSR.npy ]] || { echo "Missing data_out_fixed/wind_mrhr_gan/dataSR.npy"; exit 1; }
+[[ -f "${ROOT_DIR}/data_out_fixed/wind_mrhr_cnn/dataSR.npy" ]] || { echo "Missing ${ROOT_DIR}/data_out_fixed/wind_mrhr_cnn/dataSR.npy"; exit 1; }
+[[ -f "${ROOT_DIR}/data_out_fixed/wind_mrhr_gan/dataSR.npy" ]] || { echo "Missing ${ROOT_DIR}/data_out_fixed/wind_mrhr_gan/dataSR.npy"; exit 1; }
 
 run_model() {
   local method="$1"
   local runner=""
-  if [[ "$method" == "gan" ]]; then runner="run_paired_wind_mr_hr.py"; fi
-  if [[ "$method" == "cnn" ]]; then runner="run_paired_wind_mr_hr_cnn.py"; fi
+  if [[ "$method" == "gan" ]]; then runner="${ROOT_DIR}/run_paired_wind_mr_hr_fixed.py"; fi
+  if [[ "$method" == "cnn" ]]; then runner="${ROOT_DIR}/run_paired_wind_mr_hr_cnn_fixed.py"; fi
   [[ -f "$runner" ]] || { echo "Missing $runner"; exit 1; }
 
   python3 "$runner"
-
-  local latest stable
-  latest="$(ls -dt data_out/wind-* | head -n 1)"
-  stable="data_out/wind_mrhr_${method}"
-  mkdir -p "$stable"
-  cp -f "$latest"/dataGT.npy "$stable"/dataGT.npy
-  cp -f "$latest"/dataIN.npy "$stable"/dataIN.npy
-  cp -f "$latest"/dataSR.npy "$stable"/dataSR.npy
-  cp -f "$latest"/idx.npy "$stable"/idx.npy
-  echo "  [$method] snapshotted to $stable from $latest"
 }
 
 verify_method_n() {
   local method="$1"
-  local d="data_out_fixed/wind_mrhr_${method}"
+  local d="${ROOT_DIR}/data_out_fixed/wind_mrhr_${method}"
   python3 - <<PY
 import numpy as np
 from pathlib import Path
 
-d = Path('$d')
+d = Path(r"$d")
 idx = np.load(d/'idx.npy', mmap_mode='r')
 gt = np.load(d/'dataGT.npy', mmap_mode='r')
 sr = np.load(d/'dataSR.npy', mmap_mode='r')
 print('$method', 'N=', idx.shape[0], 'GT=', gt.shape, 'SR=', sr.shape)
-assert idx.shape[0] >= $((max_s+1)), 'Not enough samples in $d'
+assert idx.shape[0] >= $((max_s+1)), f'Not enough samples in {d}'
 PY
 }
 
 if [[ "$DO_MODELS" -eq 1 ]]; then
   echo
-  echo "[1] Running GAN/CNN paired inference + stable snapshots"
+  echo "[1] Running GAN/CNN paired inference"
   run_model gan
   run_model cnn
 fi
@@ -143,7 +139,7 @@ missing_vtis_for_label() {
   local miss=()
   local s
   for s in "${SAMPLES[@]}"; do
-    local p="vtk_inputs/${label}_s${s}_speed_p${PATCH}_x${X0}_y${Y0}.vti"
+    local p="${ROOT_DIR}/vtk_inputs/${label}_s${s}_speed_p${PATCH}_x${X0}_y${Y0}.vti"
     if [[ ! -f "$p" ]]; then
       miss+=("$s")
     fi
@@ -168,7 +164,7 @@ convert_vtis() {
     echo "  [$label] writing all requested samples"
   fi
 
-  docker run --rm -v "$PWD":/work -w /work "$DOCKER_IMAGE" \
+  docker run --rm -v "${ROOT_DIR}:/work" -w /work "$DOCKER_IMAGE" \
     bash -lc "python scripts/convert_phire_to_vti.py \
       --input '$npy' \
       --outdir vtk_inputs \
@@ -181,21 +177,21 @@ convert_vtis() {
 if [[ "$DO_TOPO" -eq 1 ]]; then
   echo
   echo "[2] Generating VTIs"
-  mkdir -p vtk_inputs
+  mkdir -p "${ROOT_DIR}/vtk_inputs"
   convert_vtis "data_out_fixed/wind_mrhr_gan/dataGT.npy" "gan_GT"
- convert_vtis "data_out_fixed/wind_mrhr_gan/dataSR.npy" "gan_SR"
- convert_vtis "data_out_fixed/wind_mrhr_cnn/dataGT.npy" "cnn_GT"
- convert_vtis "data_out_fixed/wind_mrhr_cnn/dataSR.npy" "cnn_SR"
+  convert_vtis "data_out_fixed/wind_mrhr_gan/dataSR.npy" "gan_SR"
+  convert_vtis "data_out_fixed/wind_mrhr_cnn/dataGT.npy" "cnn_GT"
+  convert_vtis "data_out_fixed/wind_mrhr_cnn/dataSR.npy" "cnn_SR"
 fi
 
 ensure_pd_mt_one() {
   local method="$1" kind="$2" s="$3"
   local stem="${method}_${kind}_s${s}_speed_p${PATCH}_x${X0}_y${Y0}"
-  local vti="vtk_inputs/${stem}.vti"
-  local pd0="${OUT_ROOT}/${method}/pd/${stem}_pd_port_0.vtu"
-  local mt0="${OUT_ROOT}/${method}/mt/${stem}_mt_port_0.vtu"
-  local mt1="${OUT_ROOT}/${method}/mt/${stem}_mt_port_1.vtu"
-  local mt2="${OUT_ROOT}/${method}/mt/${stem}_mt_port_2.vti"
+  local vti="${ROOT_DIR}/vtk_inputs/${stem}.vti"
+  local pd0="${ROOT_DIR}/${OUT_ROOT}/${method}/pd/${stem}_pd_port_0.vtu"
+  local mt0="${ROOT_DIR}/${OUT_ROOT}/${method}/mt/${stem}_mt_port_0.vtu"
+  local mt1="${ROOT_DIR}/${OUT_ROOT}/${method}/mt/${stem}_mt_port_1.vtu"
+  local mt2="${ROOT_DIR}/${OUT_ROOT}/${method}/mt/${stem}_mt_port_2.vti"
 
   [[ -f "$vti" ]] || { echo "Missing VTI: $vti"; exit 1; }
 
@@ -204,20 +200,23 @@ ensure_pd_mt_one() {
   fi
 
   if [[ ! -f "$pd0" ]]; then
-    docker run --rm -v "$PWD":/work -w /work "$DOCKER_IMAGE" \
-      bash -lc "ttkPersistenceDiagramCmd -t ${THREADS} -i '$vti' -a wind_speed -o '${OUT_ROOT}/${method}/pd/${stem}_pd'"
+    docker run --rm -v "${ROOT_DIR}:/work" -w /work "$DOCKER_IMAGE" \
+      bash -lc "ttkPersistenceDiagramCmd -t ${THREADS} -i 'vtk_inputs/${stem}.vti' -a wind_speed -o '${OUT_ROOT}/${method}/pd/${stem}_pd'"
   fi
 
   if [[ ! -f "$mt0" || ! -f "$mt1" || ! -f "$mt2" ]]; then
-    docker run --rm -v "$PWD":/work -w /work "$DOCKER_IMAGE" \
-      bash -lc "ttkMergeTreeCmd -t ${THREADS} -i '$vti' -a wind_speed -o '${OUT_ROOT}/${method}/mt/${stem}_mt'"
+    docker run --rm -v "${ROOT_DIR}:/work" -w /work "$DOCKER_IMAGE" \
+      bash -lc "ttkMergeTreeCmd -t ${THREADS} -i 'vtk_inputs/${stem}.vti' -a wind_speed -o '${OUT_ROOT}/${method}/mt/${stem}_mt'"
   fi
 }
 
 if [[ "$DO_TOPO" -eq 1 ]]; then
   echo
   echo "[3] Extracting PD/MT with resume checks"
-  mkdir -p "${OUT_ROOT}/gan/pd" "${OUT_ROOT}/gan/mt" "${OUT_ROOT}/cnn/pd" "${OUT_ROOT}/cnn/mt"
+  mkdir -p \
+    "${ROOT_DIR}/${OUT_ROOT}/gan/pd" "${ROOT_DIR}/${OUT_ROOT}/gan/mt" \
+    "${ROOT_DIR}/${OUT_ROOT}/cnn/pd" "${ROOT_DIR}/${OUT_ROOT}/cnn/mt"
+
   local_method=""
   local_kind=""
   local_s=""
@@ -236,105 +235,110 @@ if [[ "$DO_POST" -eq 1 ]]; then
   echo "[4] Postprocessing and analysis"
 
   for method in "${METHODS[@]}"; do
-    python3 -X faulthandler scripts/compute_composite_tree_distance.py \
-      --pd-dir "${OUT_ROOT}/${method}/pd" \
-      --mt-dir "${OUT_ROOT}/${method}/mt" \
-      --outdir "${OUT_ROOT}/${method}/phase_c_final" \
+    python3 -X faulthandler "${ROOT_DIR}/scripts/compute_composite_tree_distance.py" \
+      --pd-dir "${ROOT_DIR}/${OUT_ROOT}/${method}/pd" \
+      --mt-dir "${ROOT_DIR}/${OUT_ROOT}/${method}/mt" \
+      --outdir "${ROOT_DIR}/${OUT_ROOT}/${method}/phase_c_final" \
       --isolate-mt --debug
 
-    python3 scripts/phase_c_final_visualization.py --indir "${OUT_ROOT}/${method}/phase_c_final" --strict
+    python3 "${ROOT_DIR}/scripts/phase_c_final_visualization.py" \
+      --indir "${ROOT_DIR}/${OUT_ROOT}/${method}/phase_c_final" --strict
   done
 
-  python3 scripts/combine_phase_c_results.py \
-    --inputs "${OUT_ROOT}/gan/phase_c_final" "${OUT_ROOT}/cnn/phase_c_final" \
-    --outdir "${OUT_ROOT}/combined"
+  python3 "${ROOT_DIR}/scripts/combine_phase_c_results.py" \
+    --inputs "${ROOT_DIR}/${OUT_ROOT}/gan/phase_c_final" "${ROOT_DIR}/${OUT_ROOT}/cnn/phase_c_final" \
+    --outdir "${ROOT_DIR}/${OUT_ROOT}/combined"
 
-  cp -f "${OUT_ROOT}/combined/combined_pairwise_results.csv" "${OUT_ROOT}/combined/phase_c_results.csv"
-  python3 scripts/phase_c_final_visualization.py --indir "${OUT_ROOT}/combined" || true
+  cp -f "${ROOT_DIR}/${OUT_ROOT}/combined/combined_pairwise_results.csv" \
+        "${ROOT_DIR}/${OUT_ROOT}/combined/phase_c_results.csv"
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analyze_psnr_vs_ttk_topology.py \
-    --combined "${OUT_ROOT}/combined/combined_pairwise_results.csv" \
-    --gan-dir data_out_fixed/wind_mrhr_gan \
-    --cnn-dir data_out_fixed/wind_mrhr_cnn \
-    --outdir "${OUT_ROOT}/combined"
+  python3 "${ROOT_DIR}/scripts/phase_c_final_visualization.py" \
+    --indir "${ROOT_DIR}/${OUT_ROOT}/combined" || true
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analysis_compare.py \
-    --topology-csv "${OUT_ROOT}/combined/combined_pairwise_results.csv" \
-    --method-dir gan=data_out_fixed/wind_mrhr_gan \
-    --method-dir cnn=data_out_fixed/wind_mrhr_cnn \
-    --out-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
-    --out-report "${OUT_ROOT}/combined/psnr_topology_physics_report.txt" \
-    --out-delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv"
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/analyze_psnr_vs_ttk_topology.py" \
+    --combined "${ROOT_DIR}/${OUT_ROOT}/combined/combined_pairwise_results.csv" \
+    --gan-dir "${ROOT_DIR}/data_out_fixed/wind_mrhr_gan" \
+    --cnn-dir "${ROOT_DIR}/data_out_fixed/wind_mrhr_cnn" \
+    --outdir "${ROOT_DIR}/${OUT_ROOT}/combined"
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/add_ssim_to_merged.py \
-    --in-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
-    --out-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
-    --method-dir gan=data_out_fixed/wind_mrhr_gan \
-    --method-dir cnn=data_out_fixed/wind_mrhr_cnn \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/analysis_compare.py" \
+    --topology-csv "${ROOT_DIR}/${OUT_ROOT}/combined/combined_pairwise_results.csv" \
+    --method-dir gan="${ROOT_DIR}/data_out_fixed/wind_mrhr_gan" \
+    --method-dir cnn="${ROOT_DIR}/data_out_fixed/wind_mrhr_cnn" \
+    --out-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --out-report "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_report.txt" \
+    --out-delta-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_delta.csv"
+
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/add_ssim_to_merged.py" \
+    --in-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --out-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --method-dir gan="${ROOT_DIR}/data_out_fixed/wind_mrhr_gan" \
+    --method-dir cnn="${ROOT_DIR}/data_out_fixed/wind_mrhr_cnn" \
     --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}"
 
-  cp -f "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv"
+  cp -f "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+        "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_merged.csv"
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analysis_compare.py \
-    --in-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/analysis_compare.py" \
+    --in-csv "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
     --metric-column ssim \
-    --out-report "${OUT_ROOT}/combined/ssim_topology_physics_report.txt" \
-    --out-delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv"
+    --out-report "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_report.txt" \
+    --out-delta-csv "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_delta.csv"
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analyze_psnr_vs_ttk_topology.py \
-    --combined "${OUT_ROOT}/combined/combined_pairwise_results.csv" \
-    --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/analyze_psnr_vs_ttk_topology.py" \
+    --combined "${ROOT_DIR}/${OUT_ROOT}/combined/combined_pairwise_results.csv" \
+    --merged-csv "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
     --metric ssim \
-    --outdir "${OUT_ROOT}/combined"
+    --outdir "${ROOT_DIR}/${OUT_ROOT}/combined"
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
-    --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
-    --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/plot_topology_physics_analysis.py" \
+    --merged-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --delta-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
     --metric-column psnr \
     --only-heatmaps \
-    --outdir "${OUT_ROOT}/combined/figs_topology_physics"
+    --outdir "${ROOT_DIR}/${OUT_ROOT}/combined/figs_topology_physics"
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
-    --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
-    --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/plot_topology_physics_analysis.py" \
+    --merged-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+    --delta-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
     --metric-column psnr \
     --skip-heatmaps \
-    --outdir "${OUT_ROOT}/combined/figs_topology_physics"
+    --outdir "${ROOT_DIR}/${OUT_ROOT}/combined/figs_topology_physics"
 
-  PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/plot_topology_physics_analysis.py \
-    --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
-    --delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
+  PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/plot_topology_physics_analysis.py" \
+    --merged-csv "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
+    --delta-csv "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
     --metric-column ssim \
     --tie-thresh 0.075 \
     --require-consistent-topology \
     --skip-heatmaps \
-    --outdir "${OUT_ROOT}/combined/figs_topology_physics"
+    --outdir "${ROOT_DIR}/${OUT_ROOT}/combined/figs_topology_physics"
 
   if [[ "$DO_CASE_PANELS" -eq 1 ]]; then
-    PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/make_tie_break_case_panels.py \
+    PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/make_tie_break_case_panels.py" \
       --metric psnr \
-      --merged-csv "${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
-      --delta-csv "${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
-      --cnn-dir data_out_fixed/wind_mrhr_cnn \
-      --gan-dir data_out_fixed/wind_mrhr_gan \
+      --merged-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_merged.csv" \
+      --delta-csv "${ROOT_DIR}/${OUT_ROOT}/combined/psnr_topology_physics_delta.csv" \
+      --cnn-dir "${ROOT_DIR}/data_out_fixed/wind_mrhr_cnn" \
+      --gan-dir "${ROOT_DIR}/data_out_fixed/wind_mrhr_gan" \
       --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}" \
-      --outdir "${OUT_ROOT}/combined" \
+      --outdir "${ROOT_DIR}/${OUT_ROOT}/combined" \
       --samples 2 165 166
 
-    PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/make_tie_break_case_panels.py \
+    PYTHONNOUSERSITE=1 /usr/bin/python3 "${ROOT_DIR}/scripts/make_tie_break_case_panels.py" \
       --metric ssim \
-      --merged-csv "${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
-      --delta-csv "${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
-      --cnn-dir data_out_fixed/wind_mrhr_cnn \
-      --gan-dir data_out_fixed/wind_mrhr_gan \
+      --merged-csv "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_merged.csv" \
+      --delta-csv "${ROOT_DIR}/${OUT_ROOT}/combined/ssim_topology_physics_delta.csv" \
+      --cnn-dir "${ROOT_DIR}/data_out_fixed/wind_mrhr_cnn" \
+      --gan-dir "${ROOT_DIR}/data_out_fixed/wind_mrhr_gan" \
       --patch "${PATCH}" --x0 "${X0}" --y0 "${Y0}" \
       --tie-thresh 0.075 \
       --report-thresholds 0.05,0.075,0.10 \
       --require-consistent-topology \
-      --outdir "${OUT_ROOT}/combined"
+      --outdir "${ROOT_DIR}/${OUT_ROOT}/combined"
   fi
 fi
 
 echo
 echo "[done] Full experiment complete."
-echo "Combined outputs: ${OUT_ROOT}/combined"
+echo "Combined outputs: ${ROOT_DIR}/${OUT_ROOT}/combined"
