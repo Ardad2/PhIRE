@@ -1,0 +1,21 @@
+=== Correlations (SSIM vs topology; lower topology is better) ===
+global Pearson(SSIM, PD): 0.48022677542447095
+global Pearson(SSIM, MT): -0.2201590797967911
+global Spearman(SSIM, PD): 0.4915126571466534
+global Spearman(SSIM, MT): -0.45978152898078495
+
+[cnn] n=168
+  Pearson(SSIM, PD): -0.3599527764170272
+  Pearson(SSIM, MT): -0.32047701985437005
+  Spearman(SSIM, PD): -0.39680402508592294
+  Spearman(SSIM, MT): -0.27976169385658106
+
+[gan] n=168
+  Pearson(SSIM, PD): 0.41065750424924596
+  Pearson(SSIM, MT): 0.4680354176700626
+  Spearman(SSIM, PD): 0.3651176092447397
+  Spearman(SSIM, MT): 0.4269516756849784
+
+=== Mean deltas (GAN - CNN); >0 means CNN lower/better topology ===
+PD delta: -6.5422  95% CI [-7.4582, -5.6265]
+MT delta: 2.4804  95% CI [2.0625, 2.9305]

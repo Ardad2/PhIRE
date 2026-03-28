@@ -1,0 +1,13 @@
+=== SSIM tie-break case summary ===
+total_paired_samples=168
+abs_delta_ssim: min=0.017786, median=0.102589, max=0.192063
+topology_consistent_count=22 / 168
+count(|ΔSSIM| <= 0.050)=15
+count(|ΔSSIM| <= 0.050 and consistent_topology)=2
+count(|ΔSSIM| <= 0.075)=36
+count(|ΔSSIM| <= 0.075 and consistent_topology)=3
+count(|ΔSSIM| <= 0.100)=81
+count(|ΔSSIM| <= 0.100 and consistent_topology)=8
+rank 1 sample 25: |ΔSSIM|=0.0267, ΔPD=6.4606, ΔMT=0.8701, zΔPD=2.86, zΔMT=0.34, score=2.86, consistent=True, topology-closer=gan
+rank 2 sample 8: |ΔSSIM|=0.0602, ΔPD=6.3530, ΔMT=1.4545, zΔPD=2.81, zΔMT=0.57, score=2.81, consistent=True, topology-closer=gan
+rank 3 sample 12: |ΔSSIM|=0.0250, ΔPD=5.8839, ΔMT=0.7027, zΔPD=2.60, zΔMT=0.28, score=2.60, consistent=True, topology-closer=gan

@@ -1,0 +1,16 @@
+metric=ssim threshold=0.03000
+near_ties=4
+mt_select_cnn=2
+mt_select_gan=2
+
+agreement_with_mt:
+  agree_mt_winner_lr_group: 2/4 (0.5000)
+  agree_mt_winner_extreme_group: 1/2 (0.5000)
+  agree_mt_winner_physics_group: 2/4 (0.5000)
+  agree_mt_winner_lr_mae: 2/4 (0.5000)
+  agree_mt_winner_lr_mse: 2/4 (0.5000)
+  agree_mt_winner_lr_psnr: 2/4 (0.5000)
+  agree_mt_winner_extreme_abs_max: 3/4 (0.7500)
+  agree_mt_winner_tail_mae: 2/4 (0.5000)
+NOTE: very small near-tie sample size; interpret proportions cautiously.
+physics_cols_used=wpd_rmse,wpd_mae,psd_log_l2,grad_mae

@@ -1,0 +1,15 @@
+metric=ssim threshold=0.05000
+near_ties=15
+mt_select_cnn=13
+mt_select_gan=2
+
+agreement_with_mt:
+  agree_mt_winner_lr_group: 13/15 (0.8667)
+  agree_mt_winner_extreme_group: 8/9 (0.8889)
+  agree_mt_winner_physics_group: 13/15 (0.8667)
+  agree_mt_winner_lr_mae: 13/15 (0.8667)
+  agree_mt_winner_lr_mse: 13/15 (0.8667)
+  agree_mt_winner_lr_psnr: 13/15 (0.8667)
+  agree_mt_winner_extreme_abs_max: 14/15 (0.9333)
+  agree_mt_winner_tail_mae: 11/15 (0.7333)
+physics_cols_used=wpd_rmse,wpd_mae,psd_log_l2,grad_mae
