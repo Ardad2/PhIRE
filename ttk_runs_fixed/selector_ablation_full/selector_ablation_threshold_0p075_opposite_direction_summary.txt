@@ -1,0 +1,12 @@
+ablation_csv=ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075.csv
+num_rows=36
+
+bucket_1: ssim_favors_gan_but_mt_favors_cnn
+count=0
+sample_ids=
+ranked_top_candidates(sample_id|mt_support_count|abs_delta_ssim)=
+
+bucket_2: ssim_favors_cnn_but_mt_favors_gan
+count=3
+sample_ids=8,12,25
+ranked_top_candidates(sample_id|mt_support_count|abs_delta_ssim)=12|0|0.024958,25|0|0.026718,8|0|0.060152
