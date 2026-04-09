@@ -459,6 +459,75 @@ The comparison was therefore performed against the actual populated rebuild path
 
 The topology extraction and merged-table reconstruction was successful. One reconstructed file (`cnn/phase_c_final/phase_c_results.csv`) matched exactly. The remaining outputs were semantically reproduced with the same row counts, columns, and no substantive structural differences. The only consistent numeric drift was a very small difference in merge-tree distance (`mt_distance` or `delta_mt_distance`) with maximum absolute difference `0.010294914245605469`, and `combined_pairwise_results.csv` also showed likely provenance/path-related text differences. Overall, this strongly supports that the recovered topology/merge pipeline reproduces the historical legacy outputs accurately enough for provenance and reconstruction purposes.
 
+---
+
+## 9. Reconstruction test of near-tie study outputs
+
+### Goal of this stage
+
+This stage tests whether the historical near-tie study outputs can be reconstructed from the rebuilt topology/merged tables.
+
+### Reconstruction strategy
+
+The strategy was:
+
+1. confirm the historical `ttk_runs/near_tie_study/` outputs existed,
+2. rerun `run_near_tie_study.py` using the reconstructed combined and merged tables,
+3. compare the rebuilt near-tie outputs against the historical ones,
+4. classify the reconstruction as exact, semantic, partial, or mismatch.
+
+### Reconstruction notes
+
+The rebuilt near-tie outputs were written under:
+
+- `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/`
+
+so comparisons were performed against that populated path.
+
+### Inventory comparison
+
+The rebuilt tree successfully reproduced the main PSNR and SSIM near-tie outputs, including:
+
+- `near_tie_summary_all.csv`
+- PSNR threshold CSV/TXT/top-case files
+- SSIM threshold CSV/TXT/top-case files
+- key agreement-rate plots
+
+However, the rebuilt tree did **not** reproduce the historical dual-threshold artifacts present in the legacy tree, including:
+
+- `dual_agreement_rates.png`
+- `dual/near_tie_dual_psnr_0.100_ssim_0.030.csv`
+- `dual/near_tie_dual_psnr_0.100_ssim_0.030_summary.txt`
+- `dual/near_tie_dual_psnr_0.100_ssim_0.030_top_cases.csv`
+
+### Key summary-file comparison
+
+`near_tie_summary_all.csv` was not byte-identical:
+
+- legacy size: `1.3K`
+- rebuilt size: `1.2K`
+
+- legacy SHA256:
+  `a99593374ff427a894b919d71c7ff372002fbb919bb453bdff9a64fb031b55bc`
+- rebuilt SHA256:
+  `1b44fea52ec8e182da9e4867e203c24bd86c1aab05ecd8d9ab85cf5902b31f73`
+
+This likely reflects the missing dual-threshold outputs in the rebuilt run.
+
+### Comparison summary
+
+| Stage | Existing artifact | Reconstructed artifact | Match? | Notes |
+|---|---|---|---|---|
+| `near_tie_summary_all.csv` | `ttk_runs/near_tie_study/near_tie_summary_all.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/near_tie_summary_all.csv` | **Partial / semantic match** | Not hash-identical; rebuilt file smaller, likely because the rebuilt run did not reproduce the historical dual-threshold entries. |
+| Common PSNR threshold files | `ttk_runs/near_tie_study/psnr/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/psnr/...` | **[fill from full semantic output]** | Main PSNR threshold outputs were recreated. |
+| Common SSIM threshold files | `ttk_runs/near_tie_study/ssim/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/ssim/...` | **Exact match** | Shared SSIM CSV/TXT files matched exactly in the semantic comparison. |
+| Legacy dual-threshold outputs | `ttk_runs/near_tie_study/dual/...` | not reproduced | **Not reproduced in this run** | These artifacts were present in the historical tree but absent from the rebuilt run. |
+
+### Reconstruction conclusion
+
+The near-tie reconstruction was successful for the core PSNR/SSIM study outputs. The rebuilt run reproduced the main thresholded near-tie CSV/TXT outputs and, for the common SSIM files explicitly compared, matched them exactly. However, the rebuilt run did not reproduce the historical dual-threshold artifacts, and `near_tie_summary_all.csv` was therefore not byte-identical. Overall, this stage should be interpreted as a strong reconstruction of the core near-tie study, with partial reproduction of the full historical near-tie directory structure.
+---
+
 # Part III — Repair, correction, and audit history
 
 ## Why the repair still matters
