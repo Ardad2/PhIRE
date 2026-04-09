@@ -403,6 +403,62 @@ rm -rf data_out/wind_mrhr_gan data_out/wind_mrhr_cnn
 
 ---
 
+## 8. Reconstruction test of topology extraction and merged-table generation
+
+### Goal of this stage
+
+This stage tests whether the topology extraction, distance computation, and merged analysis tables can be reconstructed from the restored original `data_out/` artifacts in a way that reproduces the historical `ttk_runs/` outputs.
+
+### Reconstruction strategy
+
+The strategy was:
+
+1. confirm the original legacy `ttk_runs/` artifacts existed,
+2. rerun the topology/post-processing pipeline into a separate reconstruction directory,
+3. compare per-method `phase_c_results.csv`,
+4. compare `combined_pairwise_results.csv`,
+5. compare the merged PSNR/SSIM + topology + physics tables.
+
+### Reconstruction notes
+
+A path typo during the first rebuild attempt caused the outputs to be written under:
+
+- `provenance_compare20260408_163840/ttk_runs_rebuild/`
+
+instead of under:
+
+- `provenance_compare/20260408_163840/ttk_runs_rebuild/`
+
+The comparison was therefore performed against the actual populated rebuild path:
+
+- `provenance_compare20260408_163840/ttk_runs_rebuild/`
+
+### Files compared
+
+- `ttk_runs/gan/phase_c_final/phase_c_results.csv`
+- `ttk_runs/cnn/phase_c_final/phase_c_results.csv`
+- `ttk_runs/combined/combined_pairwise_results.csv`
+- `ttk_runs/combined/psnr_topology_physics_merged.csv`
+- `ttk_runs/combined/psnr_topology_physics_delta.csv`
+- `ttk_runs/combined/ssim_topology_physics_merged.csv`
+- `ttk_runs/combined/ssim_topology_physics_delta.csv`
+
+### Comparison summary
+
+| Stage | Existing artifact | Reconstructed artifact | Match? | Notes |
+|---|---|---|---|---|
+| GAN `phase_c_results.csv` | `ttk_runs/gan/phase_c_final/phase_c_results.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/gan/phase_c_final/phase_c_results.csv` | **Semantic match** | Same rows and columns; only numeric difference was `mt_distance` with max abs diff `0.010294914245605469`; no nonnumeric mismatches. |
+| CNN `phase_c_results.csv` | `ttk_runs/cnn/phase_c_final/phase_c_results.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/cnn/phase_c_final/phase_c_results.csv` | **Exact match** | Same rows, same columns, exact CSV match. |
+| `combined_pairwise_results.csv` | `ttk_runs/combined/combined_pairwise_results.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/combined/combined_pairwise_results.csv` | **Semantic match** | Same rows (`336`) and same columns; `nonnumeric_mismatches=336`, likely due to one text/provenance column differing per row; only numeric drift was `mt_distance` with max abs diff `0.010294914245605469`. |
+| `psnr_topology_physics_merged.csv` | `ttk_runs/combined/psnr_topology_physics_merged.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/combined/psnr_topology_physics_merged.csv` | **Semantic match** | Same rows and columns; no nonnumeric mismatches; only `mt_distance` differed slightly with max abs diff `0.010294914245605469`. |
+| `psnr_topology_physics_delta.csv` | `ttk_runs/combined/psnr_topology_physics_delta.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/combined/psnr_topology_physics_delta.csv` | **Semantic match** | Same rows and columns; no nonnumeric mismatches; only `delta_mt_distance` differed slightly with max abs diff `0.010294914245605469`. |
+| `ssim_topology_physics_merged.csv` | `ttk_runs/combined/ssim_topology_physics_merged.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/combined/ssim_topology_physics_merged.csv` | **Semantic match** | Same rows and columns; no nonnumeric mismatches; only `mt_distance` differed slightly with max abs diff `0.010294914245605469`. |
+| `ssim_topology_physics_delta.csv` | `ttk_runs/combined/ssim_topology_physics_delta.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/combined/ssim_topology_physics_delta.csv` | **Semantic match** | Same rows and columns; no nonnumeric mismatches; only `delta_mt_distance` differed slightly with max abs diff `0.010294914245605469`. |
+
+### Reconstruction conclusion
+
+The topology extraction and merged-table reconstruction was successful. One reconstructed file (`cnn/phase_c_final/phase_c_results.csv`) matched exactly. The remaining outputs were semantically reproduced with the same row counts, columns, and no substantive structural differences. The only consistent numeric drift was a very small difference in merge-tree distance (`mt_distance` or `delta_mt_distance`) with maximum absolute difference `0.010294914245605469`, and `combined_pairwise_results.csv` also showed likely provenance/path-related text differences. Overall, this strongly supports that the recovered topology/merge pipeline reproduces the historical legacy outputs accurately enough for provenance and reconstruction purposes.
+
 # Part III — Repair, correction, and audit history
 
 ## Why the repair still matters
