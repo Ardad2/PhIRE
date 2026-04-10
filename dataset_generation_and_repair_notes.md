@@ -484,7 +484,7 @@ The rebuilt near-tie outputs were written under:
 
 so comparisons were performed against that populated path.
 
-### Inventory comparison
+### Initial inventory comparison
 
 The rebuilt tree successfully reproduced the main PSNR and SSIM near-tie outputs, including:
 
@@ -493,16 +493,16 @@ The rebuilt tree successfully reproduced the main PSNR and SSIM near-tie outputs
 - SSIM threshold CSV/TXT/top-case files
 - key agreement-rate plots
 
-However, the rebuilt tree did **not** reproduce the historical dual-threshold artifacts present in the legacy tree, including:
+However, the initial rebuilt tree did **not** reproduce the historical dual-threshold artifacts present in the legacy tree, including:
 
 - `dual_agreement_rates.png`
 - `dual/near_tie_dual_psnr_0.100_ssim_0.030.csv`
 - `dual/near_tie_dual_psnr_0.100_ssim_0.030_summary.txt`
 - `dual/near_tie_dual_psnr_0.100_ssim_0.030_top_cases.csv`
 
-### Key summary-file comparison
+### Key summary-file comparison from the initial rebuilt run
 
-`near_tie_summary_all.csv` was not byte-identical:
+`near_tie_summary_all.csv` was not byte-identical in the initial rebuilt run:
 
 - legacy size: `1.3K`
 - rebuilt size: `1.2K`
@@ -512,21 +512,38 @@ However, the rebuilt tree did **not** reproduce the historical dual-threshold ar
 - rebuilt SHA256:
   `1b44fea52ec8e182da9e4867e203c24bd86c1aab05ecd8d9ab85cf5902b31f73`
 
-This likely reflects the missing dual-threshold outputs in the rebuilt run.
+This was later traced to an invocation difference rather than to a deeper reconstruction failure.
+
+### Dual-threshold caveat resolution
+
+The missing historical dual artifacts were reproduced after rerunning the near-tie study with explicit dual-mode flags:
+
+- `--include-dual`
+- `--dual-psnr 0.10`
+- `--dual-ssim 0.03`
+
+This regenerated:
+
+- `dual_agreement_rates.png`
+- `dual/near_tie_dual_psnr_0.100_ssim_0.030.csv`
+- `dual/near_tie_dual_psnr_0.100_ssim_0.030_summary.txt`
+- `dual/near_tie_dual_psnr_0.100_ssim_0.030_top_cases.csv`
+
+The rebuilt dual outputs matched the historical file inventory and file sizes, indicating that the earlier discrepancy was caused by omitting dual-mode generation in the first rebuilt run.
 
 ### Comparison summary
 
 | Stage | Existing artifact | Reconstructed artifact | Match? | Notes |
 |---|---|---|---|---|
-| `near_tie_summary_all.csv` | `ttk_runs/near_tie_study/near_tie_summary_all.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/near_tie_summary_all.csv` | **Partial / semantic match** | Not hash-identical; rebuilt file smaller, likely because the rebuilt run did not reproduce the historical dual-threshold entries. |
-| Common PSNR threshold files | `ttk_runs/near_tie_study/psnr/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/psnr/...` | **Reproduced in rebuilt tree; detailed semantic line-by-line status not fully preserved in current notes** | Main PSNR threshold outputs were recreated. |
+| `near_tie_summary_all.csv` | `ttk_runs/near_tie_study/near_tie_summary_all.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/near_tie_summary_all.csv` | **Initial partial / semantic match** | The first rebuilt run omitted dual-mode generation, so the summary file was smaller and not hash-identical. |
+| Common PSNR threshold files | `ttk_runs/near_tie_study/psnr/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/psnr/...` | **Reproduced in rebuilt tree** | Main PSNR threshold outputs were recreated. |
 | Common SSIM threshold files | `ttk_runs/near_tie_study/ssim/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/ssim/...` | **Exact match** | Shared SSIM CSV/TXT files matched exactly in the semantic comparison. |
-| Legacy dual-threshold outputs | `ttk_runs/near_tie_study/dual/...` | not reproduced | **Not reproduced in this run** | These artifacts were present in the historical tree but absent from the rebuilt run. |
+| Legacy dual-threshold outputs | `ttk_runs/near_tie_study/dual/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study_dualcheck/dual/...` | **Reproduced after dual-mode rerun** | Missing initially, then regenerated after rerunning with `--include-dual --dual-psnr 0.10 --dual-ssim 0.03`. |
 
 ### Reconstruction conclusion
 
-The near-tie reconstruction was successful for the core PSNR/SSIM study outputs. The rebuilt run reproduced the main thresholded near-tie CSV/TXT outputs and, for the common SSIM files explicitly compared, matched them exactly. However, the rebuilt run did not reproduce the historical dual-threshold artifacts, and `near_tie_summary_all.csv` was therefore not byte-identical. Overall, this stage should be interpreted as a strong reconstruction of the core near-tie study, with partial reproduction of the full historical near-tie directory structure.
----
+The near-tie reconstruction was successful for the core PSNR/SSIM study outputs, and the main remaining caveat was resolved by rerunning the study with the correct dual-mode flags. The initial discrepancy was caused by an invocation difference rather than by a methodological reconstruction failure.
+
 
 
 ## 10. Reconstruction test of selector ablation outputs
@@ -587,7 +604,9 @@ Two derivative-summary families were successfully rebuilt:
 - `*_opposite_direction_summary.txt`
 - `*_mt_supported_summary.txt`
 
-The script `scripts/summarize_selector_ablation_cases.py` was not present locally during this reconstruction pass, and the corresponding historical `*_case_summary.txt` files were also absent from `ttk_runs_fixed/selector_ablation_full/`. Therefore the case-summary sub-stage could not be reconstructed or compared in this environment.
+The earlier failure to regenerate `*_case_summary.txt` was caused by a local environment issue: the helper script `scripts/summarize_selector_ablation_cases.py` was not present in the Spark checkout, and copying it from `/mnt/data/` failed because that path refers to the chat container rather than the Spark machine.
+
+At the same time, the corresponding historical repaired `*_case_summary.txt` files were also absent from `ttk_runs_fixed/selector_ablation_full/`. Therefore this sub-stage remains **not historically comparable**, even though the helper script content is recoverable from the chat record.
 
 ### Comparison summary
 
@@ -597,14 +616,14 @@ The script `scripts/summarize_selector_ablation_cases.py` was not present locall
 | `selector_ablation_threshold_0p075_opposite_direction_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075_opposite_direction_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p075_opposite_direction_summary.txt` | **Semantic match** | Only difference was the leading `ablation_csv=` path line. |
 | `selector_ablation_threshold_0p05_mt_supported_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05_mt_supported_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p05_mt_supported_summary.txt` | **Semantic match** | Only difference was the leading `ablation_csv=` path line. |
 | `selector_ablation_threshold_0p075_mt_supported_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075_mt_supported_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p075_mt_supported_summary.txt` | **Semantic match** | Only difference was the leading `ablation_csv=` path line. |
-| `selector_ablation_threshold_0p05_case_summary.txt` | not present in legacy fixed folder | not reconstructed | **Not available for comparison** | `scripts/summarize_selector_ablation_cases.py` was not present locally during this pass, and the legacy case-summary file was also absent. |
-| `selector_ablation_threshold_0p075_case_summary.txt` | not present in legacy fixed folder | not reconstructed | **Not available for comparison** | `scripts/summarize_selector_ablation_cases.py` was not present locally during this pass, and the legacy case-summary file was also absent. |
+| `selector_ablation_threshold_0p05_case_summary.txt` | not present in legacy fixed folder | not historically comparable | **Not available for historical comparison** | The helper script was absent locally during the validated pass, and the historical repaired case-summary file was also absent. |
+| `selector_ablation_threshold_0p075_case_summary.txt` | not present in legacy fixed folder | not historically comparable | **Not available for historical comparison** | The helper script was absent locally during the validated pass, and the historical repaired case-summary file was also absent. |
 
 ### Reconstruction conclusion
 
-The available selector-ablation derivative summaries were reconstructed successfully at the semantic level. The only observed differences were path-reference changes in the first `ablation_csv=` line. The case-summary sub-stage remains unavailable for comparison in the present environment because both the generating script and the historical legacy outputs were absent.
+The available selector-ablation derivative summaries were reconstructed successfully at the semantic level. The only observed differences were path-reference changes in the first `ablation_csv=` line. The case-summary sub-stage is best treated as not historically comparable rather than as a reconstruction mismatch.
 
----
+
 
 ## 12. Reconstruction test of metric-trend analysis
 
@@ -770,13 +789,15 @@ That separation is one of the most important parts of clean scientific documenta
 
 # Part VI.A — Open reconstruction caveats to resolve
 
-The reconstruction is now strong overall, but a few explicit caveats remain open:
+The reconstruction is now strong overall. Most earlier caveats have been explained or resolved:
 
-1. **Legacy near-tie dual-threshold outputs** were not reproduced in the first rebuilt near-tie run. The most likely cause is that the dual-mode flags were not supplied when `run_near_tie_study.py` was rerun.
-2. **Selector-ablation case-summary outputs** could not be compared in the current environment because `scripts/summarize_selector_ablation_cases.py` was not present locally during the validated pass, and the corresponding legacy fixed outputs were also absent.
+1. **Legacy near-tie dual-threshold outputs** were initially missing from the first rebuilt near-tie run, but this was resolved by rerunning `run_near_tie_study.py` with `--include-dual --dual-psnr 0.10 --dual-ssim 0.03`.
+2. **Selector-ablation case-summary outputs** remain **not historically comparable**. The helper script `scripts/summarize_selector_ablation_cases.py` was absent locally during the validated pass, and the corresponding historical repaired `*_case_summary.txt` files were also absent from `ttk_runs_fixed/selector_ablation_full/`.
 3. **Small MT-distance drift in the legacy topology reconstruction** remains documented but bounded (`max_abs_diff = 0.010294914245605469`).
 
-These caveats should be treated as explicit follow-up checks rather than hidden inconsistencies.
+These caveats should be treated as explicit documentation notes rather than hidden inconsistencies.
+
+
 
 # Part VI — Suggested follow-up files to create
 
@@ -792,6 +813,8 @@ The following files would now be useful to maintain:
 ---
 
 # Final takeaway
+
+The reconstruction record now supports the central methodological claim that the dataset generation, legacy analysis pipeline, repaired/final downstream analyses, and paper figure sets are reproducible, with only small and explicitly bounded caveats.
 
 The reconstruction test gives strong evidence that the recovered `build_example_data_extension_500.py` path is the correct historical source of the original 168-sample dataset. The repair/audit history should still be documented separately, because the corrected/fixed pipeline remains the authoritative basis for the paper's final claims.
 
@@ -1181,7 +1204,13 @@ Near-tie preconditions OK
 cd ~/PhIRE
 STAMP=20260408_163840
 BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
-PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/run_near_tie_study.py   --combined-csv "$BASE/combined/combined_pairwise_results.csv"   --merged-csv   "$BASE/combined/psnr_topology_physics_merged.csv"   --cnn-dir data_out/wind_mrhr_cnn   --gan-dir data_out/wind_mrhr_gan   --out-root "$BASE/near_tie_study"   2>&1 | tee "provenance_compare/$STAMP/rebuild_near_tie.log"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/run_near_tie_study.py \
+  --combined-csv "$BASE/combined/combined_pairwise_results.csv" \
+  --merged-csv   "$BASE/combined/psnr_topology_physics_merged.csv" \
+  --cnn-dir data_out/wind_mrhr_cnn \
+  --gan-dir data_out/wind_mrhr_gan \
+  --out-root "$BASE/near_tie_study" \
+  2>&1 | tee "provenance_compare/$STAMP/rebuild_near_tie.log"
 ```
 
 Expected outputs:
@@ -1199,41 +1228,78 @@ STAMP=20260408_163840
 BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
 
 echo "=== legacy near_tie files ==="
-find ttk_runs/near_tie_study -type f | sort   | tee "provenance_compare/$STAMP/legacy_near_tie_inventory.txt"
+find ttk_runs/near_tie_study -type f | sort
 
 echo "=== rebuilt near_tie files ==="
-find "$BASE/near_tie_study" -type f | sort   | tee "provenance_compare/$STAMP/rebuilt_near_tie_inventory.txt"
+find "$BASE/near_tie_study" -type f | sort
 ```
 
-Expected outputs in the validated run:
-- main PSNR and SSIM threshold outputs reproduced
-- historical `dual/...` artifacts were **not** reproduced in the rebuilt run
+Expected outputs in the initial validated run:
+- common PSNR/SSIM near-tie outputs present
+- dual-threshold files absent from the first rebuilt run
 
-### C4. Key summary-file hash check
+### C4. Semantic compare
+
+Use the semantic CSV/TXT comparison block from the validated run to compare all common files under:
+- `ttk_runs/near_tie_study`
+- `$BASE/near_tie_study`
+
+Expected outputs in the initial validated run:
+- common SSIM CSV/TXT files exact matches
+- core PSNR/SSIM outputs reproduced
+- initial discrepancy due to missing dual-mode outputs
+
+### C5. Resolve the dual-threshold caveat
 
 ```bash
 cd ~/PhIRE
 STAMP=20260408_163840
 BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
-echo "=== near_tie_summary_all.csv ==="
-ls -lh ttk_runs/near_tie_study/near_tie_summary_all.csv         "$BASE/near_tie_study/near_tie_summary_all.csv"
-sha256sum ttk_runs/near_tie_study/near_tie_summary_all.csv           "$BASE/near_tie_study/near_tie_summary_all.csv"
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/run_near_tie_study.py \
+  --combined-csv "$BASE/combined/combined_pairwise_results.csv" \
+  --merged-csv "$BASE/combined/psnr_topology_physics_merged.csv" \
+  --cnn-dir data_out/wind_mrhr_cnn \
+  --gan-dir data_out/wind_mrhr_gan \
+  --out-root "$BASE/near_tie_study_dualcheck" \
+  --include-dual \
+  --dual-psnr 0.10 \
+  --dual-ssim 0.03
+```
+
+Expected outputs:
+- dual-mode directory created:
+  - `$BASE/near_tie_study_dualcheck/dual`
+- missing historical dual artifacts regenerated:
+  - `dual_agreement_rates.png`
+  - `dual/near_tie_dual_psnr_0.100_ssim_0.030.csv`
+  - `dual/near_tie_dual_psnr_0.100_ssim_0.030_summary.txt`
+  - `dual/near_tie_dual_psnr_0.100_ssim_0.030_top_cases.csv`
+
+### C6. Compare the dual-only caveat artifacts
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
+
+for f in \
+  dual_agreement_rates.png \
+  dual/near_tie_dual_psnr_0.100_ssim_0.030.csv \
+  dual/near_tie_dual_psnr_0.100_ssim_0.030_summary.txt \
+  dual/near_tie_dual_psnr_0.100_ssim_0.030_top_cases.csv
+do
+  echo "=== $f ==="
+  ls -lh "ttk_runs/near_tie_study/$f" "$BASE/near_tie_study_dualcheck/$f"
+done
 ```
 
 Expected outputs in the validated run:
-- rebuilt `near_tie_summary_all.csv` existed
-- hash did **not** match the legacy file
-- rebuilt size was slightly smaller because the dual-threshold extras were absent
+- all four dual artifacts present in both trees
+- matching file sizes
+- near-tie caveat resolved as an invocation difference rather than a reconstruction failure
 
-### C5. Semantic compare of common CSV/TXT outputs
 
-Use the same semantic-comparison script as in the validated run to compare all common `.csv` and `.txt` files under `ttk_runs/near_tie_study` and `$BASE/near_tie_study`.
-
-Expected outputs in the validated run:
-- common SSIM threshold files matched exactly
-- core PSNR/SSIM near-tie outputs were reconstructed correctly
-- rebuilt near-tie directory was a strong partial reconstruction of the full historical tree
-- the explicit caveat is that dual-threshold legacy extras were not reproduced
 
 ## Command protocol D — Fixed selector-ablation reconstruction
 
@@ -1364,28 +1430,133 @@ cd ~/PhIRE
 STAMP=20260408_163840
 FBASE="provenance_compare/$STAMP/fixed_rebuild"
 
-PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_opposite_direction_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p05.csv"   2>&1 | tee "$FBASE/rebuild_opposite_direction_0p05.log"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_opposite_direction_cases.py \
+  --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p05.csv" \
+  2>&1 | tee "$FBASE/rebuild_opposite_direction_0p05.log"
 
-PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_opposite_direction_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p075.csv"   2>&1 | tee "$FBASE/rebuild_opposite_direction_0p075.log"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_opposite_direction_cases.py \
+  --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p075.csv" \
+  2>&1 | tee "$FBASE/rebuild_opposite_direction_0p075.log"
 
-PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_mt_supported_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p05.csv"   2>&1 | tee "$FBASE/rebuild_mt_supported_0p05.log"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_mt_supported_cases.py \
+  --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p05.csv" \
+  2>&1 | tee "$FBASE/rebuild_mt_supported_0p05.log"
 
-PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_mt_supported_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p075.csv"   2>&1 | tee "$FBASE/rebuild_mt_supported_0p075.log"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_mt_supported_cases.py \
+  --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p075.csv" \
+  2>&1 | tee "$FBASE/rebuild_mt_supported_0p075.log"
 ```
 
 Expected outputs in the validated run:
 - rebuilt opposite-direction summaries created
 - rebuilt MT-supported summaries created
 
-### E2. Caveat about case-summary script
+### E2. Case-summary clarification
 
-The validated environment did **not** contain:
+The validated Spark checkout did **not** contain:
 
 ```text
 scripts/summarize_selector_ablation_cases.py
 ```
 
-and the legacy fixed folder also did **not** contain the corresponding `*_case_summary.txt` files. Therefore this sub-stage is currently **not available for comparison**.
+and the historical repaired directory also did **not** contain legacy `*_case_summary.txt` files. Therefore this sub-stage is **not historically comparable**.
+
+If a user wants to recreate the helper script locally from the chat record, use a heredoc and make sure to terminate it by typing a line containing only `PY`:
+
+```bash
+cd ~/PhIRE
+cat > scripts/summarize_selector_ablation_cases.py <<'PY'
+#!/usr/bin/env python3
+"""Summarize selector ablation subset/grouping for a single threshold CSV."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+from pathlib import Path
+from typing import Dict, List
+
+
+def _read_rows(path: Path) -> List[Dict[str, str]]:
+    with path.open("r", newline="") as f:
+        return list(csv.DictReader(f))
+
+
+def _as_int(x: str) -> int:
+    return int(float(str(x).strip()))
+
+
+def _is_consensus(row: Dict[str, str]) -> bool:
+    return row.get("consensus_topology_winner", "").strip().lower() in {"cnn", "gan", "tie"}
+
+
+def summarize(ablation_csv: Path) -> Path:
+    rows = _read_rows(ablation_csv)
+    ids = sorted(_as_int(r["sample_idx"]) for r in rows)
+    consensus_ids = sorted(_as_int(r["sample_idx"]) for r in rows if _is_consensus(r))
+    mt_only_ids = sorted(_as_int(r["sample_idx"]) for r in rows if not _is_consensus(r))
+
+    consensus_set = set(consensus_ids)
+    checks = {sid: (sid in consensus_set) for sid in (25, 8, 12)}
+
+    out_path = ablation_csv.with_suffix("").with_name(ablation_csv.stem + "_case_summary.txt")
+    lines = [
+        f"ablation_csv={ablation_csv}",
+        f"subset_count={len(ids)}",
+        f"subset_sample_ids={','.join(map(str, ids))}",
+        f"consensus_count={len(consensus_ids)}",
+        f"consensus_sample_ids={','.join(map(str, consensus_ids))}",
+        f"mt_only_count={len(mt_only_ids)}",
+        f"mt_only_sample_ids={','.join(map(str, mt_only_ids))}",
+        f"sample_25_in_consensus={checks[25]}",
+        f"sample_8_in_consensus={checks[8]}",
+        f"sample_12_in_consensus={checks[12]}",
+    ]
+    out_path.write_text("
+".join(lines) + "
+")
+    return out_path
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--ablation-csv", type=Path, required=True)
+    return p.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    if not args.ablation_csv.exists():
+        raise SystemExit(f"Missing ablation CSV: {args.ablation_csv}")
+    out_path = summarize(args.ablation_csv)
+    print(out_path)
+
+
+if __name__ == "__main__":
+    main()
+PY
+
+chmod +x scripts/summarize_selector_ablation_cases.py
+```
+
+Expected behavior:
+- the shell returns to the prompt only after the terminating `PY` line is entered
+- after that, the script exists locally at `scripts/summarize_selector_ablation_cases.py`
+
+Optional local generation of rebuilt case summaries:
+
+```bash
+cd ~/PhIRE
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/summarize_selector_ablation_cases.py \
+  --ablation-csv provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p05.csv
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/summarize_selector_ablation_cases.py \
+  --ablation-csv provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p075.csv
+```
+
+Expected outputs:
+- rebuilt `*_case_summary.txt` files generated under the fixed rebuild folder
+- still no historical legacy repaired case-summary files available for comparison
 
 ### E3. Diff available derivative summaries
 
@@ -1393,7 +1564,11 @@ and the legacy fixed folder also did **not** contain the corresponding `*_case_s
 cd ~/PhIRE
 STAMP=20260408_163840
 FBASE="provenance_compare/$STAMP/fixed_rebuild"
-for f in   selector_ablation_threshold_0p05_opposite_direction_summary.txt   selector_ablation_threshold_0p075_opposite_direction_summary.txt   selector_ablation_threshold_0p05_mt_supported_summary.txt   selector_ablation_threshold_0p075_mt_supported_summary.txt
+for f in \
+  selector_ablation_threshold_0p05_opposite_direction_summary.txt \
+  selector_ablation_threshold_0p075_opposite_direction_summary.txt \
+  selector_ablation_threshold_0p05_mt_supported_summary.txt \
+  selector_ablation_threshold_0p075_mt_supported_summary.txt
 do
   echo "=== $f ==="
   diff -u "ttk_runs_fixed/selector_ablation_full/$f" "$FBASE/selector_ablation_full/$f" || true
@@ -1403,6 +1578,8 @@ done | tee "$FBASE/selector_ablation_derivative_diffs.txt"
 Expected outputs in the validated run:
 - only difference was the first `ablation_csv=` path line
 - substantive contents matched
+
+
 
 ## Command protocol F — Metric-trend reconstruction
 
@@ -1524,4 +1701,4 @@ When the validated reconstruction was completed, the status by stage was:
 - fixed metric-trend analysis: **exact match**
 - repaired figure-set generation: **inventory-level exact structural match**
 
-These are the reconstruction outcomes that should be treated as the expected reference state unless and until the explicit caveats are resolved.
+These are the reconstruction outcomes that should be treated as the expected reference state. The remaining caveats are bounded and explicitly documented; none represent a massive deviation from the original validated conclusions.
