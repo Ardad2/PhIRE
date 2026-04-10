@@ -528,6 +528,152 @@ This likely reflects the missing dual-threshold outputs in the rebuilt run.
 The near-tie reconstruction was successful for the core PSNR/SSIM study outputs. The rebuilt run reproduced the main thresholded near-tie CSV/TXT outputs and, for the common SSIM files explicitly compared, matched them exactly. However, the rebuilt run did not reproduce the historical dual-threshold artifacts, and `near_tie_summary_all.csv` was therefore not byte-identical. Overall, this stage should be interpreted as a strong reconstruction of the core near-tie study, with partial reproduction of the full historical near-tie directory structure.
 ---
 
+
+## 10. Reconstruction test of selector ablation outputs
+
+### Goal of this stage
+
+This stage tests whether the repaired/final selector ablation outputs can be reconstructed from the authoritative fixed merged table and fixed CNN/GAN outputs.
+
+### Reconstruction strategy
+
+The strategy was:
+
+1. confirm the historical repaired selector-ablation outputs existed,
+2. rerun `analyze_topology_selector_ablation.py` using the fixed merged table and fixed CNN/GAN outputs,
+3. compare the rebuilt ablation CSV/TXT outputs against the historical repaired ones,
+4. classify the reconstruction as exact, semantic, or mismatch.
+
+### Files compared
+
+- `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05.csv`
+- `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05_summary.txt`
+- `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075.csv`
+- `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075_summary.txt`
+
+### Comparison summary
+
+| Stage | Existing artifact | Reconstructed artifact | Match? | Notes |
+|---|---|---|---|---|
+| `selector_ablation_threshold_0p05.csv` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05.csv` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p05.csv` | **Exact match** | Same size, same SHA256, exact semantic CSV match. |
+| `selector_ablation_threshold_0p05_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p05_summary.txt` | **Exact match** | Same size, same SHA256, exact text match. |
+| `selector_ablation_threshold_0p075.csv` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075.csv` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p075.csv` | **Exact match** | Same size, same SHA256, exact semantic CSV match. |
+| `selector_ablation_threshold_0p075_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p075_summary.txt` | **Exact match** | Same size, same SHA256, exact text match. |
+
+### Reconstruction conclusion
+
+The repaired selector-ablation stage was reconstructed exactly. All four primary ablation outputs matched the historical repaired artifacts exactly by both file hash and semantic content.
+
+---
+
+## 11. Reconstruction test of selector-ablation derivative summaries
+
+### Goal of this stage
+
+This stage tests whether the smaller downstream summaries derived from the repaired selector-ablation outputs can be reconstructed.
+
+### Reconstruction strategy
+
+The strategy was:
+
+1. rerun the available derivative-summary scripts on the rebuilt selector-ablation CSVs,
+2. compare the rebuilt summary `.txt` files against the historical repaired ones when available,
+3. document any missing scripts or missing historical artifacts explicitly.
+
+### Reconstruction notes
+
+Two derivative-summary families were successfully rebuilt:
+
+- `*_opposite_direction_summary.txt`
+- `*_mt_supported_summary.txt`
+
+The script `scripts/summarize_selector_ablation_cases.py` was not present locally during this reconstruction pass, and the corresponding historical `*_case_summary.txt` files were also absent from `ttk_runs_fixed/selector_ablation_full/`. Therefore the case-summary sub-stage could not be reconstructed or compared in this environment.
+
+### Comparison summary
+
+| Stage | Existing artifact | Reconstructed artifact | Match? | Notes |
+|---|---|---|---|---|
+| `selector_ablation_threshold_0p05_opposite_direction_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05_opposite_direction_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p05_opposite_direction_summary.txt` | **Semantic match** | Only difference was the leading `ablation_csv=` path line. |
+| `selector_ablation_threshold_0p075_opposite_direction_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075_opposite_direction_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p075_opposite_direction_summary.txt` | **Semantic match** | Only difference was the leading `ablation_csv=` path line. |
+| `selector_ablation_threshold_0p05_mt_supported_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05_mt_supported_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p05_mt_supported_summary.txt` | **Semantic match** | Only difference was the leading `ablation_csv=` path line. |
+| `selector_ablation_threshold_0p075_mt_supported_summary.txt` | `ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075_mt_supported_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/selector_ablation_full/selector_ablation_threshold_0p075_mt_supported_summary.txt` | **Semantic match** | Only difference was the leading `ablation_csv=` path line. |
+| `selector_ablation_threshold_0p05_case_summary.txt` | not present in legacy fixed folder | not reconstructed | **Not available for comparison** | `scripts/summarize_selector_ablation_cases.py` was not present locally during this pass, and the legacy case-summary file was also absent. |
+| `selector_ablation_threshold_0p075_case_summary.txt` | not present in legacy fixed folder | not reconstructed | **Not available for comparison** | `scripts/summarize_selector_ablation_cases.py` was not present locally during this pass, and the legacy case-summary file was also absent. |
+
+### Reconstruction conclusion
+
+The available selector-ablation derivative summaries were reconstructed successfully at the semantic level. The only observed differences were path-reference changes in the first `ablation_csv=` line. The case-summary sub-stage remains unavailable for comparison in the present environment because both the generating script and the historical legacy outputs were absent.
+
+---
+
+## 12. Reconstruction test of metric-trend analysis
+
+### Goal of this stage
+
+This stage tests whether the repaired/final metric-trend analysis can be reconstructed from the authoritative fixed merged table.
+
+### Reconstruction strategy
+
+The strategy was:
+
+1. confirm the historical repaired metric-trend outputs existed,
+2. rerun `analyze_metric_trends.py` on the fixed merged table,
+3. compare the rebuilt summary and per-sample CSV against the historical repaired outputs.
+
+### Files compared
+
+- `ttk_runs_fixed/metric_trends/metric_trends_summary.txt`
+- `ttk_runs_fixed/metric_trends/metric_trends_per_sample.csv`
+
+### Comparison summary
+
+| Stage | Existing artifact | Reconstructed artifact | Match? | Notes |
+|---|---|---|---|---|
+| `metric_trends_summary.txt` | `ttk_runs_fixed/metric_trends/metric_trends_summary.txt` | `provenance_compare/20260408_163840/fixed_rebuild/metric_trends/metric_trends_summary.txt` | **Exact match** | Exact text match. |
+| `metric_trends_per_sample.csv` | `ttk_runs_fixed/metric_trends/metric_trends_per_sample.csv` | `provenance_compare/20260408_163840/fixed_rebuild/metric_trends/metric_trends_per_sample.csv` | **Exact match** | Same rows (`168`), same columns, exact CSV match. |
+
+### Reconstruction conclusion
+
+The repaired metric-trend analysis was reconstructed exactly.
+
+---
+
+## 13. Reconstruction test of paper figure-set generation
+
+### Goal of this stage
+
+This stage tests whether the repaired/final qualitative figure sets used for the paper can be regenerated with the same structure and expected outputs.
+
+### Reconstruction strategy
+
+The strategy was:
+
+1. rerun `compare_selected_wind_samples.py` for the two paper figure sets,
+2. inventory the rebuilt figure-set directories,
+3. compare the rebuilt inventory against the historical repaired inventory.
+
+### Figure sets reconstructed
+
+- `mt_primary_validated` using samples `27, 31, 37, 39, 29, 32`
+- `mt_pd_consensus_qualitative` using samples `8, 12, 25`
+
+### Inventory comparison summary
+
+The rebuilt figure-set inventory matched the legacy repaired inventory structurally for both figure sets, including:
+
+- `selected_sample_metrics.csv`
+- `summary.md`
+- `speed_panels/*.png`
+- `velocity_panels/*_u.png`
+- `velocity_panels/*_v.png`
+
+### Reconstruction conclusion
+
+The repaired paper figure sets were regenerated successfully at the inventory/structure level. The rebuilt directory trees matched the historical repaired figure-set outputs in expected file organization and sample coverage.
+
+---
+
+
 # Part III — Repair, correction, and audit history
 
 ## Why the repair still matters
