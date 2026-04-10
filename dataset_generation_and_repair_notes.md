@@ -519,7 +519,7 @@ This likely reflects the missing dual-threshold outputs in the rebuilt run.
 | Stage | Existing artifact | Reconstructed artifact | Match? | Notes |
 |---|---|---|---|---|
 | `near_tie_summary_all.csv` | `ttk_runs/near_tie_study/near_tie_summary_all.csv` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/near_tie_summary_all.csv` | **Partial / semantic match** | Not hash-identical; rebuilt file smaller, likely because the rebuilt run did not reproduce the historical dual-threshold entries. |
-| Common PSNR threshold files | `ttk_runs/near_tie_study/psnr/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/psnr/...` | **[fill from full semantic output]** | Main PSNR threshold outputs were recreated. |
+| Common PSNR threshold files | `ttk_runs/near_tie_study/psnr/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/psnr/...` | **Reproduced in rebuilt tree; detailed semantic line-by-line status not fully preserved in current notes** | Main PSNR threshold outputs were recreated. |
 | Common SSIM threshold files | `ttk_runs/near_tie_study/ssim/...` | `provenance_compare20260408_163840/ttk_runs_rebuild/near_tie_study/ssim/...` | **Exact match** | Shared SSIM CSV/TXT files matched exactly in the semantic comparison. |
 | Legacy dual-threshold outputs | `ttk_runs/near_tie_study/dual/...` | not reproduced | **Not reproduced in this run** | These artifacts were present in the historical tree but absent from the rebuilt run. |
 
@@ -766,6 +766,18 @@ That separation is one of the most important parts of clean scientific documenta
 
 ---
 
+
+
+# Part VI.A — Open reconstruction caveats to resolve
+
+The reconstruction is now strong overall, but a few explicit caveats remain open:
+
+1. **Legacy near-tie dual-threshold outputs** were not reproduced in the first rebuilt near-tie run. The most likely cause is that the dual-mode flags were not supplied when `run_near_tie_study.py` was rerun.
+2. **Selector-ablation case-summary outputs** could not be compared in the current environment because `scripts/summarize_selector_ablation_cases.py` was not present locally during the validated pass, and the corresponding legacy fixed outputs were also absent.
+3. **Small MT-distance drift in the legacy topology reconstruction** remains documented but bounded (`max_abs_diff = 0.010294914245605469`).
+
+These caveats should be treated as explicit follow-up checks rather than hidden inconsistencies.
+
 # Part VI — Suggested follow-up files to create
 
 The following files would now be useful to maintain:
@@ -782,3 +794,734 @@ The following files would now be useful to maintain:
 # Final takeaway
 
 The reconstruction test gives strong evidence that the recovered `build_example_data_extension_500.py` path is the correct historical source of the original 168-sample dataset. The repair/audit history should still be documented separately, because the corrected/fixed pipeline remains the authoritative basis for the paper's final claims.
+
+---
+
+# Part VII — Copy-paste reconstruction command protocol
+
+This section converts the validated reconstruction work into a literal command protocol. The goal is that another researcher should be able to copy/paste the commands, compare the observed outputs against the expected outputs below, and determine whether the reconstruction succeeded.
+
+Unless otherwise stated, commands are assumed to be run from:
+
+```bash
+cd ~/PhIRE
+```
+
+A shared provenance timestamp used in the reconstruction documented here was:
+
+```bash
+STAMP=20260408_163840
+```
+
+This same `STAMP` is used below to reproduce the exact directory layout used in the validated reconstruction.
+
+## Command protocol A — Original 168-sample dataset-generation reconstruction
+
+### A1. Create provenance workspace
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+mkdir -p provenance_compare/$STAMP
+echo "$STAMP"
+```
+
+Expected output:
+
+```text
+20260408_163840
+```
+
+### A2. Verify prerequisites
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import h5pyd
+f = h5pyd.File("/nrel/wtk-us.h5", "r")
+print("WTK shape:", f["windspeed_100m"].shape)
+f.close()
+print("WTK access OK")
+PY
+
+python3 - <<'PY'
+import utils
+print("utils import OK")
+PY
+
+grep -E 'hs_endpoint|hs_api_key' ~/.hscfg
+```
+
+Expected output:
+- `WTK access OK`
+- `utils import OK`
+- your `~/.hscfg` should show `hs_endpoint = https://developer.nrel.gov/api/hsds`
+- environment warnings may appear, but they should not prevent execution
+
+### A3. Preserve existing TFRecords
+
+```bash
+cd ~/PhIRE
+if [ -d example_data_extension_500 ]; then
+  mv example_data_extension_500 "provenance_compare/$STAMP/example_data_extension_500_old"
+  echo "Moved existing example_data_extension_500 -> provenance_compare/$STAMP/example_data_extension_500_old"
+else
+  echo "No existing example_data_extension_500 directory found"
+fi
+```
+
+Expected output in the validated run:
+
+```text
+Moved existing example_data_extension_500 -> provenance_compare/20260408_163840/example_data_extension_500_old
+```
+
+### A4. Regenerate the original 168-sample TFRecords from scratch
+
+```bash
+cd ~/PhIRE
+python3 build_example_data_extension_500.py 2>&1 | tee "provenance_compare/$STAMP/rebuild_168.log"
+```
+
+Expected outputs in the log:
+- `Native HR stack shape: (168, 500, 500, 2)`
+- `mr_stack shape: (168, 100, 100, 2)`
+- `lr_stack shape: (168, 10, 10, 2)`
+- created files:
+  - `example_data_extension_500/wind_LR-MR.tfrecord`
+  - `example_data_extension_500/wind_MR-HR.tfrecord`
+
+### A5. Compare regenerated TFRecords against historical originals
+
+```bash
+cd ~/PhIRE
+ls -lh   "provenance_compare/$STAMP/example_data_extension_500_old"/wind_*.tfrecord   example_data_extension_500/wind_*.tfrecord | tee "provenance_compare/$STAMP/tfrecord_sizes.txt"
+
+for f in wind_LR-MR.tfrecord wind_MR-HR.tfrecord; do
+  echo "=== $f ==="
+  sha256sum "provenance_compare/$STAMP/example_data_extension_500_old/$f"
+  sha256sum "example_data_extension_500/$f"
+done | tee "provenance_compare/$STAMP/tfrecord_sha256.txt"
+```
+
+Expected outputs in the validated run:
+- file sizes matched exactly:
+  - `wind_LR-MR.tfrecord`: `26M`
+  - `wind_MR-HR.tfrecord`: `667M`
+- SHA256 hashes differed, which is acceptable at this stage because downstream equality was the stronger validation
+
+### A6. Backup current example_data and model outputs
+
+```bash
+cd ~/PhIRE
+mkdir -p "provenance_compare/$STAMP/example_data_before_test"
+cp -a example_data/wind_*.tfrecord "provenance_compare/$STAMP/example_data_before_test/"
+
+cp -f example_data_extension_500/wind_*.tfrecord example_data/
+
+mkdir -p "provenance_compare/$STAMP/data_out_before_test"
+[ -d data_out/wind_mrhr_gan ] && cp -a data_out/wind_mrhr_gan "provenance_compare/$STAMP/data_out_before_test/"
+[ -d data_out/wind_mrhr_cnn ] && cp -a data_out/wind_mrhr_cnn "provenance_compare/$STAMP/data_out_before_test/"
+```
+
+Expected result:
+- `example_data/` now contains the regenerated TFRecords
+- `provenance_compare/$STAMP/data_out_before_test/` contains the pre-test legacy model outputs
+
+### A7. Rerun paired GAN/CNN inference
+
+```bash
+cd ~/PhIRE
+python3 run_paired_wind_mr_hr.py 2>&1 | tee "provenance_compare/$STAMP/run_gan.log"
+python3 run_paired_wind_mr_hr_cnn.py 2>&1 | tee "provenance_compare/$STAMP/run_cnn.log"
+```
+
+Expected outputs:
+- both runs complete successfully despite environment warnings
+- GAN run ends with `Done.`
+- CNN run should also complete and repopulate `data_out/wind_mrhr_cnn/`
+
+### A8. Compare downstream arrays
+
+```bash
+cd ~/PhIRE
+python3 - <<PY
+import numpy as np
+from pathlib import Path
+stamp = "$STAMP"
+root = Path("provenance_compare") / stamp / "data_out_before_test"
+pairs = [
+    ("GAN", root / "wind_mrhr_gan", Path("data_out/wind_mrhr_gan")),
+    ("CNN", root / "wind_mrhr_cnn", Path("data_out/wind_mrhr_cnn")),
+]
+for label, old_dir, new_dir in pairs:
+    print("=" * 80)
+    print(label)
+    print("old:", old_dir)
+    print("new:", new_dir)
+    if not old_dir.exists():
+        print("SKIP: no old backup found")
+        continue
+    for fn in ["idx.npy", "dataIN.npy", "dataGT.npy", "dataSR.npy"]:
+        a = np.load(old_dir / fn)
+        b = np.load(new_dir / fn)
+        exact = np.array_equal(a, b)
+        same_shape = a.shape == b.shape
+        max_abs = float(np.max(np.abs(a - b))) if np.issubdtype(a.dtype, np.number) else None
+        print(f"{fn}: shape_old={a.shape}, shape_new={b.shape}, same_shape={same_shape}, exact={exact}, max_abs_diff={max_abs}")
+PY
+```
+
+Expected outputs in the validated run:
+- exact match for all GAN arrays
+- exact match for all CNN arrays
+- `max_abs_diff=0.0` for all compared arrays
+
+### A9. Restore legacy example_data and outputs
+
+```bash
+cd ~/PhIRE
+cp -f "provenance_compare/20260408_163840/example_data_before_test"/wind_*.tfrecord example_data/
+
+rm -rf data_out/wind_mrhr_gan data_out/wind_mrhr_cnn
+[ -d "provenance_compare/20260408_163840/data_out_before_test/wind_mrhr_gan" ] &&   cp -a "provenance_compare/20260408_163840/data_out_before_test/wind_mrhr_gan" data_out/
+[ -d "provenance_compare/20260408_163840/data_out_before_test/wind_mrhr_cnn" ] &&   cp -a "provenance_compare/20260408_163840/data_out_before_test/wind_mrhr_cnn" data_out/
+```
+
+Expected result:
+- legacy `example_data/` and `data_out/` state restored for later historical reconstruction steps
+
+## Command protocol B — Topology extraction and merged-table reconstruction
+
+### B1. Preconditions
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+test -f data_out/wind_mrhr_gan/dataSR.npy
+test -f data_out/wind_mrhr_cnn/dataSR.npy
+test -f ttk_runs/gan/phase_c_final/phase_c_results.csv
+test -f ttk_runs/cnn/phase_c_final/phase_c_results.csv
+test -f ttk_runs/combined/combined_pairwise_results.csv
+echo "Preconditions OK"
+```
+
+Expected output:
+
+```text
+Preconditions OK
+```
+
+### B2. Rebuild topology/merged outputs
+
+The validated run accidentally used a typo-root for the rebuild output. To reproduce the validated run exactly, use:
+
+```bash
+cd ~/PhIRE
+bash scripts/run_full_experiment.sh   --out-root "provenance_compare20260408_163840/ttk_runs_rebuild"   --skip-models   --skip-case-panels 2>&1 | tee "provenance_compare20260408_163840/rebuild_topology_and_merge.log"
+```
+
+Expected output:
+- final line should indicate the full experiment completed
+- rebuilt files will appear under `provenance_compare20260408_163840/ttk_runs_rebuild/...`
+
+### B3. Inventory rebuilt files
+
+```bash
+cd ~/PhIRE
+find provenance_compare20260408_163840/ttk_runs_rebuild -type f | head -100
+```
+
+Expected output:
+- many `gan/mt/...` and `cnn/mt/...` raw topology artifacts
+- later checks should confirm presence of:
+  - `gan/phase_c_final/phase_c_results.csv`
+  - `cnn/phase_c_final/phase_c_results.csv`
+  - `combined/combined_pairwise_results.csv`
+  - merged PSNR/SSIM CSVs
+
+### B4. Check rebuilt comparison CSVs exist
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
+
+echo "=== phase_c_results ==="
+find "$BASE" -type f | grep 'phase_c_results.csv' | sort
+
+echo "=== combined_pairwise_results ==="
+find "$BASE" -type f | grep 'combined_pairwise_results.csv' | sort
+
+echo "=== combined CSVs ==="
+find "$BASE" -type f | grep '/combined/' | sort | head -200
+```
+
+Expected outputs in the validated run:
+- `cnn/phase_c_final/phase_c_results.csv`
+- `gan/phase_c_final/phase_c_results.csv`
+- `combined/combined_pairwise_results.csv`
+- `combined/psnr_topology_physics_merged.csv`
+- `combined/psnr_topology_physics_delta.csv`
+- `combined/ssim_topology_physics_merged.csv`
+- `combined/ssim_topology_physics_delta.csv`
+
+### B5. Hash-compare against legacy originals
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
+for f in   gan/phase_c_final/phase_c_results.csv   cnn/phase_c_final/phase_c_results.csv   combined/combined_pairwise_results.csv   combined/psnr_topology_physics_merged.csv   combined/psnr_topology_physics_delta.csv   combined/ssim_topology_physics_merged.csv   combined/ssim_topology_physics_delta.csv
+do
+  echo "=== $f ==="
+  ls -lh "ttk_runs/$f" "$BASE/$f"
+  sha256sum "ttk_runs/$f" "$BASE/$f"
+done | tee "provenance_compare/$STAMP/topology_and_merge_hashes_fixedpath.txt"
+```
+
+Expected outputs in the validated run:
+- exact hash match only for `cnn/phase_c_final/phase_c_results.csv`
+- other files differ by hash but remain semantically reproducible
+
+### B6. Semantic CSV comparison
+
+```bash
+cd ~/PhIRE
+python3 - <<'PY'
+import csv
+from pathlib import Path
+
+stamp = "20260408_163840"
+base  = Path(f"provenance_compare{stamp}/ttk_runs_rebuild")
+
+pairs = [
+    ("GAN phase_c", Path("ttk_runs/gan/phase_c_final/phase_c_results.csv"), base / "gan/phase_c_final/phase_c_results.csv"),
+    ("CNN phase_c", Path("ttk_runs/cnn/phase_c_final/phase_c_results.csv"), base / "cnn/phase_c_final/phase_c_results.csv"),
+    ("combined_pairwise", Path("ttk_runs/combined/combined_pairwise_results.csv"), base / "combined/combined_pairwise_results.csv"),
+    ("psnr_merged", Path("ttk_runs/combined/psnr_topology_physics_merged.csv"), base / "combined/psnr_topology_physics_merged.csv"),
+    ("psnr_delta", Path("ttk_runs/combined/psnr_topology_physics_delta.csv"), base / "combined/psnr_topology_physics_delta.csv"),
+    ("ssim_merged", Path("ttk_runs/combined/ssim_topology_physics_merged.csv"), base / "combined/ssim_topology_physics_merged.csv"),
+    ("ssim_delta", Path("ttk_runs/combined/ssim_topology_physics_delta.csv"), base / "combined/ssim_topology_physics_delta.csv"),
+]
+
+def parse_float(x):
+    try:
+        return float(x), True
+    except Exception:
+        return x, False
+
+for label, old_p, new_p in pairs:
+    print("=" * 80)
+    print(label)
+    with old_p.open() as f:
+        old_rows = list(csv.DictReader(f))
+    with new_p.open() as f:
+        new_rows = list(csv.DictReader(f))
+    print("rows_old:", len(old_rows))
+    print("rows_new:", len(new_rows))
+    print("same_columns:", list(old_rows[0].keys()) == list(new_rows[0].keys()))
+    exact = old_rows == new_rows
+    print("exact_csv_match:", exact)
+    if exact:
+        continue
+    max_abs = {}
+    nonnumeric_mismatches = 0
+    cols = list(old_rows[0].keys())
+    for ro, rn in zip(old_rows, new_rows):
+        for k in cols:
+            vo, ok_o = parse_float(ro[k])
+            vn, ok_n = parse_float(rn[k])
+            if ok_o and ok_n:
+                diff = abs(vo - vn)
+                if diff != 0:
+                    max_abs[k] = max(max_abs.get(k, 0.0), diff)
+            else:
+                if ro[k] != rn[k]:
+                    nonnumeric_mismatches += 1
+    print("nonnumeric_mismatches:", nonnumeric_mismatches)
+    if max_abs:
+        top = sorted(max_abs.items(), key=lambda kv: kv[1], reverse=True)[:10]
+        print("top_numeric_max_abs_diffs:")
+        for k, v in top:
+            print(f"  {k}: {v}")
+PY
+```
+
+Expected outputs in the validated run:
+- `cnn/phase_c_final/phase_c_results.csv` exact CSV match
+- all other compared CSVs semantic matches
+- the only consistent numeric drift was `mt_distance` / `delta_mt_distance` with max abs diff `0.010294914245605469`
+- `combined_pairwise_results.csv` also had one text/provenance-style mismatch per row
+
+## Command protocol C — Near-tie study reconstruction
+
+### C1. Preconditions
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
+test -f ttk_runs/near_tie_study/near_tie_summary_all.csv
+test -f "$BASE/combined/combined_pairwise_results.csv"
+test -f "$BASE/combined/psnr_topology_physics_merged.csv"
+echo "Near-tie preconditions OK"
+```
+
+Expected output:
+
+```text
+Near-tie preconditions OK
+```
+
+### C2. Rebuild near-tie study
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/run_near_tie_study.py   --combined-csv "$BASE/combined/combined_pairwise_results.csv"   --merged-csv   "$BASE/combined/psnr_topology_physics_merged.csv"   --cnn-dir data_out/wind_mrhr_cnn   --gan-dir data_out/wind_mrhr_gan   --out-root "$BASE/near_tie_study"   2>&1 | tee "provenance_compare/$STAMP/rebuild_near_tie.log"
+```
+
+Expected outputs:
+- message stating outputs were written to `$BASE/near_tie_study`
+- key paths printed:
+  - `$BASE/near_tie_study/near_tie_summary_all.csv`
+  - `$BASE/near_tie_study/psnr`
+  - `$BASE/near_tie_study/ssim`
+
+### C3. Inventory compare
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
+
+echo "=== legacy near_tie files ==="
+find ttk_runs/near_tie_study -type f | sort   | tee "provenance_compare/$STAMP/legacy_near_tie_inventory.txt"
+
+echo "=== rebuilt near_tie files ==="
+find "$BASE/near_tie_study" -type f | sort   | tee "provenance_compare/$STAMP/rebuilt_near_tie_inventory.txt"
+```
+
+Expected outputs in the validated run:
+- main PSNR and SSIM threshold outputs reproduced
+- historical `dual/...` artifacts were **not** reproduced in the rebuilt run
+
+### C4. Key summary-file hash check
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+BASE="provenance_compare${STAMP}/ttk_runs_rebuild"
+echo "=== near_tie_summary_all.csv ==="
+ls -lh ttk_runs/near_tie_study/near_tie_summary_all.csv         "$BASE/near_tie_study/near_tie_summary_all.csv"
+sha256sum ttk_runs/near_tie_study/near_tie_summary_all.csv           "$BASE/near_tie_study/near_tie_summary_all.csv"
+```
+
+Expected outputs in the validated run:
+- rebuilt `near_tie_summary_all.csv` existed
+- hash did **not** match the legacy file
+- rebuilt size was slightly smaller because the dual-threshold extras were absent
+
+### C5. Semantic compare of common CSV/TXT outputs
+
+Use the same semantic-comparison script as in the validated run to compare all common `.csv` and `.txt` files under `ttk_runs/near_tie_study` and `$BASE/near_tie_study`.
+
+Expected outputs in the validated run:
+- common SSIM threshold files matched exactly
+- core PSNR/SSIM near-tie outputs were reconstructed correctly
+- rebuilt near-tie directory was a strong partial reconstruction of the full historical tree
+- the explicit caveat is that dual-threshold legacy extras were not reproduced
+
+## Command protocol D — Fixed selector-ablation reconstruction
+
+### D1. Set fixed reconstruction base
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+mkdir -p "$FBASE"
+echo "$FBASE"
+```
+
+Expected output:
+
+```text
+provenance_compare/20260408_163840/fixed_rebuild
+```
+
+### D2. Preconditions
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+test -f ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05.csv
+test -f ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p05_summary.txt
+test -f ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075.csv
+test -f ttk_runs_fixed/selector_ablation_full/selector_ablation_threshold_0p075_summary.txt
+test -f ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+test -d data_out_fixed/wind_mrhr_cnn
+test -d data_out_fixed/wind_mrhr_gan
+echo "Selector ablation preconditions OK"
+```
+
+Expected output:
+
+```text
+Selector ablation preconditions OK
+```
+
+### D3. Rebuild selector ablation
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analyze_topology_selector_ablation.py   --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv   --thresholds 0.05 0.075   --outdir "$FBASE/selector_ablation_full"   --cnn-dir data_out_fixed/wind_mrhr_cnn   --gan-dir data_out_fixed/wind_mrhr_gan   2>&1 | tee "$FBASE/rebuild_selector_ablation.log"
+```
+
+Expected outputs:
+- rebuilt files written under `$FBASE/selector_ablation_full/`
+
+### D4. Hash compare
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+for f in   selector_ablation_threshold_0p05.csv   selector_ablation_threshold_0p05_summary.txt   selector_ablation_threshold_0p075.csv   selector_ablation_threshold_0p075_summary.txt
+do
+  echo "=== $f ==="
+  ls -lh "ttk_runs_fixed/selector_ablation_full/$f" "$FBASE/selector_ablation_full/$f"
+  sha256sum "ttk_runs_fixed/selector_ablation_full/$f" "$FBASE/selector_ablation_full/$f"
+done | tee "$FBASE/selector_ablation_hashes.txt"
+```
+
+Expected outputs in the validated run:
+- all four hashes matched exactly
+
+### D5. Semantic compare
+
+```bash
+cd ~/PhIRE
+python3 - <<'PY'
+import csv
+from pathlib import Path
+
+stamp = "20260408_163840"
+old_root = Path("ttk_runs_fixed/selector_ablation_full")
+new_root = Path(f"provenance_compare/{stamp}/fixed_rebuild/selector_ablation_full")
+
+files = [
+   "selector_ablation_threshold_0p05.csv",
+   "selector_ablation_threshold_0p05_summary.txt",
+   "selector_ablation_threshold_0p075.csv",
+   "selector_ablation_threshold_0p075_summary.txt",
+]
+
+def parse_float(x):
+   try:
+       return float(x), True
+   except Exception:
+       return x, False
+
+for name in files:
+   old_p = old_root / name
+   new_p = new_root / name
+   print("=" * 80)
+   print(name)
+   if name.endswith(".txt"):
+       old_text = old_p.read_text()
+       new_text = new_p.read_text()
+       print("type: txt")
+       print("exact_text_match:", old_text == new_text)
+       continue
+   with old_p.open() as f:
+       old_rows = list(csv.DictReader(f))
+   with new_p.open() as f:
+       new_rows = list(csv.DictReader(f))
+   print("type: csv")
+   print("rows_old:", len(old_rows))
+   print("rows_new:", len(new_rows))
+   print("same_columns:", list(old_rows[0].keys()) == list(new_rows[0].keys()))
+   print("exact_csv_match:", old_rows == new_rows)
+PY
+```
+
+Expected outputs in the validated run:
+- exact CSV/text match for all four files
+
+## Command protocol E — Selector-ablation derivative summaries
+
+### E1. Rebuild available derivative summaries
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_opposite_direction_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p05.csv"   2>&1 | tee "$FBASE/rebuild_opposite_direction_0p05.log"
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_opposite_direction_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p075.csv"   2>&1 | tee "$FBASE/rebuild_opposite_direction_0p075.log"
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_mt_supported_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p05.csv"   2>&1 | tee "$FBASE/rebuild_mt_supported_0p05.log"
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/find_mt_supported_cases.py   --ablation-csv "$FBASE/selector_ablation_full/selector_ablation_threshold_0p075.csv"   2>&1 | tee "$FBASE/rebuild_mt_supported_0p075.log"
+```
+
+Expected outputs in the validated run:
+- rebuilt opposite-direction summaries created
+- rebuilt MT-supported summaries created
+
+### E2. Caveat about case-summary script
+
+The validated environment did **not** contain:
+
+```text
+scripts/summarize_selector_ablation_cases.py
+```
+
+and the legacy fixed folder also did **not** contain the corresponding `*_case_summary.txt` files. Therefore this sub-stage is currently **not available for comparison**.
+
+### E3. Diff available derivative summaries
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+for f in   selector_ablation_threshold_0p05_opposite_direction_summary.txt   selector_ablation_threshold_0p075_opposite_direction_summary.txt   selector_ablation_threshold_0p05_mt_supported_summary.txt   selector_ablation_threshold_0p075_mt_supported_summary.txt
+do
+  echo "=== $f ==="
+  diff -u "ttk_runs_fixed/selector_ablation_full/$f" "$FBASE/selector_ablation_full/$f" || true
+done | tee "$FBASE/selector_ablation_derivative_diffs.txt"
+```
+
+Expected outputs in the validated run:
+- only difference was the first `ablation_csv=` path line
+- substantive contents matched
+
+## Command protocol F — Metric-trend reconstruction
+
+### F1. Preconditions
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+test -f ttk_runs_fixed/metric_trends/metric_trends_per_sample.csv
+test -f ttk_runs_fixed/metric_trends/metric_trends_summary.txt
+test -f ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+echo "Metric-trend preconditions OK"
+```
+
+Expected output:
+
+```text
+Metric-trend preconditions OK
+```
+
+### F2. Rebuild metric trends
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/analyze_metric_trends.py   --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv   --outdir "$FBASE/metric_trends"   2>&1 | tee "$FBASE/rebuild_metric_trends.log"
+```
+
+Expected outputs in the validated run:
+- `metric_trends_per_sample.csv`
+- `metric_trends_summary.txt`
+- two scatter plots
+
+### F3. Compare summary and CSV
+
+```bash
+cd ~/PhIRE
+python3 - <<'PY'
+import csv
+from pathlib import Path
+old_root = Path("ttk_runs_fixed/metric_trends")
+new_root = Path("provenance_compare/20260408_163840/fixed_rebuild/metric_trends")
+old_txt = (old_root / "metric_trends_summary.txt").read_text()
+new_txt = (new_root / "metric_trends_summary.txt").read_text()
+print("=" * 80)
+print("metric_trends_summary.txt")
+print("exact_text_match:", old_txt == new_txt)
+print("=" * 80)
+print("metric_trends_per_sample.csv")
+with (old_root / "metric_trends_per_sample.csv").open() as f:
+    old_rows = list(csv.DictReader(f))
+with (new_root / "metric_trends_per_sample.csv").open() as f:
+    new_rows = list(csv.DictReader(f))
+print("rows_old:", len(old_rows))
+print("rows_new:", len(new_rows))
+print("same_columns:", list(old_rows[0].keys()) == list(new_rows[0].keys()))
+print("exact_csv_match:", old_rows == new_rows)
+PY
+```
+
+Expected outputs in the validated run:
+- exact text match for `metric_trends_summary.txt`
+- exact CSV match for `metric_trends_per_sample.csv`
+
+## Command protocol G — Figure-set regeneration
+
+### G1. Rebuild figure sets
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/compare_selected_wind_samples.py   --cnn-dir data_out_fixed/wind_mrhr_cnn   --gan-dir data_out_fixed/wind_mrhr_gan   --samples 27 31 37 39 29 32   --outdir "$FBASE/figure_sets/mt_primary_validated"
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/compare_selected_wind_samples.py   --cnn-dir data_out_fixed/wind_mrhr_cnn   --gan-dir data_out_fixed/wind_mrhr_gan   --samples 8 12 25   --outdir "$FBASE/figure_sets/mt_pd_consensus_qualitative"
+```
+
+Expected outputs in the validated run:
+- `[OK] wrote figures/metrics to ...`
+- `[OK] compared sample IDs: [27, 31, 37, 39, 29, 32]`
+- `[OK] compared sample IDs: [8, 12, 25]`
+
+### G2. Inventory compare
+
+```bash
+cd ~/PhIRE
+STAMP=20260408_163840
+FBASE="provenance_compare/$STAMP/fixed_rebuild"
+
+echo "=== legacy figure sets ==="
+find ttk_runs_fixed/figure_sets -type f | sort | tee "$FBASE/legacy_figure_sets_inventory.txt"
+
+echo "=== rebuilt figure sets ==="
+find "$FBASE/figure_sets" -type f | sort | tee "$FBASE/rebuilt_figure_sets_inventory.txt"
+```
+
+Expected outputs in the validated run:
+- matching structural inventories for both figure sets:
+  - `mt_primary_validated`
+  - `mt_pd_consensus_qualitative`
+- each should contain:
+  - `selected_sample_metrics.csv`
+  - `summary.md`
+  - speed panels
+  - velocity panels
+
+## Command protocol H — Reconstruction status summary
+
+When the validated reconstruction was completed, the status by stage was:
+
+- original 168-sample dataset generation: **functional match**
+- paired GAN/CNN inference: **exact match**
+- topology extraction / merged tables: **exact + semantic match mix**, with one small MT-distance caveat
+- near-tie study: **strong partial reconstruction**, with a caveat that historical dual-threshold extras were not reproduced
+- fixed selector ablation: **exact match**
+- selector-ablation derivative summaries: **semantic match** for the available files; case-summary stage not available in the validated environment
+- fixed metric-trend analysis: **exact match**
+- repaired figure-set generation: **inventory-level exact structural match**
+
+These are the reconstruction outcomes that should be treated as the expected reference state unless and until the explicit caveats are resolved.
