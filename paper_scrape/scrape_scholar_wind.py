@@ -14,8 +14,8 @@ import csv
 import os
 import random
 import re
-import sys
 import time
+from collections import Counter
 
 import requests
 from bs4 import BeautifulSoup
@@ -26,15 +26,20 @@ MASTER_CSV   = "master_papers_wind.csv"
 MASTER_DOCX  = "master_papers_wind.docx"
 
 # ── Global search settings ────────────────────────────────────────────────────
-YEAR_LOW  = 2018          # wider window — wind SR is a younger field
+YEAR_LOW  = 2018
 NUM_PAGES = 24
 PAGE_SIZE = 10
 BASE_URL  = "https://scholar.google.com/scholar"
 
-DELAY_MIN = 8
-DELAY_MAX = 20
-QUERY_DELAY_MIN = 30
-QUERY_DELAY_MAX = 60
+DELAY_MIN = 20          # seconds between page fetches (only when scraping)
+DELAY_MAX = 45
+QUERY_DELAY_MIN = 90    # seconds between queries (only when scraping, not loading cache)
+QUERY_DELAY_MAX = 150
+
+# 429 backoff — resets to BACKOFF_INITIAL after every successful fetch
+BACKOFF_INITIAL  = 120   # 2 min on first 429
+BACKOFF_MAX      = 600   # cap at 10 min
+BACKOFF_MULTIPLY = 2     # double each successive 429 within the same page
 
 HEADERS = {
     "User-Agent": (
@@ -46,54 +51,53 @@ HEADERS = {
 }
 
 # ── Queries by bucket ─────────────────────────────────────────────────────────
-# Format: (label, query, bucket_name)
 QUERIES = [
 
-    # ── Bucket A: Wind-field / atmospheric SR / downscaling (highest priority) ──
-    ("wind_field_sr",                   '"wind field" super-resolution',                        "A"),
-    ("wind_field_sr_hyphen",            '"wind-field" super-resolution',                        "A"),
-    ("wind_speed_sr",                   '"wind speed" super-resolution',                        "A"),
-    ("wind_velocity_sr",                '"wind velocity" super-resolution',                     "A"),
-    ("atmospheric_sr_wind",             '"atmospheric" super-resolution wind',                  "A"),
-    ("meteorological_field_sr",         '"meteorological field" super-resolution',              "A"),
-    ("climate_downscaling_dl_wind",     '"climate downscaling" deep learning wind',             "A"),
-    ("wind_downscaling_dl",             '"wind downscaling" deep learning',                     "A"),
-    ("spatial_downscaling_wind_nn",     '"spatial downscaling" wind field neural network',      "A"),
-    ("wrf_wind_sr",                     '"WRF" wind super-resolution',                         "A"),
-    ("wind_field_recon_dl",             '"wind field" reconstruction deep learning',            "A"),
-    ("scientific_sr_wind",              '"scientific super-resolution" wind',                   "A"),
+    # ── Bucket A: Wind-field / atmospheric SR / downscaling ───────────────────
+    ("wind_field_sr",                   '"wind field" super-resolution',                            "A"),
+    ("wind_field_sr_hyphen",            '"wind-field" super-resolution',                            "A"),
+    ("wind_speed_sr",                   '"wind speed" super-resolution',                            "A"),
+    ("wind_velocity_sr",                '"wind velocity" super-resolution',                         "A"),
+    ("atmospheric_sr_wind",             '"atmospheric" super-resolution wind',                      "A"),
+    ("meteorological_field_sr",         '"meteorological field" super-resolution',                  "A"),
+    ("climate_downscaling_dl_wind",     '"climate downscaling" deep learning wind',                 "A"),
+    ("wind_downscaling_dl",             '"wind downscaling" deep learning',                         "A"),
+    ("spatial_downscaling_wind_nn",     '"spatial downscaling" wind field neural network',          "A"),
+    ("wrf_wind_sr",                     '"WRF" wind super-resolution',                             "A"),
+    ("wind_field_recon_dl",             '"wind field" reconstruction deep learning',                "A"),
+    ("scientific_sr_wind",              '"scientific super-resolution" wind',                       "A"),
 
     # ── Bucket B: Scalar / scientific-field SR ────────────────────────────────
-    ("scalar_field_sr",                 '"scalar field" super-resolution',                      "B"),
-    ("scientific_data_sr",              '"scientific data" super-resolution scalar field',      "B"),
+    ("scalar_field_sr",                 '"scalar field" super-resolution',                          "B"),
+    ("scientific_data_sr",              '"scientific data" super-resolution scalar field',          "B"),
     ("scivis_sr_scalar",                '"scientific visualization" super-resolution scalar field', "B"),
-    ("physics_informed_sr",             '"physics-informed" scalar field super-resolution',     "B"),
-    ("simulation_sr_scalar",            '"simulation" super-resolution scalar field',           "B"),
-    ("fluid_field_sr",                  '"fluid field" super-resolution',                       "B"),
-    ("flow_field_sr",                   '"flow field" super-resolution',                        "B"),
-    ("velocity_field_sr",               '"velocity field" super-resolution',                    "B"),
-    ("temperature_field_sr",            '"temperature field" super-resolution',                 "B"),
-    ("climate_field_sr",                '"climate field" super-resolution',                     "B"),
+    ("physics_informed_sr",             '"physics-informed" scalar field super-resolution',         "B"),
+    ("simulation_sr_scalar",            '"simulation" super-resolution scalar field',               "B"),
+    ("fluid_field_sr",                  '"fluid field" super-resolution',                           "B"),
+    ("flow_field_sr",                   '"flow field" super-resolution',                            "B"),
+    ("velocity_field_sr",               '"velocity field" super-resolution',                        "B"),
+    ("temperature_field_sr",            '"temperature field" super-resolution',                     "B"),
+    ("climate_field_sr",                '"climate field" super-resolution',                         "B"),
 
     # ── Bucket C: SR metrics and their limitations ────────────────────────────
-    ("sr_psnr_ssim_limits",             '"super-resolution" PSNR SSIM limitations',             "C"),
-    ("scientific_sr_psnr_ssim",         '"scientific super-resolution" PSNR SSIM',              "C"),
-    ("perceptual_metrics_sr",           '"perceptual metrics" super-resolution scientific data',"C"),
-    ("eval_metrics_sr",                 '"evaluation metrics" super-resolution scientific data',"C"),
-    ("psnr_ssim_scivis",                '"PSNR" SSIM scientific visualization reconstruction',  "C"),
-    ("pixelwise_limits",                '"super-resolution" "pixel-wise metrics" limitations',  "C"),
+    ("sr_psnr_ssim_limits",             '"super-resolution" PSNR SSIM limitations',                "C"),
+    ("scientific_sr_psnr_ssim",         '"scientific super-resolution" PSNR SSIM',                 "C"),
+    ("perceptual_metrics_sr",           '"perceptual metrics" super-resolution scientific data',   "C"),
+    ("eval_metrics_sr",                 '"evaluation metrics" super-resolution scientific data',   "C"),
+    ("psnr_ssim_scivis",                '"PSNR" SSIM scientific visualization reconstruction',     "C"),
+    ("pixelwise_limits",                '"super-resolution" "pixel-wise metrics" limitations',     "C"),
     ("perceptual_distortion_tradeoff",  '"image super-resolution" perceptual distortion tradeoff', "C"),
-    ("srgan_perceptual_loss",           '"SRGAN" perceptual loss PSNR',                         "C"),
-    ("sr_eval_review",                  '"super-resolution" "evaluation metric" review',        "C"),
+    ("srgan_perceptual_loss",           '"SRGAN" perceptual loss PSNR',                            "C"),
+    ("sr_eval_review",                  '"super-resolution" "evaluation metric" review',           "C"),
 
     # ── Bucket D: PhIRE / wind-energy / domain justification ─────────────────
-    ("phire_wind_sr",                   '"PhIRE" wind super-resolution',                        "D"),
-    ("stengel_phire",                   '"Stengel" PhIRE wind',                                 "D"),
-    ("wind_energy_downscaling_dl",      '"wind energy" downscaling deep learning',              "D"),
-    ("wind_resource_sr",                '"wind resource" super-resolution',                     "D"),
-    ("wind_energy_forecast_downscaling",'"wind energy forecasting" spatial downscaling',        "D"),
-    ("atm_downscaling_wind_energy",     '"atmospheric downscaling" wind energy',                "D"),
-    ("hires_wind_dl",                   '"high-resolution wind field" deep learning',           "D"),
+    ("phire_wind_sr",                   '"PhIRE" wind super-resolution',                           "D"),
+    ("stengel_phire",                   '"Stengel" PhIRE wind',                                    "D"),
+    ("wind_energy_downscaling_dl",      '"wind energy" downscaling deep learning',                 "D"),
+    ("wind_resource_sr",                '"wind resource" super-resolution',                        "D"),
+    ("wind_energy_forecast_downscaling",'"wind energy forecasting" spatial downscaling',           "D"),
+    ("atm_downscaling_wind_energy",     '"atmospheric downscaling" wind energy',                   "D"),
+    ("hires_wind_dl",                   '"high-resolution wind field" deep learning',              "D"),
 ]
 
 BUCKET_NAMES = {
@@ -107,6 +111,7 @@ BUCKET_NAMES = {
 # ── Scraping helpers ──────────────────────────────────────────────────────────
 
 def fetch_page(session: requests.Session, query: str, start: int) -> BeautifulSoup | None:
+    """Fetch one page. On 429, backs off and retries. Backoff resets on success."""
     params = {
         "q":      query,
         "hl":     "en",
@@ -114,23 +119,38 @@ def fetch_page(session: requests.Session, query: str, start: int) -> BeautifulSo
         "as_ylo": str(YEAR_LOW),
         "start":  str(start),
     }
-    try:
-        resp = session.get(BASE_URL, params=params, headers=HEADERS, timeout=30)
-        resp.raise_for_status()
-    except requests.RequestException as e:
-        print(f"    [ERROR] {e}")
-        return None
 
-    soup = BeautifulSoup(resp.text, "html.parser")
+    backoff = BACKOFF_INITIAL
+    while True:
+        try:
+            resp = session.get(BASE_URL, params=params, headers=HEADERS, timeout=30)
+        except requests.RequestException as e:
+            print(f"\n    [ERROR] Network error: {e}")
+            return None
 
-    if soup.find("form", {"action": re.compile(r"sorry")}):
-        print("\n  *** CAPTCHA detected ***")
-        print("  Open https://scholar.google.com in a browser, solve the CAPTCHA,")
-        print("  then press Enter here to retry.")
-        input("  Press Enter when ready… ")
-        return fetch_page(session, query, start)
+        if resp.status_code == 429:
+            print(f"\n    [429] Rate limited. Waiting {backoff}s before retry…")
+            time.sleep(backoff)
+            backoff = min(backoff * BACKOFF_MULTIPLY, BACKOFF_MAX)
+            continue
 
-    return soup
+        try:
+            resp.raise_for_status()
+        except requests.HTTPError as e:
+            print(f"\n    [ERROR] HTTP {resp.status_code}: {e}")
+            return None
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Scholar sometimes serves a CAPTCHA/sorry page instead of 429
+        if soup.find("form", {"action": re.compile(r"sorry")}):
+            print(f"\n    [429/CAPTCHA] Rate limited via redirect. Waiting {backoff}s…")
+            time.sleep(backoff)
+            backoff = min(backoff * BACKOFF_MULTIPLY, BACKOFF_MAX)
+            continue
+
+        # Success — backoff resets for the next page
+        return soup
 
 
 def parse_results(soup: BeautifulSoup) -> list[dict]:
@@ -169,7 +189,7 @@ def scrape_query(session: requests.Session, query: str, label: str) -> list[dict
 
         soup = fetch_page(session, query, start)
         if soup is None:
-            print("SKIPPED")
+            print("SKIPPED (unrecoverable error)")
             continue
 
         results = parse_results(soup)
@@ -235,7 +255,6 @@ def write_docx(papers: list[dict], path: str, doc_title: str) -> None:
 
     doc = Document()
 
-    # ── Cover heading
     tp = doc.add_paragraph()
     tp.alignment = WD_ALIGN_PARAGRAPH.CENTER
     r = tp.add_run(doc_title)
@@ -250,7 +269,6 @@ def write_docx(papers: list[dict], path: str, doc_title: str) -> None:
     ).font.size = Pt(9)
     doc.add_paragraph()
 
-    # ── Group papers by bucket for the document
     bucket_order = ["A", "B", "C", "D"]
     by_bucket: dict[str, list[dict]] = {b: [] for b in bucket_order}
     for p in papers:
@@ -262,7 +280,6 @@ def write_docx(papers: list[dict], path: str, doc_title: str) -> None:
         if not bucket_papers:
             continue
 
-        # Bucket heading
         bh = doc.add_paragraph()
         bhr = bh.add_run(BUCKET_NAMES[bucket_key])
         bhr.bold = True
@@ -271,21 +288,18 @@ def write_docx(papers: list[dict], path: str, doc_title: str) -> None:
         bh.paragraph_format.space_after  = Pt(4)
 
         for paper in bucket_papers:
-            # Title
             p = doc.add_paragraph()
             p.add_run(f"{global_idx}. ").bold = True
             tr = p.add_run(paper["title"])
             tr.bold = True
             tr.font.size = Pt(11)
 
-            # Authors | Year
             meta = doc.add_paragraph()
             meta.paragraph_format.left_indent = Pt(20)
             mr = meta.add_run(f"{paper['authors']}  |  {paper['year']}")
             mr.font.size = Pt(10)
             mr.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
 
-            # URL
             url = paper.get("url", "").strip()
             url_para = doc.add_paragraph()
             url_para.paragraph_format.left_indent = Pt(20)
@@ -334,28 +348,33 @@ def main():
         csv_path = os.path.join(OUTPUT_DIR, f"{label}.csv")
 
         if os.path.exists(csv_path):
+            # Load from cache — no network, no pause needed
             print(f"  [SKIP] Already scraped → loading {csv_path}")
             papers = read_csv(csv_path)
-        else:
-            papers = scrape_query(session, query, label)
-            # Tag with bucket before saving
             for p in papers:
-                p["bucket"] = bucket
+                p.setdefault("bucket", bucket)
+            all_papers.extend(papers)
+            continue   # ← skip the inter-query pause entirely
+
+        papers = scrape_query(session, query, label)
+        for p in papers:
+            p["bucket"] = bucket
+
+        if papers:
             write_csv(papers, csv_path, extra_fields=["bucket"])
             print(f"  Per-query CSV → {csv_path}  ({len(papers)} papers)")
-
-        # Tag bucket even when loading from existing CSV (may be missing field)
-        for p in papers:
-            p.setdefault("bucket", bucket)
+        else:
+            print(f"  [WARN] No papers returned — skipping CSV save so this query retries next run.")
 
         all_papers.extend(papers)
 
+        # Only pause between live network queries, not cache loads
         if qi < total:
             delay = random.uniform(QUERY_DELAY_MIN, QUERY_DELAY_MAX)
             print(f"\n  ⏸  Pausing {delay:.0f}s before next query …")
             time.sleep(delay)
 
-    # ── Deduplicate & write outputs
+    # Deduplicate & write outputs
     print(f"\n{'='*60}")
     print(f"  Deduplicating {len(all_papers)} total records …")
     unique = deduplicate(all_papers)
@@ -366,10 +385,8 @@ def main():
 
     write_docx(unique, MASTER_DOCX, "Scholar Papers: Wind SR / Scientific SR / Metrics / PhIRE")
 
-    # ── Summary by bucket
     print(f"\n{'─'*60}")
     print("  Summary by bucket:")
-    from collections import Counter
     counts = Counter(p.get("bucket", "?") for p in unique)
     for b in ["A", "B", "C", "D"]:
         print(f"    {BUCKET_NAMES[b]}: {counts.get(b, 0)} papers")
