@@ -1,3 +1,4 @@
+TEST
 # Dataset Generation and Repair Notes
 
 ## Purpose
@@ -1702,3 +1703,391 @@ When the validated reconstruction was completed, the status by stage was:
 - repaired figure-set generation: **inventory-level exact structural match**
 
 These are the reconstruction outcomes that should be treated as the expected reference state. The remaining caveats are bounded and explicitly documented; none represent a massive deviation from the original validated conclusions.
+
+
+# Part VIII — Codex pipeline audit and Spark verification notes
+
+This section records the later repository audit performed with Codex, together with the Spark verification commands that were run afterward. The goal is to make the representation choices, topology-distance semantics, and reproducibility checks explicit enough that another researcher can reconstruct not only the dataset path, but also the exact meaning of the reported PSNR / SSIM / PD / MT results.
+
+## 1. Plain-English verdict from the audit
+
+The current study is **valid as an evaluation of derived wind-speed magnitude** `sqrt(u^2 + v^2)`, not as a direct evaluation of the model's original training target. The PhIRE models are trained to predict normalized two-channel velocity components `[u, v]`, while the topology branch, SSIM branch, and physics-metric branch all operate on the scalar speed magnitude derived from those components. There is therefore **no representation mismatch within the topology branch itself**, but there is a **representation mismatch between PSNR and the rest of the study**, because PSNR is currently computed on the raw `[u, v]` tensor while SSIM, topology, and physics metrics are computed on speed magnitude.
+
+This distinction should be preserved explicitly in both the methods notes and the paper.
+
+---
+
+## 2. What the model is actually trained to predict
+
+The audit found that the model target is the normalized two-channel wind-velocity field `[u, v]`, not scalar speed magnitude.
+
+### Repo-specific evidence recovered by the audit
+
+- `build_wtk_tfrecords.py` converts raw WIND Toolkit fields to vector components (audit notes: lines 72--73):
+
+```python
+u = -wind_speed * np.sin(dir_rad)
+v = -wind_speed * np.cos(dir_rad)
+```
+
+- `PhIREGANs.py` applies per-channel normalization before the model sees the data (audit notes: normalization path around lines 422, 457--459, 479--483).
+- `run_paired_wind_mr_hr.py` and `run_paired_wind_mr_hr_cnn.py` use the same two-channel `mu_sig` statistics for `[u, v]` (audit notes cite `run_paired_wind_mr_hr.py:8` and `run_paired_wind_mr_hr_cnn.py:7`).
+- `PhIREGANs.py` computes MSE loss over all channels together during pretraining, confirming that the model predicts the full 2-channel field.
+
+### Practical interpretation
+
+The model never sees scalar speed as its training target. The speed field used in the topology/SSIM/physics analysis is a **derived quantity** computed later from the denormalized `[u, v]` outputs.
+
+---
+
+## 3. What is stored in `dataIN.npy`, `dataGT.npy`, and `dataSR.npy`
+
+The audit concluded that all saved arrays are denormalized two-channel velocity fields in physical units (m/s):
+
+- `dataIN.npy` = LR input `[u, v]`
+- `dataGT.npy` = HR ground-truth `[u, v]`
+- `dataSR.npy` = SR prediction `[u, v]`
+
+The saved arrays are not scalar speed fields. Speed magnitude is always derived on-the-fly downstream.
+
+### Spark verification run
+
+The following command was run on Spark:
+
+```bash
+python3 - <<'EOF'
+import numpy as np
+for tag, p in [("CNN", "data_out/wind_mrhr_cnn"), ("GAN", "data_out/wind_mrhr_gan")]:
+    gt = np.load(f"{p}/dataGT.npy")
+    sr = np.load(f"{p}/dataSR.npy")
+    idx = np.load(f"{p}/idx.npy")
+    print(f"\n=== {tag} ===")
+    print(f"  dataGT shape: {gt.shape}  dtype: {gt.dtype}")
+    print(f"  dataSR shape: {sr.shape}  dtype: {sr.dtype}")
+    print(f"  idx.npy shape: {idx.shape}  values[:5]: {idx[:5]}")
+    print(f"  GT u range: [{gt[...,0].min():.3f}, {gt[...,0].max():.3f}]  mean={gt[...,0].mean():.3f}")
+    print(f"  GT v range: [{gt[...,1].min():.3f}, {gt[...,1].max():.3f}]  mean={gt[...,1].mean():.3f}")
+    speed_gt = np.sqrt(gt[...,0]**2 + gt[...,1]**2)
+    speed_sr = np.sqrt(sr[...,0]**2 + sr[...,1]**2)
+    print(f"  GT speed range: [{speed_gt.min():.3f}, {speed_gt.max():.3f}]  mean={speed_gt.mean():.3f}")
+    print(f"  SR speed range: [{speed_sr.min():.3f}, {speed_sr.max():.3f}]  mean={speed_sr.mean():.3f}")
+    print(f"  CNN GT==GAN GT (sample 0): {np.allclose(np.load('data_out/wind_mrhr_cnn/dataGT.npy')[0], np.load('data_out/wind_mrhr_gan/dataGT.npy')[0])}")
+EOF
+```
+
+Observed output:
+
+```text
+=== CNN ===
+  dataGT shape: (168, 500, 500, 2)  dtype: float64
+  dataSR shape: (168, 500, 500, 2)  dtype: float64
+  idx.npy shape: (168,)  values[:5]: [0 1 2 3 4]
+  GT u range: [-16.174, 30.812]  mean=4.299
+  GT v range: [-30.468, 28.131]  mean=4.054
+  GT speed range: [0.012, 33.988]  mean=9.628
+  SR speed range: [0.000, 51.454]  mean=13.688
+  CNN GT==GAN GT (sample 0): True
+
+=== GAN ===
+  dataGT shape: (168, 500, 500, 2)  dtype: float64
+  dataSR shape: (168, 500, 500, 2)  dtype: float64
+  idx.npy shape: (168,)  values[:5]: [0 1 2 3 4]
+  GT u range: [-16.174, 30.812]  mean=4.299
+  GT v range: [-30.468, 28.131]  mean=4.054
+  GT speed range: [0.012, 33.988]  mean=9.628
+  SR speed range: [0.001, 64.836]  mean=14.149
+  CNN GT==GAN GT (sample 0): True
+```
+
+### Interpretation
+
+This confirms that the saved outputs are 2-channel vector fields of shape `(168, 500, 500, 2)` and that CNN and GAN share the same ground truth.
+
+---
+
+## 4. What scalar field is actually fed into VTI / TTK
+
+The scalar field written into every VTI file is **wind-speed magnitude**, computed from the denormalized vector field in `convert_phire_to_vti.py` (audit notes: lines 145--156):
+
+```python
+field = np.sqrt(u**2 + v**2)
+array_name = "wind_speed"
+```
+
+This conversion happens in `scripts/convert_phire_to_vti.py`, and the same conversion path is used for:
+
+- GT
+- CNN SR
+- GAN SR
+
+There is therefore **no asymmetry** in how GT and SR are converted for topology.
+
+### Practical consequence
+
+The topology pipeline is a study of **derived scalar speed magnitude**, not a study of the raw `[u, v]` training target.
+
+---
+
+## 5. Exact TTK call chain recovered by the audit
+
+The recovered pipeline has three TTK stages per sample.
+
+### Stage 1 — CLI extraction inside Docker
+
+From the recovered shell scripts:
+
+```bash
+ttkPersistenceDiagramCmd -t 20 -i vtk_inputs/<stem>.vti -a wind_speed -o <out_root>/<method>/pd/<stem>_pd
+ttkMergeTreeCmd          -t 20 -i vtk_inputs/<stem>.vti -a wind_speed -o <out_root>/<method>/mt/<stem>_mt
+```
+
+These commands always operate on the scalar array named `wind_speed`, i.e. `sqrt(u^2 + v^2)`.
+
+### Stage 2 — PD distance computation
+
+The main pipeline script is `scripts/compute_composite_tree_distance.py`.
+The audit found that the PD distance path instantiates:
+
+```python
+bd = ttk.ttkBottleneckDistance()
+```
+
+and then attempts to force the bottleneck / `L_\infty` Wasserstein case with:
+
+```python
+bd.SetWassersteinMetric(-1)
+```
+
+with a build-dependent fallback to `0` when needed.
+
+### Current best description of `pd_distance`
+
+The intended PD distance in the current study is:
+
+> **bottleneck distance** (equivalently the `L_\infty` Wasserstein case) between GT and SR persistence diagrams of wind-speed magnitude.
+
+### Important reproducibility caveat
+
+Because the TTK Python bindings vary across builds, the exact setter behavior depends on the Docker image. The command recommended by the audit is:
+
+```bash
+docker run --rm phire-ttk:latest python3 - <<'EOF'
+import topologytoolkit as ttk
+bd = ttk.ttkBottleneckDistance()
+has_setter = hasattr(bd, "SetWassersteinMetric")
+print(f"SetWassersteinMetric available: {has_setter}")
+if has_setter:
+    try:
+        bd.SetWassersteinMetric(-1)
+        print("SetWassersteinMetric(-1) succeeded — distance is bottleneck (L∞)")
+    except Exception as e:
+        try:
+            bd.SetWassersteinMetric(0)
+            print(f"SetWassersteinMetric(-1) failed ({e}); SetWassersteinMetric(0) used — check TTK docs for this build's encoding")
+        except Exception as e2:
+            print(f"Both SetWassersteinMetric calls failed: {e2} — using TTK build default")
+else:
+    print("SetWassersteinMetric not exposed — using TTK build default (check TTK version)")
+EOF
+```
+
+This command was run on Spark during the later audit pass, but the output was not preserved in the notes captured here. Therefore, the precise setter result should still be treated as a pending confirmation unless the shell output is recovered separately.
+
+### Stage 3 — MT distance computation
+
+The same script computes MT distance through:
+
+```python
+flt = ttk.ttkMergeTreeDistanceMatrix()
+```
+
+with `SetOutputDistanceMatrix(1)`, `SetComputeDistanceMatrix(1)`, and `SetThreadNumber(1)`, and extracts the off-diagonal value of the `2 × 2` GT/SR distance matrix.
+
+### Current best description of `mt_distance`
+
+The current study uses:
+
+> **TTK merge-tree distance** returned by `ttkMergeTreeDistanceMatrix`, i.e. a Wasserstein-type merge-tree edit distance between GT and SR merge trees of wind-speed magnitude.
+
+### Important methodological note
+
+This means the current paper should **not** describe `d_MT` as the geometry-aware labeled interleaving distance of Yan et al. unless that distance is actually rerun separately. The current implementation uses TTK's merge-tree distance machinery, not the geometry-aware interleaving framework.
+
+---
+
+## 6. Representation consistency checks from the audit
+
+### 6.1 Sample alignment
+
+The audit found the sample alignment to be consistent:
+
+- positional indexing is used consistently across `dataGT.npy`, `dataSR.npy`, VTI generation, and SSIM evaluation,
+- `idx.npy` is sequential in the validated run.
+
+Spark verification run:
+
+```bash
+python3 - <<'EOF'
+import numpy as np
+for tag, p in [("CNN", "data_out/wind_mrhr_cnn"), ("GAN", "data_out/wind_mrhr_gan")]:
+    idx = np.load(f"{p}/idx.npy")
+    diff = np.diff(idx)
+    print(f"{tag} idx[:10]={idx[:10]}  all sequential: {np.all(diff==1)}")
+    if not np.all(diff==1):
+        print(f"  WARNING: gaps at positions {np.where(diff!=1)[0]}")
+EOF
+```
+
+Observed output:
+
+```text
+CNN idx[:10]=[0 1 2 3 4 5 6 7 8 9]  all sequential: True
+GAN idx[:10]=[0 1 2 3 4 5 6 7 8 9]  all sequential: True
+```
+
+### 6.2 GT identity between CNN and GAN runs
+
+Spark verification run:
+
+```bash
+python3 - <<'EOF'
+import numpy as np
+cnn_gt = np.load("data_out/wind_mrhr_cnn/dataGT.npy")
+gan_gt = np.load("data_out/wind_mrhr_gan/dataGT.npy")
+print(f"CNN GT shape: {cnn_gt.shape}")
+print(f"GAN GT shape: {gan_gt.shape}")
+if cnn_gt.shape == gan_gt.shape:
+    print(f"GT arrays identical: {np.allclose(cnn_gt, gan_gt)}")
+    print(f"Max GT diff: {np.abs(cnn_gt - gan_gt).max()}")
+else:
+    print("WARNING: shapes differ — they may have been produced from different test sets")
+EOF
+```
+
+Observed output:
+
+```text
+CNN GT shape: (168, 500, 500, 2)
+GAN GT shape: (168, 500, 500, 2)
+GT arrays identical: True
+Max GT diff: 0.0
+```
+
+### 6.3 PSNR representation mismatch check
+
+The audit flagged that PSNR is currently computed on the full `[u, v]` tensor, while SSIM / topology / physics metrics are all on speed magnitude.
+
+Spark verification run:
+
+```bash
+python3 - <<'EOF'
+import numpy as np, math
+gt = np.load("data_out/wind_mrhr_cnn/dataGT.npy")
+sr = np.load("data_out/wind_mrhr_cnn/dataSR.npy")
+# PSNR as computed in analysis_compare.py (on [u,v] jointly)
+d = sr - gt
+mse_uv = np.mean(d*d, axis=(1,2,3))
+dr_uv  = gt.max(axis=(1,2,3)) - gt.min(axis=(1,2,3))
+psnr_uv = [20*math.log10(float(dr_uv[i])) - 10*math.log10(float(mse_uv[i])) for i in range(len(mse_uv))]
+# PSNR on speed magnitude
+speed_gt = np.sqrt(gt[...,0]**2 + gt[...,1]**2)
+speed_sr = np.sqrt(sr[...,0]**2 + sr[...,1]**2)
+mse_spd  = np.mean((speed_sr - speed_gt)**2, axis=(1,2))
+dr_spd   = speed_gt.max(axis=(1,2)) - speed_gt.min(axis=(1,2))
+psnr_spd = [20*math.log10(float(dr_spd[i])) - 10*math.log10(float(mse_spd[i])) for i in range(len(mse_spd))]
+print("Sample  PSNR_uv  PSNR_speed  (should differ if representation matters)")
+for i in range(min(5, len(psnr_uv))):
+    print(f"  {i}:   {psnr_uv[i]:.2f}    {psnr_spd[i]:.2f}")
+EOF
+```
+
+Observed output:
+
+```text
+Sample  PSNR_uv  PSNR_speed  (should differ if representation matters)
+  0:   16.80    15.90
+  1:   16.76    15.71
+  2:   16.33    15.14
+  3:   16.19    14.86
+  4:   15.53    14.49
+```
+
+### Interpretation
+
+The difference is systematic rather than negligible. This confirms that the paper should explicitly describe the current PSNR as a **vector-field PSNR** and treat any future speed-based PSNR as a separate optional follow-up analysis.
+
+---
+
+## 7. Why GT / CNN / GAN may look visually different
+
+The audit ranked the most likely causes as follows:
+
+1. **MSE training smooths CNN outputs** relative to GT.
+2. **Color-scale mismatch** can exaggerate differences if panels are not plotted on a shared scale.
+3. **GAN adversarial artifacts** can create fine structure not present in GT.
+4. **Nonlinear vector-to-speed conversion** can magnify or suppress perceived differences.
+5. **Patch placement** may emphasize a difficult region.
+6. **Index alignment mismatch** was checked and is less likely in the validated run.
+
+The recommended sanity visualization command was run on Spark and saved `sanity_uv_speed.png` successfully. The Axes3D warning emitted by matplotlib is benign in this context and did not prevent plot creation.
+
+---
+
+## 8. Minimal code changes recommended by the audit
+
+The audit recommended the following small follow-up changes:
+
+1. **Relabel current PSNR explicitly** as vector-field PSNR, or add a clear note that it is computed on `[u, v]` while SSIM / topology / physics are on speed.
+2. **Optionally add `psnr_speed`** as an additional column so that PSNR, SSIM, PD, and MT all share the same scalar representation.
+3. **Assert GT-array identity** between CNN and GAN runs at the start of the combined analysis scripts to catch any future test-set divergence.
+
+These are best treated as post-audit cleanup improvements rather than as mandatory reruns for the current paper.
+
+---
+
+## 9. Practical paper wording implications
+
+The Codex audit implies the following wording changes in the paper and methods notes:
+
+### 9.1 What the study should be called
+
+The current study is best described as:
+
+> a descriptor-specific post hoc evaluation of **derived wind-speed magnitude** computed from PhIRE GAN/CNN `[u, v]` outputs.
+
+### 9.2 What should not be claimed
+
+The current paper should **not** imply that:
+
+- topology was computed directly on the original `[u, v]` training target,
+- `d_PD` was a generic Wasserstein distance unless the implementation is changed,
+- `d_MT` was the geometry-aware labeled interleaving distance unless that alternative method is rerun explicitly.
+
+### 9.3 What is safe to say now
+
+It is safe to say that:
+
+- the PhIRE models predict denormalized `[u, v]` velocity components,
+- the topology / SSIM / physics branches all operate on the derived scalar speed field,
+- the conversion from `[u, v]` to speed is identical for GT, CNN, and GAN,
+- the topology branch is therefore internally consistent,
+- the current PD distance is the TTK bottleneck-distance path,
+- the current MT distance is the TTK `MergeTreeDistanceMatrix` path,
+- and the present paper evaluates descriptor behavior on derived wind-speed magnitude rather than on the full original vector-field target.
+
+---
+
+## 10. Recommended follow-up analyses after the current paper draft
+
+Two follow-up analyses remain scientifically attractive but are not required to validate the current paper draft:
+
+### A. Replace / augment PD bottleneck with Wasserstein-p PD distance
+
+The current main pipeline uses the bottleneck-distance path. A separate rerun using the alternate Wasserstein-p PD script would be a useful future comparison, but it is not required to support the current claims.
+
+### B. Add speed-based PSNR
+
+The current main paper can explicitly state that PSNR is on `[u, v]` while SSIM/topology/physics are on speed magnitude. A future analysis can add `psnr_speed` so that all metrics live on the same scalar field.
+
+These should be treated as optional follow-up experiments rather than as blockers for the current paper.
+
