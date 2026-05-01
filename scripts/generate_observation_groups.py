@@ -162,46 +162,69 @@ CONFIGURED_PHYSICS_GROUP = [
 def discover_repo_root(explicit: Optional[Path] = None) -> Path:
     """Find the PhIRE repo root even when this script is run from ./scripts.
 
-    Search order:
-      1. explicit --repo-root, if provided;
-      2. current working directory and its parents;
-      3. this script's directory and its parents;
-      4. fallback: parent of cwd if cwd is named scripts, otherwise cwd.
-
-    A directory is accepted as the repo root if it contains either:
-      - ttk_runs_fixed/
-      - data_out_fixed/
-      - scripts/ plus at least one common project marker.
+    Important: if the script is run from ~/PhIRE/scripts, the repo root is
+    ~/PhIRE, not ~/PhIRE/scripts. This matters because a previous failed run may
+    have created a misleading ~/PhIRE/scripts/ttk_runs_fixed directory.
     """
+
     if explicit is not None:
         return explicit.expanduser().resolve()
 
-    candidates: List[Path] = []
-    for start in [Path.cwd(), Path(__file__).resolve().parent]:
-        start = start.resolve()
-        candidates.append(start)
-        candidates.extend(start.parents)
+    cwd = Path.cwd().resolve()
+    script_dir = Path(__file__).resolve().parent
+
+    def looks_like_repo_root(cand: Path) -> bool:
+        """Return True only for likely repository roots, not the scripts dir."""
+        cand = cand.resolve()
+
+        # Never accept the scripts directory itself as the repo root.
+        if cand.name == "scripts":
+            return False
+
+        # Strongest signal for this project: final merged table exists.
+        if (cand / "ttk_runs_fixed" / "combined" / "psnr_topology_physics_merged.csv").exists():
+            return True
+
+        # Other useful repo-root signals.
+        if (cand / "scripts").is_dir() and (
+            (cand / "ttk_runs_fixed").is_dir()
+            or (cand / "ttk_runs").is_dir()
+            or (cand / "data_out_fixed").is_dir()
+            or (cand / "data_out").is_dir()
+            or (cand / "example_data").is_dir()
+            or (cand / ".git").exists()
+        ):
+            return True
+
+        return False
+
+    # Prefer the parent when the command is run from scripts/.
+    preferred: List[Path] = []
+    if cwd.name == "scripts":
+        preferred.append(cwd.parent)
+    if script_dir.name == "scripts":
+        preferred.append(script_dir.parent)
+
+    # Then search upward from cwd and the script location.
+    for start in [cwd, script_dir]:
+        preferred.append(start)
+        preferred.extend(start.parents)
 
     seen = set()
-    for cand in candidates:
+    for cand in preferred:
+        cand = cand.resolve()
         if cand in seen:
             continue
         seen.add(cand)
-        if (cand / "ttk_runs_fixed").exists() or (cand / "data_out_fixed").exists():
-            return cand
-        if (cand / "scripts").exists() and (
-            (cand / "ttk_runs").exists()
-            or (cand / "example_data").exists()
-            or (cand / "data_out").exists()
-            or (cand / ".git").exists()
-        ):
+        if looks_like_repo_root(cand):
             return cand
 
-    cwd = Path.cwd().resolve()
+    # Final fallback: if running from scripts, use its parent.
     if cwd.name == "scripts":
         return cwd.parent
+    if script_dir.name == "scripts":
+        return script_dir.parent
     return cwd
-
 
 def resolve_project_path(path: Path, repo_root: Path, *, prefer_repo_root: bool = True) -> Path:
     """Resolve a user path robustly.
