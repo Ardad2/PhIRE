@@ -2722,3 +2722,224 @@ repo_root=/home/adadhwal/PhIRE
 merged_csv=/home/adadhwal/PhIRE/ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
 outdir=/home/adadhwal/PhIRE/ttk_runs_fixed/observation_groups
 ```
+
+
+---
+
+# Part X — Visual-inspection panel generation and qualitative audit
+
+## Purpose
+
+This stage generates qualitative visual-inspection panels from the final repaired CNN/GAN outputs and the observation groups produced in Part IX. The goal is to inspect representative samples visually rather than relying only on metric winner counts.
+
+The audit is motivated by the current interpretation of the experiment:
+
+- direct-error metrics such as PSNR, SSIM, WPD MAE/RMSE, and gradient MAE tend to favor CNN,
+- distributional and tail-sensitive metrics such as PSD log-\(L_2\), gradient Wasserstein-1, and some upper-tail exceedance metrics often support GAN,
+- bottleneck PD is strongly GAN-facing,
+- MT is intermediate and therefore useful as a structural diagnostic,
+- PD--MT disagreement provides candidate structural-hallucination cases for visual inspection, not automatic proof of hallucination.
+
+## Script added
+
+The script for this stage is:
+
+```text
+scripts/generate_visual_inspection_panels.py
+```
+
+The script is designed to be run from the `scripts/` directory, consistent with the rest of this workflow.
+
+## Command to run on Spark
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py
+```
+
+The script auto-detects the repository root and uses the following default paths:
+
+```text
+CNN directory:       data_out_fixed/wind_mrhr_cnn/
+GAN directory:       data_out_fixed/wind_mrhr_gan/
+observation groups:  ttk_runs_fixed/observation_groups/
+output directory:    ttk_runs_fixed/visual_inspection/
+```
+
+## Optional commands
+
+Generate full-field panels in addition to the default 160x160 crop panels:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --include-full-panels
+```
+
+Generate u/v component panels in addition to speed panels:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --include-uv-panels
+```
+
+Generate only the small starter set:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --preset starter
+```
+
+## Output directory
+
+The default output directory is:
+
+```text
+ttk_runs_fixed/visual_inspection/
+```
+
+Expected files and folders:
+
+```text
+README_visual_inspection.md
+index.html
+visual_inspection_manifest.csv
+visual_observation_template.csv
+panels_crop160/
+contact_sheets/
+```
+
+If optional flags are used, these may also be created:
+
+```text
+panels_full/
+panels_uv/
+```
+
+## Default panel format
+
+Each generated speed/error panel contains:
+
+```text
+GT speed | CNN speed | GAN speed | |CNN-GT| |GAN-GT|
+```
+
+The default panel uses a 160x160 crop beginning at `(y=0, x=0)`, matching the topology-evaluation crop used in the current pipeline.
+
+## Recommended inspection plan
+
+### Phase 1 — Core contrast set
+
+Inspect these first:
+
+```text
+8, 12, 25, 27, 31, 37, 39, 29, 32
+```
+
+Interpretation:
+
+- samples `8, 12, 25` are near-tie topology-consensus-GAN / validator-disagreement cases,
+- samples `27, 31, 37, 39, 29, 32` are MT-primary / CNN-control cases.
+
+This is the highest-value first pass because it contrasts the most interesting edge cases against stable CNN-aligned controls.
+
+### Phase 2 — MT-GAN diagnostic set
+
+Inspect all MT-GAN samples:
+
+```text
+6, 8, 12, 16, 17, 18, 19, 20, 25, 48,
+62, 63, 65, 68, 77, 79, 80, 82, 92, 154
+```
+
+Question:
+
+> When MT favors GAN, does GAN better preserve GT structure, or does it introduce sharper but misleading structures?
+
+### Phase 3 — PD-GAN / MT-CNN disagreement cases
+
+Use:
+
+```text
+ttk_runs_fixed/observation_groups/group_candidate_structural_hallucination_signature.csv
+```
+
+Question:
+
+> Does PD favor GAN because GAN has plausible feature lifetimes, while MT favors CNN because GAN's features are spatially or hierarchically misorganized?
+
+### Phase 4 — GAN-distributional cases
+
+Use:
+
+```text
+ttk_runs_fixed/observation_groups/group_gan_distributional_cases.csv
+```
+
+Question:
+
+> Do the spectral/distributional advantages of GAN correspond to visually meaningful wind structure?
+
+### Phase 5 — Controls
+
+Use:
+
+```text
+ttk_runs_fixed/observation_groups/group_cnn_consensus_core.csv
+ttk_runs_fixed/observation_groups/group_topology_consensus_cnn.csv
+```
+
+Question:
+
+> What do stable CNN-favoring examples look like, and how do they differ from GAN-favoring or topology-disagreement samples?
+
+## Observation template
+
+The script writes:
+
+```text
+ttk_runs_fixed/visual_inspection/visual_observation_template.csv
+```
+
+This file should be used to record manual inspection notes. Suggested labels include:
+
+```text
+CNN clearly closer
+GAN visually sharper but suspicious
+GAN plausible structure
+GAN shifted/misaligned
+CNN oversmoothed
+ambiguous
+needs topology visualization
+```
+
+Suggested columns to fill include:
+
+- `visual_winner`,
+- `gan_sharper`,
+- `gan_artifact_or_hallucination_candidate`,
+- `cnn_oversmoothed`,
+- `which_is_closer_to_gt_structure`,
+- `notes`.
+
+## Reproducibility status
+
+This stage is reproducible from:
+
+- the final repaired CNN/GAN arrays under `data_out_fixed/`,
+- the observation group outputs under `ttk_runs_fixed/observation_groups/`.
+
+It should be treated as a qualitative-audit stage following the quantitative report-table generation, robust metric sweep, and observation-group generation.
+
+## Interpretation note
+
+This stage should be used carefully. The visual panels can support or weaken the candidate hallucination interpretation, but they should not be used to claim hallucination automatically. The safe claim remains:
+
+> PD--MT disagreement identifies candidate structural-hallucination cases that require visual inspection.
+
