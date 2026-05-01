@@ -2156,3 +2156,210 @@ A simple rule for future writing is:
 - In the **main paper**, say **validated 168-sample evaluation set constructed for this study**.
 - In the **appendix / reproducibility notes**, explain the internal MR-construction mistake, how it was diagnosed, and how the final validated artifact was produced.
 - Do **not** describe the repair itself as a contribution.
+
+---
+
+# Part VIII — Report-table CSV generation and robust all-metric sweep
+
+## Goal of this addition
+
+This section documents the reproducible generation of the report-table CSV files added to the paper and the robust all-sample metric sweep requested after the evaluator-bias audit. The goal is to make the tables in the paper reproducible from the final repaired artifacts instead of manually maintained.
+
+This stage covers:
+
+1. generating one CSV for each paper table derived from the final repaired metrics,
+2. generating a long-form and wide-form all-sample metric sweep across standard, topology, physics, and domain measures,
+3. explicitly listing unranked source columns so that no measurement column is silently ignored,
+4. preserving the code used to generate these tables in the repository.
+
+## New reproducibility script
+
+Add the following script to the repository:
+
+```text
+scripts/generate_report_tables_and_metric_sweep.py
+```
+
+A copy of this script was generated with this documentation. It reads the final repaired merged table and, when available, the repaired selector-ablation outputs:
+
+```text
+ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+ttk_runs_fixed/selector_ablation_full/
+```
+
+The script writes all derived table CSVs to:
+
+```text
+ttk_runs_fixed/report_tables/
+```
+
+## Command to regenerate all paper-table CSVs and metric sweeps
+
+Run from the repository root:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/generate_report_tables_and_metric_sweep.py \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --selector-ablation-dir ttk_runs_fixed/selector_ablation_full \
+  --out-dir ttk_runs_fixed/report_tables
+```
+
+Expected terminal output:
+
+```text
+Generated report tables and metric sweep CSVs in ttk_runs_fixed/report_tables
+```
+
+## Generated files
+
+The script generates the following files:
+
+```text
+ttk_runs_fixed/report_tables/table_near_tie_counts.csv
+ttk_runs_fixed/report_tables/table_all_sample_selector_winner_counts.csv
+ttk_runs_fixed/report_tables/table_domain_metric_winner_counts.csv
+ttk_runs_fixed/report_tables/table_selector_ablation_agreement.csv
+ttk_runs_fixed/report_tables/table_near_tie_validator_winners.csv
+ttk_runs_fixed/report_tables/table_opposite_direction_cases.csv
+ttk_runs_fixed/report_tables/metric_winner_summary_all_rankable.csv
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_long.csv
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+ttk_runs_fixed/report_tables/raw_numeric_measurements_long.csv
+ttk_runs_fixed/report_tables/unranked_source_columns.csv
+ttk_runs_fixed/report_tables/mt_gan_diagnostic_samples.csv
+ttk_runs_fixed/report_tables/README_report_tables.md
+```
+
+## Meaning of each generated CSV
+
+| File | Purpose |
+|---|---|
+| `table_near_tie_counts.csv` | Reproduces the paper table of SSIM near-tie counts for thresholds 0.03, 0.05, 0.075, and 0.10. |
+| `table_all_sample_selector_winner_counts.csv` | Reproduces the all-168 winner-count table for PSNR, SSIM, MT, PD, and the configured physics-group majority. |
+| `table_domain_metric_winner_counts.csv` | Reproduces the domain-metric decomposition table used in the paper. |
+| `table_selector_ablation_agreement.csv` | Reproduces the MT-vs-PD agreement table for the 0.05 and 0.075 SSIM near-tie selector-ablation regimes. |
+| `table_near_tie_validator_winners.csv` | Reproduces the independent-validator winner-count table inside the SSIM near-tie subsets. |
+| `table_opposite_direction_cases.csv` | Reproduces the table of SSIM-vs-MT opposite-direction cases. |
+| `metric_winner_summary_all_rankable.csv` | Robust sweep summary across all rankable standard, topology, physics, and domain metrics. |
+| `metric_sweep_all_samples_long.csv` | One row per sample and per rankable metric, including CNN value, GAN value, delta, criterion, and winner. |
+| `metric_sweep_all_samples_wide.csv` | One row per sample with CNN/GAN values, deltas, and winners for each rankable metric. |
+| `raw_numeric_measurements_long.csv` | Long-form export of every numeric source column for both CNN and GAN rows, including reference/raw GT/SR values. |
+| `unranked_source_columns.csv` | Explicit list of columns not used for winner comparisons, usually because they are GT/SR reference values or duplicated by an error/absolute-delta column. |
+| `mt_gan_diagnostic_samples.csv` | List of samples where MT selects GAN across all 168 samples. |
+
+## Winner criteria used by the script
+
+The script uses explicit winner rules for every rankable metric:
+
+| Metric type | Winner rule |
+|---|---|
+| PSNR | higher is better |
+| SSIM | higher is better |
+| MT distance | lower is better |
+| PD distance | lower is better |
+| Error/distance metrics such as MAE, RMSE, W1, PSD log-L2, gradient MAE | lower is better |
+| Signed bias or signed delta metrics | smaller absolute value is better |
+| GT/SR reference columns | not ranked directly; exported in `raw_numeric_measurements_long.csv` and listed in `unranked_source_columns.csv` when not part of the winner sweep |
+
+This distinction is important because columns such as `psd_slope_gt`, `psd_slope_sr`, `exceed_frac_gt_*`, and `exceed_frac_sr_*` are reference/model values rather than direct winner metrics. The corresponding signed-delta or absolute-delta columns are used for winner comparisons.
+
+## Paper-table reconstruction results
+
+The regenerated paper-table CSVs reproduce the current paper values:
+
+### SSIM near-tie counts
+
+| Threshold | Near-tie count | Interpretation |
+|---:|---:|---|
+| 0.03 | 4 | Too small |
+| 0.05 | 15 | Robustness check |
+| 0.075 | 36 | Primary regime |
+| 0.10 | 81 | Broader but looser |
+
+### All-sample selector behavior
+
+| Selector / validator | CNN wins | GAN wins | Ties / unavailable |
+|---|---:|---:|---:|
+| PSNR_uv | 168 | 0 | 0 |
+| SSIM | 168 | 0 | 0 |
+| Merge tree (MT) | 148 | 20 | 0 |
+| Bottleneck PD | 2 | 166 | 0 |
+| Physics group majority | 168 | 0 | 0 |
+
+The 20 MT-GAN diagnostic samples are:
+
+```text
+6 8 12 16 17 18 19 20 25 48 62 63 65 68 77 79 80 82 92 154
+```
+
+### Domain-metric decomposition across all 168 samples
+
+| Measure | CNN wins | GAN wins | Ties |
+|---|---:|---:|---:|
+| WPD bias absolute error | 115 | 53 | 0 |
+| WPD MAE | 168 | 0 | 0 |
+| WPD RMSE | 167 | 1 | 0 |
+| WPD Wasserstein-1 | 119 | 49 | 0 |
+| PSD log-L2 | 25 | 143 | 0 |
+| PSD slope absolute delta | 77 | 91 | 0 |
+| Gradient MAE | 168 | 0 | 0 |
+| Gradient Wasserstein-1 | 1 | 167 | 0 |
+| Gradient kurtosis absolute delta | 96 | 72 | 0 |
+| Exceedance absolute delta, s>5 | 112 | 56 | 0 |
+| Exceedance absolute delta, s>10 | 142 | 26 | 0 |
+| Exceedance absolute delta, s>15 | 101 | 67 | 0 |
+| Exceedance absolute delta, p90 | 104 | 64 | 0 |
+| Exceedance absolute delta, p95 | 83 | 85 | 0 |
+| Exceedance absolute delta, p99 | 76 | 92 | 0 |
+
+This confirms that the configured physics-group majority is CNN-favoring, but the full domain-metric sweep is not uniformly CNN-favoring. GAN receives strong support from spectral, gradient-distribution, PSD-slope, and high-tail exceedance measures.
+
+### MT-vs-PD selector-ablation agreement
+
+| Threshold | MT/LR | MT/Extreme | MT/Physics | PD/LR | PD/Extreme | PD/Physics |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.05 | 13/15 (86.7%) | 8/9 (88.9%) | 13/15 (86.7%) | 0/15 (0.0%) | 0/9 (0.0%) | 0/15 (0.0%) |
+| 0.075 | 33/36 (91.7%) | 24/28 (85.7%) | 33/36 (91.7%) | 0/36 (0.0%) | 2/28 (7.1%) | 0/36 (0.0%) |
+
+### Independent-validator winners inside SSIM near-tie subsets
+
+| Threshold / validator | CNN wins | GAN wins | Ties | Majority CNN/GAN |
+|---|---:|---:|---:|---:|
+| 0.05 LR group | 15 | 0 | 0 |  |
+| 0.05 Extreme group | 9 | 0 | 6 |  |
+| 0.05 Physics group | 15 | 0 | 0 |  |
+| 0.05 3-validator majority | 15 | 0 | 0 | 15/0 |
+| 0.075 LR group | 36 | 0 | 0 |  |
+| 0.075 Extreme group | 26 | 2 | 8 |  |
+| 0.075 Physics group | 36 | 0 | 0 |  |
+| 0.075 3-validator majority | 36 | 0 | 0 | 36/0 |
+
+### Opposite-direction cases
+
+| Threshold | Sample | SSIM winner | MT winner | PD winner | Validator majority | MT support count |
+|---:|---:|---|---|---|---|---:|
+| 0.05 | 12 | CNN | GAN | GAN | CNN | 0 |
+| 0.05 | 25 | CNN | GAN | GAN | CNN | 0 |
+| 0.075 | 8 | CNN | GAN | GAN | CNN | 0 |
+| 0.075 | 12 | CNN | GAN | GAN | CNN | 0 |
+| 0.075 | 25 | CNN | GAN | GAN | CNN | 0 |
+
+These cases should be interpreted as topology-consensus-but-validator-disagreement cases rather than MT rescue cases.
+
+## Robust sweep conclusion
+
+The robust sweep confirms the audit-driven interpretation in the paper:
+
+1. PSNR and SSIM are uniformly CNN-favoring on this evaluation set.
+2. Bottleneck PD is nearly uniformly GAN-favoring.
+3. MT is intermediate, choosing CNN in 148/168 samples and GAN in 20/168 samples.
+4. The configured physics-group majority is CNN-favoring because WPD MAE, WPD RMSE, and gradient MAE strongly favor CNN.
+5. The full domain-metric decomposition is more nuanced: GAN is strongly supported by PSD log-L2, gradient Wasserstein-1, PSD slope absolute error, and p95/p99 tail exceedance metrics.
+6. The validator groups should therefore be treated as informative but not neutral ground truth.
+7. The scientifically safest claim remains that MT, PD, SSIM, PSNR, and domain metrics expose different evaluator biases, with MT serving as a complementary structural diagnostic rather than a universal selector.
+
+## Reproducibility status
+
+This stage is reproducible from the final repaired merged table and selector-ablation outputs. It should be treated as an additional reconstruction stage after the exact repaired selector-ablation and exact metric-trend reconstruction stages already documented above.
