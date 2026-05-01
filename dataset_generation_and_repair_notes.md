@@ -2363,3 +2363,362 @@ The robust sweep confirms the audit-driven interpretation in the paper:
 ## Reproducibility status
 
 This stage is reproducible from the final repaired merged table and selector-ablation outputs. It should be treated as an additional reconstruction stage after the exact repaired selector-ablation and exact metric-trend reconstruction stages already documented above.
+
+
+---
+
+# Part IX — Qualitative observation-group generation
+
+## Purpose
+
+This stage adds a reproducible way to generate qualitative observation groups for manual inspection. It follows the audit-driven interpretation that the experiment should not be framed as a single metric proving a universal winner. Instead, the goal is to identify samples that represent different parts of the distortion--distribution--topology tradeoff.
+
+The groups are intended to help answer questions such as:
+
+1. Where do direct-error metrics, SSIM, PSNR, and MT all favor CNN?
+2. Where do distributional or tail-oriented measures favor GAN even though direct-error metrics favor CNN?
+3. Where do PD and MT disagree?
+4. Where does PD favor GAN while MT favors CNN, suggesting a candidate structural-hallucination signature?
+5. Where does MT favor GAN, making the sample useful for visual/topological diagnosis?
+
+## Script added
+
+The script for this stage is:
+
+```text
+scripts/generate_observation_groups.py
+```
+
+The chat-generated copy is also provided as:
+
+```text
+generate_observation_groups.py
+```
+
+## Command to run on Spark
+
+The script is now repo-root aware, so it can be run either from the repository root or from the `scripts/` directory.
+
+Recommended command from the `scripts/` directory:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py
+```
+
+Equivalent command from the repository root:
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/generate_observation_groups.py
+```
+
+Both forms auto-detect the repo root and use these default paths:
+
+```text
+merged CSV: ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+outdir:     ttk_runs_fixed/observation_groups
+```
+
+If auto-detection ever fails, pass `--repo-root ~/PhIRE` explicitly:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py \
+  --repo-root ~/PhIRE
+```
+
+This uses the final repaired merged table:
+
+```text
+ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+```
+
+which belongs to the fixed/authoritative pipeline already documented above.
+
+## Output directory
+
+The script writes:
+
+```text
+ttk_runs_fixed/observation_groups/
+```
+
+Expected output files:
+
+```text
+README_observation_groups.md
+observation_groups_per_sample.csv
+observation_group_summary.csv
+observation_metric_winner_summary.csv
+group_cnn_consensus_core.csv
+group_gan_distributional_cases.csv
+group_pd_mt_disagreement.csv
+group_candidate_structural_hallucination_signature.csv
+group_mt_gan_diagnostic.csv
+group_topology_consensus_gan.csv
+group_topology_consensus_cnn.csv
+group_neartie_topology_validator_disagreement.csv
+recommended_visual_inspection_cases.csv
+recommended_visual_inspection_unique_samples.csv
+sample_ids_cnn_consensus_core.txt
+sample_ids_gan_distributional_cases.txt
+sample_ids_pd_mt_disagreement.txt
+sample_ids_candidate_structural_hallucination_signature.txt
+sample_ids_mt_gan_diagnostic.txt
+sample_ids_topology_consensus_gan.txt
+sample_ids_topology_consensus_cnn.txt
+sample_ids_neartie_topology_validator_disagreement.txt
+sample_ids_recommended_visual_inspection_unique.txt
+```
+
+## Group definitions
+
+The script defines the following groups:
+
+### 1. `cnn_consensus_core`
+
+Samples where:
+
+- PSNR favors CNN,
+- SSIM favors CNN,
+- MT favors CNN,
+- the direct-error group favors CNN,
+- the configured physics group favors CNN.
+
+This is the main group for distortion-faithful / structurally safe CNN-aligned examples.
+
+### 2. `gan_distributional_cases`
+
+Samples where:
+
+- PSNR favors CNN,
+- SSIM favors CNN,
+- the direct-error group favors CNN,
+- but the distributional group favors GAN.
+
+This group highlights the perception--distortion tradeoff: CNN is closer to the specific GT field under direct-error criteria, while GAN better matches distributional/spectral/tail structure.
+
+### 3. `pd_mt_disagreement`
+
+Samples where the PD-selected topology winner and MT-selected topology winner differ.
+
+This group is useful because PD and MT are not interchangeable. PD summarizes birth--death lifetimes, while MT retains merge hierarchy. Their disagreement is therefore diagnostically meaningful.
+
+### 4. `candidate_structural_hallucination_signature`
+
+Samples where:
+
+- PD favors GAN,
+- MT favors CNN.
+
+This is a candidate structural-hallucination signature. The cautious interpretation is:
+
+> GAN may have plausible topological feature lifetimes at the PD level, but those features may not match the GT merge hierarchy as well as CNN does.
+
+This should not be stated as proof of hallucination without visual inspection. It is a shortlist of samples where hallucination-like behavior should be checked.
+
+### 5. `mt_gan_diagnostic`
+
+Samples where MT favors GAN.
+
+These are important because MT is mostly CNN-aligned overall. When MT favors GAN, the sample should be inspected visually to determine whether MT is rewarding genuine structural fidelity or GAN-generated artifacts.
+
+### 6. `topology_consensus_gan`
+
+Samples where both PD and MT favor GAN.
+
+These are topology-consensus GAN cases. In the near-tie regime, these were previously observed to be topology-consensus-but-validator-disagreement cases.
+
+### 7. `topology_consensus_cnn`
+
+Samples where both PD and MT favor CNN.
+
+This group is expected to be small in the current results because bottleneck PD is strongly GAN-favoring.
+
+### 8. `neartie_topology_validator_disagreement`
+
+Samples where:
+
+- the sample is inside the SSIM 0.075 near-tie regime,
+- SSIM favors CNN,
+- PD favors GAN,
+- MT favors GAN,
+- the direct-error group favors CNN,
+- the configured physics group favors CNN.
+
+These are the highest-priority qualitative audit cases because they represent topology-consensus GAN behavior inside the main SSIM small-margin window, while the configured validators still favor CNN.
+
+## Winner conventions
+
+The script uses the following winner logic:
+
+- PSNR and SSIM: higher is better.
+- PD and MT distances: lower is better.
+- Error/distance metrics: lower is better.
+- Signed bias/delta metrics: lower absolute value is better.
+- Absolute-delta metrics: lower is better.
+
+The script also computes signed deltas where positive values mean CNN preference and negative values mean GAN preference.
+
+## Metric families used by the script
+
+### Direct-error group
+
+```text
+PSNR_uv
+SSIM_speed
+WPD_MAE
+WPD_RMSE
+Gradient_MAE
+```
+
+### Distributional group
+
+```text
+PSD_log_L2
+PSD_slope_abs_delta
+Gradient_W1
+Exceed_abs_p95
+Exceed_abs_p99
+```
+
+### Tail group
+
+```text
+Exceed_abs_p90
+Exceed_abs_p95
+Exceed_abs_p99
+```
+
+### Configured physics group
+
+```text
+WPD_RMSE
+WPD_MAE
+PSD_log_L2
+Gradient_MAE
+```
+
+This configured physics group is retained to stay consistent with the earlier selector-ablation interpretation, but the full domain-metric decomposition should still be reported separately because it shows that GAN receives support from several distributional and tail metrics.
+
+## Validated counts from the current repaired table
+
+The current run produced the following group counts:
+
+```text
+cnn_consensus_core: 148 samples
+gan_distributional_cases: 148 samples
+pd_mt_disagreement: 146 samples
+candidate_structural_hallucination_signature: 146 samples
+mt_gan_diagnostic: 20 samples
+topology_consensus_gan: 20 samples
+topology_consensus_cnn: 2 samples
+neartie_topology_validator_disagreement: 3 samples
+```
+
+These counts are consistent with the earlier robust sweep:
+
+- MT selects CNN in 148/168 and GAN in 20/168.
+- PD selects GAN in 166/168 and CNN in 2/168.
+- PD and MT agree on 22 samples: 20 topology-consensus-GAN cases and 2 topology-consensus-CNN cases.
+- Therefore, PD/MT disagreement occurs in 146 samples.
+- The candidate PD-GAN / MT-CNN group contains the same 146 samples, because these are exactly the cases where PD favors GAN while MT favors CNN.
+- The MT-GAN group contains 20 samples.
+
+## Recommended visual-inspection workflow
+
+For each recommended sample, generate or inspect a panel with:
+
+```text
+GT speed | CNN speed | GAN speed | |CNN-GT| |GAN-GT|
+```
+
+The main questions are:
+
+1. Does GAN add sharper structures that are actually present in GT?
+2. Are GAN high-speed ridges or local extrema shifted relative to GT?
+3. Does CNN look smoother but more spatially aligned?
+4. Does PD favor GAN because it captures feature lifetimes while MT penalizes incorrect merge hierarchy?
+5. Do the MT-GAN cases show genuine GAN structural fidelity, or are they sharper but hallucinated artifacts?
+
+## Suggested follow-up visualization sets
+
+The following generated sample-ID files are the most useful for figure generation:
+
+```text
+sample_ids_neartie_topology_validator_disagreement.txt
+sample_ids_mt_gan_diagnostic.txt
+sample_ids_candidate_structural_hallucination_signature.txt
+sample_ids_gan_distributional_cases.txt
+sample_ids_recommended_visual_inspection_unique.txt
+```
+
+The highest-priority qualitative set is:
+
+```text
+sample_ids_neartie_topology_validator_disagreement.txt
+```
+
+because it targets the key topology-consensus / validator-disagreement cases inside the SSIM 0.075 near-tie regime.
+
+## Interpretation note
+
+This stage strengthens the current paper framing:
+
+- The result is not that MT universally corrects SSIM.
+- The result is that different evaluators occupy different roles:
+  - PSNR/SSIM/direct-error metrics emphasize distortion to one GT realization,
+  - distributional/tail metrics often support GAN,
+  - PD is strongly GAN-facing,
+  - MT is intermediate,
+  - PD-MT disagreement identifies samples where topological feature lifetimes and topological merge hierarchy tell different stories.
+
+The safest claim is:
+
+> PD-MT disagreement provides candidate structural-hallucination cases for visual inspection, not automatic proof of hallucination.
+
+## Reproducibility status
+
+This stage is reproducible from the final repaired merged table. It should be treated as an additional reconstruction and qualitative-audit stage after the report-table CSV generation and robust metric sweep documented in Part VIII.
+
+
+
+## Troubleshooting note: repo root detected as `~/PhIRE/scripts`
+
+If the script prints:
+
+```text
+repo_root=/home/.../PhIRE/scripts
+```
+
+then an older failed run may have created a misleading directory such as:
+
+```text
+~/PhIRE/scripts/ttk_runs_fixed/
+```
+
+The updated script version avoids accepting `scripts/` as the repo root. You can also clean the accidental directory if it only contains failed-output folders:
+
+```bash
+cd ~/PhIRE/scripts
+rm -rf ttk_runs_fixed
+```
+
+Then rerun:
+
+```bash
+cd ~/PhIRE/scripts
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py
+```
+
+Expected path printout:
+
+```text
+repo_root=/home/adadhwal/PhIRE
+merged_csv=/home/adadhwal/PhIRE/ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+outdir=/home/adadhwal/PhIRE/ttk_runs_fixed/observation_groups
+```
