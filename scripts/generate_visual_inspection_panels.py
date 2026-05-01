@@ -1,711 +1,745 @@
 #!/usr/bin/env python3
 """
-Generate visual-inspection panels for TopoAware SR observation groups.
+Generate / rebuild the TopoAware SR visual inspection index in a more readable
+card-based layout.
 
-Run from the scripts directory:
+This script is designed to be run from:
+    ~/PhIRE/scripts
 
-    cd ~/PhIRE/scripts
-    PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py
+It looks for:
+    ~/PhIRE/ttk_runs_fixed/observation_groups/recommended_visual_inspection_cases.csv
+and existing visual inspection assets under:
+    ~/PhIRE/ttk_runs_fixed/visual_inspection/
 
-The script auto-detects the PhIRE repository root and uses the final repaired
-artifacts by default:
+It then writes:
+    ~/PhIRE/ttk_runs_fixed/visual_inspection/index.html
 
-    data_out_fixed/wind_mrhr_cnn/
-    data_out_fixed/wind_mrhr_gan/
-    ttk_runs_fixed/observation_groups/
-    ttk_runs_fixed/visual_inspection/
-
-Default behavior
-----------------
-The default preset is `paper_audit`. It generates one speed/error panel per
-unique recommended visual-inspection sample plus the core control samples.
-
-Each panel contains:
-
-    GT speed | CNN speed | GAN speed | |CNN-GT| |GAN-GT|
-
-By default, the panel uses the 160x160 crop used by the topology evaluation.
-Use `--include-full-panels` to also generate full 500x500 panels.
-
-Why this exists
----------------
-The quantitative audit showed that:
-  - PSNR/SSIM/direct-error metrics are strongly CNN-facing,
-  - several distributional/tail metrics support GAN,
-  - bottleneck PD is strongly GAN-facing,
-  - MT is intermediate,
-  - PD-MT disagreement identifies candidate structural-hallucination cases.
-
-The visual-inspection panels are meant to determine whether GAN-favored
-topological/distributional structure is physically meaningful or visually sharp
-but spatially/hierarchically misaligned.
+The generated HTML is a responsive, card-based interface with:
+- search
+- clickable group filters
+- larger preview images
+- wrapped group tags
+- full panel / crop panel links
 """
 
 from __future__ import annotations
 
-import argparse
 import csv
 import html
-import math
-from collections import defaultdict
+import os
+import re
+import sys
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
-
-import numpy as np
-
-# Must be set before importing pyplot on headless Spark nodes.
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+from collections import Counter
 
 
-CORE_CONTRAST_SAMPLES = [8, 12, 25, 27, 31, 37, 39, 29, 32]
-MT_PRIMARY_CONTROL_SAMPLES = [27, 31, 37, 39, 29, 32]
-NEARTIE_DISAGREEMENT_SAMPLES = [8, 12, 25]
-MT_GAN_DIAGNOSTIC_SAMPLES = [6, 8, 12, 16, 17, 18, 19, 20, 25, 48,
-                             62, 63, 65, 68, 77, 79, 80, 82, 92, 154]
-TOPOLOGY_CONSENSUS_CNN_SAMPLES = [162, 163]
+# ============================================================
+# Path helpers
+# ============================================================
 
+def resolve_repo_root() -> Path:
+    """
+    Resolve repo root robustly whether the script is run from:
+      - ~/PhIRE/scripts
+      - ~/PhIRE
+      - another working directory
+    """
+    candidates = []
 
-def discover_repo_root(explicit: Optional[Path] = None) -> Path:
-    """Find repo root when the script is run from either ~/PhIRE or ~/PhIRE/scripts."""
-    if explicit is not None:
-        return explicit.expanduser().resolve()
+    try:
+        candidates.append(Path(__file__).resolve().parent)
+        candidates.append(Path(__file__).resolve().parent.parent)
+    except NameError:
+        pass
 
-    cwd = Path.cwd().resolve()
-    script_dir = Path(__file__).resolve().parent
+    candidates.append(Path.cwd().resolve())
+    candidates.append(Path.cwd().resolve().parent)
 
-    def looks_like_repo_root(cand: Path) -> bool:
-        cand = cand.resolve()
-        if cand.name == "scripts":
-            return False
-        if (cand / "data_out_fixed").is_dir() and (cand / "ttk_runs_fixed").is_dir():
-            return True
-        if (cand / "scripts").is_dir() and (
-            (cand / "data_out_fixed").is_dir()
-            or (cand / "ttk_runs_fixed").is_dir()
-            or (cand / "data_out").is_dir()
-            or (cand / ".git").exists()
-        ):
-            return True
-        return False
-
-    candidates: List[Path] = []
-    if cwd.name == "scripts":
-        candidates.append(cwd.parent)
-    if script_dir.name == "scripts":
-        candidates.append(script_dir.parent)
-
-    for start in [cwd, script_dir]:
-        candidates.append(start)
-        candidates.extend(start.parents)
-
-    seen = set()
-    for cand in candidates:
-        cand = cand.resolve()
-        if cand in seen:
+    checked = []
+    for c in candidates:
+        if c in checked:
             continue
-        seen.add(cand)
-        if looks_like_repo_root(cand):
-            return cand
+        checked.append(c)
 
-    if cwd.name == "scripts":
-        return cwd.parent
-    if script_dir.name == "scripts":
-        return script_dir.parent
-    return cwd
+        # direct repo root
+        if (c / "ttk_runs_fixed").exists():
+            return c
 
+        # if candidate is scripts/
+        if c.name == "scripts" and (c.parent / "ttk_runs_fixed").exists():
+            return c.parent
 
-def resolve_project_path(path: Path, repo_root: Path) -> Path:
-    path = path.expanduser()
-    if path.is_absolute():
-        return path
-    return (repo_root / path).resolve()
+    raise RuntimeError(
+        "Could not locate repo root containing 'ttk_runs_fixed'. "
+        "Please run this from ~/PhIRE/scripts or ~/PhIRE."
+    )
 
 
-def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--repo-root", type=Path, default=None,
-                   help="Optional explicit PhIRE repository root.")
-    p.add_argument("--cnn-dir", type=Path, default=Path("data_out_fixed/wind_mrhr_cnn"),
-                   help="Fixed CNN output directory. Relative paths resolve from repo root.")
-    p.add_argument("--gan-dir", type=Path, default=Path("data_out_fixed/wind_mrhr_gan"),
-                   help="Fixed GAN output directory. Relative paths resolve from repo root.")
-    p.add_argument("--groups-dir", type=Path, default=Path("ttk_runs_fixed/observation_groups"),
-                   help="Observation group directory generated by generate_observation_groups.py.")
-    p.add_argument("--outdir", type=Path, default=Path("ttk_runs_fixed/visual_inspection"),
-                   help="Output directory for visual-inspection panels.")
-    p.add_argument("--preset", choices=["starter", "paper_audit", "all_observation_groups"],
-                   default="paper_audit",
-                   help=(
-                       "starter: 9-sample contrast set. "
-                       "paper_audit: recommended unique samples plus controls. "
-                       "all_observation_groups: all samples appearing in any observation group."
-                   ))
-    p.add_argument("--crop-size", type=int, default=160,
-                   help="Crop size for default panels. Use 160 to match topology-evaluation crop.")
-    p.add_argument("--crop-origin", type=int, nargs=2, default=[0, 0], metavar=("Y0", "X0"),
-                   help="Top-left crop origin as Y0 X0. Default is 0 0.")
-    p.add_argument("--include-full-panels", action="store_true",
-                   help="Also generate full-field 500x500 panels.")
-    p.add_argument("--include-uv-panels", action="store_true",
-                   help="Also generate optional u/v component panels.")
-    p.add_argument("--max-candidate-hallucination", type=int, default=20,
-                   help="Number of top candidate structural-hallucination samples to include in paper_audit if recommended file is absent.")
-    p.add_argument("--max-gan-distributional", type=int, default=20,
-                   help="Number of top GAN-distributional samples to include in paper_audit if recommended file is absent.")
-    return p.parse_args()
+# ============================================================
+# CSV helpers
+# ============================================================
 
-
-def read_csv_dicts(path: Path) -> List[Dict[str, str]]:
-    if not path.exists():
-        return []
-    with path.open("r", newline="") as f:
+def read_csv_rows(path: Path):
+    with path.open("r", encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
 
 
-def read_sample_ids(path: Path) -> List[int]:
-    if not path.exists():
-        return []
-    text = path.read_text().strip()
+def get_first(row: dict, *keys, default=""):
+    for key in keys:
+        if key in row and str(row[key]).strip():
+            return str(row[key]).strip()
+    return default
+
+
+def parse_sample_id(row: dict) -> int:
+    raw = get_first(row, "sample", "sample_id", "Sample", "id")
+    if not raw:
+        raise ValueError(f"Could not find sample id in row: {row}")
+    m = re.search(r"\d+", str(raw))
+    if not m:
+        raise ValueError(f"Could not parse sample id from: {raw}")
+    return int(m.group(0))
+
+
+def split_groups(text: str):
     if not text:
         return []
-    vals: List[int] = []
-    for tok in text.replace("\n", ",").split(","):
-        tok = tok.strip()
-        if tok:
-            vals.append(int(float(tok)))
-    return vals
+    parts = re.split(r"[;,|]", text)
+    return [p.strip() for p in parts if p.strip()]
 
 
-def ordered_unique(values: Iterable[int]) -> List[int]:
-    out: List[int] = []
-    seen = set()
-    for v in values:
-        iv = int(v)
-        if iv not in seen:
-            seen.add(iv)
-            out.append(iv)
-    return out
+def pretty_group_name(name: str) -> str:
+    return name.replace("_", " ")
 
 
-def build_group_map(groups_dir: Path) -> Dict[str, List[int]]:
-    """Load available observation-group sample lists, with hardcoded fallbacks."""
-    group_map: Dict[str, List[int]] = {}
+# ============================================================
+# Input discovery
+# ============================================================
 
-    sample_id_files = {
-        "neartie_topology_validator_disagreement": "sample_ids_neartie_topology_validator_disagreement.txt",
-        "mt_gan_diagnostic": "sample_ids_mt_gan_diagnostic.txt",
-        "topology_consensus_gan": "sample_ids_topology_consensus_gan.txt",
-        "topology_consensus_cnn": "sample_ids_topology_consensus_cnn.txt",
-        "candidate_structural_hallucination_signature": "sample_ids_candidate_structural_hallucination_signature.txt",
-        "gan_distributional_cases": "sample_ids_gan_distributional_cases.txt",
-        "cnn_consensus_core": "sample_ids_cnn_consensus_core.txt",
-        "recommended_visual_inspection_unique": "sample_ids_recommended_visual_inspection_unique.txt",
-    }
-
-    for name, fn in sample_id_files.items():
-        ids = read_sample_ids(groups_dir / fn)
-        if ids:
-            group_map[name] = ids
-
-    group_map.setdefault("neartie_topology_validator_disagreement", NEARTIE_DISAGREEMENT_SAMPLES)
-    group_map.setdefault("mt_gan_diagnostic", MT_GAN_DIAGNOSTIC_SAMPLES)
-    group_map.setdefault("topology_consensus_gan", MT_GAN_DIAGNOSTIC_SAMPLES)
-    group_map.setdefault("topology_consensus_cnn", TOPOLOGY_CONSENSUS_CNN_SAMPLES)
-    group_map.setdefault("cnn_consensus_core", MT_PRIMARY_CONTROL_SAMPLES)
-
-    return group_map
-
-
-def load_per_sample_metadata(groups_dir: Path) -> Dict[int, Dict[str, str]]:
-    rows = read_csv_dicts(groups_dir / "observation_groups_per_sample.csv")
-    out: Dict[int, Dict[str, str]] = {}
-    for row in rows:
-        try:
-            out[int(float(row["sample_idx"]))] = row
-        except Exception:
-            continue
-    return out
-
-
-def load_arrays(cnn_dir: Path, gan_dir: Path) -> Dict[str, np.ndarray]:
-    required = [
-        cnn_dir / "dataGT.npy",
-        cnn_dir / "dataSR.npy",
-        cnn_dir / "idx.npy",
-        gan_dir / "dataGT.npy",
-        gan_dir / "dataSR.npy",
-        gan_dir / "idx.npy",
+def find_cases_csv(obs_dir: Path, vis_dir: Path) -> Path:
+    candidates = [
+        vis_dir / "recommended_visual_inspection_cases.csv",
+        vis_dir / "visual_inspection_cases.csv",
+        vis_dir / "visual_inspection_index.csv",
+        obs_dir / "recommended_visual_inspection_cases.csv",
+        obs_dir / "recommended_visual_inspection_unique_samples.csv",
+        obs_dir / "recommended_visual_inspection.csv",
     ]
-    missing = [p for p in required if not p.exists()]
-    if missing:
-        raise SystemExit("Missing required arrays:\n" + "\n".join(str(p) for p in missing))
-
-    arrays = {
-        "cnn_gt": np.load(cnn_dir / "dataGT.npy", mmap_mode="r"),
-        "cnn_sr": np.load(cnn_dir / "dataSR.npy", mmap_mode="r"),
-        "cnn_idx": np.load(cnn_dir / "idx.npy", mmap_mode="r"),
-        "gan_gt": np.load(gan_dir / "dataGT.npy", mmap_mode="r"),
-        "gan_sr": np.load(gan_dir / "dataSR.npy", mmap_mode="r"),
-        "gan_idx": np.load(gan_dir / "idx.npy", mmap_mode="r"),
-    }
-    return arrays
+    for c in candidates:
+        if c.exists():
+            return c
+    raise FileNotFoundError(
+        "Could not find a visual inspection cases CSV.\n"
+        "Looked in:\n  - " + "\n  - ".join(str(x) for x in candidates)
+    )
 
 
-def build_idx_lookup(idx: np.ndarray) -> Dict[int, int]:
-    return {int(v): i for i, v in enumerate(np.asarray(idx).tolist())}
-
-
-def speed(arr: np.ndarray) -> np.ndarray:
-    return np.sqrt(arr[..., 0] ** 2 + arr[..., 1] ** 2)
-
-
-def crop_field(field: np.ndarray, y0: int, x0: int, crop_size: Optional[int]) -> np.ndarray:
-    if crop_size is None:
-        return np.asarray(field)
-    return np.asarray(field[y0:y0 + crop_size, x0:x0 + crop_size])
-
-
-def short_groups_for_sample(sample_id: int, group_map: Dict[str, List[int]]) -> str:
-    hits = []
-    for name, ids in group_map.items():
-        if sample_id in set(ids):
-            hits.append(name)
-    return ";".join(sorted(hits))
-
-
-def metadata_title(sample_id: int, metadata: Dict[int, Dict[str, str]]) -> str:
-    row = metadata.get(sample_id, {})
-    if not row:
-        return f"sample {sample_id}"
-    parts = [
-        f"sample {sample_id}",
-        f"SSIM={row.get('ssim_winner', '?')}",
-        f"PD={row.get('pd_winner', '?')}",
-        f"MT={row.get('mt_winner', '?')}",
-        f"direct={row.get('direct_error_group_winner', '?')}",
-        f"dist={row.get('distributional_group_winner', '?')}",
-    ]
-    return " | ".join(parts)
-
-
-def make_speed_error_panel(
-    sample_id: int,
-    arrays: Dict[str, np.ndarray],
-    cnn_lookup: Dict[int, int],
-    gan_lookup: Dict[int, int],
-    out_path: Path,
-    metadata: Dict[int, Dict[str, str]],
-    crop_size: Optional[int],
-    crop_origin: Tuple[int, int],
-) -> None:
-    if sample_id not in cnn_lookup or sample_id not in gan_lookup:
-        raise KeyError(f"sample_id={sample_id} missing from CNN or GAN idx.npy")
-
-    ci = cnn_lookup[sample_id]
-    gi = gan_lookup[sample_id]
-
-    gt = np.asarray(arrays["cnn_gt"][ci])
-    gan_gt = np.asarray(arrays["gan_gt"][gi])
-    if gt.shape == gan_gt.shape:
-        max_gt_diff = float(np.max(np.abs(gt - gan_gt)))
+def resolve_existing_asset(vis_dir: Path, sample_id: int, kind: str) -> Path | None:
+    """
+    Tries common filenames/folders for existing generated assets.
+    """
+    if kind == "panel":
+        candidates = [
+            vis_dir / "panels" / f"sample_{sample_id:03d}_panel.png",
+            vis_dir / "full_panels" / f"sample_{sample_id:03d}_panel.png",
+            vis_dir / f"sample_{sample_id:03d}_panel.png",
+        ]
+    elif kind == "crop":
+        candidates = [
+            vis_dir / "crop_panels" / f"sample_{sample_id:03d}_crop_panel.png",
+            vis_dir / "crops" / f"sample_{sample_id:03d}_crop_panel.png",
+            vis_dir / f"sample_{sample_id:03d}_crop_panel.png",
+        ]
+    elif kind == "thumb":
+        candidates = [
+            vis_dir / "thumbnails" / f"sample_{sample_id:03d}_thumb.png",
+            vis_dir / "thumbs" / f"sample_{sample_id:03d}_thumb.png",
+            vis_dir / "thumbnails" / f"sample_{sample_id:03d}_panel.png",
+            vis_dir / "panels" / f"sample_{sample_id:03d}_panel.png",
+            vis_dir / "full_panels" / f"sample_{sample_id:03d}_panel.png",
+        ]
     else:
-        max_gt_diff = float("nan")
+        raise ValueError(f"Unknown asset kind: {kind}")
 
-    cnn = np.asarray(arrays["cnn_sr"][ci])
-    gan = np.asarray(arrays["gan_sr"][gi])
-
-    y0, x0 = crop_origin
-    gt_s = crop_field(speed(gt), y0, x0, crop_size)
-    cnn_s = crop_field(speed(cnn), y0, x0, crop_size)
-    gan_s = crop_field(speed(gan), y0, x0, crop_size)
-
-    cnn_err = np.abs(cnn_s - gt_s)
-    gan_err = np.abs(gan_s - gt_s)
-
-    vmin = float(np.nanmin([gt_s.min(), cnn_s.min(), gan_s.min()]))
-    vmax = float(np.nanmax([gt_s.max(), cnn_s.max(), gan_s.max()]))
-    err_vmax = float(np.nanmax([cnn_err.max(), gan_err.max()]))
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    fig, axes = plt.subplots(1, 5, figsize=(18, 4.2), constrained_layout=True)
-    fig.suptitle(metadata_title(sample_id, metadata), fontsize=11)
-
-    panels = [
-        ("GT speed", gt_s, vmin, vmax),
-        ("CNN speed", cnn_s, vmin, vmax),
-        ("GAN speed", gan_s, vmin, vmax),
-        ("|CNN-GT|", cnn_err, 0.0, err_vmax),
-        ("|GAN-GT|", gan_err, 0.0, err_vmax),
-    ]
-
-    for ax, (title, data, lo, hi) in zip(axes, panels):
-        im = ax.imshow(data, origin="lower", vmin=lo, vmax=hi)
-        ax.set_title(title, fontsize=10)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    if crop_size is None:
-        subtitle = f"full field; max GT CNN/GAN diff={max_gt_diff:.3e}"
-    else:
-        subtitle = f"crop y={y0}:{y0+crop_size}, x={x0}:{x0+crop_size}; max GT CNN/GAN diff={max_gt_diff:.3e}"
-    fig.text(0.5, 0.01, subtitle, ha="center", fontsize=9)
-
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
+    for c in candidates:
+        if c.exists():
+            return c
+    return None
 
 
-def make_uv_panel(
-    sample_id: int,
-    arrays: Dict[str, np.ndarray],
-    cnn_lookup: Dict[int, int],
-    gan_lookup: Dict[int, int],
-    out_path: Path,
-    crop_size: Optional[int],
-    crop_origin: Tuple[int, int],
-) -> None:
-    ci = cnn_lookup[sample_id]
-    gi = gan_lookup[sample_id]
+# ============================================================
+# HTML generation
+# ============================================================
 
-    gt = np.asarray(arrays["cnn_gt"][ci])
-    cnn = np.asarray(arrays["cnn_sr"][ci])
-    gan = np.asarray(arrays["gan_sr"][gi])
-
-    y0, x0 = crop_origin
-    if crop_size is not None:
-        sl = (slice(y0, y0 + crop_size), slice(x0, x0 + crop_size))
-        gt = gt[sl]
-        cnn = cnn[sl]
-        gan = gan[sl]
-
-    fields = [
-        ("GT u", gt[..., 0]), ("CNN u", cnn[..., 0]), ("GAN u", gan[..., 0]),
-        ("GT v", gt[..., 1]), ("CNN v", cnn[..., 1]), ("GAN v", gan[..., 1]),
-    ]
-
-    u_min = float(np.nanmin([fields[i][1].min() for i in [0, 1, 2]]))
-    u_max = float(np.nanmax([fields[i][1].max() for i in [0, 1, 2]]))
-    v_min = float(np.nanmin([fields[i][1].min() for i in [3, 4, 5]]))
-    v_max = float(np.nanmax([fields[i][1].max() for i in [3, 4, 5]]))
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    fig, axes = plt.subplots(2, 3, figsize=(12, 7), constrained_layout=True)
-    fig.suptitle(f"sample {sample_id}: u/v components", fontsize=11)
-
-    for ax, (title, data) in zip(axes.ravel(), fields):
-        lo, hi = (u_min, u_max) if " u" in title else (v_min, v_max)
-        im = ax.imshow(data, origin="lower", vmin=lo, vmax=hi)
-        ax.set_title(title, fontsize=10)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
+def relpath_if_exists(path: Path | None, start: Path) -> str:
+    if path is None or not path.exists():
+        return ""
+    return os.path.relpath(path, start)
 
 
-def make_contact_sheet(sample_ids: Sequence[int], panel_dir: Path, out_path: Path, title: str, max_cols: int = 3) -> None:
-    """Make a lightweight contact sheet from already generated PNG files."""
-    from PIL import Image, ImageDraw
-
-    images = []
-    labels = []
-    for sid in sample_ids:
-        p = panel_dir / f"sample_{sid:03d}_speed_error_crop.png"
-        if p.exists():
-            img = Image.open(p).convert("RGB")
-            img.thumbnail((600, 180))
-            images.append(img.copy())
-            labels.append(str(sid))
-            img.close()
-
-    if not images:
-        return
-
-    cols = min(max_cols, len(images))
-    rows = math.ceil(len(images) / cols)
-    cell_w = max(img.width for img in images)
-    cell_h = max(img.height for img in images) + 24
-    sheet = Image.new("RGB", (cols * cell_w, rows * cell_h + 40), "white")
-    draw = ImageDraw.Draw(sheet)
-    draw.text((10, 10), title, fill="black")
-
-    for idx, (img, label) in enumerate(zip(images, labels)):
-        r = idx // cols
-        c = idx % cols
-        x = c * cell_w
-        y = 40 + r * cell_h
-        draw.text((x + 8, y + 2), f"sample {label}", fill="black")
-        sheet.paste(img, (x, y + 22))
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    sheet.save(out_path)
+def build_group_filter_buttons(group_counts: Counter) -> str:
+    items = []
+    for group, count in sorted(group_counts.items(), key=lambda x: (-x[1], x[0])):
+        items.append(
+            f"""
+            <button class="group-filter" data-group="{html.escape(group)}" type="button">
+              {html.escape(pretty_group_name(group))} <span class="group-count">{count}</span>
+            </button>
+            """
+        )
+    return "\n".join(items)
 
 
-def write_csv(path: Path, rows: List[Dict[str, object]]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fieldnames: List[str] = []
-    for row in rows:
-        for k in row:
-            if k not in fieldnames:
-                fieldnames.append(k)
-    with path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(rows)
+def build_cards(records: list[dict], vis_dir: Path) -> str:
+    cards = []
 
+    for row in records:
+        sample_id = parse_sample_id(row)
 
-def choose_samples(preset: str, group_map: Dict[str, List[int]], groups_dir: Path,
-                   max_candidate: int, max_distributional: int) -> Tuple[List[int], Dict[int, List[str]]]:
-    sample_to_sets: Dict[int, List[str]] = defaultdict(list)
+        groups_text = get_first(row, "groups", "group_membership", "membership", "group_list")
+        groups = split_groups(groups_text)
 
-    def add(name: str, ids: Iterable[int]) -> None:
-        for sid in ids:
-            sample_to_sets[int(sid)].append(name)
-
-    add("phase1_core_contrast", CORE_CONTRAST_SAMPLES)
-    add("mt_primary_controls", MT_PRIMARY_CONTROL_SAMPLES)
-    add("neartie_topology_validator_disagreement", group_map.get("neartie_topology_validator_disagreement", []))
-    add("mt_gan_diagnostic", group_map.get("mt_gan_diagnostic", []))
-    add("topology_consensus_cnn", group_map.get("topology_consensus_cnn", []))
-
-    if preset == "starter":
-        ids = CORE_CONTRAST_SAMPLES
-        return ordered_unique(ids), sample_to_sets
-
-    recommended = group_map.get("recommended_visual_inspection_unique", [])
-    if preset == "paper_audit":
-        if recommended:
-            add("recommended_visual_inspection_unique", recommended)
-            ids = recommended + CORE_CONTRAST_SAMPLES + TOPOLOGY_CONSENSUS_CNN_SAMPLES
-        else:
-            cand = group_map.get("candidate_structural_hallucination_signature", [])[:max_candidate]
-            dist = group_map.get("gan_distributional_cases", [])[:max_distributional]
-            add("candidate_structural_hallucination_top", cand)
-            add("gan_distributional_top", dist)
-            ids = CORE_CONTRAST_SAMPLES + MT_GAN_DIAGNOSTIC_SAMPLES + TOPOLOGY_CONSENSUS_CNN_SAMPLES + cand + dist
-        return ordered_unique(ids), sample_to_sets
-
-    # all_observation_groups
-    all_ids: List[int] = []
-    for name, ids in sorted(group_map.items()):
-        if name.startswith("recommended"):
-            continue
-        add(name, ids)
-        all_ids.extend(ids)
-    all_ids.extend(CORE_CONTRAST_SAMPLES)
-    return ordered_unique(all_ids), sample_to_sets
-
-
-def make_index_html(outdir: Path, manifest_rows: List[Dict[str, object]]) -> None:
-    rows_html = []
-    for row in manifest_rows:
-        sample_id = int(row["sample_idx"])
-        rel = html.escape(str(row["crop_panel_path"]))
-        groups = html.escape(str(row.get("groups", "")))
-        suggested = html.escape(str(row.get("suggested_question", "")))
-        rows_html.append(
-            f"<tr><td>{sample_id}</td><td>{groups}</td><td>{suggested}</td>"
-            f"<td><a href='{rel}'><img src='{rel}' width='420'></a></td></tr>"
+        question = get_first(
+            row,
+            "question",
+            "inspection_question",
+            "prompt_question",
+            default="Visual inspection: compare GT, CNN, and GAN structure."
         )
 
-    text = f"""<!doctype html>
-<html>
+        note = get_first(row, "note", "notes", "comment", default="")
+
+        # Prefer paths in CSV if present, otherwise infer from common filenames
+        panel_from_csv = get_first(row, "panel_path", "full_panel", "full_panel_path", "panel")
+        crop_from_csv = get_first(row, "crop_panel", "crop_panel_path", "crop")
+        thumb_from_csv = get_first(row, "thumbnail", "thumb", "thumbnail_path")
+
+        def resolve_from_csv(raw: str) -> Path | None:
+            if not raw:
+                return None
+            p = Path(raw)
+            if p.is_absolute() and p.exists():
+                return p
+            # Try relative to repo visual directory
+            p1 = vis_dir / raw
+            if p1.exists():
+                return p1
+            # Try relative to repo root shape like ttk_runs_fixed/...
+            p2 = vis_dir.parent.parent / raw
+            if p2.exists():
+                return p2
+            return None
+
+        panel_path = resolve_from_csv(panel_from_csv) or resolve_existing_asset(vis_dir, sample_id, "panel")
+        crop_path = resolve_from_csv(crop_from_csv) or resolve_existing_asset(vis_dir, sample_id, "crop")
+        thumb_path = resolve_from_csv(thumb_from_csv) or resolve_existing_asset(vis_dir, sample_id, "thumb")
+
+        # Fallback preview to full panel if no thumb exists
+        preview_path = thumb_path or panel_path or crop_path
+
+        panel_rel = relpath_if_exists(panel_path, vis_dir)
+        crop_rel = relpath_if_exists(crop_path, vis_dir)
+        preview_rel = relpath_if_exists(preview_path, vis_dir)
+
+        tags_html = "\n".join(
+            f'<span class="tag">{html.escape(pretty_group_name(g))}</span>'
+            for g in groups
+        )
+
+        search_blob = " ".join(
+            [str(sample_id), groups_text, question, note]
+        ).lower()
+
+        links = []
+        if panel_rel:
+            links.append(f'<a href="{html.escape(panel_rel)}" target="_blank" rel="noopener">Open full panel</a>')
+        if crop_rel:
+            links.append(f'<a href="{html.escape(crop_rel)}" target="_blank" rel="noopener">Open crop panel</a>')
+
+        links_html = " ".join(links) if links else '<span class="muted">No linked panel files found.</span>'
+
+        preview_html = (
+            f'<a href="{html.escape(panel_rel or crop_rel or preview_rel)}" target="_blank" rel="noopener">'
+            f'  <img src="{html.escape(preview_rel)}" alt="Sample {sample_id} preview">'
+            f'</a>'
+            if preview_rel else
+            '<div class="no-preview">No preview found</div>'
+        )
+
+        cards.append(
+            f"""
+            <article class="sample-card"
+                     data-sample="{sample_id}"
+                     data-groups="{' '.join(html.escape(g) for g in groups)}"
+                     data-search="{html.escape(search_blob)}">
+              <div class="sample-meta">
+                <div class="sample-header">
+                  <h2>Sample {sample_id}</h2>
+                </div>
+
+                <div class="meta-block">
+                  <div class="meta-label">Question</div>
+                  <div class="meta-value">{html.escape(question)}</div>
+                </div>
+
+                <div class="meta-block">
+                  <div class="meta-label">Groups</div>
+                  <div class="tag-list">
+                    {tags_html if tags_html else '<span class="muted">No groups listed</span>'}
+                  </div>
+                </div>
+
+                {f'''
+                <div class="meta-block">
+                  <div class="meta-label">Notes</div>
+                  <div class="meta-value">{html.escape(note)}</div>
+                </div>
+                ''' if note else ''}
+
+                <div class="meta-block links">
+                  {links_html}
+                </div>
+              </div>
+
+              <div class="sample-preview">
+                {preview_html}
+              </div>
+            </article>
+            """
+        )
+
+    return "\n".join(cards)
+
+
+def build_html(records: list[dict], vis_dir: Path) -> str:
+    all_groups = []
+    for row in records:
+        all_groups.extend(split_groups(get_first(row, "groups", "group_membership", "membership", "group_list")))
+    group_counts = Counter(all_groups)
+
+    buttons_html = build_group_filter_buttons(group_counts)
+    cards_html = build_cards(records, vis_dir)
+
+    total = len(records)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>TopoAware SR visual inspection index</title>
-<style>
-body {{ font-family: sans-serif; margin: 24px; }}
-table {{ border-collapse: collapse; width: 100%; }}
-td, th {{ border: 1px solid #ddd; padding: 6px; vertical-align: top; }}
-th {{ background: #f2f2f2; }}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TopoAware SR visual inspection index</title>
+  <style>
+    :root {{
+      --bg: #f7f7f9;
+      --card: #ffffff;
+      --border: #dddddd;
+      --text: #111111;
+      --muted: #666666;
+      --blue-bg: #eef3ff;
+      --blue-border: #c8d7ff;
+      --accent: #0056b3;
+      --shadow: 0 1px 4px rgba(0,0,0,0.05);
+    }}
+
+    * {{
+      box-sizing: border-box;
+    }}
+
+    body {{
+      font-family: Arial, Helvetica, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }}
+
+    .page {{
+      max-width: 1500px;
+      margin: 0 auto;
+    }}
+
+    h1 {{
+      margin: 0 0 8px 0;
+      font-size: 2.25rem;
+      line-height: 1.15;
+    }}
+
+    .subtitle {{
+      margin-bottom: 10px;
+      color: #222;
+      font-size: 1.1rem;
+    }}
+
+    .helper {{
+      color: var(--muted);
+      margin-bottom: 20px;
+    }}
+
+    .controls {{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 10px;
+      z-index: 10;
+    }}
+
+    .controls-top {{
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 14px;
+    }}
+
+    .search-box {{
+      flex: 1 1 360px;
+      min-width: 240px;
+    }}
+
+    .search-box input {{
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 15px;
+    }}
+
+    .stats {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      font-size: 14px;
+      color: #333;
+    }}
+
+    .stat-pill {{
+      background: #f1f1f1;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      padding: 7px 12px;
+    }}
+
+    .clear-btn {{
+      border: 1px solid #ccc;
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+    }}
+
+    .clear-btn:hover {{
+      background: #f4f4f4;
+    }}
+
+    .filter-title {{
+      font-weight: 700;
+      margin-bottom: 8px;
+    }}
+
+    .group-filters {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }}
+
+    .group-filter {{
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1.2;
+    }}
+
+    .group-filter.active {{
+      background: var(--blue-bg);
+      border-color: var(--blue-border);
+      font-weight: 700;
+    }}
+
+    .group-count {{
+      color: var(--muted);
+      margin-left: 4px;
+    }}
+
+    .index-container {{
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }}
+
+    .sample-card {{
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      box-shadow: var(--shadow);
+      align-items: start;
+    }}
+
+    .sample-header h2 {{
+      margin: 0 0 10px 0;
+      font-size: 1.6rem;
+    }}
+
+    .meta-block {{
+      margin-bottom: 14px;
+    }}
+
+    .meta-label {{
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #333;
+    }}
+
+    .meta-value {{
+      color: #222;
+      white-space: normal;
+      word-break: break-word;
+    }}
+
+    .tag-list {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }}
+
+    .tag {{
+      background: var(--blue-bg);
+      border: 1px solid var(--blue-border);
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 13px;
+      white-space: normal;
+      word-break: break-word;
+    }}
+
+    .links {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: center;
+    }}
+
+    .links a {{
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 600;
+    }}
+
+    .links a:hover {{
+      text-decoration: underline;
+    }}
+
+    .sample-preview {{
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+    }}
+
+    .sample-preview img {{
+      width: 100%;
+      max-width: 560px;
+      height: auto;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      display: block;
+      background: white;
+    }}
+
+    .no-preview {{
+      width: 100%;
+      min-height: 220px;
+      border: 1px dashed #bbb;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      background: #fafafa;
+      padding: 20px;
+      text-align: center;
+    }}
+
+    .muted {{
+      color: var(--muted);
+    }}
+
+    .footer-note {{
+      margin-top: 28px;
+      color: var(--muted);
+      font-size: 13px;
+    }}
+
+    @media (max-width: 1100px) {{
+      .sample-card {{
+        grid-template-columns: 1fr;
+      }}
+
+      .sample-preview {{
+        justify-content: flex-start;
+      }}
+
+      .sample-preview img {{
+        max-width: 100%;
+      }}
+    }}
+
+    @media (max-width: 700px) {{
+      body {{
+        padding: 14px;
+      }}
+
+      h1 {{
+        font-size: 1.8rem;
+      }}
+
+      .controls {{
+        position: static;
+      }}
+    }}
+  </style>
 </head>
 <body>
-<h1>TopoAware SR visual inspection index</h1>
-<p>Each panel shows: GT speed | CNN speed | GAN speed | |CNN-GT| |GAN-GT|.</p>
-<table>
-<thead><tr><th>Sample</th><th>Groups</th><th>Question</th><th>Panel</th></tr></thead>
-<tbody>
-{''.join(rows_html)}
-</tbody>
-</table>
+  <div class="page">
+    <h1>TopoAware SR visual inspection index</h1>
+    <div class="subtitle">
+      Each panel shows: GT speed | CNN speed | GAN speed | CNN-GT | GAN-GT.
+    </div>
+    <div class="helper">
+      Use the search box and group filters to narrow the inspection set. Click a preview to open the full panel.
+    </div>
+
+    <section class="controls">
+      <div class="controls-top">
+        <div class="search-box">
+          <input type="text" id="searchBox" placeholder="Search sample ID, group, or question...">
+        </div>
+        <button type="button" class="clear-btn" id="clearFiltersBtn">Clear filters</button>
+        <div class="stats">
+          <span class="stat-pill">Total samples: <strong>{total}</strong></span>
+          <span class="stat-pill">Visible: <strong id="visibleCount">{total}</strong></span>
+          <span class="stat-pill">Group filters: <strong>{len(group_counts)}</strong></span>
+        </div>
+      </div>
+
+      <div class="filter-title">Filter by group</div>
+      <div class="group-filters">
+        {buttons_html}
+      </div>
+    </section>
+
+    <section class="index-container" id="cardContainer">
+      {cards_html}
+    </section>
+
+    <div class="footer-note">
+      Generated automatically by <code>scripts/generate_visual_inspection_panels.py</code>.
+    </div>
+  </div>
+
+  <script>
+    const searchBox = document.getElementById('searchBox');
+    const clearBtn = document.getElementById('clearFiltersBtn');
+    const groupButtons = Array.from(document.querySelectorAll('.group-filter'));
+    const cards = Array.from(document.querySelectorAll('.sample-card'));
+    const visibleCount = document.getElementById('visibleCount');
+
+    function activeGroups() {{
+      return groupButtons
+        .filter(btn => btn.classList.contains('active'))
+        .map(btn => btn.dataset.group);
+    }}
+
+    function applyFilters() {{
+      const q = searchBox.value.trim().toLowerCase();
+      const groups = activeGroups();
+      let visible = 0;
+
+      cards.forEach(card => {{
+        const hay = (card.dataset.search || '').toLowerCase();
+        const cardGroups = (card.dataset.groups || '').split(/\\s+/).filter(Boolean);
+
+        const queryMatch = !q || hay.includes(q);
+        const groupMatch = groups.length === 0 || groups.every(g => cardGroups.includes(g));
+
+        const show = queryMatch && groupMatch;
+        card.style.display = show ? '' : 'none';
+        if (show) visible += 1;
+      }});
+
+      visibleCount.textContent = visible;
+    }}
+
+    groupButtons.forEach(btn => {{
+      btn.addEventListener('click', () => {{
+        btn.classList.toggle('active');
+        applyFilters();
+      }});
+    }});
+
+    searchBox.addEventListener('input', applyFilters);
+
+    clearBtn.addEventListener('click', () => {{
+      searchBox.value = '';
+      groupButtons.forEach(btn => btn.classList.remove('active'));
+      applyFilters();
+    }});
+
+    applyFilters();
+  </script>
 </body>
 </html>
 """
-    (outdir / "index.html").write_text(text)
 
 
-def suggested_question_for_sample(sample_id: int, groups: List[str]) -> str:
-    g = set(groups)
-    if "neartie_topology_validator_disagreement" in g:
-        return "Near-tie edge case: do PD/MT reward real GAN structure or visually sharp artifacts?"
-    if "mt_gan_diagnostic" in g:
-        return "MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?"
-    if "candidate_structural_hallucination_signature" in g:
-        return "PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?"
-    if "gan_distributional_cases" in g:
-        return "Distributional metrics favor GAN: does GAN preserve multiscale/tail structure better?"
-    if "mt_primary_controls" in g:
-        return "Control: does CNN look smoother but more faithful to GT?"
-    return "Inspect GT/CNN/GAN structure and error maps."
+# ============================================================
+# Main
+# ============================================================
 
+def main():
+    repo_root = resolve_repo_root()
 
-def main() -> None:
-    args = parse_args()
-    repo_root = discover_repo_root(args.repo_root)
+    vis_dir = repo_root / "ttk_runs_fixed" / "visual_inspection"
+    obs_dir = repo_root / "ttk_runs_fixed" / "observation_groups"
 
-    cnn_dir = resolve_project_path(args.cnn_dir, repo_root)
-    gan_dir = resolve_project_path(args.gan_dir, repo_root)
-    groups_dir = resolve_project_path(args.groups_dir, repo_root)
-    outdir = resolve_project_path(args.outdir, repo_root)
+    vis_dir.mkdir(parents=True, exist_ok=True)
+
+    cases_csv = find_cases_csv(obs_dir, vis_dir)
+    rows = read_csv_rows(cases_csv)
+
+    if not rows:
+        raise RuntimeError(f"No rows found in CSV: {cases_csv}")
+
+    # Sort by sample id if available
+    rows = sorted(rows, key=parse_sample_id)
+
+    html_text = build_html(rows, vis_dir)
+
+    out_html = vis_dir / "index.html"
+    out_html.write_text(html_text, encoding="utf-8")
 
     print(f"repo_root={repo_root}")
-    print(f"cnn_dir={cnn_dir}")
-    print(f"gan_dir={gan_dir}")
-    print(f"groups_dir={groups_dir}")
-    print(f"outdir={outdir}")
-
-    outdir.mkdir(parents=True, exist_ok=True)
-
-    group_map = build_group_map(groups_dir)
-    metadata = load_per_sample_metadata(groups_dir)
-    sample_ids, sample_to_sets = choose_samples(
-        args.preset, group_map, groups_dir, args.max_candidate_hallucination, args.max_gan_distributional
-    )
-
-    arrays = load_arrays(cnn_dir, gan_dir)
-    cnn_lookup = build_idx_lookup(arrays["cnn_idx"])
-    gan_lookup = build_idx_lookup(arrays["gan_idx"])
-
-    y0, x0 = args.crop_origin
-    crop_dir = outdir / "panels_crop160"
-    full_dir = outdir / "panels_full"
-    uv_dir = outdir / "panels_uv"
-    contact_dir = outdir / "contact_sheets"
-
-    manifest_rows: List[Dict[str, object]] = []
-
-    for sid in sample_ids:
-        groups = sorted(set(sample_to_sets.get(sid, []) + [
-            name for name, ids in group_map.items() if sid in set(ids)
-        ]))
-        crop_path = crop_dir / f"sample_{sid:03d}_speed_error_crop.png"
-        make_speed_error_panel(
-            sid, arrays, cnn_lookup, gan_lookup, crop_path, metadata,
-            crop_size=args.crop_size, crop_origin=(y0, x0)
-        )
-
-        full_path = ""
-        if args.include_full_panels:
-            p = full_dir / f"sample_{sid:03d}_speed_error_full.png"
-            make_speed_error_panel(
-                sid, arrays, cnn_lookup, gan_lookup, p, metadata,
-                crop_size=None, crop_origin=(0, 0)
-            )
-            full_path = str(p.relative_to(outdir))
-
-        uv_path = ""
-        if args.include_uv_panels:
-            p = uv_dir / f"sample_{sid:03d}_uv_crop.png"
-            make_uv_panel(
-                sid, arrays, cnn_lookup, gan_lookup, p,
-                crop_size=args.crop_size, crop_origin=(y0, x0)
-            )
-            uv_path = str(p.relative_to(outdir))
-
-        row_meta = metadata.get(sid, {})
-        manifest_rows.append({
-            "sample_idx": sid,
-            "groups": ";".join(groups),
-            "suggested_question": suggested_question_for_sample(sid, groups),
-            "ssim_winner": row_meta.get("ssim_winner", ""),
-            "psnr_winner": row_meta.get("psnr_winner", ""),
-            "pd_winner": row_meta.get("pd_winner", ""),
-            "mt_winner": row_meta.get("mt_winner", ""),
-            "direct_error_group_winner": row_meta.get("direct_error_group_winner", ""),
-            "distributional_group_winner": row_meta.get("distributional_group_winner", ""),
-            "tail_group_winner": row_meta.get("tail_group_winner", ""),
-            "configured_physics_group_winner": row_meta.get("configured_physics_group_winner", ""),
-            "crop_panel_path": str(crop_path.relative_to(outdir)),
-            "full_panel_path": full_path,
-            "uv_panel_path": uv_path,
-        })
-
-    write_csv(outdir / "visual_inspection_manifest.csv", manifest_rows)
-
-    template_rows = []
-    for r in manifest_rows:
-        template_rows.append({
-            **r,
-            "visual_winner": "",
-            "gan_sharper": "",
-            "gan_artifact_or_hallucination_candidate": "",
-            "cnn_oversmoothed": "",
-            "which_is_closer_to_gt_structure": "",
-            "notes": "",
-        })
-    write_csv(outdir / "visual_observation_template.csv", template_rows)
-
-    # Contact sheets for core groups.
-    for name, ids in [
-        ("phase1_core_contrast", CORE_CONTRAST_SAMPLES),
-        ("neartie_topology_validator_disagreement", group_map.get("neartie_topology_validator_disagreement", [])),
-        ("mt_gan_diagnostic", group_map.get("mt_gan_diagnostic", [])),
-        ("topology_consensus_cnn", group_map.get("topology_consensus_cnn", [])),
-    ]:
-        ids_present = [sid for sid in ids if sid in sample_ids]
-        if ids_present:
-            make_contact_sheet(ids_present, crop_dir, contact_dir / f"{name}_contact_sheet.png", name)
-
-    make_index_html(outdir, manifest_rows)
-
-    readme = f"""# Visual Inspection Panels
-
-Generated by `generate_visual_inspection_panels.py`.
-
-## Input directories
-
-- CNN: `{cnn_dir}`
-- GAN: `{gan_dir}`
-- observation groups: `{groups_dir}`
-
-## Output
-
-- `panels_crop160/`: default GT/CNN/GAN speed and error panels using the {args.crop_size}x{args.crop_size} crop
-- `visual_inspection_manifest.csv`: sample list, group membership, and panel paths
-- `visual_observation_template.csv`: copy/edit this file while recording visual observations
-- `contact_sheets/`: quick overview sheets for core groups
-- `index.html`: browser-viewable index of generated panels
-
-## Recommended inspection order
-
-1. Samples 8, 12, 25: near-tie topology-consensus-GAN / validator-disagreement cases.
-2. Samples 27, 31, 37, 39, 29, 32: MT-primary / CNN-control cases.
-3. All MT-GAN diagnostic samples.
-4. Top candidate PD-GAN / MT-CNN disagreement samples.
-5. Top GAN-distributional cases.
-
-## Interpretation reminder
-
-These panels should be used to determine whether GAN-favored structure is
-physically meaningful, merely visually sharp, or spatially/hierarchically
-misaligned relative to GT. The safest claim is that PD-MT disagreement provides
-candidate structural-hallucination cases for visual inspection, not automatic
-proof of hallucination.
-"""
-    (outdir / "README_visual_inspection.md").write_text(readme)
-
-    print(f"Wrote {len(sample_ids)} unique sample panels.")
-    print(f"manifest={outdir / 'visual_inspection_manifest.csv'}")
-    print(f"template={outdir / 'visual_observation_template.csv'}")
-    print(f"index={outdir / 'index.html'}")
-    print(f"panels={crop_dir}")
+    print(f"visual_inspection_dir={vis_dir}")
+    print(f"cases_csv={cases_csv}")
+    print(f"wrote={out_html}")
+    print(f"sample_count={len(rows)}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
