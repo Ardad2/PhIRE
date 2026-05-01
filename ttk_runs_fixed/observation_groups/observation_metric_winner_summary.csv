@@ -1,0 +1,20 @@
+metric_name,column,family,winner_rule,cnn_wins,gan_wins,ties,unavailable,description
+PSNR_uv,psnr,standard,higher,168,0,0,0,Vector-field PSNR; higher is better.
+SSIM_speed,ssim,standard,higher,168,0,0,0,Speed-magnitude SSIM; higher is better.
+PD_distance,pd_distance,topology,lower,2,166,0,0,Persistence-diagram bottleneck distance; lower is better.
+MT_distance,mt_distance,topology,lower,148,20,0,0,Merge-tree distance; lower is better.
+WPD_bias_abs,wpd_bias,direct_error,lower_abs,115,53,0,0,Absolute WPD signed bias; lower absolute value is better.
+WPD_MAE,wpd_mae,direct_error,lower,168,0,0,0,WPD MAE; lower is better.
+WPD_RMSE,wpd_rmse,direct_error,lower,167,1,0,0,WPD RMSE; lower is better.
+WPD_W1,wpd_w1,distributional,lower,119,49,0,0,WPD Wasserstein-1 distance; lower is better.
+PSD_log_L2,psd_log_l2,distributional,lower,25,143,0,0,Radial PSD log-L2 mismatch; lower is better.
+PSD_slope_abs_delta,psd_slope_abs_delta,distributional,lower,77,91,0,0,Absolute PSD slope mismatch; lower is better.
+Gradient_MAE,grad_mae,direct_error,lower,168,0,0,0,Gradient MAE; lower is better.
+Gradient_W1,grad_w1,distributional,lower,1,167,0,0,Gradient-distribution Wasserstein-1 distance; lower is better.
+Gradient_kurtosis_abs_delta,grad_kurtosis_abs_delta,distributional,lower,96,72,0,0,Absolute gradient-kurtosis mismatch; lower is better.
+Exceed_abs_t5,exceed_frac_abs_delta_t5,tail,lower,112,56,0,0,"Absolute exceedance-fraction error, speed > 5; lower is better."
+Exceed_abs_t10,exceed_frac_abs_delta_t10,tail,lower,142,26,0,0,"Absolute exceedance-fraction error, speed > 10; lower is better."
+Exceed_abs_t15,exceed_frac_abs_delta_t15,tail,lower,101,67,0,0,"Absolute exceedance-fraction error, speed > 15; lower is better."
+Exceed_abs_p90,exceed_frac_abs_delta_p90,tail,lower,104,64,0,0,"Absolute exceedance-fraction error, p90 threshold; lower is better."
+Exceed_abs_p95,exceed_frac_abs_delta_p95,tail,lower,83,85,0,0,"Absolute exceedance-fraction error, p95 threshold; lower is better."
+Exceed_abs_p99,exceed_frac_abs_delta_p99,tail,lower,76,92,0,0,"Absolute exceedance-fraction error, p99 threshold; lower is better."
