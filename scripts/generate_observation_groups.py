@@ -59,11 +59,21 @@ Important generated files:
   - sample_ids_*.txt
   - README_observation_groups.md
 
-Example
--------
-PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/generate_observation_groups.py \
-  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
-  --outdir ttk_runs_fixed/observation_groups
+Examples
+--------
+From the repo root:
+
+    PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/generate_observation_groups.py
+
+From the scripts directory:
+
+    cd ~/PhIRE/scripts
+    PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py
+
+Both commands auto-detect the repo root and use:
+
+    ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+    ttk_runs_fixed/observation_groups
 """
 
 from __future__ import annotations
@@ -149,19 +159,101 @@ CONFIGURED_PHYSICS_GROUP = [
 ]
 
 
+def discover_repo_root(explicit: Optional[Path] = None) -> Path:
+    """Find the PhIRE repo root even when this script is run from ./scripts.
+
+    Search order:
+      1. explicit --repo-root, if provided;
+      2. current working directory and its parents;
+      3. this script's directory and its parents;
+      4. fallback: parent of cwd if cwd is named scripts, otherwise cwd.
+
+    A directory is accepted as the repo root if it contains either:
+      - ttk_runs_fixed/
+      - data_out_fixed/
+      - scripts/ plus at least one common project marker.
+    """
+    if explicit is not None:
+        return explicit.expanduser().resolve()
+
+    candidates: List[Path] = []
+    for start in [Path.cwd(), Path(__file__).resolve().parent]:
+        start = start.resolve()
+        candidates.append(start)
+        candidates.extend(start.parents)
+
+    seen = set()
+    for cand in candidates:
+        if cand in seen:
+            continue
+        seen.add(cand)
+        if (cand / "ttk_runs_fixed").exists() or (cand / "data_out_fixed").exists():
+            return cand
+        if (cand / "scripts").exists() and (
+            (cand / "ttk_runs").exists()
+            or (cand / "example_data").exists()
+            or (cand / "data_out").exists()
+            or (cand / ".git").exists()
+        ):
+            return cand
+
+    cwd = Path.cwd().resolve()
+    if cwd.name == "scripts":
+        return cwd.parent
+    return cwd
+
+
+def resolve_project_path(path: Path, repo_root: Path, *, prefer_repo_root: bool = True) -> Path:
+    """Resolve a user path robustly.
+
+    Absolute paths are preserved. Relative paths are interpreted relative to the
+    repo root by default, which lets the script be run from ~/PhIRE/scripts.
+    If the repo-root interpretation does not exist for an input file, the cwd
+    interpretation is also allowed as a fallback.
+    """
+    path = path.expanduser()
+    if path.is_absolute():
+        return path
+
+    repo_path = (repo_root / path).resolve()
+    cwd_path = (Path.cwd() / path).resolve()
+
+    if prefer_repo_root:
+        if repo_path.exists() or not cwd_path.exists():
+            return repo_path
+        return cwd_path
+
+    return repo_path
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument(
+        "--repo-root",
+        type=Path,
+        default=None,
+        help=(
+            "Path to the PhIRE repository root. Optional. If omitted, the script "
+            "auto-detects the repo root, so it can be run from either ~/PhIRE or ~/PhIRE/scripts."
+        ),
+    )
     p.add_argument(
         "--merged-csv",
         type=Path,
         default=Path("ttk_runs_fixed/combined/psnr_topology_physics_merged.csv"),
-        help="Final repaired merged metric table with one CNN row and one GAN row per sample.",
+        help=(
+            "Final repaired merged metric table with one CNN row and one GAN row per sample. "
+            "Relative paths are resolved from the repo root, not necessarily the current directory."
+        ),
     )
     p.add_argument(
         "--outdir",
         type=Path,
         default=Path("ttk_runs_fixed/observation_groups"),
-        help="Output directory for generated groups.",
+        help=(
+            "Output directory for generated groups. Relative paths are resolved from the repo root, "
+            "so the default works when running from ./scripts."
+        ),
     )
     p.add_argument(
         "--near-tie-thresholds",
@@ -295,9 +387,18 @@ def ids_string(rows: List[Dict[str, object]], limit: Optional[int] = None) -> st
 
 def main() -> None:
     args = parse_args()
-    args.outdir.mkdir(parents=True, exist_ok=True)
 
-    input_rows = read_rows(args.merged_csv)
+    repo_root = discover_repo_root(args.repo_root)
+    merged_csv = resolve_project_path(args.merged_csv, repo_root, prefer_repo_root=True)
+    outdir = resolve_project_path(args.outdir, repo_root, prefer_repo_root=True)
+
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    print(f"repo_root={repo_root}")
+    print(f"merged_csv={merged_csv}")
+    print(f"outdir={outdir}")
+
+    input_rows = read_rows(merged_csv)
 
     by_sample: Dict[int, Dict[str, Dict[str, str]]] = {}
     for row in input_rows:
@@ -458,7 +559,7 @@ def main() -> None:
         )
 
     # Write full per-sample table.
-    write_csv(args.outdir / "observation_groups_per_sample.csv", per_sample)
+    write_csv(outdir / "observation_groups_per_sample.csv", per_sample)
 
     # Define output groups and their sorting keys.
     groups = [
@@ -535,8 +636,8 @@ def main() -> None:
         rows = [r for r in per_sample if bool(r.get(flag, False))]
         rows = sorted(rows, key=lambda r: (float(r.get(sort_key, 0.0)) if sort_key != "sample_idx" else int(r["sample_idx"])), reverse=reverse)
         group_rows_by_name[short_name] = rows
-        write_csv(args.outdir / f"group_{short_name}.csv", rows)
-        write_sample_ids(args.outdir / f"sample_ids_{short_name}.txt", rows)
+        write_csv(outdir / f"group_{short_name}.csv", rows)
+        write_sample_ids(outdir / f"sample_ids_{short_name}.txt", rows)
         summary_rows.append({
             "group": short_name,
             "title": title,
@@ -546,7 +647,7 @@ def main() -> None:
             "description": description,
         })
 
-    write_csv(args.outdir / "observation_group_summary.csv", summary_rows)
+    write_csv(outdir / "observation_group_summary.csv", summary_rows)
 
     # Recommended visual inspection list.
     recommendations: List[Dict[str, object]] = []
@@ -585,7 +686,7 @@ def main() -> None:
     )
 
     # Deduplicate recommendations by (sample_idx, recommendation_group) first, then create a compact unique sample list.
-    write_csv(args.outdir / "recommended_visual_inspection_cases.csv", recommendations)
+    write_csv(outdir / "recommended_visual_inspection_cases.csv", recommendations)
 
     unique_recommended: Dict[int, Dict[str, object]] = {}
     for r in recommendations:
@@ -613,8 +714,8 @@ def main() -> None:
         rr["appears_in_groups"] = ";".join(sorted(set(rr["appears_in_groups"])))
         unique_rows.append(rr)
 
-    write_csv(args.outdir / "recommended_visual_inspection_unique_samples.csv", unique_rows)
-    (args.outdir / "sample_ids_recommended_visual_inspection_unique.txt").write_text(
+    write_csv(outdir / "recommended_visual_inspection_unique_samples.csv", unique_rows)
+    (outdir / "sample_ids_recommended_visual_inspection_unique.txt").write_text(
         ",".join(str(int(r["sample_idx"])) for r in unique_rows) + ("\n" if unique_rows else "")
     )
 
@@ -644,7 +745,7 @@ def main() -> None:
             "unavailable": unavailable,
             "description": spec.description,
         })
-    write_csv(args.outdir / "observation_metric_winner_summary.csv", metric_summary_rows)
+    write_csv(outdir / "observation_metric_winner_summary.csv", metric_summary_rows)
 
     # README
     summary_by_group = {r["group"]: r for r in summary_rows}
@@ -657,7 +758,7 @@ def main() -> None:
         "",
         "## Input",
         "",
-        f"- merged CSV: `{args.merged_csv}`",
+        f"- merged CSV: `{merged_csv}`",
         "",
         "## Key interpretation",
         "",
@@ -700,9 +801,9 @@ def main() -> None:
         "```",
         "",
     ])
-    (args.outdir / "README_observation_groups.md").write_text("\n".join(readme_lines))
+    (outdir / "README_observation_groups.md").write_text("\n".join(readme_lines))
 
-    print(f"Wrote observation groups to: {args.outdir}")
+    print(f"Wrote observation groups to: {outdir}")
     print("Summary:")
     for row in summary_rows:
         print(f"  {row['group']}: {row['count']} samples")
