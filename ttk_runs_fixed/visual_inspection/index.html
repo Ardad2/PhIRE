@@ -4,20 +4,1865 @@
 <meta charset="utf-8">
 <title>TopoAware SR visual inspection index</title>
 <style>
-body { font-family: sans-serif; margin: 24px; }
-table { border-collapse: collapse; width: 100%; }
-td, th { border: 1px solid #ddd; padding: 6px; vertical-align: top; }
-th { background: #f2f2f2; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f7f7f9;
+    color: #111;
+    line-height: 1.45;
+  }
+  .page {
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+  h1 {
+    margin: 0 0 8px 0;
+    font-size: 2.2rem;
+  }
+  .subtitle {
+    margin-bottom: 6px;
+    font-size: 1.05rem;
+  }
+  .helper {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 0.95rem;
+  }
+  .controls {
+    position: sticky;
+    top: 10px;
+    z-index: 10;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 22px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .controls-top {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  #searchBox {
+    flex: 1 1 360px;
+    min-width: 260px;
+    padding: 12px 14px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 15px;
+  }
+  .clear-btn {
+    border: 1px solid #ccc;
+    background: #fff;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .stat-pill {
+    background: #f1f1f1;
+    border: 1px solid #ddd;
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-size: 14px;
+  }
+  .filter-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .group-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .group-filter {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 999px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .group-filter.active {
+    background: #eef3ff;
+    border-color: #c8d7ff;
+    font-weight: 700;
+  }
+  .index-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .sample-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(360px, 1fr);
+    gap: 20px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+    align-items: start;
+  }
+  .sample-card h2 {
+    margin: 0 0 8px 0;
+    font-size: 1.55rem;
+  }
+  .winner-strip {
+    color: #333;
+    background: #f5f5f5;
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    word-break: break-word;
+  }
+  .meta-block {
+    margin-bottom: 14px;
+  }
+  .meta-label {
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .tag {
+    background: #eef3ff;
+    border: 1px solid #c8d7ff;
+    border-radius: 999px;
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .links a {
+    color: #0056b3;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .links a:hover {
+    text-decoration: underline;
+  }
+  .sample-preview {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .sample-preview img {
+    width: 100%;
+    max-width: 620px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: white;
+  }
+  .no-preview {
+    width: 100%;
+    min-height: 220px;
+    border: 1px dashed #bbb;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #666;
+    background: #fafafa;
+  }
+  .muted {
+    color: #666;
+  }
+  @media (max-width: 1100px) {
+    .sample-card { grid-template-columns: 1fr; }
+    .sample-preview { justify-content: flex-start; }
+    .sample-preview img { max-width: 100%; }
+  }
 </style>
 </head>
 <body>
-<h1>TopoAware SR visual inspection index</h1>
-<p>Each panel shows: GT speed | CNN speed | GAN speed | |CNN-GT| |GAN-GT|.</p>
-<table>
-<thead><tr><th>Sample</th><th>Groups</th><th>Question</th><th>Panel</th></tr></thead>
-<tbody>
-<tr><td>6</td><td>mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_006_speed_error_crop.png'><img src='panels_crop160/sample_006_speed_error_crop.png' width='420'></a></td></tr><tr><td>8</td><td>mt_gan_diagnostic;neartie_topology_validator_disagreement;phase1_core_contrast;recommended_visual_inspection_unique;topology_consensus_gan</td><td>Near-tie edge case: do PD/MT reward real GAN structure or visually sharp artifacts?</td><td><a href='panels_crop160/sample_008_speed_error_crop.png'><img src='panels_crop160/sample_008_speed_error_crop.png' width='420'></a></td></tr><tr><td>12</td><td>gan_distributional_cases;mt_gan_diagnostic;neartie_topology_validator_disagreement;phase1_core_contrast;recommended_visual_inspection_unique;topology_consensus_gan</td><td>Near-tie edge case: do PD/MT reward real GAN structure or visually sharp artifacts?</td><td><a href='panels_crop160/sample_012_speed_error_crop.png'><img src='panels_crop160/sample_012_speed_error_crop.png' width='420'></a></td></tr><tr><td>16</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_016_speed_error_crop.png'><img src='panels_crop160/sample_016_speed_error_crop.png' width='420'></a></td></tr><tr><td>17</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_017_speed_error_crop.png'><img src='panels_crop160/sample_017_speed_error_crop.png' width='420'></a></td></tr><tr><td>18</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_018_speed_error_crop.png'><img src='panels_crop160/sample_018_speed_error_crop.png' width='420'></a></td></tr><tr><td>19</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_019_speed_error_crop.png'><img src='panels_crop160/sample_019_speed_error_crop.png' width='420'></a></td></tr><tr><td>20</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_020_speed_error_crop.png'><img src='panels_crop160/sample_020_speed_error_crop.png' width='420'></a></td></tr><tr><td>24</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_024_speed_error_crop.png'><img src='panels_crop160/sample_024_speed_error_crop.png' width='420'></a></td></tr><tr><td>25</td><td>gan_distributional_cases;mt_gan_diagnostic;neartie_topology_validator_disagreement;phase1_core_contrast;recommended_visual_inspection_unique;topology_consensus_gan</td><td>Near-tie edge case: do PD/MT reward real GAN structure or visually sharp artifacts?</td><td><a href='panels_crop160/sample_025_speed_error_crop.png'><img src='panels_crop160/sample_025_speed_error_crop.png' width='420'></a></td></tr><tr><td>27</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;mt_primary_controls;phase1_core_contrast;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_027_speed_error_crop.png'><img src='panels_crop160/sample_027_speed_error_crop.png' width='420'></a></td></tr><tr><td>28</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_028_speed_error_crop.png'><img src='panels_crop160/sample_028_speed_error_crop.png' width='420'></a></td></tr><tr><td>30</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_030_speed_error_crop.png'><img src='panels_crop160/sample_030_speed_error_crop.png' width='420'></a></td></tr><tr><td>31</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;mt_primary_controls;phase1_core_contrast;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_031_speed_error_crop.png'><img src='panels_crop160/sample_031_speed_error_crop.png' width='420'></a></td></tr><tr><td>32</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;mt_primary_controls;phase1_core_contrast;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_032_speed_error_crop.png'><img src='panels_crop160/sample_032_speed_error_crop.png' width='420'></a></td></tr><tr><td>33</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_033_speed_error_crop.png'><img src='panels_crop160/sample_033_speed_error_crop.png' width='420'></a></td></tr><tr><td>34</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_034_speed_error_crop.png'><img src='panels_crop160/sample_034_speed_error_crop.png' width='420'></a></td></tr><tr><td>48</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_048_speed_error_crop.png'><img src='panels_crop160/sample_048_speed_error_crop.png' width='420'></a></td></tr><tr><td>62</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_062_speed_error_crop.png'><img src='panels_crop160/sample_062_speed_error_crop.png' width='420'></a></td></tr><tr><td>63</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_063_speed_error_crop.png'><img src='panels_crop160/sample_063_speed_error_crop.png' width='420'></a></td></tr><tr><td>64</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_064_speed_error_crop.png'><img src='panels_crop160/sample_064_speed_error_crop.png' width='420'></a></td></tr><tr><td>65</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_065_speed_error_crop.png'><img src='panels_crop160/sample_065_speed_error_crop.png' width='420'></a></td></tr><tr><td>66</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_066_speed_error_crop.png'><img src='panels_crop160/sample_066_speed_error_crop.png' width='420'></a></td></tr><tr><td>67</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_067_speed_error_crop.png'><img src='panels_crop160/sample_067_speed_error_crop.png' width='420'></a></td></tr><tr><td>68</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_068_speed_error_crop.png'><img src='panels_crop160/sample_068_speed_error_crop.png' width='420'></a></td></tr><tr><td>73</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_073_speed_error_crop.png'><img src='panels_crop160/sample_073_speed_error_crop.png' width='420'></a></td></tr><tr><td>74</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_074_speed_error_crop.png'><img src='panels_crop160/sample_074_speed_error_crop.png' width='420'></a></td></tr><tr><td>75</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_075_speed_error_crop.png'><img src='panels_crop160/sample_075_speed_error_crop.png' width='420'></a></td></tr><tr><td>76</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_076_speed_error_crop.png'><img src='panels_crop160/sample_076_speed_error_crop.png' width='420'></a></td></tr><tr><td>77</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_077_speed_error_crop.png'><img src='panels_crop160/sample_077_speed_error_crop.png' width='420'></a></td></tr><tr><td>79</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_079_speed_error_crop.png'><img src='panels_crop160/sample_079_speed_error_crop.png' width='420'></a></td></tr><tr><td>80</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_080_speed_error_crop.png'><img src='panels_crop160/sample_080_speed_error_crop.png' width='420'></a></td></tr><tr><td>82</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_082_speed_error_crop.png'><img src='panels_crop160/sample_082_speed_error_crop.png' width='420'></a></td></tr><tr><td>84</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_084_speed_error_crop.png'><img src='panels_crop160/sample_084_speed_error_crop.png' width='420'></a></td></tr><tr><td>86</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_086_speed_error_crop.png'><img src='panels_crop160/sample_086_speed_error_crop.png' width='420'></a></td></tr><tr><td>87</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_087_speed_error_crop.png'><img src='panels_crop160/sample_087_speed_error_crop.png' width='420'></a></td></tr><tr><td>88</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_088_speed_error_crop.png'><img src='panels_crop160/sample_088_speed_error_crop.png' width='420'></a></td></tr><tr><td>89</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_089_speed_error_crop.png'><img src='panels_crop160/sample_089_speed_error_crop.png' width='420'></a></td></tr><tr><td>90</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_090_speed_error_crop.png'><img src='panels_crop160/sample_090_speed_error_crop.png' width='420'></a></td></tr><tr><td>91</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_091_speed_error_crop.png'><img src='panels_crop160/sample_091_speed_error_crop.png' width='420'></a></td></tr><tr><td>92</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_092_speed_error_crop.png'><img src='panels_crop160/sample_092_speed_error_crop.png' width='420'></a></td></tr><tr><td>98</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_098_speed_error_crop.png'><img src='panels_crop160/sample_098_speed_error_crop.png' width='420'></a></td></tr><tr><td>102</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_102_speed_error_crop.png'><img src='panels_crop160/sample_102_speed_error_crop.png' width='420'></a></td></tr><tr><td>104</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_104_speed_error_crop.png'><img src='panels_crop160/sample_104_speed_error_crop.png' width='420'></a></td></tr><tr><td>111</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_111_speed_error_crop.png'><img src='panels_crop160/sample_111_speed_error_crop.png' width='420'></a></td></tr><tr><td>117</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_117_speed_error_crop.png'><img src='panels_crop160/sample_117_speed_error_crop.png' width='420'></a></td></tr><tr><td>131</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_131_speed_error_crop.png'><img src='panels_crop160/sample_131_speed_error_crop.png' width='420'></a></td></tr><tr><td>132</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_132_speed_error_crop.png'><img src='panels_crop160/sample_132_speed_error_crop.png' width='420'></a></td></tr><tr><td>134</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_134_speed_error_crop.png'><img src='panels_crop160/sample_134_speed_error_crop.png' width='420'></a></td></tr><tr><td>135</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_135_speed_error_crop.png'><img src='panels_crop160/sample_135_speed_error_crop.png' width='420'></a></td></tr><tr><td>137</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_137_speed_error_crop.png'><img src='panels_crop160/sample_137_speed_error_crop.png' width='420'></a></td></tr><tr><td>139</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_139_speed_error_crop.png'><img src='panels_crop160/sample_139_speed_error_crop.png' width='420'></a></td></tr><tr><td>140</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;recommended_visual_inspection_unique</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_140_speed_error_crop.png'><img src='panels_crop160/sample_140_speed_error_crop.png' width='420'></a></td></tr><tr><td>154</td><td>gan_distributional_cases;mt_gan_diagnostic;recommended_visual_inspection_unique;topology_consensus_gan</td><td>MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</td><td><a href='panels_crop160/sample_154_speed_error_crop.png'><img src='panels_crop160/sample_154_speed_error_crop.png' width='420'></a></td></tr><tr><td>37</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;mt_primary_controls;phase1_core_contrast</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_037_speed_error_crop.png'><img src='panels_crop160/sample_037_speed_error_crop.png' width='420'></a></td></tr><tr><td>39</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;mt_primary_controls;phase1_core_contrast</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_039_speed_error_crop.png'><img src='panels_crop160/sample_039_speed_error_crop.png' width='420'></a></td></tr><tr><td>29</td><td>candidate_structural_hallucination_signature;cnn_consensus_core;gan_distributional_cases;mt_primary_controls;phase1_core_contrast</td><td>PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</td><td><a href='panels_crop160/sample_029_speed_error_crop.png'><img src='panels_crop160/sample_029_speed_error_crop.png' width='420'></a></td></tr><tr><td>162</td><td>cnn_consensus_core;gan_distributional_cases;topology_consensus_cnn</td><td>Distributional metrics favor GAN: does GAN preserve multiscale/tail structure better?</td><td><a href='panels_crop160/sample_162_speed_error_crop.png'><img src='panels_crop160/sample_162_speed_error_crop.png' width='420'></a></td></tr><tr><td>163</td><td>cnn_consensus_core;topology_consensus_cnn</td><td>Inspect GT/CNN/GAN structure and error maps.</td><td><a href='panels_crop160/sample_163_speed_error_crop.png'><img src='panels_crop160/sample_163_speed_error_crop.png' width='420'></a></td></tr>
-</tbody>
-</table>
+<div class="page">
+  <h1>TopoAware SR visual inspection index</h1>
+  <div class="subtitle">Each panel shows: GT speed | CNN speed | GAN speed | CNN-GT | GAN-GT.</div>
+  <div class="helper">Source CSV: <code>/home/adadhwal/PhIRE/ttk_runs_fixed/visual_inspection/visual_inspection_manifest.csv</code>. Use search and group filters to narrow samples.</div>
+
+  <section class="controls">
+    <div class="controls-top">
+      <input id="searchBox" type="text" placeholder="Search sample ID, group, question, or winner...">
+      <button class="clear-btn" id="clearBtn" type="button">Clear filters</button>
+      <span class="stat-pill">Total: <strong>59</strong></span>
+      <span class="stat-pill">Visible: <strong id="visibleCount">59</strong></span>
+    </div>
+
+    <div class="filter-title">Filter by group</div>
+    <div class="group-filters"><button class="group-filter" data-group="recommended_visual_inspection_unique" type="button">recommended visual inspection unique <span>54</span></button>
+<button class="group-filter" data-group="gan_distributional_cases" type="button">gan distributional cases <span>53</span></button>
+<button class="group-filter" data-group="cnn_consensus_core" type="button">cnn consensus core <span>39</span></button>
+<button class="group-filter" data-group="candidate_structural_hallucination_signature" type="button">candidate structural hallucination signature <span>37</span></button>
+<button class="group-filter" data-group="mt_gan_diagnostic" type="button">mt gan diagnostic <span>20</span></button>
+<button class="group-filter" data-group="topology_consensus_gan" type="button">topology consensus gan <span>20</span></button>
+<button class="group-filter" data-group="phase1_core_contrast" type="button">phase1 core contrast <span>9</span></button>
+<button class="group-filter" data-group="mt_primary_controls" type="button">mt primary controls <span>6</span></button>
+<button class="group-filter" data-group="neartie_topology_validator_disagreement" type="button">neartie topology validator disagreement <span>3</span></button>
+<button class="group-filter" data-group="topology_consensus_cnn" type="button">topology consensus cnn <span>2</span></button></div>
+  </section>
+
+  <section class="index-container" id="cards">
+    
+<article class="sample-card"
+         data-search="6 mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: cnn | tail: cnn | physics: cnn"
+         data-groups="mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 6</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: CNN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_006_speed_error_crop.png" target="_blank">Open crop panel</a> <a href="panels_full/sample_006_speed_error_full.png" target="_blank">Open full panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_full/sample_006_speed_error_full.png" target="_blank"><img src="panels_crop160/sample_006_speed_error_crop.png" alt="Sample 6 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="8 mt_gan_diagnostic neartie_topology_validator_disagreement phase1_core_contrast recommended_visual_inspection_unique topology_consensus_gan near-tie edge case: do pd/mt reward real gan structure or visually sharp artifacts? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: cnn | tail: gan | physics: cnn"
+         data-groups="mt_gan_diagnostic neartie_topology_validator_disagreement phase1_core_contrast recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 8</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: CNN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">Near-tie edge case: do PD/MT reward real GAN structure or visually sharp artifacts?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">mt gan diagnostic</span>
+<span class="tag">neartie topology validator disagreement</span>
+<span class="tag">phase1 core contrast</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_008_speed_error_crop.png" target="_blank">Open crop panel</a> <a href="panels_full/sample_008_speed_error_full.png" target="_blank">Open full panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_full/sample_008_speed_error_full.png" target="_blank"><img src="panels_crop160/sample_008_speed_error_crop.png" alt="Sample 8 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="12 gan_distributional_cases mt_gan_diagnostic neartie_topology_validator_disagreement phase1_core_contrast recommended_visual_inspection_unique topology_consensus_gan near-tie edge case: do pd/mt reward real gan structure or visually sharp artifacts? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic neartie_topology_validator_disagreement phase1_core_contrast recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 12</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">Near-tie edge case: do PD/MT reward real GAN structure or visually sharp artifacts?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">neartie topology validator disagreement</span>
+<span class="tag">phase1 core contrast</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_012_speed_error_crop.png" target="_blank">Open crop panel</a> <a href="panels_full/sample_012_speed_error_full.png" target="_blank">Open full panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_full/sample_012_speed_error_full.png" target="_blank"><img src="panels_crop160/sample_012_speed_error_crop.png" alt="Sample 12 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="16 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 16</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_016_speed_error_crop.png" target="_blank">Open crop panel</a> <a href="panels_full/sample_016_speed_error_full.png" target="_blank">Open full panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_full/sample_016_speed_error_full.png" target="_blank"><img src="panels_crop160/sample_016_speed_error_crop.png" alt="Sample 16 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="17 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 17</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_017_speed_error_crop.png" target="_blank">Open crop panel</a> <a href="panels_full/sample_017_speed_error_full.png" target="_blank">Open full panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_full/sample_017_speed_error_full.png" target="_blank"><img src="panels_crop160/sample_017_speed_error_crop.png" alt="Sample 17 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="18 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 18</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_018_speed_error_crop.png" target="_blank">Open crop panel</a> <a href="panels_full/sample_018_speed_error_full.png" target="_blank">Open full panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_full/sample_018_speed_error_full.png" target="_blank"><img src="panels_crop160/sample_018_speed_error_crop.png" alt="Sample 18 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="19 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 19</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_019_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_019_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_019_speed_error_crop.png" alt="Sample 19 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="20 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 20</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_020_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_020_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_020_speed_error_crop.png" alt="Sample 20 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="24 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 24</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_024_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_024_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_024_speed_error_crop.png" alt="Sample 24 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="25 gan_distributional_cases mt_gan_diagnostic neartie_topology_validator_disagreement phase1_core_contrast recommended_visual_inspection_unique topology_consensus_gan near-tie edge case: do pd/mt reward real gan structure or visually sharp artifacts? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic neartie_topology_validator_disagreement phase1_core_contrast recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 25</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">Near-tie edge case: do PD/MT reward real GAN structure or visually sharp artifacts?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">neartie topology validator disagreement</span>
+<span class="tag">phase1 core contrast</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_025_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_025_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_025_speed_error_crop.png" alt="Sample 25 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="27 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 27</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">mt primary controls</span>
+<span class="tag">phase1 core contrast</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_027_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_027_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_027_speed_error_crop.png" alt="Sample 27 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="28 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 28</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_028_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_028_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_028_speed_error_crop.png" alt="Sample 28 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="29 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast">
+  <div class="sample-meta">
+    <h2>Sample 29</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">mt primary controls</span>
+<span class="tag">phase1 core contrast</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_029_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_029_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_029_speed_error_crop.png" alt="Sample 29 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="30 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 30</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_030_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_030_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_030_speed_error_crop.png" alt="Sample 30 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="31 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 31</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">mt primary controls</span>
+<span class="tag">phase1 core contrast</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_031_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_031_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_031_speed_error_crop.png" alt="Sample 31 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="32 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 32</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">mt primary controls</span>
+<span class="tag">phase1 core contrast</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_032_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_032_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_032_speed_error_crop.png" alt="Sample 32 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="33 candidate_structural_hallucination_signature cnn_consensus_core recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: cnn | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 33</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: CNN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_033_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_033_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_033_speed_error_crop.png" alt="Sample 33 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="34 candidate_structural_hallucination_signature cnn_consensus_core recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: cnn | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 34</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: CNN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_034_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_034_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_034_speed_error_crop.png" alt="Sample 34 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="37 candidate_structural_hallucination_signature cnn_consensus_core mt_primary_controls phase1_core_contrast pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: cnn | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core mt_primary_controls phase1_core_contrast">
+  <div class="sample-meta">
+    <h2>Sample 37</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: CNN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">mt primary controls</span>
+<span class="tag">phase1 core contrast</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_037_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_037_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_037_speed_error_crop.png" alt="Sample 37 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="39 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases mt_primary_controls phase1_core_contrast">
+  <div class="sample-meta">
+    <h2>Sample 39</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">mt primary controls</span>
+<span class="tag">phase1 core contrast</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_039_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_039_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_039_speed_error_crop.png" alt="Sample 39 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="48 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 48</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_048_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_048_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_048_speed_error_crop.png" alt="Sample 48 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="62 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 62</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_062_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_062_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_062_speed_error_crop.png" alt="Sample 62 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="63 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 63</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_063_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_063_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_063_speed_error_crop.png" alt="Sample 63 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="64 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 64</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_064_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_064_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_064_speed_error_crop.png" alt="Sample 64 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="65 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 65</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_065_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_065_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_065_speed_error_crop.png" alt="Sample 65 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="66 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 66</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_066_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_066_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_066_speed_error_crop.png" alt="Sample 66 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="67 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 67</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_067_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_067_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_067_speed_error_crop.png" alt="Sample 67 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="68 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 68</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_068_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_068_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_068_speed_error_crop.png" alt="Sample 68 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="73 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 73</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_073_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_073_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_073_speed_error_crop.png" alt="Sample 73 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="74 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 74</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_074_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_074_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_074_speed_error_crop.png" alt="Sample 74 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="75 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 75</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_075_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_075_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_075_speed_error_crop.png" alt="Sample 75 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="76 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 76</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_076_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_076_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_076_speed_error_crop.png" alt="Sample 76 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="77 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 77</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_077_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_077_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_077_speed_error_crop.png" alt="Sample 77 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="79 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 79</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_079_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_079_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_079_speed_error_crop.png" alt="Sample 79 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="80 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 80</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_080_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_080_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_080_speed_error_crop.png" alt="Sample 80 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="82 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 82</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_082_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_082_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_082_speed_error_crop.png" alt="Sample 82 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="84 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 84</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_084_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_084_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_084_speed_error_crop.png" alt="Sample 84 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="86 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 86</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_086_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_086_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_086_speed_error_crop.png" alt="Sample 86 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="87 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 87</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_087_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_087_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_087_speed_error_crop.png" alt="Sample 87 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="88 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 88</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_088_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_088_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_088_speed_error_crop.png" alt="Sample 88 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="89 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 89</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_089_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_089_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_089_speed_error_crop.png" alt="Sample 89 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="90 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 90</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_090_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_090_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_090_speed_error_crop.png" alt="Sample 90 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="91 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 91</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_091_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_091_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_091_speed_error_crop.png" alt="Sample 91 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="92 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 92</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_092_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_092_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_092_speed_error_crop.png" alt="Sample 92 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="98 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 98</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_098_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_098_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_098_speed_error_crop.png" alt="Sample 98 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="102 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 102</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_102_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_102_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_102_speed_error_crop.png" alt="Sample 102 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="104 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 104</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_104_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_104_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_104_speed_error_crop.png" alt="Sample 104 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="111 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 111</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_111_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_111_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_111_speed_error_crop.png" alt="Sample 111 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="117 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 117</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_117_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_117_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_117_speed_error_crop.png" alt="Sample 117 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="131 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 131</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_131_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_131_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_131_speed_error_crop.png" alt="Sample 131 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="132 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 132</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_132_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_132_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_132_speed_error_crop.png" alt="Sample 132 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="134 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 134</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_134_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_134_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_134_speed_error_crop.png" alt="Sample 134 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="135 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 135</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_135_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_135_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_135_speed_error_crop.png" alt="Sample 135 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="137 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 137</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_137_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_137_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_137_speed_error_crop.png" alt="Sample 137 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="139 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 139</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_139_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_139_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_139_speed_error_crop.png" alt="Sample 139 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="140 candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique pd favors gan but mt favors cnn: are gan features plausible but hierarchically/spatially misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: cnn | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="candidate_structural_hallucination_signature cnn_consensus_core gan_distributional_cases recommended_visual_inspection_unique">
+  <div class="sample-meta">
+    <h2>Sample 140</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">PD favors GAN but MT favors CNN: are GAN features plausible but hierarchically/spatially misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">candidate structural hallucination signature</span>
+<span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">recommended visual inspection unique</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_140_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_140_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_140_speed_error_crop.png" alt="Sample 140 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="154 gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan mt favors gan: is gan structurally closer to gt, or sharper but misaligned? psnr: cnn | ssim: cnn | pd: gan | mt: gan | direct: cnn | distributional: gan | tail: cnn | physics: cnn"
+         data-groups="gan_distributional_cases mt_gan_diagnostic recommended_visual_inspection_unique topology_consensus_gan">
+  <div class="sample-meta">
+    <h2>Sample 154</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: GAN | MT: GAN | Direct: CNN | Distributional: GAN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">MT favors GAN: is GAN structurally closer to GT, or sharper but misaligned?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">gan distributional cases</span>
+<span class="tag">mt gan diagnostic</span>
+<span class="tag">recommended visual inspection unique</span>
+<span class="tag">topology consensus gan</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_154_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_154_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_154_speed_error_crop.png" alt="Sample 154 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="162 cnn_consensus_core gan_distributional_cases topology_consensus_cnn distributional metrics favor gan: does gan preserve multiscale/tail structure better? psnr: cnn | ssim: cnn | pd: cnn | mt: cnn | direct: cnn | distributional: gan | tail: gan | physics: cnn"
+         data-groups="cnn_consensus_core gan_distributional_cases topology_consensus_cnn">
+  <div class="sample-meta">
+    <h2>Sample 162</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: CNN | MT: CNN | Direct: CNN | Distributional: GAN | Tail: GAN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">Distributional metrics favor GAN: does GAN preserve multiscale/tail structure better?</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">cnn consensus core</span>
+<span class="tag">gan distributional cases</span>
+<span class="tag">topology consensus cnn</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_162_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_162_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_162_speed_error_crop.png" alt="Sample 162 preview"></a></div>
+</article>
+
+
+<article class="sample-card"
+         data-search="163 cnn_consensus_core topology_consensus_cnn inspect gt/cnn/gan structure and error maps. psnr: cnn | ssim: cnn | pd: cnn | mt: cnn | direct: cnn | distributional: cnn | tail: cnn | physics: cnn"
+         data-groups="cnn_consensus_core topology_consensus_cnn">
+  <div class="sample-meta">
+    <h2>Sample 163</h2>
+    <div class="winner-strip">PSNR: CNN | SSIM: CNN | PD: CNN | MT: CNN | Direct: CNN | Distributional: CNN | Tail: CNN | Physics: CNN</div>
+
+    <div class="meta-block">
+      <div class="meta-label">Question</div>
+      <div class="meta-value">Inspect GT/CNN/GAN structure and error maps.</div>
+    </div>
+
+    <div class="meta-block">
+      <div class="meta-label">Groups</div>
+      <div class="tag-list"><span class="tag">cnn consensus core</span>
+<span class="tag">topology consensus cnn</span></div>
+    </div>
+
+    <div class="meta-block links"><a href="panels_crop160/sample_163_speed_error_crop.png" target="_blank">Open crop panel</a></div>
+  </div>
+
+  <div class="sample-preview"><a href="panels_crop160/sample_163_speed_error_crop.png" target="_blank"><img src="panels_crop160/sample_163_speed_error_crop.png" alt="Sample 163 preview"></a></div>
+</article>
+
+  </section>
+</div>
+
+<script>
+const searchBox = document.getElementById("searchBox");
+const clearBtn = document.getElementById("clearBtn");
+const cards = Array.from(document.querySelectorAll(".sample-card"));
+const buttons = Array.from(document.querySelectorAll(".group-filter"));
+const visibleCount = document.getElementById("visibleCount");
+
+function activeGroups() {
+  return buttons.filter(b => b.classList.contains("active")).map(b => b.dataset.group);
+}
+
+function applyFilters() {
+  const q = searchBox.value.trim().toLowerCase();
+  const groups = activeGroups();
+  let visible = 0;
+
+  cards.forEach(card => {
+    const text = card.dataset.search || "";
+    const cardGroups = (card.dataset.groups || "").split(/\s+/).filter(Boolean);
+
+    const queryMatch = !q || text.includes(q);
+    const groupMatch = groups.length === 0 || groups.every(g => cardGroups.includes(g));
+
+    const show = queryMatch && groupMatch;
+    card.style.display = show ? "" : "none";
+    if (show) visible++;
+  });
+
+  visibleCount.textContent = visible;
+}
+
+buttons.forEach(b => b.addEventListener("click", () => {
+  b.classList.toggle("active");
+  applyFilters();
+}));
+
+searchBox.addEventListener("input", applyFilters);
+
+clearBtn.addEventListener("click", () => {
+  searchBox.value = "";
+  buttons.forEach(b => b.classList.remove("active"));
+  applyFilters();
+});
+
+applyFilters();
+</script>
 </body>
 </html>
