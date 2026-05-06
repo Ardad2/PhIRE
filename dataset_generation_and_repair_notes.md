@@ -2943,3 +2943,234 @@ This stage should be used carefully. The visual panels can support or weaken the
 
 > PD--MT disagreement identifies candidate structural-hallucination cases that require visual inspection.
 
+
+---
+
+# Part XI — Full physics/domain breakdown tables and browser dashboard
+
+## Purpose
+
+This stage was added after the qualitative visual-inspection work to make the physics/domain metric decomposition easier to audit across **all 168 samples**, not only the manually inspected MT-GAN subset. The goal is to support three additional checks:
+
+1. inspect the physics/domain metric breakdown for every sample,
+2. separate rare `PD = CNN` cases and GAN-majority cases,
+3. identify adjacent sample-index transitions where MT or the 15-measure physics/domain majority changes.
+
+This stage should be treated as an audit and interpretation layer on top of the repaired/final outputs. It does not regenerate model outputs or topology distances; it reorganizes the existing final merged/sweep tables into easier-to-read CSV and HTML views.
+
+## Script added
+
+```text
+scripts/generate_full_physics_domain_breakdown.py
+```
+
+The current version of this script is designed to be run from the `scripts/` directory. It detects the repository root as the parent directory when run from `~/PhIRE/scripts`.
+
+The script reads:
+
+```text
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+```
+
+It also uses the following optional metadata files when available:
+
+```text
+ttk_runs_fixed/observation_groups/observation_groups_per_sample.csv
+ttk_runs_fixed/visual_inspection/visual_inspection_manifest.csv
+```
+
+The optional metadata files are used only to enrich the output tables with group labels, recommendation labels, and selector/group winners. The core physics/domain metric breakdown comes from the wide metric-sweep CSV.
+
+## Command to run on Spark
+
+```bash
+cd ~/PhIRE/scripts
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_full_physics_domain_breakdown.py
+```
+
+Expected printed paths:
+
+```text
+repo_root=/home/adadhwal/PhIRE
+input=/home/adadhwal/PhIRE/ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+outdir=/home/adadhwal/PhIRE/ttk_runs_fixed/report_tables/full_physics_domain_breakdown
+html=/home/adadhwal/PhIRE/ttk_runs_fixed/report_tables/full_physics_domain_breakdown/physics_domain_breakdown_index.html
+```
+
+## Output directory
+
+```text
+ttk_runs_fixed/report_tables/full_physics_domain_breakdown/
+```
+
+## Generated CSV outputs
+
+The script writes:
+
+```text
+physics_domain_breakdown_all_samples.csv
+physics_domain_breakdown_non_mt_gan.csv
+physics_domain_breakdown_mt_gan.csv
+physics_domain_breakdown_pd_cnn_cases.csv
+physics_domain_breakdown_gan_majority_cases.csv
+physics_domain_breakdown_gan_majority_mt_not_gan.csv
+physics_domain_breakdown_mt_gan_strong_moderate_lower.csv
+adjacency_runs_all_samples.csv
+adjacency_runs_mt_gan.csv
+adjacency_runs_gan_majority.csv
+adjacency_transition_pairs.csv
+summary_counts.csv
+README_full_physics_domain_breakdown.md
+```
+
+## Generated web dashboard
+
+The script also writes a static HTML dashboard:
+
+```text
+physics_domain_breakdown_index.html
+```
+
+Open it locally or through the repository browser after pushing:
+
+```bash
+open ttk_runs_fixed/report_tables/full_physics_domain_breakdown/physics_domain_breakdown_index.html
+```
+
+On Spark or another remote machine, the file can be downloaded or opened through a GitHub raw/local preview workflow.
+
+The dashboard contains:
+
+- summary cards for total samples, MT-GAN cases, PD-CNN cases, GAN-majority cases, GAN-majority / MT-not-GAN cases, and adjacent transition pairs,
+- searchable/filterable all-sample table,
+- presets for MT-GAN, PD-CNN, GAN-majority, GAN-majority-but-MT-not-GAN, and Strong/Moderate/Lower MT-GAN tiers,
+- per-sample expandable 15-measure physics/domain breakdown,
+- links to all generated CSVs,
+- adjacency-transition cards for neighboring sample IDs where MT or the physics/domain majority changes.
+
+## Measures included
+
+The 15 physics/domain measures are:
+
+```text
+WPD Bias |·|
+WPD MAE
+WPD RMSE
+WPD Wasserstein-1
+PSD log-L2
+PSD slope |Δ|
+Gradient MAE
+Gradient Wasserstein-1
+Gradient kurtosis |Δ|
+Exceedance |Δ|, s>5
+Exceedance |Δ|, s>10
+Exceedance |Δ|, s>15
+Exceedance |Δ|, p90
+Exceedance |Δ|, p95
+Exceedance |Δ|, p99
+```
+
+For all measures, the winner is the model with the lower error. For signed quantities such as WPD bias, PSD slope delta, gradient-kurtosis delta, and exceedance deltas, the comparison uses absolute error relative to GT.
+
+## Important generated subsets
+
+### 1. `physics_domain_breakdown_pd_cnn_cases.csv`
+
+This file isolates the rare cases where the persistence-diagram selector picks CNN instead of GAN. Since PD is otherwise strongly GAN-favoring, these cases are important controls. They help show that topology is not mechanically forced to prefer GAN.
+
+### 2. `physics_domain_breakdown_gan_majority_cases.csv`
+
+This file isolates samples where GAN wins a majority of the 15 physics/domain measures. These are the strongest non-topological candidates for cases where GAN may be doing something scientifically meaningful despite losing conservative metrics such as PSNR/SSIM.
+
+### 3. `physics_domain_breakdown_gan_majority_mt_not_gan.csv`
+
+This file is especially important. It contains cases where GAN wins the majority of the 15 physics/domain measures but MT does **not** select GAN. These are counterexamples to a simple interpretation that MT only follows distributional/tail metrics. They should be visually inspected as cases where GAN may match distributional statistics but fail spatial/hierarchical organization.
+
+### 4. `adjacency_transition_pairs.csv`
+
+This file identifies adjacent sample-index pairs where either the MT winner or the physics/domain majority changes. Because the dataset consists of consecutive hourly samples, adjacent IDs may represent a slowly evolving meteorological regime. These transition pairs are useful for asking:
+
+> What changed between two neighboring timesteps such that MT flipped, or such that GAN/CNN physics-domain majority flipped?
+
+## Recommended visual follow-up
+
+After running this script, inspect in this order:
+
+1. `physics_domain_breakdown_gan_majority_mt_not_gan.csv`  
+   These are the strongest counterexamples to the idea that MT merely follows GAN-friendly physics/domain metrics.
+
+2. `physics_domain_breakdown_pd_cnn_cases.csv`  
+   These are rare topology-consensus or PD-CNN control cases.
+
+3. `adjacency_transition_pairs.csv`  
+   These are useful for temporal/adjacent-sample reasoning.
+
+4. `physics_domain_breakdown_gan_majority_cases.csv`  
+   These are candidate samples where GAN has broader physics/domain support and may deserve visual inspection even when MT does not select GAN.
+
+## Interpretation note
+
+This dashboard should be used as an interpretive audit, not as a new ground truth. A safe interpretation is:
+
+> CNN remains consistently strong on conservative pointwise and energy-error measures, while GAN often wins distributional, spectral, gradient-distribution, and tail-oriented measures. MT should be interpreted as a structural diagnostic that may agree with GAN when the added GAN structure is hierarchically meaningful, but it may reject GAN even when GAN wins several distributional or tail measures.
+
+The useful scientific question is therefore not simply which model wins, but which notion of quality each metric family is measuring.
+
+## Reproducibility status
+
+This stage is reproducible from:
+
+```text
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+```
+
+and optionally enriched by:
+
+```text
+ttk_runs_fixed/observation_groups/observation_groups_per_sample.csv
+ttk_runs_fixed/visual_inspection/visual_inspection_manifest.csv
+```
+
+It is downstream of the report-table sweep, observation-group generation, and visual-inspection index generation.
+
+## Suggested Git commands
+
+```bash
+cd ~/PhIRE
+
+git add scripts/generate_full_physics_domain_breakdown.py
+git add dataset_generation_and_repair_notes.md
+
+git add -f ttk_runs_fixed/report_tables/full_physics_domain_breakdown/*.csv
+git add -f ttk_runs_fixed/report_tables/full_physics_domain_breakdown/*.md
+git add -f ttk_runs_fixed/report_tables/full_physics_domain_breakdown/*.html
+
+git commit -m "Add full physics-domain breakdown dashboard"
+git push origin $(git branch --show-current)
+```
+
+## Script inventory added during this audit phase
+
+The following scripts now form the reproducibility chain for the report-table, grouping, visual-inspection, and full-breakdown audits:
+
+```text
+scripts/generate_report_tables_and_metric_sweep.py
+scripts/generate_observation_groups.py
+scripts/generate_visual_inspection_panels.py
+scripts/generate_visual_inspection_index_with_metric_breakdown.py
+scripts/generate_full_physics_domain_breakdown.py
+```
+
+Recommended run order:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_report_tables_and_metric_sweep.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_index_with_metric_breakdown.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_full_physics_domain_breakdown.py
+```
+
+If a later script fails because an expected upstream CSV is missing, rerun the preceding script in this chain first.
