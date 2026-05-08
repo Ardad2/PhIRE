@@ -9,10 +9,18 @@ Colour scales are shared within each group per sample:
   - Speed columns (GT / Bicubic / CNN / GAN): same vmin / vmax
   - Error columns (|Bicubic-GT| / |CNN-GT| / |GAN-GT|): same vmin=0 / vmax
 
+If ttk_runs_fixed/baseline_metrics/all_methods_per_sample.csv is present,
+each sample card in index.html also shows a 15-row physics / domain breakdown
+table (Measure | Bicubic | CNN | GAN | Winner), with the winner determined
+by lower-is-better for all measures.
+
 Inputs (all under <repo>/data_out_fixed/):
     wind_mrhr_cnn/{idx,dataIN,dataGT,dataSR}.npy
     wind_mrhr_gan/{idx,dataIN,dataGT,dataSR}.npy
     wind_mrhr_bicubic/{idx,dataIN,dataGT,dataSR}.npy
+
+Optional:
+    ttk_runs_fixed/baseline_metrics/all_methods_per_sample.csv
 
 Outputs:
     ttk_runs_fixed/baseline_visual_panels/
@@ -30,10 +38,12 @@ Run from scripts/ or the repo root:
 from __future__ import annotations
 
 import argparse
+import csv
 import html
+import math
 import sys
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -57,7 +67,8 @@ CNN_DIR   = DATA_ROOT / "wind_mrhr_cnn"
 GAN_DIR   = DATA_ROOT / "wind_mrhr_gan"
 BIC_DIR   = DATA_ROOT / "wind_mrhr_bicubic"
 
-OUT_DIR   = REPO_ROOT / "ttk_runs_fixed" / "baseline_visual_panels"
+OUT_DIR      = REPO_ROOT / "ttk_runs_fixed" / "baseline_visual_panels"
+METRICS_CSV  = REPO_ROOT / "ttk_runs_fixed" / "baseline_metrics" / "all_methods_per_sample.csv"
 
 DEFAULT_SAMPLES: List[int] = [
     10, 11, 12, 13, 17, 19, 25,
@@ -65,6 +76,179 @@ DEFAULT_SAMPLES: List[int] = [
     90, 91, 92, 93,
     154, 162, 163,
 ]
+
+
+# ---------------------------------------------------------------------------
+# Physics metric table definitions
+# ---------------------------------------------------------------------------
+
+# (display label, CSV column, needs_abs)
+# needs_abs=True  → value is signed in the CSV; we take abs before comparing
+# needs_abs=False → CSV already stores the absolute / unsigned version
+_PHYSICS_MEASURES: List[Tuple[str, str, bool]] = [
+    ("WPD bias |·|",          "wpd_bias",                   True),
+    ("WPD MAE",               "wpd_mae",                    False),
+    ("WPD RMSE",              "wpd_rmse",                   False),
+    ("WPD Wasserstein-1",     "wpd_w1",                     False),
+    ("PSD log-L2",            "psd_log_l2",                 False),
+    ("PSD slope |Δ|",         "psd_slope_abs_delta",        False),
+    ("Gradient MAE",          "grad_mae",                   False),
+    ("Gradient Wasserstein-1","grad_w1",                    False),
+    ("Gradient kurtosis |Δ|", "grad_kurtosis_abs_delta",    False),
+    ("Exceedance |Δ|, s > 5", "exceed_frac_abs_delta_t5",   False),
+    ("Exceedance |Δ|, s > 10","exceed_frac_abs_delta_t10",  False),
+    ("Exceedance |Δ|, s > 15","exceed_frac_abs_delta_t15",  False),
+    ("Exceedance |Δ|, p90",   "exceed_frac_abs_delta_p90",  False),
+    ("Exceedance |Δ|, p95",   "exceed_frac_abs_delta_p95",  False),
+    ("Exceedance |Δ|, p99",   "exceed_frac_abs_delta_p99",  False),
+]
+
+# Canonical method names as they appear in the Winner column.
+# The CSV loader normalises whatever strings it finds to these keys.
+_METHODS = ("bicubic", "cnn", "gan")
+_METHOD_LABELS = {"bicubic": "Bicubic", "cnn": "CNN", "gan": "GAN"}
+
+# PhysicsData maps (normalised_method, sample_idx) → {col: raw_string}
+PhysicsData = Dict[Tuple[str, int], Dict[str, str]]
+
+
+def _normalise_method(raw: str) -> Optional[str]:
+    """Map raw method string from CSV to one of ('bicubic', 'cnn', 'gan')."""
+    s = raw.strip().lower()
+    # accept prefixed names like "wind_mrhr_cnn" or "mrhr_bicubic"
+    for key in _METHODS:
+        if key in s:
+            return key
+    return None
+
+
+def _load_physics_csv(path: Path) -> Optional[PhysicsData]:
+    """Load all_methods_per_sample.csv into a (method, sample_idx) → row dict.
+
+    Returns None (with a printed warning) if the file is missing or malformed.
+    Missing method / sample_idx columns are also reported and None returned.
+    """
+    if not path.exists():
+        print(f"  [info] Physics CSV not found — skipping table: {path}")
+        return None
+    try:
+        with path.open(newline="") as f:
+            rows = list(csv.DictReader(f))
+    except Exception as exc:
+        print(f"  [warn] Could not read physics CSV ({exc}) — skipping table.")
+        return None
+
+    if not rows:
+        print("  [warn] Physics CSV is empty — skipping table.")
+        return None
+
+    # Detect method and sample_idx columns
+    method_col  = next((c for c in rows[0] if c.strip().lower() in ("method", "model")), None)
+    sample_col  = next(
+        (c for c in rows[0] if c.strip().lower() in ("sample_idx", "sample", "idx", "sidx", "index")),
+        None,
+    )
+    if method_col is None or sample_col is None:
+        print(
+            f"  [warn] Physics CSV missing 'method' or 'sample_idx' column "
+            f"(found: {list(rows[0].keys())[:10]}) — skipping table."
+        )
+        return None
+
+    data: PhysicsData = {}
+    skipped = 0
+    for r in rows:
+        meth = _normalise_method(r.get(method_col, ""))
+        try:
+            si = int(float(r.get(sample_col, "nan")))
+        except (ValueError, TypeError):
+            skipped += 1
+            continue
+        if meth is None:
+            skipped += 1
+            continue
+        data[(meth, si)] = r
+
+    if skipped:
+        print(f"  [info] Physics CSV: skipped {skipped} unrecognised rows.")
+    print(
+        f"  Physics CSV loaded — {len(data)} (method, sample) entries "
+        f"from {path.name}"
+    )
+    return data
+
+
+def _fval(row: Dict[str, str], col: str, needs_abs: bool) -> Optional[float]:
+    """Extract a float from a CSV row, optionally taking abs; returns None on NaN/missing."""
+    raw = row.get(col)
+    if raw is None:
+        # try the abs_delta variant automatically
+        alt = col.replace("_delta", "_abs_delta") if "_delta" in col else None
+        if alt:
+            raw = row.get(alt)
+    if raw is None:
+        return None
+    try:
+        v = float(raw)
+        if math.isnan(v) or math.isinf(v):
+            return None
+        return abs(v) if needs_abs else v
+    except (ValueError, TypeError):
+        return None
+
+
+def _physics_table_html(si: int, physics: PhysicsData) -> str:
+    """Return an HTML table fragment for the physics breakdown of sample si.
+
+    Returns an empty string if none of the three methods have data for si.
+    """
+    rows_by_method = {m: physics.get((m, si)) for m in _METHODS}
+    if all(r is None for r in rows_by_method.values()):
+        return (
+            '<p style="color:#999;font-size:0.85em;margin:0.5em 0">'
+            "Physics metrics not available for this sample.</p>"
+        )
+
+    # Build table rows
+    tbody_rows: List[str] = []
+    for label, col, needs_abs in _PHYSICS_MEASURES:
+        vals: Dict[str, Optional[float]] = {
+            m: _fval(rows_by_method[m], col, needs_abs) if rows_by_method[m] else None
+            for m in _METHODS
+        }
+        # Determine winner (lowest non-None value)
+        finite = {m: v for m, v in vals.items() if v is not None}
+        winner: Optional[str] = min(finite, key=lambda m: finite[m]) if finite else None
+
+        cells: List[str] = [f'<td class="m-label">{html.escape(label)}</td>']
+        for m in _METHODS:
+            v = vals[m]
+            is_win = (m == winner) and (winner is not None)
+            cls = ' class="winner"' if is_win else ""
+            text = f"{v:.5g}" if v is not None else "—"
+            cells.append(f"<td{cls}>{html.escape(text)}</td>")
+        # Winner label cell
+        if winner is not None:
+            w_label = html.escape(_METHOD_LABELS[winner])
+            cells.append(f'<td class="winner-label">{w_label}</td>')
+        else:
+            cells.append('<td class="winner-label">—</td>')
+
+        tbody_rows.append("<tr>" + "".join(cells) + "</tr>")
+
+    tbody = "\n      ".join(tbody_rows)
+    return f"""<table class="phys-table">
+  <thead>
+    <tr>
+      <th>Measure</th>
+      <th>Bicubic</th><th>CNN</th><th>GAN</th>
+      <th>Winner</th>
+    </tr>
+  </thead>
+  <tbody>
+      {tbody}
+  </tbody>
+</table>"""
 
 
 # ---------------------------------------------------------------------------
@@ -198,45 +382,147 @@ def _plot_panel(
 # HTML index
 # ---------------------------------------------------------------------------
 
-def _write_index(out_dir: Path, sample_indices: List[int]) -> Path:
-    """Write a minimal index.html linking all generated panel PNGs."""
-    rows_html = []
+def _write_index(
+    out_dir: Path,
+    sample_indices: List[int],
+    physics: Optional[PhysicsData],
+) -> Path:
+    """Write index.html with one white card per sample.
+
+    Each card contains the panel image and, if physics data is available,
+    a 15-row physics/domain breakdown table.
+    """
+    cards: List[str] = []
     for si in sample_indices:
-        fname = _panel_filename(si)
-        fpath = out_dir / fname
-        exists_mark = "" if fpath.exists() else " ⚠ missing"
-        escaped = html.escape(fname)
-        rows_html.append(
-            f'  <div class="panel">\n'
-            f'    <p><strong>Sample {si}</strong>{html.escape(exists_mark)}</p>\n'
-            f'    <a href="{escaped}">'
-            f'<img src="{escaped}" alt="sample {si}" width="1200"></a>\n'
-            f'  </div>'
+        fname   = _panel_filename(si)
+        fpath   = out_dir / fname
+        missing = "" if fpath.exists() else " <span class='warn'>⚠ image missing</span>"
+        esc_fname = html.escape(fname)
+
+        # physics table (empty string when not available)
+        phys_html = _physics_table_html(si, physics) if physics is not None else (
+            '<p class="phys-missing">Physics CSV not loaded — '
+            'run baseline_metrics pipeline first.</p>'
         )
 
-    content = "\n".join(rows_html)
+        cards.append(f"""  <div class="card">
+    <h2>Sample {si}{missing}</h2>
+    <a href="{esc_fname}">
+      <img src="{esc_fname}" alt="sample {si} comparison panel" loading="lazy">
+    </a>
+    <div class="phys-section">
+      <h3>Physics / domain breakdown</h3>
+      {phys_html}
+    </div>
+  </div>""")
+
+    cards_html = "\n".join(cards)
+
+    has_phys = physics is not None
+    phys_note = (
+        "Physics breakdown is shown below each panel "
+        "(lower&nbsp;=&nbsp;better;&nbsp;winner&nbsp;highlighted&nbsp;in&nbsp;green)."
+        if has_phys else
+        "Physics CSV not found — run the baseline_metrics pipeline to add the table."
+    )
+
     page = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Baseline visual panels — CNN / GAN / Bicubic</title>
+<title>Baseline visual panels — Bicubic / CNN / GAN</title>
 <style>
-  body {{ font-family: sans-serif; background: #111; color: #eee; }}
-  h1   {{ font-size: 1.2em; margin: 1em; }}
-  .panel {{ margin: 1.5em 1em; border-bottom: 1px solid #333; padding-bottom: 1em; }}
-  .panel p {{ margin: 0 0 0.4em; }}
-  img {{ max-width: 100%; display: block; }}
+  /* ---- page ---- */
+  *, *::before, *::after {{ box-sizing: border-box; }}
+  body {{
+    font-family: system-ui, sans-serif;
+    background: #f0f2f5;
+    color: #1a1a1a;
+    margin: 0;
+    padding: 1.5em;
+  }}
+  h1 {{ font-size: 1.25em; margin: 0 0 0.35em; }}
+  .intro {{ color: #555; font-size: 0.9em; margin: 0 0 1.5em; line-height: 1.5; }}
+
+  /* ---- white cards ---- */
+  .card {{
+    background: #fff;
+    border: 1px solid #dde1e7;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    margin-bottom: 2em;
+    padding: 1.25em 1.5em;
+  }}
+  .card h2 {{
+    font-size: 1em;
+    margin: 0 0 0.75em;
+    color: #222;
+  }}
+  .warn {{ color: #b45309; }}
+  .card img {{
+    display: block;
+    max-width: 100%;
+    border-radius: 4px;
+    margin-bottom: 1em;
+  }}
+
+  /* ---- physics section ---- */
+  .phys-section h3 {{
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #666;
+    margin: 0 0 0.5em;
+  }}
+  .phys-missing {{ color: #999; font-size: 0.85em; margin: 0; }}
+
+  /* ---- physics table ---- */
+  .phys-table {{
+    border-collapse: collapse;
+    font-size: 0.82em;
+    width: 100%;
+    margin: 0;
+  }}
+  .phys-table th {{
+    background: #f7f8fa;
+    color: #444;
+    font-weight: 600;
+    text-align: left;
+    padding: 5px 10px;
+    border: 1px solid #e2e5ea;
+  }}
+  .phys-table td {{
+    padding: 4px 10px;
+    border: 1px solid #e2e5ea;
+    color: #222;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }}
+  .phys-table td.m-label {{ color: #444; font-weight: 500; }}
+  .phys-table tr:nth-child(even) td {{ background: #fafbfc; }}
+  .phys-table td.winner {{
+    background: #d1fae5;
+    color: #065f46;
+    font-weight: 700;
+  }}
+  .phys-table td.winner-label {{
+    background: #ecfdf5;
+    color: #047857;
+    font-weight: 600;
+  }}
 </style>
 </head>
 <body>
 <h1>Baseline visual panels: GT | Bicubic | CNN SR | GAN SR | errors (speed m/s)</h1>
-<p style="margin:0 1em 1em">
-  Columns: GT speed | Bicubic speed | CNN speed | GAN speed |
-  |Bicubic−GT| | |CNN−GT| | |GAN−GT|<br>
-  Speed columns share one colour scale per sample.
-  Error columns share one colour scale per sample.
+<p class="intro">
+  <strong>Panel columns:</strong>
+  GT speed &nbsp;|&nbsp; Bicubic speed &nbsp;|&nbsp; CNN speed &nbsp;|&nbsp; GAN speed &nbsp;|&nbsp;
+  |Bicubic&minus;GT| &nbsp;|&nbsp; |CNN&minus;GT| &nbsp;|&nbsp; |GAN&minus;GT|<br>
+  Speed columns share one colour scale per sample &mdash;
+  error columns share one colour scale per sample.<br>
+  {phys_note}
 </p>
-{content}
+{cards_html}
 </body>
 </html>
 """
@@ -255,6 +541,8 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--gan-dir",     type=Path, default=GAN_DIR)
     ap.add_argument("--bicubic-dir", type=Path, default=BIC_DIR)
     ap.add_argument("--outdir",      type=Path, default=OUT_DIR)
+    ap.add_argument("--metrics-csv", type=Path, default=METRICS_CSV,
+                    help="Path to all_methods_per_sample.csv (omit to skip physics table)")
     ap.add_argument(
         "--samples", nargs="*", type=int, default=None,
         help="Sample indices to render (default: hard-coded 18-sample set)",
@@ -273,12 +561,17 @@ def main() -> int:
     print(f"  CNN dir     : {args.cnn_dir}")
     print(f"  GAN dir     : {args.gan_dir}")
     print(f"  Bicubic dir : {args.bicubic_dir}")
+    print(f"  Metrics CSV : {args.metrics_csv}")
     print(f"  Output dir  : {args.outdir}")
     print(f"  Samples     : {samples}")
     print("=" * 65)
 
-    # ---- load ---------------------------------------------------------------
-    print("\n[1] Loading arrays …")
+    # ---- load physics CSV ---------------------------------------------------
+    print("\n[1] Loading physics CSV …")
+    physics = _load_physics_csv(args.metrics_csv)
+
+    # ---- load arrays --------------------------------------------------------
+    print("\n[2] Loading arrays …")
     cnn_idx, cnn_in, cnn_gt, cnn_sr = _load_arrays(args.cnn_dir)
     gan_idx, gan_in, gan_gt, gan_sr = _load_arrays(args.gan_dir)
     bic_idx, bic_in, bic_gt, bic_sr = _load_arrays(args.bicubic_dir)
@@ -288,7 +581,7 @@ def main() -> int:
     print(f"  Bic  GT={bic_gt.shape} SR={bic_sr.shape} dtype={bic_gt.dtype}")
 
     # ---- verify -------------------------------------------------------------
-    print("\n[2] Verifying alignment …")
+    print("\n[3] Verifying alignment …")
     _verify_alignment(cnn_idx, gan_idx, bic_idx, cnn_gt, gan_gt, bic_gt)
 
     # ---- check sample bounds ------------------------------------------------
@@ -298,7 +591,7 @@ def main() -> int:
         raise SystemExit(f"[error] Sample indices out of range [0, {n-1}]: {bad}")
 
     # ---- render panels ------------------------------------------------------
-    print(f"\n[3] Rendering {len(samples)} panels …")
+    print(f"\n[4] Rendering {len(samples)} panels …")
     generated: List[int] = []
     for si in samples:
         print(f"  sample {si} …", end=" ", flush=True)
@@ -314,8 +607,8 @@ def main() -> int:
         print("done")
 
     # ---- HTML index ---------------------------------------------------------
-    print("\n[4] Writing index.html …")
-    idx_path = _write_index(args.outdir, samples)
+    print("\n[5] Writing index.html …")
+    idx_path = _write_index(args.outdir, samples, physics)
     print(f"  {idx_path}")
 
     # ---- summary ------------------------------------------------------------
