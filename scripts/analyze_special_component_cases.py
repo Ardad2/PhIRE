@@ -3,32 +3,38 @@
 
 Reads the component_counts_per_sample.csv produced by
 analyze_component_counts_all_baselines.py and produces focused reports for
-the curated sample groups defined in generate_visual_inspection_panels.py:
-  - Adjacent MT-GAN cluster 10–13  (anchor: 12)
-  - Adjacent MT-GAN cluster 76–78  (anchor: 77)
-  - Adjacent MT-GAN cluster 90–93  (anchor: 92)
-  - Ridge-rich motif 16–20         (anchors: 17, 19)
-  - Rare PD-CNN/MT-CNN cluster 161–164
-  - Lower-confidence limitation cases (25, 80, 154)
+curated and dynamically-discovered sample groups.
 
-For each sample a per-threshold winner signature, GAN bias direction, and
-an interpretation label from a fixed vocabulary are derived:
-  GAN_component_strong                  — GAN wins ≥ 4 of 6 thresholds
-  GAN_component_low_threshold_only      — GAN wins at low speeds only
-  GAN_component_overfragmented_high_threshold — GAN over-fragments at high percentiles
-  CNN_component_control                 — CNN wins ≥ 4 of 6 thresholds
-  mixed_or_ambiguous                    — no dominant winner
+Curated groups (static):
+  cluster 10–13  (MT-GAN anchor: 12)
+  cluster 76–78  (MT-GAN anchor: 77)
+  cluster 90–93  (MT-GAN anchor: 92)
+  ridge motif 16–20 (MT-GAN anchors: 17, 19)
+  cluster 161–164 (rare PD-CNN/MT-CNN)
+  limitation cases 25, 80, 154
+
+Dynamic groups (from manifest):
+  all_mt_gan               — every sample where mt_winner == GAN
+  gan_majority_but_mt_not_gan — samples whose metric majority is GAN but MT is not
+
+Interpretation labels (component-count winner analysis):
+  GAN_component_strong                       GAN wins ≥ 4 / 6 thresholds
+  GAN_component_low_threshold_only           GAN leads at t5/t10 only
+  GAN_component_overfragmented_high_threshold GAN over-fragments at high percentiles
+  CNN_component_control                      CNN wins ≥ 4 / 6 thresholds
+  mixed_or_ambiguous                         no clear winner
 
 Inputs
 ------
-  ttk_runs_fixed/component_counts/component_counts_per_sample.csv  (required)
-  ttk_runs_fixed/baseline_metrics/all_methods_per_sample.csv       (optional)
+  ttk_runs_fixed/component_counts/component_counts_per_sample.csv   (required)
+  ttk_runs_fixed/baseline_visual_panels/baseline_visual_manifest.csv (optional)
+  ttk_runs_fixed/baseline_metrics/all_methods_per_sample.csv        (optional)
 
 Outputs (under ttk_runs_fixed/component_counts/)
 -------
-  special_component_case_summary.csv    — one row per special sample
-  special_component_case_thresholds.csv — one row per (sample, threshold)
-  special_component_case_report.html    — grouped HTML report with panel links
+  special_component_case_summary.csv
+  special_component_case_thresholds.csv
+  special_component_case_report.html
 
 Run from repo root or scripts/:
     cd ~/PhIRE
@@ -55,12 +61,13 @@ import numpy as np
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT  = SCRIPT_DIR.parent
 
-COMP_CSV = REPO_ROOT / "ttk_runs_fixed" / "component_counts" / "component_counts_per_sample.csv"
-PHYS_CSV = REPO_ROOT / "ttk_runs_fixed" / "baseline_metrics" / "all_methods_per_sample.csv"
-OUT_DIR  = REPO_ROOT / "ttk_runs_fixed" / "component_counts"
+COMP_CSV     = REPO_ROOT / "ttk_runs_fixed" / "component_counts" / "component_counts_per_sample.csv"
+MANIFEST_CSV = REPO_ROOT / "ttk_runs_fixed" / "baseline_visual_panels" / "baseline_visual_manifest.csv"
+PHYS_CSV     = REPO_ROOT / "ttk_runs_fixed" / "baseline_metrics" / "all_methods_per_sample.csv"
+OUT_DIR      = REPO_ROOT / "ttk_runs_fixed" / "component_counts"
 
-# Relative path from OUT_DIR to baseline visual panels index.
-_PANELS_REL = "../../baseline_visual_panels/index.html"
+# Relative path from OUT_DIR to the baseline visual panels index.
+_PANELS_REL = "../baseline_visual_panels/index.html"
 
 
 # ---------------------------------------------------------------------------
@@ -97,24 +104,34 @@ FORCED: Dict[int, str] = {
     154: "lower-confidence MT-GAN limitation case",
 }
 
-# Each group: (id, display title, list of sample indices)
-GROUPS: List[Tuple[str, str, List[int]]] = [
-    ("cluster_10_13",     "Adjacent cluster 10–13 (MT-GAN anchor: 12)",              [10, 11, 12, 13]),
-    ("cluster_76_78",     "Adjacent cluster 76–78 (MT-GAN anchor: 77)",              [76, 77, 78]),
-    ("cluster_90_93",     "Adjacent cluster 90–93 (MT-GAN anchor: 92)",              [90, 91, 92, 93]),
-    ("ridge_motif_16_20", "Ridge-rich motif 16–20 (MT-GAN anchors: 17, 19)",         [16, 17, 18, 19, 20]),
-    ("cluster_161_164",   "Rare PD-CNN/MT-CNN cluster 161–164",                      [161, 162, 163, 164]),
-    ("limitation_cases",  "Lower-confidence MT-GAN limitation cases (25, 80, 154)",  [25, 80, 154]),
+# Static curated groups: (id, display title, sample list)
+_STATIC_GROUPS: List[Tuple[str, str, List[int]]] = [
+    ("cluster_10_13",     "Adjacent cluster 10–13 (MT-GAN anchor: 12)",             [10, 11, 12, 13]),
+    ("cluster_76_78",     "Adjacent cluster 76–78 (MT-GAN anchor: 77)",             [76, 77, 78]),
+    ("cluster_90_93",     "Adjacent cluster 90–93 (MT-GAN anchor: 92)",             [90, 91, 92, 93]),
+    ("ridge_motif_16_20", "Ridge-rich motif 16–20 (MT-GAN anchors: 17, 19)",        [16, 17, 18, 19, 20]),
+    ("cluster_161_164",   "Rare PD-CNN/MT-CNN cluster 161–164",                     [161, 162, 163, 164]),
+    ("limitation_cases",  "Lower-confidence MT-GAN limitation cases (25, 80, 154)", [25, 80, 154]),
 ]
 
 METHODS     = ("bicubic", "cnn", "gan")
 ALL_TLABELS = ["t5", "t10", "t15", "p90", "p95", "p99"]
-LOW_TLABELS  = ["t5", "t10", "t15"]    # fixed-threshold, lower speeds
-HIGH_TLABELS = ["p90", "p95", "p99"]   # percentile-threshold, high speeds
+LOW_TLABELS  = ["t5", "t10"]              # low-speed fixed thresholds
+HIGH_TLABELS = ["t15", "p90", "p95", "p99"]  # higher thresholds (fixed + percentile)
 
-# Physics columns to use when computing per-sample physics winner (lower-is-better)
+_MANIFEST_COLS = [
+    "pd_winner",
+    "mt_winner",
+    "direct_error_group_winner",
+    "distributional_group_winner",
+    "tail_group_winner",
+    "configured_physics_group_winner",
+    "groups",
+    "question",
+]
+
 _PHYS_COLS = [
-    "wpd_mae", "wpd_rmse", "wpd_w1",
+    "wpd_bias", "wpd_rmse", "wpd_mae", "wpd_w1",
     "psd_log_l2", "psd_slope_abs_delta",
     "grad_mae", "grad_w1", "grad_kurtosis_abs_delta",
     "exceed_frac_abs_delta_t5",  "exceed_frac_abs_delta_t10",
@@ -122,10 +139,36 @@ _PHYS_COLS = [
     "exceed_frac_abs_delta_p95", "exceed_frac_abs_delta_p99",
 ]
 
+_SUMMARY_FIELDS = [
+    "sample_idx", "group_name",
+    "pd_winner", "mt_winner",
+    "direct_error_group_winner", "distributional_group_winner",
+    "tail_group_winner", "configured_physics_group_winner",
+    "bicubic_wins", "cnn_wins", "gan_wins", "tie_count",
+    "gan_wins_low", "gan_wins_high",
+    "winner_signature", "gan_mean_bias", "gan_direction",
+    "interpretation_label",
+    "phys_bicubic_wins", "phys_cnn_wins", "phys_gan_wins", "phys_winner",
+    "groups", "question",
+    "forced_note",
+]
+
+_THRESHOLD_FIELDS = [
+    "sample_idx", "group_name",
+    "threshold_label", "threshold_name", "threshold_type", "threshold_value",
+    "gt_count", "bicubic_count", "cnn_count", "gan_count",
+    "bicubic_abs_error", "cnn_abs_error", "gan_abs_error",
+    "winner",
+]
+
 
 # ---------------------------------------------------------------------------
 # Loading helpers
 # ---------------------------------------------------------------------------
+
+def _to_int(s: str) -> int:
+    return int(float(str(s).strip()))
+
 
 def _load_component_csv(path: Path) -> Dict[int, Dict[str, Dict[str, str]]]:
     """Load component_counts_per_sample.csv → {sample_idx: {threshold_label: row}}."""
@@ -137,7 +180,7 @@ def _load_component_csv(path: Path) -> Dict[int, Dict[str, Dict[str, str]]]:
     with path.open(newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
             try:
-                sid = int(float(row["sample_idx"]))
+                sid = _to_int(row["sample_idx"])
             except (KeyError, ValueError):
                 continue
             tlabel = row.get("threshold_label", "").strip()
@@ -146,39 +189,60 @@ def _load_component_csv(path: Path) -> Dict[int, Dict[str, Dict[str, str]]]:
     return data
 
 
-def _load_physics_csv(path: Path) -> Optional[Dict[int, Dict[str, str]]]:
-    """Load all_methods_per_sample.csv and compute per-sample physics winner.
+def _load_manifest_csv(path: Path) -> Optional[Dict[int, Dict[str, str]]]:
+    """Load baseline_visual_manifest.csv → {sample_idx: row}.  Returns None if absent."""
+    if not path.exists():
+        print(f"[info] Manifest CSV not found (optional): {path}")
+        return None
+    try:
+        out: Dict[int, Dict[str, str]] = {}
+        with path.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                sid = None
+                for k in ("sample_idx", "sample_id", "sample"):
+                    if k in row:
+                        try:
+                            sid = _to_int(row[k])
+                        except (ValueError, TypeError):
+                            pass
+                        break
+                if sid is not None:
+                    out[sid] = dict(row)
+        print(f"  Loaded manifest for {len(out)} samples")
+        return out
+    except Exception as exc:
+        print(f"[info] Could not parse manifest CSV: {exc}")
+        return None
 
-    Returns None when the file is absent or unparseable.
-    Each entry: {"phys_bicubic_wins": str, "phys_cnn_wins": str,
-                 "phys_gan_wins": str, "phys_winner": str}.
+
+def _load_physics_csv(path: Path) -> Optional[Dict[int, Dict[str, str]]]:
+    """Load all_methods_per_sample.csv and return per-sample physics winner counts.
+
+    Returns None when absent or unparseable.
+    Result keys per sample: phys_bicubic_wins, phys_cnn_wins, phys_gan_wins, phys_winner.
     """
     if not path.exists():
         print(f"[info] Physics CSV not found (optional): {path}")
         return None
 
-    # Pivot to {sample_idx: {method: {col: val}}}
     by_sample: Dict[int, Dict[str, Dict[str, str]]] = {}
     try:
         with path.open(newline="", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
+            for row in csv.DictReader(f):
                 sid = None
                 for k in ("sample_idx", "sample_id", "sample"):
                     if k in row:
                         try:
-                            sid = int(float(row[k]))
+                            sid = _to_int(row[k])
                         except (ValueError, TypeError):
                             pass
                         break
                 if sid is None:
                     continue
-
-                raw = row.get("method", "").strip().lower()
+                raw    = row.get("method", "").strip().lower()
                 method = next((m for m in METHODS if m in raw), None)
                 if method is None:
                     continue
-
                 by_sample.setdefault(sid, {})[method] = dict(row)
     except Exception as exc:
         print(f"[info] Could not parse physics CSV: {exc}")
@@ -196,7 +260,7 @@ def _load_physics_csv(path: Path) -> Optional[Dict[int, Dict[str, str]]]:
                 if m not in by_method:
                     continue
                 try:
-                    v = float(by_method[m].get(col, "nan"))
+                    v = abs(float(by_method[m].get(col, "nan")))
                     if not math.isnan(v):
                         vals[m] = v
                 except (ValueError, TypeError):
@@ -207,7 +271,6 @@ def _load_physics_csv(path: Path) -> Optional[Dict[int, Dict[str, str]]]:
             best  = [m for m, v in vals.items() if v == min_v]
             if len(best) == 1:
                 wins[best[0]] += 1
-
         top = max(wins, key=wins.__getitem__)
         result[sid] = {
             "phys_bicubic_wins": str(wins["bicubic"]),
@@ -220,7 +283,57 @@ def _load_physics_csv(path: Path) -> Optional[Dict[int, Dict[str, str]]]:
 
 
 # ---------------------------------------------------------------------------
-# Per-sample analysis
+# Dynamic group construction
+# ---------------------------------------------------------------------------
+
+def _build_dynamic_groups(
+    manifest: Optional[Dict[int, Dict[str, str]]],
+) -> List[Tuple[str, str, List[int]]]:
+    """Return (all_mt_gan, gan_majority_but_mt_not_gan) groups from the manifest.
+
+    Returns two groups with empty sample lists when manifest is None.
+    """
+    if manifest is None:
+        return [
+            ("all_mt_gan",                "All MT-GAN samples (from manifest)", []),
+            ("gan_majority_but_mt_not_gan", "GAN metric-majority but MT rejects GAN", []),
+        ]
+
+    mt_gan: List[int] = []
+    gm: List[int] = []
+
+    for sid, m in manifest.items():
+        mt = m.get("mt_winner", "").strip().upper()
+        if mt == "GAN":
+            mt_gan.append(sid)
+
+        gtxt   = m.get("groups", "")
+        direct = m.get("direct_error_group_winner", "").strip().upper()
+        distr  = m.get("distributional_group_winner", "").strip().upper()
+        tail   = m.get("tail_group_winner", "").strip().upper()
+        phys   = m.get("configured_physics_group_winner", "").strip().upper()
+
+        votes = [v for v in (direct, distr, tail, phys) if v in {"BICUBIC", "CNN", "GAN"}]
+        majority_gan = (
+            votes.count("GAN") > max(votes.count("CNN"), votes.count("BICUBIC"), 0)
+            if votes else False
+        )
+        gtxt_l = gtxt.lower()
+        if (
+            "gan_majority_mt_rejects_gan" in gtxt_l
+            or ("gan_metric_majority" in gtxt_l and mt != "GAN")
+            or (majority_gan and mt != "GAN")
+        ):
+            gm.append(sid)
+
+    return [
+        ("all_mt_gan",                "All MT-GAN samples (from manifest)",       sorted(mt_gan)),
+        ("gan_majority_but_mt_not_gan", "GAN metric-majority but MT rejects GAN", sorted(set(gm))),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Per-sample component-count analysis
 # ---------------------------------------------------------------------------
 
 def _interpret(
@@ -230,10 +343,9 @@ def _interpret(
     gan_wins_high: int,
     gan_mean_bias: float,
 ) -> str:
-    """Assign one of five interpretation labels."""
     if gan_wins >= 4:
         return "GAN_component_strong"
-    if gan_wins_low >= 2 and gan_wins_high <= 1:
+    if gan_wins_low >= 1 and gan_wins_high <= 1:
         return "GAN_component_low_threshold_only"
     bias_ok = not math.isnan(gan_mean_bias)
     if gan_wins_high == 0 and bias_ok and gan_mean_bias > 1.0:
@@ -244,9 +356,9 @@ def _interpret(
 
 
 def analyse_sample(sid: int, thresholds: Dict[str, Dict[str, str]]) -> Dict:
-    """Derive summary statistics for one sample from its 6 threshold rows."""
-    wins:  Dict[str, int] = {m: 0 for m in METHODS}
-    ties   = 0
+    """Derive component-count summary statistics for one sample."""
+    wins: Dict[str, int] = {m: 0 for m in METHODS}
+    ties  = 0
     sig_parts: List[str] = []
     gan_biases: List[float] = []
     gan_wins_low  = 0
@@ -254,14 +366,15 @@ def analyse_sample(sid: int, thresholds: Dict[str, Dict[str, str]]) -> Dict:
 
     for tl in ALL_TLABELS:
         row = thresholds.get(tl, {})
-        w   = row.get("winner", "").strip()
+        w   = row.get("winner", "").strip().lower()
 
         if w in METHODS:
             wins[w] += 1
         elif w == "tie":
             ties += 1
 
-        sig_parts.append(f"{tl}={w or '?'}")
+        # Signature uses uppercase method names and semicolons
+        sig_parts.append(f"{tl}={w.upper() if w else '?'}")
 
         try:
             gan_n = float(row.get("gan_count", "nan"))
@@ -274,7 +387,7 @@ def analyse_sample(sid: int, thresholds: Dict[str, Dict[str, str]]) -> Dict:
         if w == "gan":
             if tl in LOW_TLABELS:
                 gan_wins_low  += 1
-            else:
+            elif tl in HIGH_TLABELS:
                 gan_wins_high += 1
 
     gan_mean_bias = float(np.mean(gan_biases)) if gan_biases else float("nan")
@@ -289,51 +402,62 @@ def analyse_sample(sid: int, thresholds: Dict[str, Dict[str, str]]) -> Dict:
     else:
         gan_direction = "unknown"
 
-    interpretation = _interpret(
-        wins["gan"], wins["cnn"], gan_wins_low, gan_wins_high, gan_mean_bias
-    )
-
     return {
-        "sample_idx":          sid,
-        "forced_note":         FORCED.get(sid, ""),
-        "bicubic_wins":        wins["bicubic"],
-        "cnn_wins":            wins["cnn"],
-        "gan_wins":            wins["gan"],
-        "tie_count":           ties,
-        "gan_wins_low":        gan_wins_low,
-        "gan_wins_high":       gan_wins_high,
-        "winner_signature":    ",".join(sig_parts),
-        "gan_mean_bias":       f"{gan_mean_bias:.3f}" if not math.isnan(gan_mean_bias) else "nan",
-        "gan_direction":       gan_direction,
-        "interpretation_label": interpretation,
+        "sample_idx":           sid,
+        "forced_note":          FORCED.get(sid, ""),
+        "bicubic_wins":         wins["bicubic"],
+        "cnn_wins":             wins["cnn"],
+        "gan_wins":             wins["gan"],
+        "tie_count":            ties,
+        "gan_wins_low":         gan_wins_low,
+        "gan_wins_high":        gan_wins_high,
+        "winner_signature":     ";".join(sig_parts),
+        "gan_mean_bias":        f"{gan_mean_bias:.3f}" if not math.isnan(gan_mean_bias) else "nan",
+        "gan_direction":        gan_direction,
+        "interpretation_label": _interpret(
+            wins["gan"], wins["cnn"], gan_wins_low, gan_wins_high, gan_mean_bias
+        ),
+        # Manifest fields — filled in later from manifest_by_idx
+        "pd_winner":                        "",
+        "mt_winner":                        "",
+        "direct_error_group_winner":        "",
+        "distributional_group_winner":      "",
+        "tail_group_winner":                "",
+        "configured_physics_group_winner":  "",
+        "groups":                           "",
+        "question":                         "",
+        # Physics fields — filled in later from physics loader
+        "phys_bicubic_wins": "",
+        "phys_cnn_wins":     "",
+        "phys_gan_wins":     "",
+        "phys_winner":       "",
     }
 
 
 # ---------------------------------------------------------------------------
-# CSV output
+# CSV helpers
 # ---------------------------------------------------------------------------
 
-def _write_csv(path: Path, rows: List[Dict]) -> None:
+def _write_csv(path: Path, rows: List[Dict], fields: List[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if not rows:
         return
-    cols = list(rows[0].keys())
     with path.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
+        w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
         w.writeheader()
         for r in rows:
             w.writerow(r)
 
 
 # ---------------------------------------------------------------------------
-# HTML report
+# HTML helpers
 # ---------------------------------------------------------------------------
 
 _INTERP_DESC: Dict[str, str] = {
     "GAN_component_strong":
         "GAN wins ≥ 4 of 6 thresholds — consistently better component structure",
     "GAN_component_low_threshold_only":
-        "GAN leads at low-speed thresholds only; advantage fades at high speeds",
+        "GAN leads at t5/t10 only; advantage disappears at higher thresholds",
     "GAN_component_overfragmented_high_threshold":
         "GAN over-fragments at high speed percentiles relative to GT",
     "CNN_component_control":
@@ -364,7 +488,7 @@ def _esc(s: object) -> str:
 
 def _fmt(val: object) -> str:
     try:
-        return f"{float(val):.2f}"   # type: ignore[arg-type]
+        return f"{float(val):.2f}"  # type: ignore[arg-type]
     except (ValueError, TypeError):
         return _esc(val)
 
@@ -373,11 +497,11 @@ def _threshold_table_html(thresholds: Dict[str, Dict[str, str]]) -> str:
     rows_html = ""
     for tl in ALL_TLABELS:
         row = thresholds.get(tl, {})
-        w   = row.get("winner", "").strip()
+        w   = row.get("winner", "").strip().lower()
         bg  = _WINNER_BG.get(w, "#f9fafb")
 
-        def _c(col: str) -> str:
-            return _fmt(row.get(col, "—"))
+        def _c(col: str, _row: Dict = row) -> str:
+            return _fmt(_row.get(col, "—"))
 
         rows_html += (
             f"<tr>"
@@ -392,7 +516,7 @@ def _threshold_table_html(thresholds: Dict[str, Dict[str, str]]) -> str:
             f"<td>{_c('bicubic_abs_error')}</td>"
             f"<td>{_c('cnn_abs_error')}</td>"
             f"<td>{_c('gan_abs_error')}</td>"
-            f"<td style='background:{bg};font-weight:600'>{_esc(w or '—')}</td>"
+            f"<td style='background:{bg};font-weight:600'>{_esc(w.upper() if w else '—')}</td>"
             f"</tr>\n"
         )
 
@@ -413,7 +537,6 @@ def _sample_card_html(
     sid: int,
     comp_data: Dict[int, Dict[str, Dict[str, str]]],
     summaries: Dict[int, Dict],
-    physics: Optional[Dict[int, Dict[str, str]]],
     panels_rel: str,
 ) -> str:
     if sid not in comp_data:
@@ -424,43 +547,68 @@ def _sample_card_html(
     bg     = _INTERP_BG.get(interp, "#e5e7eb")
     desc   = _INTERP_DESC.get(interp, interp)
 
+    panel_href = f"{panels_rel}#sample-{sid}"
+
+    # Manifest info row (only shown when populated)
+    manifest_parts = []
+    for lbl, key in (
+        ("PD winner",  "pd_winner"),
+        ("MT winner",  "mt_winner"),
+        ("Direct err", "direct_error_group_winner"),
+        ("Distribut.", "distributional_group_winner"),
+        ("Tail",       "tail_group_winner"),
+        ("Physics",    "configured_physics_group_winner"),
+    ):
+        v = s.get(key, "").strip()
+        if v:
+            manifest_parts.append(f"<b>{lbl}:</b>&nbsp;{_esc(v)}")
+    manifest_html = (
+        "<p style='margin:6px 0;font-size:0.9em'>" + " &nbsp;|&nbsp; ".join(manifest_parts) + "</p>"
+        if manifest_parts else ""
+    )
+
+    # Physics summary
+    phys_winner = s.get("phys_winner", "").strip()
     phys_html = ""
-    if physics and sid in physics:
-        p = physics[sid]
+    if phys_winner:
         phys_html = (
             "<p style='margin:6px 0'>"
-            f"<b>Physics winner:</b> {_esc(p.get('phys_winner', '—'))} "
-            f"(Bic {p.get('phys_bicubic_wins', '—')}, "
-            f"CNN {p.get('phys_cnn_wins', '—')}, "
-            f"GAN {p.get('phys_gan_wins', '—')} wins/{len(_PHYS_COLS)})"
+            f"<b>Physics winner:</b> {_esc(phys_winner)} "
+            f"(Bic {s.get('phys_bicubic_wins', '—')}, "
+            f"CNN {s.get('phys_cnn_wins', '—')}, "
+            f"GAN {s.get('phys_gan_wins', '—')} wins/{len(_PHYS_COLS)})"
             "</p>"
         )
 
-    panel_href = f"{panels_rel}#sample-{sid}"
+    # Groups / question from manifest
+    grp_q_html = ""
+    q = s.get("question", "").strip()
+    if q:
+        grp_q_html = f"<p style='margin:4px 0;font-size:0.88em;color:#374151'><i>{_esc(q)}</i></p>"
 
     return (
         f"<div class='card sample-card' id='sc-{sid}'>"
-        f"<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
-        f"<div>"
-        f"<h3 style='margin:0'>Sample {sid}</h3>"
-        f"<p style='color:#6b7280;margin:2px 0'>{_esc(s.get('forced_note', ''))}</p>"
-        f"</div>"
+        "<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
+        f"<div><h3 style='margin:0'>Sample {sid}</h3>"
+        f"<p style='color:#6b7280;margin:2px 0'>{_esc(s.get('forced_note', ''))}</p></div>"
         f"<a href='{panel_href}' target='_blank' style='font-size:0.85em;white-space:nowrap'>View panel ↗</a>"
-        f"</div>"
+        "</div>"
         f"<div style='margin:8px 0;padding:8px 12px;background:{bg};border-radius:6px'>"
         f"<b>{_esc(interp)}</b><br>"
         f"<span style='font-size:0.9em;color:#374151'>{_esc(desc)}</span>"
-        f"</div>"
-        f"<div style='display:flex;gap:24px;flex-wrap:wrap;margin:6px 0'>"
+        "</div>"
+        f"{manifest_html}"
+        "<div style='display:flex;gap:24px;flex-wrap:wrap;margin:6px 0'>"
         f"<div><b>GAN wins:</b> {s.get('gan_wins', '—')}/6 "
         f"(low={s.get('gan_wins_low', '—')}, high={s.get('gan_wins_high', '—')})</div>"
         f"<div><b>CNN wins:</b> {s.get('cnn_wins', '—')}/6</div>"
         f"<div><b>GAN bias:</b> {_esc(s.get('gan_direction', '—'))} "
-        f"({s.get('gan_mean_bias', '—')} components/threshold)</div>"
-        f"</div>"
+        f"({s.get('gan_mean_bias', '—')} comp/threshold)</div>"
+        "</div>"
         f"<p style='margin:4px 0'><b>Winner signature:</b> "
         f"<code>{_esc(s.get('winner_signature', '—'))}</code></p>"
         f"{phys_html}"
+        f"{grp_q_html}"
         + _threshold_table_html(comp_data[sid])
         + "</div>\n"
     )
@@ -468,22 +616,31 @@ def _sample_card_html(
 
 def _write_html(
     path: Path,
+    runtime_groups: List[Tuple[str, str, List[int]]],
     comp_data: Dict[int, Dict[str, Dict[str, str]]],
     summaries: Dict[int, Dict],
-    physics: Optional[Dict[int, Dict[str, str]]],
 ) -> None:
-    # path is inside OUT_DIR, so panels_rel is relative from there
     panels_rel = _PANELS_REL
 
     nav_links = "\n".join(
         f'<a href="#{gid}">{_esc(gtitle)}</a>'
-        for gid, gtitle, _ in GROUPS
+        for gid, gtitle, _ in runtime_groups
+        if _  # skip groups with no samples (empty dynamic groups still get nav entry)
+        or True
     )
 
     sections = ""
-    for gid, gtitle, samples in GROUPS:
+    for gid, gtitle, samples in runtime_groups:
+        if not samples:
+            sections += (
+                f"<section class='card group-card' id='{gid}'>"
+                f"<h2 style='margin-top:0'>{_esc(gtitle)}</h2>"
+                f"<p class='muted'>No samples in this group (manifest not available or no matches).</p>"
+                f"</section>\n"
+            )
+            continue
         cards = "".join(
-            _sample_card_html(sid, comp_data, summaries, physics, panels_rel)
+            _sample_card_html(sid, comp_data, summaries, panels_rel)
             for sid in samples
         )
         sections += (
@@ -565,17 +722,16 @@ def _write_html(
 <body>
 <h1>Special Component-Count Case Report</h1>
 <p style="color:#6b7280;margin-bottom:20px">
-  Topology proxy analysis: 8-connected superlevel-set component counts for GT,
-  Bicubic, CNN, and GAN across six thresholds
-  (t5/t10/t15&nbsp;=&nbsp;fixed&nbsp;m/s; p90/p95/p99&nbsp;=&nbsp;GT percentile).
+  Topology proxy: 8-connected superlevel-set component counts for GT, Bicubic,
+  CNN, and GAN across six thresholds
+  (t5/t10/t15&nbsp;=&nbsp;fixed m/s;&nbsp;p90/p95/p99&nbsp;=&nbsp;GT percentile).
   Winner = method whose count is closest to GT.
+  Low thresholds: t5, t10.  High thresholds: t15, p90, p95, p99.
 </p>
-
 <nav class="jump-nav">
   <b style="align-self:center">Jump:&nbsp;</b>
   {nav_links}
 </nav>
-
 {sections}
 </body>
 </html>
@@ -592,15 +748,19 @@ def _write_html(
 
 def main() -> None:
     ap = argparse.ArgumentParser(
-        description="Analyse special-case component-count patterns for curated sample groups."
+        description="Analyse special-case component-count patterns for curated and dynamic groups."
     )
     ap.add_argument(
         "--comp-csv", type=Path, default=COMP_CSV,
         help=f"component_counts_per_sample.csv (default: {COMP_CSV})",
     )
     ap.add_argument(
+        "--manifest-csv", type=Path, default=MANIFEST_CSV,
+        help=f"baseline_visual_manifest.csv (optional, default: {MANIFEST_CSV})",
+    )
+    ap.add_argument(
         "--phys-csv", type=Path, default=PHYS_CSV,
-        help=f"all_methods_per_sample.csv — optional physics winner data (default: {PHYS_CSV})",
+        help=f"all_methods_per_sample.csv (optional, default: {PHYS_CSV})",
     )
     ap.add_argument(
         "--outdir", type=Path, default=OUT_DIR,
@@ -610,9 +770,10 @@ def main() -> None:
 
     print("=" * 60)
     print("PhIRE special component case analyser")
-    print(f"  comp CSV : {args.comp_csv}")
-    print(f"  phys CSV : {args.phys_csv}")
-    print(f"  output   : {args.outdir}")
+    print(f"  comp CSV     : {args.comp_csv}")
+    print(f"  manifest CSV : {args.manifest_csv}")
+    print(f"  phys CSV     : {args.phys_csv}")
+    print(f"  output       : {args.outdir}")
     print("=" * 60)
 
     # ------------------------------------------------------------------
@@ -623,47 +784,78 @@ def main() -> None:
     print(f"  Loaded {len(comp_data)} samples × {len(ALL_TLABELS)} thresholds")
 
     # ------------------------------------------------------------------
-    # 2. Load physics metrics (optional)
+    # 2. Load manifest (optional)
     # ------------------------------------------------------------------
-    print("\n[2] Loading physics metrics CSV (optional) …")
+    print("\n[2] Loading manifest CSV (optional) …")
+    manifest_by_idx = _load_manifest_csv(args.manifest_csv)
+
+    # ------------------------------------------------------------------
+    # 3. Load physics metrics (optional)
+    # ------------------------------------------------------------------
+    print("\n[3] Loading physics metrics CSV (optional) …")
     physics = _load_physics_csv(args.phys_csv)
     if physics:
         print(f"  Loaded physics winner data for {len(physics)} samples")
 
     # ------------------------------------------------------------------
-    # 3. Analyse each curated sample
+    # 4. Build runtime groups (static curated + dynamic from manifest)
     # ------------------------------------------------------------------
-    print("\n[3] Analysing curated sample groups …")
-    all_special: List[int] = sorted({sid for _, _, sids in GROUPS for sid in sids})
+    dynamic_groups = _build_dynamic_groups(manifest_by_idx)
+    runtime_groups = _STATIC_GROUPS + dynamic_groups
 
+    # All unique sample IDs across all groups
+    all_sids: List[int] = sorted({
+        sid for _, _, sids in runtime_groups for sid in sids
+    })
+    print(f"\n[4] Groups: {len(runtime_groups)} total "
+          f"({len(_STATIC_GROUPS)} static, {len(dynamic_groups)} dynamic), "
+          f"{len(all_sids)} unique samples")
+
+    # ------------------------------------------------------------------
+    # 5. Analyse each sample
+    # ------------------------------------------------------------------
+    print("\n[5] Analysing samples …")
     summaries: Dict[int, Dict] = {}
-    for sid in all_special:
+    for sid in all_sids:
         if sid not in comp_data:
-            print(f"  [warn] Sample {sid} not found in component CSV; skipping")
+            print(f"  [warn] Sample {sid} not in component CSV; skipping")
             continue
         summaries[sid] = analyse_sample(sid, comp_data[sid])
 
-    print(f"  Analysed {len(summaries)} / {len(all_special)} requested samples")
+    # Merge manifest columns
+    if manifest_by_idx:
+        for sid, s in summaries.items():
+            mrow = manifest_by_idx.get(sid, {})
+            for col in _MANIFEST_COLS:
+                s[col] = mrow.get(col, "")
+
+    # Merge physics columns
+    if physics:
+        for sid, s in summaries.items():
+            if sid in physics:
+                s.update(physics[sid])
+
+    print(f"  Analysed {len(summaries)} / {len(all_sids)} samples")
 
     # ------------------------------------------------------------------
-    # 4. Build output rows
+    # 6. Build output rows
     # ------------------------------------------------------------------
 
-    # Summary: one row per sample, with group name prepended
+    # Summary: one row per (group, sample)
     summary_rows: List[Dict] = []
-    for gid, gtitle, samples in GROUPS:
+    for gid, _, samples in runtime_groups:
         for sid in samples:
             if sid not in summaries:
                 continue
-            row: Dict = {"group_name": gid, "group_title": gtitle}
+            row: Dict = {"group_name": gid}
             row.update(summaries[sid])
-            if physics and sid in physics:
-                row.update(physics[sid])
             summary_rows.append(row)
 
-    # Thresholds: one row per (sample, threshold) for all special samples
+    summary_rows.sort(key=lambda r: (str(r["group_name"]), int(r["sample_idx"])))
+
+    # Threshold detail: one row per (group, sample, threshold)
     threshold_rows: List[Dict] = []
-    for gid, _, samples in GROUPS:
+    for gid, _, samples in runtime_groups:
         for sid in samples:
             if sid not in comp_data:
                 continue
@@ -675,37 +867,46 @@ def main() -> None:
                 tr.update(r)
                 threshold_rows.append(tr)
 
+    threshold_rows.sort(key=lambda r: (
+        str(r["group_name"]), int(r["sample_idx"]), str(r.get("threshold_label", ""))
+    ))
+
     # ------------------------------------------------------------------
-    # 5. Write CSVs
+    # 7. Write CSVs
     # ------------------------------------------------------------------
-    print("\n[4] Writing CSVs …")
+    print("\n[6] Writing CSVs …")
     args.outdir.mkdir(parents=True, exist_ok=True)
 
     p_summary    = args.outdir / "special_component_case_summary.csv"
     p_thresholds = args.outdir / "special_component_case_thresholds.csv"
 
-    _write_csv(p_summary, summary_rows)
+    _write_csv(p_summary, summary_rows, _SUMMARY_FIELDS)
     print(f"  Wrote: {p_summary}  ({len(summary_rows)} rows)")
 
-    _write_csv(p_thresholds, threshold_rows)
+    _write_csv(p_thresholds, threshold_rows, _THRESHOLD_FIELDS)
     print(f"  Wrote: {p_thresholds}  ({len(threshold_rows)} rows)")
 
     # ------------------------------------------------------------------
-    # 6. Write HTML report
+    # 8. Write HTML
     # ------------------------------------------------------------------
-    print("\n[5] Writing HTML report …")
+    print("\n[7] Writing HTML report …")
     _write_html(
         args.outdir / "special_component_case_report.html",
+        runtime_groups,
         comp_data,
         summaries,
-        physics,
     )
 
     # ------------------------------------------------------------------
-    # 7. Interpretation summary
+    # 9. Interpretation summary
     # ------------------------------------------------------------------
-    print("\n[6] Interpretation label distribution across curated samples:")
-    counts = Counter(s.get("interpretation_label", "") for s in summaries.values())
+    print("\n[8] Interpretation label distribution (curated samples only):")
+    curated_sids = {sid for _, _, sids in _STATIC_GROUPS for sid in sids}
+    counts = Counter(
+        s.get("interpretation_label", "")
+        for sid, s in summaries.items()
+        if sid in curated_sids
+    )
     for label, n in sorted(counts.items(), key=lambda x: -x[1]):
         print(f"  {label:<52s}: {n}")
 
