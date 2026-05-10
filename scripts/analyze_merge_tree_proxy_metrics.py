@@ -1050,6 +1050,19 @@ def main() -> None:
     if not np.array_equal(idx_bic, idx_gan):
         sys.exit("[error] Bicubic and GAN idx arrays differ.")
 
+    max_gt_diff_cnn = float(np.abs(gt_bic.astype(np.float64) - gt_cnn.astype(np.float64)).max())
+    max_gt_diff_gan = float(np.abs(gt_bic.astype(np.float64) - gt_gan.astype(np.float64)).max())
+    if max_gt_diff_cnn > 1e-9 or max_gt_diff_gan > 1e-9:
+        sys.exit(
+            f"[error] GT arrays are not aligned across methods.\n"
+            f"  bicubic vs CNN max_abs_diff={max_gt_diff_cnn:.6e}\n"
+            f"  bicubic vs GAN max_abs_diff={max_gt_diff_gan:.6e}"
+        )
+    print(
+        f"  GT alignment OK: bicubic vs CNN max_abs_diff={max_gt_diff_cnn:.6e},"
+        f" bicubic vs GAN max_abs_diff={max_gt_diff_gan:.6e}"
+    )
+
     sample_indices: List[int] = idx_bic.astype(int).ravel().tolist()
     N = len(sample_indices)
     print(f"  Aligned: {N} samples, idx range=[{min(sample_indices)}..{max(sample_indices)}]")
