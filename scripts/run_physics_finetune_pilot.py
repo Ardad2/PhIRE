@@ -62,6 +62,7 @@ class _Tee:
         return self._stream.fileno()
 
 sys.stdout = _Tee(sys.stdout, LOG_PATH)
+sys.stderr = sys.stdout   # capture TensorFlow warnings/errors in the log too
 
 # ---------------------------------------------------------------------------
 # Imports (after sys.path is set and tee is active).

@@ -182,8 +182,8 @@ class PhIREGANs:
                 print('Epoch took %.2f seconds\n' %(time() - start_time), flush=True)
 
             model_dir = '/'.join([self.model_name, 'cnn'])
-            if not os.path.exists(self.model_name):
-                os.makedirs(self.model_name)
+            if not os.path.exists(model_dir):
+                os.makedirs(model_dir)
             saved_model = '/'.join([model_dir, 'cnn'])
             g_saver.save(sess, saved_model)
 
