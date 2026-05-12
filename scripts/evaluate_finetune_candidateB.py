@@ -43,12 +43,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT   = SCRIPT_DIR.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+_SKIMAGE_IMPORT_ERROR: str = ''
 try:
     from skimage.metrics import structural_similarity as _skssim
     _HAS_SKIMAGE = True
-except ImportError:
+except Exception as e:
     _HAS_SKIMAGE = False
-    print('[warning] skimage not found — SSIM will be NaN.')
+    _SKIMAGE_IMPORT_ERROR = repr(e)
+    print(f'[warning] skimage SSIM unavailable — SSIM will be NaN. '
+          f'Reason: {_SKIMAGE_IMPORT_ERROR}')
 
 from metrics_physics import compute_physics_metrics
 
@@ -232,7 +235,7 @@ def _load_topology_from_merged_csv(
     with csv_path.open() as fh:
         for row in csv.DictReader(fh):
             try:
-                method = row['method'].strip()
+                method = row['method'].strip().lower()
                 si = int(float(row['sample_idx']))
                 pd = float(row.get('pd_distance') or 'nan')
                 mt = float(row.get('mt_distance') or 'nan')
@@ -742,6 +745,10 @@ def main() -> None:
              'lambda_wpd=0.0, lambda_levelset=0.25, lr=1e-5, 3 epochs`\n\n')
     md.write(f'**Samples evaluated:** {N}\n\n')
     md.write(f'**Methods compared:** {", ".join(present_methods)}\n\n')
+    if not _HAS_SKIMAGE:
+        md.write('> **SSIM note:** SSIM was not computed because skimage could not '
+                 'be imported in the current NumPy environment '
+                 f'(`{_SKIMAGE_IMPORT_ERROR}`). All SSIM values are NaN.\n\n')
     md.write('> Note: PD/MT distances for Candidate B are N/A — '
              'TTK not re-run on pilot outputs. Values for CNN/GAN are '
              'loaded from the pre-computed merged CSV.\n\n')
