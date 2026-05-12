@@ -105,9 +105,11 @@ class PhIREGANs:
                 'Auxiliary physics losses ENABLED: '
                 'lambda_speed=%.4g  lambda_grad=%.4g  '
                 'lambda_wpd=%.4g  lambda_levelset=%.4g  '
+                'lambda_crit=%.4g  '
                 'levelset_temperature=%.4g  thresholds=%s'
                 % (phys_cfg.lambda_speed, phys_cfg.lambda_grad,
                    phys_cfg.lambda_wpd,   phys_cfg.lambda_levelset,
+                   phys_cfg.lambda_crit,
                    phys_cfg.levelset_temperature,
                    phys_cfg.levelset_thresholds)
             )
@@ -161,8 +163,10 @@ class PhIREGANs:
                                               feed_dict={x_HR: batch_HR, x_LR: batch_LR})
                                 print('  Loss breakdown:')
                                 for key in ('L_uv', 'L_speed', 'L_grad', 'L_wpd',
-                                            'L_levelset', 'w_L_speed', 'w_L_grad',
-                                            'w_L_wpd', 'w_L_levelset', 'total_loss'):
+                                            'L_levelset', 'L_crit',
+                                            'w_L_speed', 'w_L_grad',
+                                            'w_L_wpd', 'w_L_levelset', 'w_L_crit',
+                                            'total_loss'):
                                     if key in bv:
                                         print('    %-18s %.6f' % (key + ':', bv[key]))
 
