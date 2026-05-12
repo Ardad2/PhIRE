@@ -9,7 +9,7 @@ PILOT RUN ONLY — not the final experiment. This script:
        lambda_grad     = 0.05
        lambda_wpd      = 0.0
        lambda_levelset = 0.25
-       lambda_crit     = 0.05    ← new: critical-value / topological-extrema proxy
+       lambda_crit     = 0.001   ← new: critical-value / topological-extrema proxy
        crit_high_z     = 1.0
        crit_pool       = 3
   2. Saves per-epoch checkpoints to:
@@ -145,7 +145,7 @@ def main() -> None:
     print('  lambda_grad    = 0.05')
     print('  lambda_wpd     = 0.0')
     print('  lambda_levelset= 0.25')
-    print('  lambda_crit    = 0.05  (critical-value proxy; first pilot)')
+    print('  lambda_crit    = 0.001  (critical-value proxy; calibrated: ~19% of L_uv)')
     print('  crit_high_z    = 1.0   (adaptive threshold: mean + 1σ)')
     print('  crit_pool      = 3     (max-pool neighbourhood size)')
     print('  learning_rate  = 1e-5')
@@ -180,7 +180,7 @@ def main() -> None:
         lambda_levelset      = 0.25,
         levelset_temperature = 10.0,
         levelset_thresholds  = [5.0, 10.0, 15.0],
-        lambda_crit          = 0.05,
+        lambda_crit          = 0.001,
         crit_high_z          = 1.0,
         crit_include_minima  = False,
         crit_low_z           = -1.0,

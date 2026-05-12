@@ -90,7 +90,11 @@ CANDIDATES = {
     ),
     'C1 (B + crit-value)': dict(
         lambda_speed=0.01, lambda_grad=0.05, lambda_wpd=0.0, lambda_levelset=0.25,
-        lambda_crit=0.05,
+        lambda_crit=0.001,
+    ),
+    'C2 (B + stronger crit-value)': dict(
+        lambda_speed=0.01, lambda_grad=0.05, lambda_wpd=0.0, lambda_levelset=0.25,
+        lambda_crit=0.0025,
     ),
 }
 
