@@ -147,11 +147,8 @@ class PhIREGANs:
                         N_batch = batch_LR.shape[0]
                         feed_dict = {x_HR:batch_HR, x_LR:batch_LR}
 
-                        # Training step of the generator
-                        sess.run(g_train_op, feed_dict=feed_dict)
-
-                        # Calculate current losses
-                        gl = sess.run(model.g_loss, feed_dict={x_HR: batch_HR, x_LR: batch_LR})
+                        # Training step and loss fetch in one call (avoids duplicate forward pass).
+                        _, gl = sess.run([g_train_op, model.g_loss], feed_dict=feed_dict)
 
                         epoch_loss += gl*N_batch
                         N += N_batch
