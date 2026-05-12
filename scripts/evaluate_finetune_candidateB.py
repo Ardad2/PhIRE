@@ -689,6 +689,12 @@ def main() -> None:
                    not math.isnan(method_data[method][si].get(metric, float('nan')))]
         return float(np.mean(vals)) if vals else float('nan')
 
+    def _relpath_for_report(path: Path) -> str:
+        try:
+            return str(path.resolve().relative_to(REPO_ROOT.resolve()))
+        except ValueError:
+            return str(path)
+
     def _fmt(v: float, decimals: int = 4) -> str:
         return f'{v:.{decimals}f}' if not math.isnan(v) else 'N/A'
 
@@ -888,14 +894,14 @@ def main() -> None:
     md.write('\n')
 
     md.write('## Output files\n\n')
-    md.write(f'- `{csv_path.relative_to(REPO_ROOT)}` — per-sample metrics for all methods\n')
-    md.write(f'- `{(out_dir/"pairwise_cnn_vs_candidateB.csv").relative_to(REPO_ROOT)}` '
+    md.write(f'- `{_relpath_for_report(csv_path)}` — per-sample metrics for all methods\n')
+    md.write(f'- `{_relpath_for_report(out_dir / "pairwise_cnn_vs_candidateB.csv")}` '
              '— per-metric delta table\n')
-    md.write(f'- `{(out_dir/"winner_counts.csv").relative_to(REPO_ROOT)}` '
+    md.write(f'- `{_relpath_for_report(out_dir / "winner_counts.csv")}` '
              '— win counts per method\n')
-    md.write(f'- `{(out_dir/"adjacent_cluster_table.csv").relative_to(REPO_ROOT)}` '
+    md.write(f'- `{_relpath_for_report(out_dir / "adjacent_cluster_table.csv")}` '
              '— adjacent-cluster detail\n')
-    md.write(f'- `{report_p.relative_to(REPO_ROOT)}` — this report\n\n')
+    md.write(f'- `{_relpath_for_report(report_p)}` — this report\n\n')
 
     md.write('## Notes\n\n')
     md.write('- PSNRuv is computed on physical [u,v] arrays using per-sample '
