@@ -27,6 +27,11 @@ Lambda overrides for on-the-fly inspection:
     --lambda-levelset FLOAT
     --levelset-temperature FLOAT
     --levelset-thresholds  FLOAT [FLOAT ...]
+    --lambda-crit     FLOAT
+    --crit-high-z     FLOAT
+    --crit-include-minima
+    --crit-low-z      FLOAT
+    --crit-pool       INT
 """
 
 from __future__ import annotations
@@ -69,15 +74,27 @@ EXPECTED_N_RECORDS = 168
 CANDIDATES = {
     'A (conservative)': dict(
         lambda_speed=0.005, lambda_grad=0.01, lambda_wpd=0.0, lambda_levelset=0.1,
+        lambda_crit=0.0,
     ),
     'B (moderate)': dict(
         lambda_speed=0.01, lambda_grad=0.05, lambda_wpd=0.0, lambda_levelset=0.25,
+        lambda_crit=0.0,
     ),
     'C (aggressive)': dict(
         lambda_speed=0.02, lambda_grad=0.05, lambda_wpd=0.0, lambda_levelset=0.5,
+        lambda_crit=0.0,
     ),
     'D (moderate + WPD)': dict(
         lambda_speed=0.01, lambda_grad=0.05, lambda_wpd=1e-5, lambda_levelset=0.25,
+        lambda_crit=0.0,
+    ),
+    'C1 (B + crit-value)': dict(
+        lambda_speed=0.01, lambda_grad=0.05, lambda_wpd=0.0, lambda_levelset=0.25,
+        lambda_crit=0.001,
+    ),
+    'C2 (B + stronger crit-value)': dict(
+        lambda_speed=0.01, lambda_grad=0.05, lambda_wpd=0.0, lambda_levelset=0.25,
+        lambda_crit=0.0025,
     ),
 }
 
@@ -128,6 +145,11 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument('--levelset-thresholds',  type=float, nargs='+',
                     default=[5.0, 10.0, 15.0],
                     help='Physical speed thresholds in m/s (default: 5 10 15)')
+    ap.add_argument('--lambda-crit',        type=float, default=0.0)
+    ap.add_argument('--crit-high-z',        type=float, default=1.0)
+    ap.add_argument('--crit-include-minima', action='store_true', default=False)
+    ap.add_argument('--crit-low-z',         type=float, default=-1.0)
+    ap.add_argument('--crit-pool',          type=int,   default=3)
     return ap.parse_args()
 
 
@@ -196,6 +218,11 @@ def main() -> None:
         lambda_levelset      = args.lambda_levelset,
         levelset_temperature = args.levelset_temperature,
         levelset_thresholds  = args.levelset_thresholds,
+        lambda_crit          = args.lambda_crit,
+        crit_high_z          = args.crit_high_z,
+        crit_include_minima  = args.crit_include_minima,
+        crit_low_z           = args.crit_low_z,
+        crit_pool            = args.crit_pool,
         diagnostic_mode      = True,
     )
 
@@ -210,9 +237,13 @@ def main() -> None:
     print(f'  mu         : {args.mu}')
     print(f'  sig        : {args.sig}')
     print(f'  lambdas    : speed={args.lambda_speed}  grad={args.lambda_grad}'
-          f'  wpd={args.lambda_wpd}  levelset={args.lambda_levelset}')
+          f'  wpd={args.lambda_wpd}  levelset={args.lambda_levelset}'
+          f'  crit={args.lambda_crit}')
     print(f'  levelset k : {args.levelset_temperature}')
     print(f'  thresholds : {args.levelset_thresholds} m/s')
+    print(f'  crit_high_z: {args.crit_high_z}  crit_pool={args.crit_pool}'
+          f'  include_minima={args.crit_include_minima}'
+          f'  crit_low_z={args.crit_low_z}')
     print(f'  out_csv    : {out_csv}')
     print(f'  out_md     : {out_md}')
     print()
@@ -257,7 +288,7 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Per-loss accumulators
     # -----------------------------------------------------------------------
-    loss_keys   = ['L_uv', 'L_speed', 'L_grad', 'L_wpd', 'L_levelset']
+    loss_keys   = ['L_uv', 'L_speed', 'L_grad', 'L_wpd', 'L_levelset', 'L_crit']
     accumulators: dict[str, list[float]] = {k: [] for k in loss_keys}
     batch_rows: list[dict] = []
 
@@ -298,7 +329,8 @@ def main() -> None:
             print(f'  batch {batch_num:3d}: indices={batch_idx.astype(int).ravel().tolist()}'
                   f'  L_uv={row["L_uv"]:.6f}  L_speed={row["L_speed"]:.6f}'
                   f'  L_grad={row["L_grad"]:.6f}  L_wpd={row["L_wpd"]:.6f}'
-                  f'  L_levelset={row["L_levelset"]:.6f}')
+                  f'  L_levelset={row["L_levelset"]:.6f}'
+                  f'  L_crit={row["L_crit"]:.6f}')
             batch_num += 1
 
     n_batches = len(batch_rows)
@@ -329,28 +361,35 @@ def main() -> None:
     # -----------------------------------------------------------------------
     # Candidate lambda analysis
     # -----------------------------------------------------------------------
+    _CAND_TERMS = [
+        ('L_speed',    'lambda_speed'),
+        ('L_grad',     'lambda_grad'),
+        ('L_wpd',      'lambda_wpd'),
+        ('L_levelset', 'lambda_levelset'),
+        ('L_crit',     'lambda_crit'),
+    ]
+
     candidate_lines: list[str] = []
     for cand_name, lambdas in CANDIDATES.items():
         contribs: dict[str, float] = {}
         total_aux = 0.0
-        for lk, stat_key in [('L_speed', 'lambda_speed'), ('L_grad', 'lambda_grad'),
-                              ('L_wpd', 'lambda_wpd'), ('L_levelset', 'lambda_levelset')]:
-            lam = lambdas[stat_key]
+        for lk, stat_key in _CAND_TERMS:
+            lam = lambdas.get(stat_key, 0.0)
             contrib = lam * stats[lk]['mean']
             contribs[lk] = contrib
             total_aux += contrib
         total_loss = mean_luv + total_aux
         lines = [f'\n### Candidate {cand_name}']
-        lines.append(f'  lambda_speed={lambdas["lambda_speed"]}  '
-                     f'lambda_grad={lambdas["lambda_grad"]}  '
-                     f'lambda_wpd={lambdas["lambda_wpd"]}  '
-                     f'lambda_levelset={lambdas["lambda_levelset"]}')
+        lines.append(f'  lambda_speed={lambdas.get("lambda_speed", 0.0)}  '
+                     f'lambda_grad={lambdas.get("lambda_grad", 0.0)}  '
+                     f'lambda_wpd={lambdas.get("lambda_wpd", 0.0)}  '
+                     f'lambda_levelset={lambdas.get("lambda_levelset", 0.0)}  '
+                     f'lambda_crit={lambdas.get("lambda_crit", 0.0)}')
         lines.append(f'  {"Term":<18s}  {"Raw mean":>12s}  {"Lambda":>10s}  '
                      f'{"Weighted":>12s}  {"% of L_uv":>12s}  Regime')
         lines.append('  ' + '-' * 90)
-        for lk, stat_key in [('L_speed', 'lambda_speed'), ('L_grad', 'lambda_grad'),
-                              ('L_wpd', 'lambda_wpd'), ('L_levelset', 'lambda_levelset')]:
-            lam  = lambdas[stat_key]
+        for lk, stat_key in _CAND_TERMS:
+            lam  = lambdas.get(stat_key, 0.0)
             raw  = stats[lk]['mean']
             wt   = contribs[lk]
             pct  = 100.0 * wt / mean_luv if mean_luv > 0 else float('nan')
@@ -380,7 +419,7 @@ def main() -> None:
 
     print()
     print('Ratios to L_uv (mean):')
-    for k in ['L_speed', 'L_grad', 'L_wpd', 'L_levelset']:
+    for k in ['L_speed', 'L_grad', 'L_wpd', 'L_levelset', 'L_crit']:
         ratio = stats[k]['mean'] / mean_luv if mean_luv > 0 else float('nan')
         print(f'  {k:<14s} / L_uv = {ratio:>10.4f}×')
 
@@ -395,6 +434,8 @@ def main() -> None:
     print('  L_grad     — physical speed-gradient magnitude MSE (grid-cell units).')
     print('  L_wpd      — MAE on speed³ proxy for wind power density (m³/s³).')
     print('  L_levelset — dimensionless soft-mask MSE at physical thresholds.')
+    print('  L_crit     — MSE at GT local-speed maxima above adaptive threshold;')
+    print('               critical-value proxy for superlevel-set topology.')
     print('  No checkpoint was modified.')
     print('=' * 64)
 
@@ -416,7 +457,12 @@ def main() -> None:
     md.write(f'| mu | {args.mu} |\n')
     md.write(f'| sig | {args.sig} |\n')
     md.write(f'| levelset thresholds (m/s) | {args.levelset_thresholds} |\n')
-    md.write(f'| levelset temperature k | {args.levelset_temperature} |\n\n')
+    md.write(f'| levelset temperature k | {args.levelset_temperature} |\n')
+    md.write(f'| lambda_crit | {args.lambda_crit} |\n')
+    md.write(f'| crit_high_z | {args.crit_high_z} |\n')
+    md.write(f'| crit_include_minima | {args.crit_include_minima} |\n')
+    md.write(f'| crit_low_z | {args.crit_low_z} |\n')
+    md.write(f'| crit_pool | {args.crit_pool} |\n\n')
 
     md.write('## Loss term descriptions\n\n')
     md.write('| Term | Description |\n|---|---|\n')
@@ -425,7 +471,9 @@ def main() -> None:
     md.write('| L_grad | Physical speed-gradient magnitude MSE; backward finite differences on interior grid. |\n')
     md.write('| L_wpd | MAE on speed³ wind-power-density proxy (m³/s³); MAE used to keep magnitudes tractable. |\n')
     md.write('| L_levelset | Dimensionless soft-mask MSE at physical speed thresholds via sigmoid; '
-             'topology-inspired superlevel-set proxy. |\n\n')
+             'topology-inspired superlevel-set proxy. |\n')
+    md.write('| L_crit | MSE focused on GT local-speed maxima above an adaptive per-sample threshold; '
+             'critical-value proxy for superlevel-set topology (inspired by Kissi et al.). |\n\n')
 
     md.write('## Summary statistics\n\n')
     md.write('| Term | Mean | Std | Min | Max |\n|---|---|---|---|---|\n')
@@ -435,7 +483,7 @@ def main() -> None:
 
     md.write('\n## Ratios to L_uv\n\n')
     md.write('| Term | Ratio (×L_uv) |\n|---|---|\n')
-    for k in ['L_speed', 'L_grad', 'L_wpd', 'L_levelset']:
+    for k in ['L_speed', 'L_grad', 'L_wpd', 'L_levelset', 'L_crit']:
         ratio = stats[k]['mean'] / mean_luv if mean_luv > 0 else float('nan')
         md.write(f'| {k} | {ratio:.4f}× |\n')
 
@@ -446,25 +494,22 @@ def main() -> None:
 
     for cand_name, lambdas in CANDIDATES.items():
         md.write(f'### Candidate {cand_name}\n\n')
-        md.write(f'`lambda_speed={lambdas["lambda_speed"]}  '
-                 f'lambda_grad={lambdas["lambda_grad"]}  '
-                 f'lambda_wpd={lambdas["lambda_wpd"]}  '
-                 f'lambda_levelset={lambdas["lambda_levelset"]}`\n\n')
+        md.write(f'`lambda_speed={lambdas.get("lambda_speed", 0.0)}  '
+                 f'lambda_grad={lambdas.get("lambda_grad", 0.0)}  '
+                 f'lambda_wpd={lambdas.get("lambda_wpd", 0.0)}  '
+                 f'lambda_levelset={lambdas.get("lambda_levelset", 0.0)}  '
+                 f'lambda_crit={lambdas.get("lambda_crit", 0.0)}`\n\n')
         md.write('| Term | Raw mean | Lambda | Weighted contrib | % of L_uv | Regime |\n')
         md.write('|---|---|---|---|---|---|\n')
-        for lk, stat_key in [('L_speed', 'lambda_speed'), ('L_grad', 'lambda_grad'),
-                              ('L_wpd', 'lambda_wpd'), ('L_levelset', 'lambda_levelset')]:
-            lam  = lambdas[stat_key]
+        for lk, stat_key in _CAND_TERMS:
+            lam  = lambdas.get(stat_key, 0.0)
             raw  = stats[lk]['mean']
             wt   = lam * raw
             pct  = 100.0 * wt / mean_luv if mean_luv > 0 else float('nan')
             reg  = _regime(wt / mean_luv) if mean_luv > 0 else 'n/a'
             md.write(f'| {lk} | {raw:.6f} | {lam} | {wt:.6f} | {pct:.2f}% | {reg} |\n')
-        lam_total = mean_luv + sum(lambdas[sk] * stats[lk]['mean']
-                                   for lk, sk in [('L_speed', 'lambda_speed'),
-                                                  ('L_grad',  'lambda_grad'),
-                                                  ('L_wpd',   'lambda_wpd'),
-                                                  ('L_levelset', 'lambda_levelset')])
+        lam_total = mean_luv + sum(lambdas.get(sk, 0.0) * stats[lk]['mean']
+                                   for lk, sk in _CAND_TERMS)
         md.write(f'| L_uv (baseline) | {mean_luv:.6f} | — | {mean_luv:.6f} | 100.00% | — |\n')
         md.write(f'| **total_loss** | | | **{lam_total:.6f}** | | |\n\n')
 
@@ -482,6 +527,9 @@ def main() -> None:
              'even so it remains ~100–300× L_uv and should only be enabled with very small lambda.\n')
     md.write('- L_levelset is a soft superlevel-set proxy, not a merge-tree loss. '
              'It uses `sigmoid(k*(speed−τ))` at physical thresholds [5,10,15] m/s.\n')
+    md.write('- L_crit is a critical-value proxy loss: MSE is concentrated at GT local-speed maxima '
+             'that exceed `mean + crit_high_z * std` per sample.  These maxima correspond to '
+             'superlevel-set component births.  Inspired by Kissi et al. (not a full PD loss).\n')
     md.write('- No checkpoint was modified during this diagnostic run.\n')
 
     md_text = md.getvalue()

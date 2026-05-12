@@ -3174,3 +3174,453 @@ PYTHONNOUSERSITE=1 /usr/bin/python3 generate_full_physics_domain_breakdown.py
 ```
 
 If a later script fails because an expected upstream CSV is missing, rerun the preceding script in this chain first.
+
+
+# Candidate B Topology-Inspired Fine-Tuning Pilot
+
+This section documents the completed Candidate B pilot: its motivation, implementation, commands, outputs, and quantitative/qualitative results. It is intended to be appended to the project reproducibility notes and used as source material for the paper's Methods/Results sections.
+
+---
+
+## 1. Motivation
+
+The original evaluation showed a strong split between metric families:
+
+- PSNRuv and SSIM favored the CNN.
+- Persistence diagrams (PD) strongly favored the GAN.
+- Merge trees (MT) were more selective, favoring GAN in only 20/168 samples and CNN in the remaining 148.
+- Component-count and branch-proxy analyses suggested that GAN often restores additional scalar-field structure, especially at lower speed thresholds, but may also over-fragment the field.
+
+Candidate B tests whether these post-hoc topology/physics observations can motivate a training-time objective. It does **not** optimize PD or MT distance directly. Instead, it fine-tunes the pretrained CNN using differentiable scalar-field losses that are physically and topologically motivated.
+
+---
+
+## 2. Representation
+
+The PhIRE wind model predicts two-channel vector wind fields `[u, v]`.
+
+- Base reconstruction loss: computed on normalized `[u, v]`.
+- PSNR convention: computed on vector `[u, v]`.
+- Scalar/physics/topology metrics: computed on scalar speed  
+  `speed = sqrt(u^2 + v^2)`.
+
+The auxiliary losses use physical speed, so the normalized network outputs are first denormalized:
+
+```python
+mu  = [0.7684, -0.4575]
+sig = [5.02455, 5.9017]
+
+u_phys = sig[0] * x[..., 0] + mu[0]
+v_phys = sig[1] * x[..., 1] + mu[1]
+speed  = sqrt(u_phys**2 + v_phys**2 + 1e-8)
+```
+
+---
+
+## 3. Candidate B objective
+
+Candidate B uses the pretrained CNN as initialization and fine-tunes with:
+
+```text
+L_total = L_uv
+        + lambda_speed    * L_speed
+        + lambda_grad     * L_grad
+        + lambda_levelset * L_levelset
+```
+
+where:
+
+- `L_uv`: original normalized vector `[u, v]` reconstruction loss.
+- `L_speed`: MSE on physical scalar speed.
+- `L_grad`: MSE on scalar-speed gradient magnitude.
+- `L_levelset`: soft superlevel-set mask MSE at physical thresholds `[5, 10, 15]` m/s.
+- `L_wpd`: implemented as MAE on `speed^3`, but disabled in Candidate B because diagnostics showed it was too large relative to `L_uv`.
+
+Candidate B configuration:
+
+```python
+PhysicsLossConfig(
+    use_aux_losses=True,
+    mu=[0.7684, -0.4575],
+    sig=[5.02455, 5.9017],
+    lambda_speed=0.01,
+    lambda_grad=0.05,
+    lambda_wpd=0.0,
+    lambda_levelset=0.25,
+    levelset_temperature=10.0,
+    levelset_thresholds=[5.0, 10.0, 15.0],
+    diagnostic_mode=True,
+)
+```
+
+Training configuration:
+
+```text
+checkpoint: models/wind_mr-hr/trained_cnn/cnn
+data:       example_data_fixed/wind_MR-HR.tfrecord
+epochs:     3
+batch size: 4
+lr:         1e-5
+output:     models_fixed/topology_finetuning/wind_finetune_pilot_candidateB/
+inference:  data_out/wind_finetune_pilot_candidateB/
+```
+
+---
+
+## 4. Reproduction commands
+
+### 4.1 Loss-magnitude diagnostic
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_physics_loss_diagnostic.py \
+  --data-path example_data_fixed/wind_MR-HR.tfrecord \
+  --model-path models/wind_mr-hr/trained_cnn/cnn \
+  --batch-size 4 \
+  --max-batches 0
+```
+
+Expected key output:
+
+```text
+Record count: 168
+Processed batches: 42
+```
+
+The diagnostic showed that `L_levelset` was naturally close to `L_uv`, `L_speed` and `L_grad` required smaller weights, and `L_wpd` was too large for the first pilot.
+
+### 4.2 Candidate B fine-tuning and paired inference
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_physics_finetune_pilot.py
+```
+
+Expected outputs:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateB/cnn/cnn
+data_out/wind_finetune_pilot_candidateB/dataSR.npy
+data_out/wind_finetune_pilot_candidateB/dataGT.npy
+data_out/wind_finetune_pilot_candidateB/dataIN.npy
+data_out/wind_finetune_pilot_candidateB/idx.npy
+logs/wind_finetune_pilot_candidateB.log
+```
+
+### 4.3 Scalar/physics/component evaluation
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/evaluate_finetune_candidateB.py \
+  --candidate-dir data_out/wind_finetune_pilot_candidateB \
+  --cnn-dir       data_out_fixed/wind_mrhr_cnn \
+  --gan-dir       data_out_fixed/wind_mrhr_gan \
+  --merged-csv    ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir       ttk_runs_fixed/topology_finetuning/candidateB_eval
+```
+
+Outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv
+ttk_runs_fixed/topology_finetuning/candidateB_eval/pairwise_cnn_vs_candidateB.csv
+ttk_runs_fixed/topology_finetuning/candidateB_eval/winner_counts.csv
+ttk_runs_fixed/topology_finetuning/candidateB_eval/adjacent_cluster_table.csv
+docs/topology_finetuning_candidateB_eval.md
+```
+
+### 4.4 Candidate B topology extraction
+
+The full TTK run extracts PD and MT outputs for 168 GT fields and 168 Candidate B SR fields.
+
+```bash
+cd /home/adadhwal/PhIRE
+
+rm -rf ttk_runs_fixed/topology_finetuning/candidateB_vti \
+       ttk_runs_fixed/topology_finetuning/candidateB_topology
+
+mkdir -p logs
+
+tmux new -s candb_topology
+```
+
+Inside tmux:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+bash scripts/run_candidateB_topology_pipeline.sh --skip-viz \
+  2>&1 | tee logs/candidateB_topology_pipeline.log
+```
+
+Expected Stage 2 completion counts:
+
+```text
+PD files: 336
+MT port0: 336
+MT port1: 336
+MT port2: 336
+```
+
+If Stage 3 completes but the report is not regenerated, run Stage 5 manually:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/build_candidateB_topology_comparison.py \
+  --candidateB-results ttk_runs_fixed/topology_finetuning/candidateB_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results   ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidateB-idx     data_out/wind_finetune_pilot_candidateB/idx.npy \
+  --out-dir            ttk_runs_fixed/topology_finetuning/candidateB_topology \
+  --report-path        docs/topology_finetuning_candidateB_topology_eval.md
+```
+
+Expected validation:
+
+```text
+Candidate B topology entries: 168
+PD valid: 168
+MT valid: 168
+candidateB_pd_mt_distances.csv: 169 lines
+candidateB_topology_comparison.csv: 169 lines
+```
+
+### 4.5 Visual inspection panels
+
+```bash
+cd /home/adadhwal/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 18,25,63,80
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 10,11,12,13,90,91,92,93,162,163
+```
+
+The Candidate B visualization panels show:
+
+```text
+GT speed | CNN speed | Candidate B speed | GAN speed | |CNN-GT| | |CandB-GT| | |GAN-GT|
+```
+
+---
+
+## 5. Scalar/physics/component results
+
+Candidate B improves over baseline CNN on most scalar-fidelity and physics metrics.
+
+| Metric | Bicubic | CNN | GAN | Candidate B | Improved vs CNN |
+|---|---:|---:|---:|---:|---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | 32.5394 | 168/168 |
+| Speed MAE | 0.5963 | 0.6941 | 0.9026 | 0.5885 | 168/168 |
+| Speed RMSE | 1.0156 | 1.1078 | 1.3775 | 0.9641 | 168/168 |
+| WPD MAE | 193.5403 | 231.6709 | 310.7328 | 191.4653 | 168/168 |
+| WPD W1 | 55.5103 | 45.2713 | 85.6191 | 30.4994 | 125/168 |
+| WPD bias abs | 41.2244 | 35.3439 | 78.7236 | 21.5107 | 119/168 |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | 0.3272 | 168/168 |
+| Gradient W1 | 0.3282 | 0.2329 | 0.0564 | 0.2109 | 143/168 |
+| Gradient kurtosis abs Δ | 6.6163 | 3.7004 | 4.2010 | 2.7542 | 87/168 |
+| PSD log-L2 | 1.3625 | 0.8335 | 0.5139 | 0.9465 | 4/168 |
+| PSD slope abs Δ | 1.6684 | 0.9150 | 0.9482 | 1.2079 | 0/168 |
+| Exceedance abs Δ s>5 | 0.0095 | 0.0042 | 0.0082 | 0.0044 | 89/168 |
+| Exceedance abs Δ s>10 | 0.0085 | 0.0066 | 0.0243 | 0.0038 | 118/168 |
+| Exceedance abs Δ s>15 | 0.0074 | 0.0062 | 0.0096 | 0.0043 | 104/168 |
+| Exceedance abs Δ p90 | 0.0109 | 0.0103 | 0.0123 | 0.0060 | 131/168 |
+| Component-count proxy L1 | 173.1855 | 115.5278 | 124.6567 | 105.8363 | 147/168 |
+
+Interpretation:
+
+- Candidate B improves direct vector PSNR and scalar speed error over CNN.
+- Candidate B improves WPD MAE on all 168 samples.
+- Candidate B improves gradient MAE on all 168 samples and gradient W1 on 143/168.
+- Candidate B improves the component-count proxy on 147/168 samples.
+- Candidate B does not improve spectral metrics; PSD log-L2 and PSD slope worsen relative to CNN. This is expected because no spectral loss was included.
+- Exceedance at `s > 5` is nearly neutral/slightly worse on average, while `s > 10`, `s > 15`, and p90 improve.
+
+---
+
+## 6. True topology results from TTK
+
+Candidate B was evaluated using the same TTK-based PD and MT pipeline as the CNN/GAN baselines.
+
+| Metric | CNN | GAN | Candidate B |
+|---|---:|---:|---:|
+| Mean PD distance | 27.4063 | 20.8641 | 26.1794 |
+| Mean MT distance | 5.8678 | 8.3481 | 6.0186 |
+| PD better than CNN | — | 166/168 | 136/168 |
+| MT better than CNN | — | 20/168 | 66/168 |
+| PD better than GAN | — | — | 1/168 |
+| Original MT-GAN cases recovered | — | 20/20 | 4/20 |
+
+Interpretation:
+
+- Candidate B improves PD relative to CNN on 136/168 samples, despite not directly optimizing PD.
+- Candidate B does not close the PD gap to GAN.
+- Candidate B improves MT over CNN on 66/168 samples.
+- Candidate B recovers 4 of the 20 original MT-GAN cases.
+- Candidate B's mean MT distance is slightly worse than CNN, so the MT effect is localized rather than globally dominant.
+
+Recovered original MT-GAN cases:
+
+| Sample | CNN MT | GAN MT | Candidate B MT |
+|---:|---:|---:|---:|
+| 18 | 6.2586 | 5.5544 | 5.5258 |
+| 25 | 11.3716 | 10.5015 | 6.5420 |
+| 63 | 7.6606 | 7.5776 | 6.9816 |
+| 80 | 6.9827 | 6.1767 | 5.7105 |
+
+---
+
+## 7. Adjacent-cluster MT behavior
+
+| Sample | CNN MT | GAN MT | Candidate B MT | Winner before | Winner after |
+|---:|---:|---:|---:|---|---|
+| 10 | 6.6345 | 7.4238 | 6.3437 | CNN | Candidate B |
+| 11 | 5.9107 | 7.8317 | 6.7322 | CNN | CNN |
+| 12 | 6.6164 | 5.9137 | 6.0934 | GAN | GAN |
+| 13 | 6.0738 | 7.4023 | 6.8512 | CNN | CNN |
+| 90 | 5.2579 | 5.6635 | 5.4967 | CNN | CNN |
+| 91 | 5.5083 | 5.5198 | 6.5752 | CNN | CNN |
+| 92 | 5.7358 | 5.6779 | 5.8324 | GAN | GAN |
+| 93 | 6.5070 | 6.8160 | 5.8948 | CNN | Candidate B |
+
+Rare topology-CNN controls:
+
+| Sample | CNN MT | GAN MT | Candidate B MT | Winner after |
+|---:|---:|---:|---:|---|
+| 162 | 4.5406 | 9.6957 | 6.3513 | CNN |
+| 163 | 5.6989 | 6.7890 | 5.1843 | Candidate B |
+
+Interpretation:
+
+- Candidate B becomes the MT winner for samples 10 and 93.
+- Samples 12 and 92 remain GAN-favored.
+- Sample 163 is a useful rare-control success: it was originally topology-CNN, but Candidate B improves beyond CNN.
+- Sample 162 remains CNN-favored, showing that Candidate B is not uniformly better and may over-sharpen in some cases.
+
+---
+
+## 8. Qualitative observations
+
+Visual inspection of samples 18, 25, 63, and 80 shows that Candidate B generally remains CNN-like in global organization while restoring sharper ridge-like scalar-speed structures. It is less speckled than GAN and does not simply imitate adversarial texture.
+
+Strong qualitative examples:
+
+- **Sample 25**: strongest recovered MT-GAN case. Candidate B sharply reduces MT distance and visually restores the main front/ridge structure while avoiding much of the GAN's excess texture.
+- **Sample 80**: Candidate B sharpens central/top-right ridge structures while staying less noisy than GAN.
+- **Sample 10**: Candidate B becomes the MT winner in the adjacent 10–13 cluster.
+- **Sample 93**: Candidate B becomes the MT winner in the adjacent 90–93 cluster.
+- **Sample 163**: Candidate B improves beyond CNN in a rare topology-CNN control region.
+
+Cautionary cases:
+
+- **Sample 11** and **sample 91** show that added detail does not always improve MT hierarchy.
+- **Sample 162** remains CNN-favored, suggesting that Candidate B can over-sharpen when CNN was already topologically close.
+
+---
+
+## 9. Paper-ready interpretation
+
+Candidate B provides feasibility evidence that topology-inspired differentiable surrogates can improve scientific SR outputs.
+
+A concise paper statement:
+
+> Candidate B improves scalar physical fidelity, gradient metrics, component-count topology proxies, and PD distance relative to the baseline CNN. It also recovers 4 of the 20 original MT-GAN cases. However, mean MT distance remains slightly worse than CNN, indicating that speed, gradient, and soft level-set losses capture feature prominence and superlevel-set support better than full merge-tree hierarchy. These results support topology-inspired training as a useful direction while motivating future work on differentiable or learned merge-tree-aware losses.
+
+Important caveat:
+
+> Candidate B was trained and evaluated on the same 168-sample fixed set. The result should therefore be framed as an in-corpus feasibility pilot, not as a generalization claim. A UV-only fine-tuning control is needed to separate the effect of auxiliary physics/topology-inspired losses from the effect of additional fine-tuning alone.
+
+---
+
+## 10. Recommended figures to include
+
+### Figure A: Candidate B qualitative recovered MT-GAN cases
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_recovered_mt_cases.pdf
+```
+
+Suggested samples:
+
+```text
+18, 25, 63, 80
+```
+
+Suggested caption:
+
+> Recovered MT-GAN cases after Candidate B fine-tuning. Each row compares GT, CNN, Candidate B, GAN, and absolute-error maps. Candidate B remains closer to CNN in global organization but restores sharper ridge-like scalar-speed structures, especially in samples 25 and 80.
+
+### Figure B: Candidate B adjacent-cluster examples
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_adjacent_cases.pdf
+```
+
+Suggested samples:
+
+```text
+10, 12, 93, 163
+```
+
+Suggested caption:
+
+> Adjacent and control examples illustrating localized MT behavior after Candidate B fine-tuning. Candidate B becomes the MT winner for samples 10 and 93, sample 12 remains GAN-favored, and sample 163 shows improvement beyond CNN in a rare topology-CNN control.
+
+### Figure C: Candidate B metric summary
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_metric_summary.pdf
+```
+
+Suggested content:
+
+- Bar chart of CNN vs Candidate B for PSNRuv, speed MAE, WPD MAE, gradient MAE, component-count L1, PD, and MT.
+- Use lower-is-better arrows or annotate PSNR separately.
+
+### Figure D: Candidate B topology summary
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_topology_summary.pdf
+```
+
+Suggested content:
+
+- PD mean distances: CNN, GAN, Candidate B.
+- MT mean distances: CNN, GAN, Candidate B.
+- Annotation: `PD CandB < CNN: 136/168`, `MT CandB < CNN: 66/168`, `MT-GAN recovered: 4/20`.
+
+---
+
+## 11. Next steps
+
+1. Run the UV-only fine-tuning ablation:
+   - same checkpoint,
+   - same TFRecord,
+   - same 3 epochs,
+   - same learning rate,
+   - all auxiliary lambdas set to zero.
+
+2. Compare UV-only against Candidate B:
+   - physics metrics,
+   - component-count proxy,
+   - PD/MT if time permits.
+
+3. Try a low-threshold-weighted variant:
+   - `levelset_thresholds = [5.0, 5.0, 10.0, 15.0]`
+
+4. If time permits, prototype a PyTorch PD-based loss:
+   - direct persistence-feature prominence objective,
+   - compare PD improvement against Candidate B,
+   - frame differentiable merge-tree losses as future work.

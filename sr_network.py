@@ -43,6 +43,18 @@ class PhysicsLossConfig:
     levelset_thresholds : list[float]
         Physical speed thresholds in m/s for the soft level-set loss.
         Default [5.0, 10.0, 15.0].
+    lambda_crit : float
+        Weight for L_crit (critical-value / topological-extrema proxy loss).
+        Focuses MSE on GT local-speed maxima above an adaptive per-sample
+        threshold.  Default 0 (disabled).
+    crit_high_z : float
+        Adaptive threshold for maxima: mean + crit_high_z * std.  Default 1.0.
+    crit_include_minima : bool
+        If True, also penalise error at GT local minima.  Default False.
+    crit_low_z : float
+        Adaptive threshold offset for minima (typically negative).  Default -1.0.
+    crit_pool : int
+        Neighbourhood radius for the max-pool local-maximum detector.  Default 3.
     diagnostic_mode : bool
         When True, individual loss tensors are stored in model.loss_breakdown
         so they can be fetched via sess.run without running a training step.
@@ -61,6 +73,11 @@ class PhysicsLossConfig:
         lambda_levelset=0.0,
         levelset_temperature=10.0,
         levelset_thresholds=None,
+        lambda_crit=0.0,
+        crit_high_z=1.0,
+        crit_include_minima=False,
+        crit_low_z=-1.0,
+        crit_pool=3,
         diagnostic_mode=False,
     ):
         self.use_aux_losses       = use_aux_losses
@@ -74,6 +91,11 @@ class PhysicsLossConfig:
         self.levelset_thresholds  = (list(levelset_thresholds)
                                      if levelset_thresholds is not None
                                      else list(self._DEFAULT_THRESHOLDS))
+        self.lambda_crit          = float(lambda_crit)
+        self.crit_high_z          = float(crit_high_z)
+        self.crit_include_minima  = bool(crit_include_minima)
+        self.crit_low_z           = float(crit_low_z)
+        self.crit_pool            = int(crit_pool)
         self.diagnostic_mode      = diagnostic_mode
 
         if use_aux_losses and (mu is None or sig is None):
@@ -130,6 +152,72 @@ def _gradmag(speed):
     return tf.sqrt(dx ** 2 + dy ** 2 + _EPS)
 
 
+def _critical_value_loss(speed_hr, speed_sr, high_z=1.0,
+                         include_minima=False, low_z=-1.0, pool=3):
+    """Critical-value / topological-extrema proxy loss.
+
+    Focuses squared error at GT local-speed maxima that exceed an adaptive
+    per-sample threshold, inspired by the critical-value loss of Kissi et al.
+    for topology-aware scalar-field interpolation.  For superlevel-set topology
+    high-speed local maxima correspond to births of connected components, so
+    matching scalar values at those points helps preserve feature prominence and
+    spatially anchored topological structure.
+
+    Parameters
+    ----------
+    speed_hr, speed_sr : tf.Tensor, shape [B, H, W]
+        Physical scalar wind speed for GT and SR respectively.
+    high_z : float
+        Adaptive threshold = mean + high_z * std.  Only maxima above this
+        threshold are kept to suppress noisy low-amplitude local maxima.
+    include_minima : bool
+        If True, also penalise squared error at GT local minima below
+        mean + low_z * std.
+    low_z : float
+        Adaptive threshold offset for the minima branch (typically negative).
+    pool : int
+        Neighbourhood size for the max-pool local-maximum detector.
+
+    Returns
+    -------
+    L_crit : tf.Tensor, scalar float32
+    """
+    ksize   = [1, pool, pool, 1]
+    strides = [1, 1, 1, 1]
+    eps_t   = tf.constant(_EPS, dtype=tf.float32)
+
+    s_hr_4d = speed_hr[..., tf.newaxis]            # [B, H, W, 1]
+
+    # Local maximum: a pixel whose value equals its neighbourhood max.
+    local_max = tf.nn.max_pool(s_hr_4d, ksize=ksize, strides=strides, padding='SAME')
+    local_max = local_max[..., 0]                   # [B, H, W]
+    is_local_max = speed_hr >= local_max - eps_t
+
+    # Per-sample adaptive threshold over spatial axes.
+    mean_hr      = tf.reduce_mean(speed_hr, axis=[1, 2], keepdims=True)  # [B,1,1]
+    std_hr       = tf.math.reduce_std(speed_hr, axis=[1, 2], keepdims=True)
+    threshold_hi = mean_hr + high_z * std_hr
+
+    max_mask  = tf.cast(is_local_max & (speed_hr >= threshold_hi), tf.float32)
+    sq_err    = tf.square(speed_sr - speed_hr)      # [B, H, W]
+    mask_sum  = tf.maximum(tf.reduce_sum(max_mask), 1.0)
+    L_max     = tf.reduce_sum(max_mask * sq_err) / mask_sum
+
+    if not include_minima:
+        return L_max
+
+    # Optional minima branch: max-pool on negated speed finds local minima.
+    local_min_neg = tf.nn.max_pool(-s_hr_4d, ksize=ksize, strides=strides, padding='SAME')
+    local_min     = -local_min_neg[..., 0]          # [B, H, W]
+    is_local_min  = speed_hr <= local_min + eps_t
+    threshold_lo  = mean_hr + low_z * std_hr
+    min_mask      = tf.cast(is_local_min & (speed_hr <= threshold_lo), tf.float32)
+    min_mask_sum  = tf.maximum(tf.reduce_sum(min_mask), 1.0)
+    L_min         = tf.reduce_sum(min_mask * sq_err) / min_mask_sum
+
+    return L_max + L_min
+
+
 # ---------------------------------------------------------------------------
 # SR network
 # ---------------------------------------------------------------------------
@@ -178,10 +266,12 @@ class SR_NETWORK(object):
                         'L_grad':       breakdown['L_grad'],
                         'L_wpd':        breakdown['L_wpd'],
                         'L_levelset':   breakdown['L_levelset'],
+                        'L_crit':       breakdown['L_crit'],
                         'w_L_speed':    phys_cfg.lambda_speed    * breakdown['L_speed'],
                         'w_L_grad':     phys_cfg.lambda_grad     * breakdown['L_grad'],
                         'w_L_wpd':      phys_cfg.lambda_wpd      * breakdown['L_wpd'],
                         'w_L_levelset': phys_cfg.lambda_levelset * breakdown['L_levelset'],
+                        'w_L_crit':     phys_cfg.lambda_crit     * breakdown['L_crit'],
                         'total_loss':   self.g_loss,
                     }
             else:
@@ -279,18 +369,31 @@ class SR_NETWORK(object):
             tau_losses.append(tf.reduce_mean((mask_hr - mask_sr) ** 2))
         L_levelset = tf.reduce_mean(tf.stack(tau_losses))
 
+        # --- L5: Critical-value / topological-extrema proxy ---
+        # Concentrates MSE on high-speed GT local maxima (superlevel-set births).
+        # Disabled by default (lambda_crit=0).
+        L_crit = _critical_value_loss(
+            speed_hr, speed_sr,
+            high_z         = cfg.crit_high_z,
+            include_minima = cfg.crit_include_minima,
+            low_z          = cfg.crit_low_z,
+            pool           = cfg.crit_pool,
+        )
+
         breakdown = {
             'L_speed':    L_speed,
             'L_grad':     L_grad,
             'L_wpd':      L_wpd,
             'L_levelset': L_levelset,
+            'L_crit':     L_crit,
         }
 
         weighted_total = (
             cfg.lambda_speed    * L_speed    +
             cfg.lambda_grad     * L_grad     +
             cfg.lambda_wpd      * L_wpd      +
-            cfg.lambda_levelset * L_levelset
+            cfg.lambda_levelset * L_levelset +
+            cfg.lambda_crit     * L_crit
         )
 
         return weighted_total, breakdown
