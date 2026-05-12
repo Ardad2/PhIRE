@@ -102,7 +102,7 @@ for f in "$DATA_DIR/dataGT.npy" "$DATA_DIR/dataSR.npy"; do
 done
 
 # Build sample index list 0 .. N_SAMPLES-1
-SAMPLE_LIST=$(seq 0 $((N_SAMPLES - 1)))
+SAMPLE_LIST=$(seq -s ' ' 0 $((N_SAMPLES - 1)))
 N_LAST=$((N_SAMPLES - 1))
 
 echo "========================================"
