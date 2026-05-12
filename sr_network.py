@@ -35,7 +35,7 @@ class PhysicsLossConfig:
     lambda_grad : float
         Weight for L_grad (speed gradient-magnitude MSE).  Default 0.
     lambda_wpd : float
-        Weight for L_wpd (wind-power-density proxy MSE, speed^3).  Default 0.
+        Weight for L_wpd (wind-power-density proxy MAE on speed^3).  Default 0.
     lambda_levelset : float
         Weight for L_levelset (soft level-set / exceedance loss).  Default 0.
     levelset_temperature : float
@@ -258,12 +258,13 @@ class SR_NETWORK(object):
         gm_sr = _gradmag(speed_sr)
         L_grad = tf.reduce_mean((gm_hr - gm_sr) ** 2)
 
-        # --- L3: Wind-power-density proxy MSE (speed^3) ---
+        # --- L3: Wind-power-density proxy MAE (speed^3) ---
         # speed^3 is proportional to the instantaneous kinetic power flux.
+        # MAE used (not MSE) to keep magnitudes in a tractable range.
         # Disabled by default (lambda_wpd=0) because raw magnitudes are large.
         wpd_hr = speed_hr ** 3
         wpd_sr = speed_sr ** 3
-        L_wpd = tf.reduce_mean((wpd_hr - wpd_sr) ** 2)
+        L_wpd = tf.reduce_mean(tf.abs(wpd_hr - wpd_sr))
 
         # --- L4: Soft level-set / topology-inspired superlevel-set loss ---
         # For each physical threshold tau, approximate the exceedance mask with
