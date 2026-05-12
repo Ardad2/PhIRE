@@ -59,10 +59,10 @@ class PhIREGANs:
         self.model_name    = '/'.join(['models', self.run_id])
         self.data_out_path = '/'.join(['data_out', self.run_id])
 
-    def pretrain(self, r, data_path, model_path=None, batch_size=100, phys_cfg=None):
+    def pretrain(self, r, data_path, model_path=None, batch_size=100):
         '''
-            This method trains the generator without using a disctiminator/adversarial training.
-            This method should be called to sufficiently train the generator to produce decent images before
+            This method trains the generator without using a disctiminator/adversarial training. 
+            This method should be called to sufficiently train the generator to produce decent images before 
             moving on to adversarial training with the train() method.
 
             inputs:
@@ -70,18 +70,16 @@ class PhIREGANs:
                 data_path  - (string) path of training data file to load in
                 model_path - (string) path of previously trained model to load in if continuing training
                 batch_size - (int) number of images to grab per batch. decrease if running out of memory
-                phys_cfg   - (PhysicsLossConfig | None) optional auxiliary physics/topology losses.
-                             None or PhysicsLossConfig(use_aux_losses=False) → baseline behaviour unchanged.
 
             output:
                 saved_model - (string) path to the trained model
         '''
-
+        
         tf.reset_default_graph()
-
+        
         if self.mu_sig is None:
             self.set_mu_sig(data_path, batch_size)
-
+        
         self.set_LR_data_shape(data_path)
         h, w, C = self.LR_data_shape
 
@@ -89,7 +87,7 @@ class PhIREGANs:
         x_LR = tf.placeholder(tf.float32, [None, h,             w,            C])
         x_HR = tf.placeholder(tf.float32, [None, h*np.prod(r),  w*np.prod(r), C])
 
-        model = SR_NETWORK(x_LR, x_HR, r=r, status='pretraining', phys_cfg=phys_cfg)
+        model = SR_NETWORK(x_LR, x_HR, r=r, status='pretraining')
 
         optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
         g_train_op = optimizer.minimize(model.g_loss, var_list= model.g_variables)
@@ -97,20 +95,6 @@ class PhIREGANs:
 
         g_saver = tf.train.Saver(var_list=model.g_variables, max_to_keep=10000)
         print('Done.')
-
-        # Announce active auxiliary losses (if any).
-        _diag = phys_cfg is not None and phys_cfg.use_aux_losses
-        if _diag:
-            print(
-                'Auxiliary physics losses ENABLED: '
-                'lambda_speed=%.4g  lambda_grad=%.4g  '
-                'lambda_wpd=%.4g  lambda_levelset=%.4g  '
-                'levelset_temperature=%.4g  thresholds=%s'
-                % (phys_cfg.lambda_speed, phys_cfg.lambda_grad,
-                   phys_cfg.lambda_wpd,   phys_cfg.lambda_levelset,
-                   phys_cfg.levelset_temperature,
-                   phys_cfg.levelset_thresholds)
-            )
 
         print('Building data pipeline ...', end=' ')
         ds = tf.data.TFRecordDataset(data_path)
@@ -147,8 +131,11 @@ class PhIREGANs:
                         N_batch = batch_LR.shape[0]
                         feed_dict = {x_HR:batch_HR, x_LR:batch_LR}
 
-                        # Training step and loss fetch in one call (avoids duplicate forward pass).
-                        _, gl = sess.run([g_train_op, model.g_loss], feed_dict=feed_dict)
+                        # Training step of the generator
+                        sess.run(g_train_op, feed_dict=feed_dict)
+
+                        # Calculate current losses
+                        gl = sess.run(model.g_loss, feed_dict={x_HR: batch_HR, x_LR: batch_LR})
 
                         epoch_loss += gl*N_batch
                         N += N_batch
@@ -156,15 +143,6 @@ class PhIREGANs:
                         iters += 1
                         if (iters % self.print_every) == 0:
                             print('Iteration=%d, G loss=%.5f' %(iters, gl))
-                            if _diag and model.loss_breakdown is not None:
-                                bv = sess.run(model.loss_breakdown,
-                                              feed_dict={x_HR: batch_HR, x_LR: batch_LR})
-                                print('  Loss breakdown:')
-                                for key in ('L_uv', 'L_speed', 'L_grad', 'L_wpd',
-                                            'L_levelset', 'w_L_speed', 'w_L_grad',
-                                            'w_L_wpd', 'w_L_levelset', 'total_loss'):
-                                    if key in bv:
-                                        print('    %-18s %.6f' % (key + ':', bv[key]))
 
                 except tf.errors.OutOfRangeError:
                     pass
@@ -182,8 +160,8 @@ class PhIREGANs:
                 print('Epoch took %.2f seconds\n' %(time() - start_time), flush=True)
 
             model_dir = '/'.join([self.model_name, 'cnn'])
-            if not os.path.exists(model_dir):
-                os.makedirs(model_dir)
+            if not os.path.exists(self.model_name):
+                os.makedirs(self.model_name)
             saved_model = '/'.join([model_dir, 'cnn'])
             g_saver.save(sess, saved_model)
 
