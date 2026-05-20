@@ -1,6 +1,6 @@
 # Candidate E TTK Critical-Pair Refiner Notes
 
-**Updated:** 2026-05-20 (E1-fix)
+**Updated:** 2026-05-20 (E1-parser-fix)
 
 Candidate E = Candidate C losses + Candidate B level-set loss + TTK critical-pair losses (Kissi-style).
 
@@ -51,6 +51,20 @@ with actionable error messages:
 - Writes human-readable CSV with columns: `sample_idx`, `sample_name`, `pair_id`, `pair_type`, `birth_vid`, `death_vid`, `birth_y`, `birth_x`, `death_y`, `death_x`, `birth_val`, `death_val`, `persistence`.
 - Full output validation: finite values, vertex IDs in `[0, patch*patch)`, `y`/`x` in `[0, patch)`, `pair_type != -1`.
 - Prints per-sample stats and examples for samples 6, 18, 25, 80, 162 if present.
+
+### C. extract_ttk_pd_critical_pairs.py (E1-parser-fix)
+
+- Adds VTK Python reader path (`_try_vtk_reader`): prefers `import vtk` when available;
+  falls back to manual binary parser.
+- Fixes `nblk > 1` binary-parsing bug: old code assumed 24-char header (nblk=1, UInt32)
+  always. For nblk=2 the header is 28 chars; reading data from `off+24` landed inside the
+  header and caused `zlib.Error -3 "unknown compression method"` on ~48/168 Spark files.
+  Fix: decode `nblk` from first 24 chars, compute `full_hdr_chars = ((3+nblk)*hint+2)//3*4`,
+  read full header, start data at `off+full_hdr_chars`.
+- Adds `_header_int_size()`: reads `header_type` from VTK XML to handle both UInt32 (hint=4)
+  and UInt64 (hint=8) variants.
+- Debug-quality error messages: first-4-bytes hex, array name, file path in all exceptions.
+- Raw docstring `r"""..."""` to suppress `SyntaxWarning` from `_s(\d+)_` pattern.
 
 ### B. run_candidateE_ttkcrit_refiner.py
 
@@ -108,3 +122,20 @@ and is not assumed. The unsigned convention matches how TTK stores data in VTU f
 | NPZ missing `sample_idx` key | refiner | 1 (ValueError) |
 | NPZ has 8 < 168 samples | refiner | 1 (without --allow-partial-constraints) |
 | dataSR.npy missing | refiner | 1 (clear error) |
+
+## Known Failure Mode (Fixed in E1-parser-fix)
+
+On Spark, ~48/168 VTU files failed with:
+
+```
+Error -3 while decompressing data: unknown compression method
+```
+
+Root cause: DataArrays with `nblk > 1` compressed blocks have a larger VTK ZLib header.
+For `nblk=2` (UInt32): header is 20 bytes → 28 b64 chars with `=` padding at position 27.
+The old code always assumed a 24-char header, so it read data starting at `off+24`, which
+was inside the 28-char header. `base64.b64decode` stopped at the `=` and returned only 2
+bytes; `zlib.decompress(2 bytes)` → Error -3.
+
+Fix: decode `nblk` from the first 24 chars, then compute `full_hdr_chars` from `nblk`
+before reading any data. Backward-compatible: for `nblk=1`, `full_hdr_chars = 24` (same as before).
