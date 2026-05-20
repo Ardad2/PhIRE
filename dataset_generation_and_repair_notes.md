@@ -3624,3 +3624,599 @@ Suggested content:
    - direct persistence-feature prominence objective,
    - compare PD improvement against Candidate B,
    - frame differentiable merge-tree losses as future work.
+
+
+---
+
+# Part VIII — Candidate B/C topology-aware fine-tuning addendum
+
+## Purpose
+
+This addendum documents the topology-aware fine-tuning experiments that were added after the original repaired CNN/GAN evaluation. These experiments use the same corrected 168-sample wind-field artifacts described above and fine-tune the pretrained PhIRE vector CNN checkpoint. The goal is to test whether the post-hoc topology analysis can be converted into training-time losses that preserve CNN-like direct fidelity while improving scalar-field structure and true TTK topology metrics.
+
+The two fine-tuned variants are:
+
+- **Candidate B:** speed + gradient + soft level-set auxiliary losses.
+- **Candidate C:** Candidate B + a critical-value / topological-extrema proxy loss.
+
+Both candidates operate on the vector `[u,v]` model, but all auxiliary scalar-field losses are computed after denormalizing `[u,v]` and converting to physical scalar speed.
+
+---
+
+## VIII.1 Representation and denormalization
+
+The pretrained PhIRE wind model predicts normalized two-channel wind components. Auxiliary losses are applied to physical scalar speed after denormalization:
+
+```python
+mu  = [0.7684, -0.4575]
+sig = [5.02455, 5.9017]
+
+u_phys = sig[0] * x[..., 0] + mu[0]
+v_phys = sig[1] * x[..., 1] + mu[1]
+speed  = sqrt(u_phys**2 + v_phys**2 + eps)
+```
+
+This distinction is essential. Physical thresholds such as 5, 10, and 15 m/s must be applied to scalar speed after denormalization, not to normalized `[u,v]` channels.
+
+---
+
+## VIII.2 Candidate B: speed, gradient, and soft level-set fine-tuning
+
+### Objective
+
+Candidate B fine-tunes the pretrained CNN with:
+
+```text
+L_total = L_uv
+        + lambda_speed    * L_speed
+        + lambda_grad     * L_grad
+        + lambda_levelset * L_levelset
+```
+
+where:
+
+- `L_uv` is the original normalized vector reconstruction loss,
+- `L_speed` is MSE on physical scalar speed,
+- `L_grad` is MSE on physical scalar-speed gradient magnitude,
+- `L_levelset` compares soft superlevel-set masks at 5, 10, and 15 m/s.
+
+Candidate B uses:
+
+```python
+lambda_speed    = 0.01
+lambda_grad     = 0.05
+lambda_wpd      = 0.0
+lambda_levelset = 0.25
+levelset_temperature = 10.0
+levelset_thresholds  = [5.0, 10.0, 15.0]
+learning_rate   = 1e-5
+epochs          = 3
+batch_size      = 4
+```
+
+### Main Candidate B outputs
+
+```text
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateB/
+data_out/wind_finetune_pilot_candidateB/
+logs/wind_finetune_pilot_candidateB.log
+
+ttk_runs_fixed/topology_finetuning/candidateB_eval/
+ttk_runs_fixed/topology_finetuning/candidateB_topology/
+docs/topology_finetuning_candidateB_eval.md
+docs/topology_finetuning_candidateB_topology_eval.md
+```
+
+### Candidate B headline results
+
+Candidate B preserved and improved CNN-like direct fidelity and improved several scalar/physics metrics. It also improved PD relative to the baseline CNN on many samples, but MT behavior was more mixed.
+
+```text
+PD mean: CNN 27.4063, GAN 20.8641, CandidateB 26.1794
+MT mean: CNN 5.8678, GAN 8.3481, CandidateB 6.0186
+PD CandidateB < CNN: 136/168
+MT CandidateB < CNN: 66/168
+PD CandidateB < GAN: 1/168
+Original MT-GAN cases recovered: 4/20
+Recovered samples: [18, 25, 63, 80]
+```
+
+Interpretation:
+
+> Candidate B shows that differentiable scalar-field surrogates can improve speed fidelity, gradient behavior, component-count topology proxies, and PD distance, but soft level-set and gradient losses alone do not consistently improve merge-tree hierarchy.
+
+---
+
+## VIII.3 Candidate C: critical-value / topological-extrema proxy
+
+### Motivation
+
+Candidate C was introduced to make the fine-tuning objective more explicitly topology-aware. It is inspired by topology-aware neural interpolation work that uses persistence-based losses, including critical-value enforcement and persistence-diagram Wasserstein losses. Candidate C does **not** implement full differentiable PD optimization. Instead, it adds a TensorFlow-1-compatible proxy that penalizes speed mismatch at GT high-speed local maxima.
+
+For superlevel-set topology, high-speed local maxima correspond to births of connected components. Matching the scalar values at these locations provides a spatially anchored topological-extrema signal.
+
+### Objective
+
+Candidate C uses:
+
+```text
+L_total = L_uv
+        + lambda_speed    * L_speed
+        + lambda_grad     * L_grad
+        + lambda_levelset * L_levelset
+        + lambda_crit     * L_crit
+```
+
+The critical-value proxy is computed as follows:
+
+1. Convert GT physical scalar speed to shape `[B,H,W,1]`.
+2. Use a 3x3 max-pooling neighborhood to detect local maxima.
+3. Keep only maxima above an adaptive threshold:
+
+```text
+threshold = mean(speed_GT) + crit_high_z * std(speed_GT)
+```
+
+4. Penalize Candidate C's scalar-speed error only at those selected GT maxima:
+
+```text
+L_crit = sum(mask * (speed_SR - speed_GT)^2) / max(sum(mask), 1)
+```
+
+Candidate C uses:
+
+```python
+lambda_speed    = 0.01
+lambda_grad     = 0.05
+lambda_wpd      = 0.0
+lambda_levelset = 0.25
+lambda_crit     = 0.001
+crit_high_z     = 1.0
+crit_pool       = 3
+crit_include_minima = False
+learning_rate   = 1e-5
+epochs          = 3
+batch_size      = 4
+```
+
+### Lambda calibration
+
+The initial diagnostic showed:
+
+```text
+L_uv mean      = 0.031759
+L_crit mean    = 6.064671
+L_crit / L_uv  = 190.9567x
+```
+
+The initially proposed `lambda_crit=0.05` would have contributed:
+
+```text
+w_L_crit = 0.303234 = 954.78% of L_uv
+```
+
+This was too dominant. The calibrated Candidate C setting uses `lambda_crit=0.001`, which contributes approximately 19% of `L_uv`. During training, `w_L_crit` remained in the approximate range `0.0034–0.0071`, while total loss stayed in a stable range.
+
+---
+
+## VIII.4 Candidate C reproduction commands
+
+### Run loss diagnostic
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_physics_loss_diagnostic.py \
+  --data-path  example_data_fixed/wind_MR-HR.tfrecord \
+  --model-path models/wind_mr-hr/trained_cnn/cnn \
+  --batch-size 4 \
+  --max-batches 0 \
+  --lambda-speed 0.01 \
+  --lambda-grad 0.05 \
+  --lambda-wpd 0.0 \
+  --lambda-levelset 0.25 \
+  --lambda-crit 0.001 \
+  --crit-high-z 1.0 \
+  --crit-pool 3
+```
+
+### Run Candidate C fine-tuning and inference
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_candidateC_crit_finetune.py
+```
+
+Expected outputs:
+
+```text
+data_out/wind_finetune_pilot_candidateC/idx.npy
+data_out/wind_finetune_pilot_candidateC/dataIN.npy
+data_out/wind_finetune_pilot_candidateC/dataGT.npy
+data_out/wind_finetune_pilot_candidateC/dataSR.npy
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateC/
+logs/wind_finetune_pilot_candidateC.log
+```
+
+Expected shape sanity check:
+
+```text
+idx.npy    (168,)
+dataIN.npy (168, 100, 100, 2)
+dataGT.npy (168, 500, 500, 2)
+dataSR.npy (168, 500, 500, 2)
+```
+
+### Evaluate scalar/physics/proxy metrics
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateC \
+  --candidate-dir data_out/wind_finetune_pilot_candidateC \
+  --cnn-dir       data_out_fixed/wind_mrhr_cnn \
+  --gan-dir       data_out_fixed/wind_mrhr_gan \
+  --merged-csv    ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir       ttk_runs_fixed/topology_finetuning/candidateC_eval
+```
+
+Expected outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_eval/all_sample_metrics_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/pairwise_cnn_vs_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/winner_counts_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/adjacent_cluster_table_candidateC.csv
+docs/topology_finetuning_candidateC_eval.md
+```
+
+### Run Candidate C topology extraction
+
+Smoke test:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+rm -rf ttk_runs_fixed/topology_finetuning/candidateC_vti \
+       ttk_runs_fixed/topology_finetuning/candidateC_topology
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateC \
+  --data-dir data_out/wind_finetune_pilot_candidateC \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateC_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateC_topology \
+  --n-samples 2 \
+  --skip-viz \
+  --debug
+```
+
+Full run:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+rm -rf ttk_runs_fixed/topology_finetuning/candidateC_vti \
+       ttk_runs_fixed/topology_finetuning/candidateC_topology
+
+mkdir -p logs
+
+tmux new -s candC_topology
+```
+
+Inside tmux:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateC \
+  --data-dir data_out/wind_finetune_pilot_candidateC \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateC_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateC_topology \
+  --skip-viz \
+  2>&1 | tee logs/candidateC_topology_pipeline.log
+```
+
+Expected final TTK counts:
+
+```bash
+find ttk_runs_fixed/topology_finetuning/candidateC_topology/pd -name "*.vtu" | wc -l
+find ttk_runs_fixed/topology_finetuning/candidateC_topology/mt -name "*_port_0.vtu" | wc -l
+```
+
+Expected output:
+
+```text
+336
+336
+```
+
+If Stage 2 completes but Stage 3 does not run, organize the files into GT/SR subdirectories and run the distance computation manually:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+METHOD="candidateC"
+OUT_BASE="ttk_runs_fixed/topology_finetuning/candidateC_topology"
+PD_DIR="$OUT_BASE/pd"
+MT_DIR="$OUT_BASE/mt"
+FINAL_DIR="$OUT_BASE/phase_c_final"
+
+mkdir -p "$PD_DIR/GT" "$PD_DIR/SR" "$MT_DIR/GT" "$MT_DIR/SR"
+
+shopt -s nullglob
+PD_GT=("$PD_DIR"/${METHOD}_GT_*)
+PD_SR=("$PD_DIR"/${METHOD}_SR_*)
+MT_GT=("$MT_DIR"/${METHOD}_GT_*)
+MT_SR=("$MT_DIR"/${METHOD}_SR_*)
+shopt -u nullglob
+
+[[ ${#PD_GT[@]} -gt 0 ]] && mv -f -- "${PD_GT[@]}" "$PD_DIR/GT/"
+[[ ${#PD_SR[@]} -gt 0 ]] && mv -f -- "${PD_SR[@]}" "$PD_DIR/SR/"
+[[ ${#MT_GT[@]} -gt 0 ]] && mv -f -- "${MT_GT[@]}" "$MT_DIR/GT/"
+[[ ${#MT_SR[@]} -gt 0 ]] && mv -f -- "${MT_SR[@]}" "$MT_DIR/SR/"
+
+rm -rf "$FINAL_DIR"
+
+python3 -u -X faulthandler scripts/compute_composite_tree_distance.py \
+  --pd-dir "$PD_DIR" \
+  --mt-dir "$MT_DIR" \
+  --outdir "$FINAL_DIR" \
+  --isolate-mt \
+  --debug 2>&1 | tee logs/candidateC_stage3_distance.log
+```
+
+Expected result:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_topology/phase_c_final/phase_c_results.csv
+```
+
+with 169 lines (`1 header + 168 samples`).
+
+### Build Candidate C topology comparison report
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateC \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateC_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results   ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx      data_out/wind_finetune_pilot_candidateC/idx.npy \
+  --out-dir            ttk_runs_fixed/topology_finetuning/candidateC_topology \
+  --report-path        docs/topology_finetuning_candidateC_topology_eval.md
+```
+
+Expected outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_topology_comparison.csv
+docs/topology_finetuning_candidateC_topology_eval.md
+```
+
+---
+
+## VIII.5 Candidate C scalar/physics/proxy results
+
+Candidate C preserves CNN-like direct fidelity and improves many scalar/physics/proxy metrics relative to the baseline CNN.
+
+```text
+PSNRuv: CNN=31.1925, GAN=29.1380, CandidateC=32.4344
+Speed MAE: CNN=0.6941, GAN=0.9026, CandidateC=0.5951
+Speed RMSE: CNN=1.1078, GAN=1.3775, CandidateC=0.9755
+WPD MAE: CNN=231.6709, GAN=310.7328, CandidateC=195.1476
+WPD W1: CNN=45.2713, GAN=85.6191, CandidateC=21.9732
+WPD bias abs: CNN=35.3439, GAN=78.7236, CandidateC=9.7407
+Gradient MAE: CNN=0.3491, GAN=0.3806, CandidateC=0.3255
+Gradient W1: CNN=0.2329, GAN=0.0564, CandidateC=0.2028
+Gradient kurtosis abs Δ: CNN=3.7004, GAN=4.2010, CandidateC=2.6852
+PSD log-L2: CNN=0.8335, GAN=0.5139, CandidateC=0.9095
+PSD slope abs Δ: CNN=0.9150, GAN=0.9482, CandidateC=1.2550
+Exceedance abs Δ s>5: CNN=0.0042, GAN=0.0082, CandidateC=0.0053
+Exceedance abs Δ s>10: CNN=0.0066, GAN=0.0243, CandidateC=0.0063
+Exceedance abs Δ s>15: CNN=0.0062, GAN=0.0096, CandidateC=0.0021
+Exceedance abs Δ p90: CNN=0.0103, GAN=0.0123, CandidateC=0.0022
+Component-count curve L1: CNN=115.5278, GAN=124.6567, CandidateC=99.6786
+```
+
+Candidate C improved over CNN on:
+
+```text
+PSNRuv: 168/168
+Speed MAE: 168/168
+Speed RMSE: 168/168
+WPD MAE: 168/168
+WPD W1: 160/168
+WPD bias abs: 153/168
+Gradient MAE: 168/168
+Gradient W1: 150/168
+Gradient kurtosis abs Δ: 88/168
+Exceedance s>15: 136/168
+Exceedance p90: 146/168
+Component-count curve L1: 151/168
+```
+
+Compared with Candidate B, Candidate C is slightly weaker on direct fidelity but stronger on several distributional/topology-adjacent metrics:
+
+```text
+WPD W1: Candidate C better than B on 163/168 samples
+WPD bias abs: Candidate C better than B on 149/168 samples
+Gradient MAE: Candidate C better than B on 160/168 samples
+Gradient W1: Candidate C better than B on 168/168 samples
+PSD log-L2: Candidate C better than B on 158/168 samples
+Component-count curve L1: Candidate C better than B on 136/168 samples
+```
+
+Interpretation:
+
+> Candidate C shifts the model away from purely pointwise fidelity and toward improved high-speed feature structure, component-count agreement, gradient distribution, and spectral behavior, while still retaining CNN-like reconstruction quality.
+
+---
+
+## VIII.6 Candidate C true topology results
+
+Candidate C was evaluated with true TTK PD and MT distances on all 168 samples.
+
+```text
+PD mean: CNN=27.4063, GAN=20.8641, CandidateC=27.0021
+MT mean: CNN=5.8678, GAN=8.3481, CandidateC=5.7141
+PD CandidateC < CNN: 120/168
+MT CandidateC < CNN: 102/168
+PD CandidateC < GAN: 0/168
+MT CandidateC < GAN: 157/168
+Original MT-GAN cases recovered by CandidateC: 11/20
+```
+
+The original 20 MT-GAN baseline cases were:
+
+```text
+[6, 8, 12, 16, 17, 18, 19, 20, 25, 48, 62, 63, 65, 68, 77, 79, 80, 82, 92, 154]
+```
+
+Candidate C recovered the following 11 cases:
+
+```text
+[6, 18, 20, 25, 62, 63, 65, 68, 79, 80, 92]
+```
+
+Per-sample MT distances for recovered cases:
+
+| sample_idx | MT CNN | MT GAN | MT CandidateC | winner before | winner after |
+|---|---:|---:|---:|---|---|
+| 6 | 6.1440 | 6.0106 | 5.7881 | GAN | CandidateC |
+| 18 | 6.2586 | 5.5544 | 5.2225 | GAN | CandidateC |
+| 20 | 6.2541 | 5.6891 | 5.4852 | GAN | CandidateC |
+| 25 | 11.3716 | 10.5015 | 6.5417 | GAN | CandidateC |
+| 62 | 6.7203 | 6.6502 | 6.5421 | GAN | CandidateC |
+| 63 | 7.6606 | 7.5776 | 6.5270 | GAN | CandidateC |
+| 65 | 5.8208 | 5.5768 | 5.2142 | GAN | CandidateC |
+| 68 | 6.0743 | 5.6709 | 5.5099 | GAN | CandidateC |
+| 79 | 6.8565 | 6.4670 | 6.2650 | GAN | CandidateC |
+| 80 | 6.9827 | 6.1767 | 5.2586 | GAN | CandidateC |
+| 92 | 5.7358 | 5.6779 | 5.2720 | GAN | CandidateC |
+
+Adjacent-cluster MT behavior:
+
+| sample_idx | MT CNN | MT GAN | MT CandidateC | winner before | winner after |
+|---|---:|---:|---:|---|---|
+| 10 | 6.6345 | 7.4238 | 6.0843 | CNN | CandidateC |
+| 11 | 5.9107 | 7.8317 | 5.8242 | CNN | CandidateC |
+| 12 | 6.6164 | 5.9137 | 6.1039 | GAN | GAN |
+| 13 | 6.0738 | 7.4023 | 6.6037 | CNN | CNN |
+| 90 | 5.2579 | 5.6635 | 5.0751 | CNN | CandidateC |
+| 91 | 5.5083 | 5.5198 | 5.7392 | CNN | CNN |
+| 92 | 5.7358 | 5.6779 | 5.2720 | GAN | CandidateC |
+| 93 | 6.5070 | 6.8160 | 6.1437 | CNN | CandidateC |
+
+Rare topology-CNN controls:
+
+| sample_idx | MT CNN | MT GAN | MT CandidateC | winner before | winner after |
+|---|---:|---:|---:|---|---|
+| 162 | 4.5406 | 9.6957 | 5.1857 | CNN | CNN |
+| 163 | 5.6989 | 6.7890 | 4.9161 | CNN | CandidateC |
+
+Interpretation:
+
+> Candidate C is the strongest merge-tree result in this project so far. It improves mean MT distance below the baseline CNN, improves MT over CNN on 102/168 samples, and recovers 11 of the 20 original MT-GAN cases. It does not close the PD gap to GAN, which supports the interpretation that PD and MT reward different structural properties.
+
+---
+
+## VIII.7 Visualization panel generation with Candidate B and Candidate C
+
+The visualization script was updated to include Candidate C and a direct Candidate-C-minus-Candidate-B difference panel.
+
+Updated panel layout:
+
+```text
+Top row:
+GT | CNN | Candidate B | Candidate C | GAN
+
+Bottom row:
+|CNN-GT| | |CandB-GT| | |CandC-GT| | |GAN-GT| | |CandC-CandB|
+```
+
+The `|CandC-CandB|` panel is useful because Candidate C is visually close to Candidate B. It isolates the local scalar-speed changes introduced by the critical-value/topological-extrema term.
+
+Recommended sample sets:
+
+```bash
+cd /home/adadhwal/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 6,18,20,25,62,63,65,68,79,80,92
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 10,11,12,13,90,91,92,93,162,163
+```
+
+Paper-worthy samples:
+
+```text
+Recovered MT-GAN examples: 6, 18, 25, 63, 80, 92
+Adjacent/control examples: 10, 12, 90, 92, 93, 163
+```
+
+Qualitative interpretation:
+
+> Candidate C remains CNN-like in global structure and does not become GAN-like. It often sharpens or preserves selected ridges and high-speed structures while avoiding the spatially diffuse GAN texture. This matches the quantitative result: Candidate C improves MT hierarchy without becoming the PD-favored GAN-like solution.
+
+---
+
+## VIII.8 Paper-facing Candidate C summary
+
+A concise statement for the paper:
+
+> Candidate C adds a critical-value/topological-extrema proxy to Candidate B, inspired by persistence-based critical-value losses in topology-aware scalar-field interpolation. Although this proxy does not directly optimize merge-tree distance, it produces the strongest MT improvement among the tested fine-tuned variants: mean MT distance decreases from 5.8678 for the baseline CNN to 5.7141, MT improves over CNN on 102/168 samples, and 11/20 original MT-GAN cases are recovered. Candidate C does not beat GAN on PD, indicating that the PD and MT objectives reward different structural properties. This supports the central hypothesis that merge-tree-aware training signals may preserve hierarchy not captured by PD-based or purely level-set objectives.
+
+Candidate C should be framed as:
+
+- a **topology-derived proxy**, not a full topology loss;
+- a stronger MT result than Candidate B;
+- evidence that critical-value supervision can improve hierarchical topology;
+- motivation for future differentiable merge-tree-aware losses.
+
+---
+
+## VIII.9 Files to preserve for Candidate C
+
+Small files that should be safe to commit:
+
+```text
+scripts/run_candidateC_crit_finetune.py
+scripts/evaluate_finetune_candidate.py
+scripts/run_candidate_topology_pipeline.sh
+scripts/build_candidate_topology_comparison.py
+scripts/generate_visual_inspection_panels.py
+
+docs/topology_finetuning_candidateC_eval.md
+docs/topology_finetuning_candidateC_topology_eval.md
+
+ttk_runs_fixed/topology_finetuning/candidateC_eval/all_sample_metrics_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/pairwise_cnn_vs_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/winner_counts_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/adjacent_cluster_table_candidateC.csv
+
+ttk_runs_fixed/topology_finetuning/candidateC_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_topology_comparison.csv
+```
+
+Large files to avoid committing unless Git LFS or external storage is intended:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_vti/
+ttk_runs_fixed/topology_finetuning/candidateC_topology/pd/
+ttk_runs_fixed/topology_finetuning/candidateC_topology/mt/
+data_out/wind_finetune_pilot_candidateC/dataSR.npy
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateC/
+```
+
+---
+
+## Updated final takeaway with Candidate C
+
+The repaired/final pipeline now supports both post-hoc topology evaluation and an initial topology-aware fine-tuning result. Candidate B demonstrates that speed, gradient, and soft level-set losses can improve scalar fidelity and PD-like behavior. Candidate C demonstrates a stronger merge-tree result: adding a critical-value/topological-extrema proxy improves true MT distance, recovers more than half of the original MT-GAN cases, and preserves CNN-like direct fidelity. This provides concrete evidence that topology-derived training signals can improve scientific SR structure, while also showing that PD and MT remain distinct objectives.
