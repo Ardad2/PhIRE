@@ -15,7 +15,7 @@ What this version changes:
     plus the anchor/context samples:
         12, 16, 17, 18, 19, 20, 25, 77, 80, 91, 92, 154, 162, 163.
   - Regenerates crop and full-field PNG panels.
-  - Adds Candidate B, Candidate C, Candidate D, and Candidate E2 panels and topology comparison metadata when available.
+  - Adds Candidate UV, Candidate B, Candidate C, Candidate D, and Candidate E2 panels and topology comparison metadata when available.
   - Rebuilds ttk_runs_fixed/visual_inspection/index.html with physics/domain breakdowns.
 
 Optional:
@@ -83,6 +83,7 @@ GAN_DIR = first_existing(
 )
 CANDIDATEB_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateB"
 CANDIDATEC_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateC"
+CANDIDATEUV_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateUV"
 CANDIDATED_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateD"
 CANDIDATEE2_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateE2"
 
@@ -99,6 +100,13 @@ CANDIDATEC_TOPOLOGY_COMPARISON = (
     / "topology_finetuning"
     / "candidateC_topology"
     / "candidateC_topology_comparison.csv"
+)
+CANDIDATEUV_TOPOLOGY_COMPARISON = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateUV_topology"
+    / "candidateUV_topology_comparison.csv"
 )
 CANDIDATED_TOPOLOGY_COMPARISON = (
     ROOT
@@ -128,6 +136,13 @@ CANDIDATEC_EVAL = (
     / "topology_finetuning"
     / "candidateC_eval"
     / "all_sample_metrics_candidateC.csv"
+)
+CANDIDATEUV_EVAL = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateUV_eval"
+    / "all_sample_metrics_candidateUV.csv"
 )
 CANDIDATED_EVAL = (
     ROOT
@@ -196,6 +211,7 @@ FORCED = {
 # original MT-GAN cases recovered by each fine-tuned candidate.
 CANDIDATEB_MT_GAN_RECOVERED = {18, 25, 63, 80}
 CANDIDATEC_MT_GAN_RECOVERED = {6, 18, 20, 25, 62, 63, 65, 68, 79, 80, 92}
+CANDIDATEUV_MT_GAN_RECOVERED = {25}
 CANDIDATED_MT_GAN_RECOVERED = {25}
 CANDIDATEE2_MT_GAN_RECOVERED = {25}
 
@@ -220,6 +236,7 @@ EVAL_METRIC_KEYS = {
 
 RANK_METHODS = [
     ("candidateC", "Candidate C"),
+    ("candidateUV", "Candidate UV"),
     ("candidateD", "Candidate D"),
     ("candidateE2", "Candidate E2"),
     ("candidateB", "Candidate B"),
@@ -412,7 +429,7 @@ def load_candidate_eval_rows() -> dict[int, dict[str, dict[str, str]]]:
     """Load per-sample rows from Candidate B/C evaluation CSVs for 4-way metric rankings."""
     out: dict[int, dict[str, dict[str, str]]] = {}
 
-    for path in (CANDIDATEB_EVAL, CANDIDATEC_EVAL, CANDIDATED_EVAL, CANDIDATEE2_EVAL):
+    for path in (CANDIDATEB_EVAL, CANDIDATEC_EVAL, CANDIDATEUV_EVAL, CANDIDATED_EVAL, CANDIDATEE2_EVAL):
         for r in read_csv(path):
             try:
                 sid = sid_from(r)
@@ -431,6 +448,8 @@ def load_candidate_eval_rows() -> dict[int, dict[str, dict[str, str]]]:
                 methods["candidateB"] = methods[k]
             elif lk == "candidatec" and "candidateC" not in methods:
                 methods["candidateC"] = methods[k]
+            elif lk == "candidateuv" and "candidateUV" not in methods:
+                methods["candidateUV"] = methods[k]
             elif lk == "candidated" and "candidateD" not in methods:
                 methods["candidateD"] = methods[k]
             elif lk == "candidatee2" and "candidateE2" not in methods:
@@ -439,7 +458,7 @@ def load_candidate_eval_rows() -> dict[int, dict[str, dict[str, str]]]:
     if out:
         print(f"Loaded candidate evaluation metric rows for {len(out)} samples")
     else:
-        print("WARNING: Candidate B/C evaluation CSVs not found; 4-way metric ranking unavailable.")
+        print("WARNING: Candidate B/C/UV/D/E2 evaluation CSVs not found; metric ranking unavailable.")
     return out
 
 
@@ -530,6 +549,29 @@ def infer_groups(sid: int, row: dict, obs: dict) -> list[str]:
     if np.isfinite(cc_mt) and np.isfinite(cb_mt) and cc_mt < cb_mt:
         groups.add("candidateC_mt_improves_vs_candidateB")
 
+    mt_after_uv = str(obs.get("mt_winner_after_candidateUV", "")).strip().lower()
+    pd_after_uv = str(obs.get("pd_winner_after_candidateUV", "")).strip().lower()
+
+    if sid in CANDIDATEUV_MT_GAN_RECOVERED:
+        groups.add("candidateUV_mt_gan_recovered")
+    if mt_after_uv == "candidateuv":
+        groups.add("candidateUV_mt_winner")
+    if was_mt_gan and mt_after_uv == "candidateuv":
+        groups.add("mt_gan_flipped_to_candidateUV")
+    if pd_after_uv == "candidateuv":
+        groups.add("candidateUV_pd_winner")
+
+    cuv_pd = fnum(obs.get("pd_distance_candidateUV", ""))
+    cuv_mt = fnum(obs.get("mt_distance_candidateUV", ""))
+    if np.isfinite(cuv_pd) and np.isfinite(cnn_pd) and cuv_pd < cnn_pd:
+        groups.add("candidateUV_pd_improves_vs_cnn")
+    if np.isfinite(cuv_mt) and np.isfinite(cnn_mt) and cuv_mt < cnn_mt:
+        groups.add("candidateUV_mt_improves_vs_cnn")
+    if np.isfinite(cuv_pd) and np.isfinite(cc_pd) and cuv_pd < cc_pd:
+        groups.add("candidateUV_pd_improves_vs_candidateC")
+    if np.isfinite(cuv_mt) and np.isfinite(cc_mt) and cuv_mt < cc_mt:
+        groups.add("candidateUV_mt_improves_vs_candidateC")
+
     mt_after_d = str(obs.get("mt_winner_after_candidateD", "")).strip().lower()
     pd_after_d = str(obs.get("pd_winner_after_candidateD", "")).strip().lower()
 
@@ -586,6 +628,8 @@ def question(sid: int, row: dict, obs: dict) -> str:
         return "Candidate D is the true PD-loss pilot's only recovered MT-GAN case: does the PD-refiner change visible structure, or is the improvement localized and metric-specific?"
     if sid in CANDIDATEC_MT_GAN_RECOVERED:
         return "Candidate C recovered this original MT-GAN case: does the critical-value/topological-extrema proxy improve merge-tree hierarchy while retaining CNN-like fidelity?"
+    if sid in CANDIDATEUV_MT_GAN_RECOVERED:
+        return "Candidate UV is the UV-only ablation's only recovered MT-GAN case: is this an isolated fine-tuning effect compared with Candidate C's broader MT improvement?"
     if sid in CANDIDATEB_MT_GAN_RECOVERED:
         return "Candidate B recovered this original MT-GAN case: does the fine-tuned CNN restore broad level-set/hierarchical structure while retaining CNN fidelity?"
 
@@ -644,9 +688,10 @@ def load_arrays():
     gan_p = GAN_DIR / "dataSR.npy"
     candb_p = CANDIDATEB_DIR / "dataSR.npy"
     candc_p = CANDIDATEC_DIR / "dataSR.npy"
+    canduv_p = CANDIDATEUV_DIR / "dataSR.npy"
     candd_p = CANDIDATED_DIR / "dataSR.npy"
     cande2_p = CANDIDATEE2_DIR / "dataSR.npy"
-    missing = [str(p) for p in (gt_p, cnn_p, gan_p, candb_p, candc_p, candd_p, cande2_p) if not p.exists()]
+    missing = [str(p) for p in (gt_p, cnn_p, gan_p, candb_p, candc_p, canduv_p, candd_p, cande2_p) if not p.exists()]
     if missing:
         raise FileNotFoundError("Missing NPY arrays:\n" + "\n".join(missing))
 
@@ -655,6 +700,7 @@ def load_arrays():
     gan = np.load(gan_p, mmap_mode="r")
     candb = np.load(candb_p, mmap_mode="r")
     candc = np.load(candc_p, mmap_mode="r")
+    canduv = np.load(canduv_p, mmap_mode="r")
     candd = np.load(candd_p, mmap_mode="r")
     cande2 = np.load(cande2_p, mmap_mode="r")
 
@@ -679,6 +725,13 @@ def load_arrays():
         candc_idx = np.arange(candc.shape[0])
     candc_pos = {int(v): i for i, v in enumerate(candc_idx.tolist())}
 
+    canduv_idx_p = CANDIDATEUV_DIR / "idx.npy"
+    if canduv_idx_p.exists():
+        canduv_idx = np.load(canduv_idx_p)
+    else:
+        canduv_idx = np.arange(canduv.shape[0])
+    canduv_pos = {int(v): i for i, v in enumerate(canduv_idx.tolist())}
+
     candd_idx_p = CANDIDATED_DIR / "idx.npy"
     if candd_idx_p.exists():
         candd_idx = np.load(candd_idx_p)
@@ -693,7 +746,7 @@ def load_arrays():
         cande2_idx = np.arange(cande2.shape[0])
     cande2_pos = {int(v): i for i, v in enumerate(cande2_idx.tolist())}
 
-    return gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos
+    return gt, cnn, gan, candb, candc, canduv, candd, cande2, pos, candb_pos, candc_pos, canduv_pos, candd_pos, cande2_pos
 
 def speed(a: np.ndarray) -> np.ndarray:
     if a.ndim == 3 and a.shape[-1] == 2:
@@ -716,8 +769,8 @@ def panel_title(sid: int, row: dict, obs: dict) -> str:
     )
 
 
-def make_panel(sid: int, gt, cnn, gan, candb, candc, candd, cande2,
-               pos: dict[int, int], candb_pos: dict[int, int], candc_pos: dict[int, int], candd_pos: dict[int, int], cande2_pos: dict[int, int],
+def make_panel(sid: int, gt, cnn, gan, candb, candc, canduv, candd, cande2,
+               pos: dict[int, int], candb_pos: dict[int, int], candc_pos: dict[int, int], canduv_pos: dict[int, int], candd_pos: dict[int, int], cande2_pos: dict[int, int],
                row: dict, obs: dict, crop, out: Path) -> bool:
     if sid not in pos:
         print(f"WARNING: sample {sid} not found in baseline idx.npy; skipping panel.")
@@ -727,6 +780,9 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd, cande2,
         return False
     if sid not in candc_pos:
         print(f"WARNING: sample {sid} not found in Candidate C idx.npy; skipping panel.")
+        return False
+    if sid not in canduv_pos:
+        print(f"WARNING: sample {sid} not found in Candidate UV idx.npy; skipping panel.")
         return False
     if sid not in candd_pos:
         print(f"WARNING: sample {sid} not found in Candidate D idx.npy; skipping panel.")
@@ -738,6 +794,7 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd, cande2,
     i = pos[sid]
     j = candb_pos[sid]
     k = candc_pos[sid]
+    u = canduv_pos[sid]
     m = candd_pos[sid]
     n = cande2_pos[sid]
     gt_s = speed(np.asarray(gt[i]))
@@ -745,6 +802,7 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd, cande2,
     gan_s = speed(np.asarray(gan[i]))
     candb_s = speed(np.asarray(candb[j]))
     candc_s = speed(np.asarray(candc[k]))
+    canduv_s = speed(np.asarray(canduv[u]))
     candd_s = speed(np.asarray(candd[m]))
     cande2_s = speed(np.asarray(cande2[n]))
 
@@ -755,6 +813,7 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd, cande2,
         cnn_s = cnn_s[y0:y1, x0:x1]
         candb_s = candb_s[y0:y1, x0:x1]
         candc_s = candc_s[y0:y1, x0:x1]
+        canduv_s = canduv_s[y0:y1, x0:x1]
         candd_s = candd_s[y0:y1, x0:x1]
         cande2_s = cande2_s[y0:y1, x0:x1]
         gan_s = gan_s[y0:y1, x0:x1]
@@ -763,35 +822,36 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd, cande2,
     err_cnn = np.abs(cnn_s - gt_s)
     err_candb = np.abs(candb_s - gt_s)
     err_candc = np.abs(candc_s - gt_s)
+    err_canduv = np.abs(canduv_s - gt_s)
     err_candd = np.abs(candd_s - gt_s)
     err_cande2 = np.abs(cande2_s - gt_s)
     err_gan = np.abs(gan_s - gt_s)
+    diff_c_uv = np.abs(candc_s - canduv_s)
     diff_e2_cc = np.abs(cande2_s - candc_s)
-    diff_e2_cd = np.abs(cande2_s - candd_s)
 
-    vmin = float(min(np.nanmin(gt_s), np.nanmin(cnn_s), np.nanmin(candb_s), np.nanmin(candc_s), np.nanmin(candd_s), np.nanmin(cande2_s), np.nanmin(gan_s)))
-    vmax = float(max(np.nanmax(gt_s), np.nanmax(cnn_s), np.nanmax(candb_s), np.nanmax(candc_s), np.nanmax(candd_s), np.nanmax(cande2_s), np.nanmax(gan_s)))
-    emax = float(max(np.nanmax(err_cnn), np.nanmax(err_candb), np.nanmax(err_candc), np.nanmax(err_candd), np.nanmax(err_cande2), np.nanmax(err_gan)))
-    dmax = float(max(np.nanmax(diff_e2_cc), np.nanmax(diff_e2_cd)))
+    vmin = float(min(np.nanmin(gt_s), np.nanmin(cnn_s), np.nanmin(candb_s), np.nanmin(candc_s), np.nanmin(canduv_s), np.nanmin(candd_s), np.nanmin(cande2_s), np.nanmin(gan_s)))
+    vmax = float(max(np.nanmax(gt_s), np.nanmax(cnn_s), np.nanmax(candb_s), np.nanmax(candc_s), np.nanmax(canduv_s), np.nanmax(candd_s), np.nanmax(cande2_s), np.nanmax(gan_s)))
+    emax = float(max(np.nanmax(err_cnn), np.nanmax(err_canduv), np.nanmax(err_candb), np.nanmax(err_candc), np.nanmax(err_candd), np.nanmax(err_cande2), np.nanmax(err_gan)))
+    dmax = float(max(np.nanmax(diff_c_uv), np.nanmax(diff_e2_cc)))
     if not np.isfinite(emax) or emax <= 0:
         emax = 1.0
     if not np.isfinite(dmax) or dmax <= 0:
         dmax = 1.0
 
-    fig, axes = plt.subplots(1, 15, figsize=(74, 5.2))
+    fig, axes = plt.subplots(1, 17, figsize=(84, 5.2))
     fields = [
-        gt_s, cnn_s, candb_s, candc_s, candd_s, cande2_s, gan_s,
-        err_cnn, err_candb, err_candc, err_candd, err_cande2, err_gan,
-        diff_e2_cc, diff_e2_cd,
+        gt_s, cnn_s, canduv_s, candb_s, candc_s, candd_s, cande2_s, gan_s,
+        err_cnn, err_canduv, err_candb, err_candc, err_candd, err_cande2, err_gan,
+        diff_c_uv, diff_e2_cc,
     ]
     titles = [
-        "GT speed", "CNN speed", "Candidate B speed", "Candidate C speed", "Candidate D speed", "Candidate E2 speed", "GAN speed",
-        "|CNN-GT|", "|CandB-GT|", "|CandC-GT|", "|CandD-GT|", "|CandE2-GT|", "|GAN-GT|",
-        "|CandE2-CandC|", "|CandE2-CandD|",
+        "GT speed", "CNN speed", "Candidate UV speed", "Candidate B speed", "Candidate C speed", "Candidate D speed", "Candidate E2 speed", "GAN speed",
+        "|CNN-GT|", "|CandUV-GT|", "|CandB-GT|", "|CandC-GT|", "|CandD-GT|", "|CandE2-GT|", "|GAN-GT|",
+        "|CandC-CandUV|", "|CandE2-CandC|",
     ]
 
     for ax, field, title in zip(axes, fields, titles):
-        if title.startswith("|CandE2-Cand"):
+        if title.startswith("|CandC-CandUV") or title.startswith("|CandE2-Cand"):
             im = ax.imshow(field, origin="lower", vmin=0, vmax=dmax)
         elif title.startswith("|"):
             im = ax.imshow(field, origin="lower", vmin=0, vmax=emax)
@@ -862,6 +922,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
             gan_val = raw.get("gan", "")
             b_val = raw.get("candidateB", "")
             c_val = raw.get("candidateC", "")
+            uv_val = raw.get("candidateUV", "")
             d_val = raw.get("candidateD", "")
             e2_val = raw.get("candidateE2", "")
         else:
@@ -883,6 +944,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
             gan_val = num(row.get(key + "_gan", ""))
             b_val = ""
             c_val = ""
+            uv_val = ""
             d_val = ""
             e2_val = ""
 
@@ -892,6 +954,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
             f"<td class='num'>{H(gan_val)}</td>"
             f"<td class='num'>{H(b_val)}</td>"
             f"<td class='num'>{H(c_val)}</td>"
+            f"<td class='num'>{H(uv_val)}</td>"
             f"<td class='num'>{H(d_val)}</td>"
             f"<td class='num'>{H(e2_val)}</td>"
             f"<td>{rank_cell}</td></tr>"
@@ -899,6 +962,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
 
     count_line = (
         f"Top-ranked: Candidate C {top_counts['candidateC']} | "
+        f"Candidate UV {top_counts['candidateUV']} | "
         f"Candidate D {top_counts['candidateD']} | "
         f"Candidate E2 {top_counts['candidateE2']} | "
         f"Candidate B {top_counts['candidateB']} | "
@@ -914,7 +978,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
       </summary>
       <p class="muted">Lower is better for these physics/domain error metrics. Ranking is better → worse using Candidate B/C/D/E2 evaluation CSVs when available.</p>
       <table class="metrics">
-        <thead><tr><th>Measure</th><th>Group</th><th>CNN</th><th>GAN</th><th>Candidate B</th><th>Candidate C</th><th>Candidate D</th><th>Candidate E2</th><th>Ranking / Winner</th></tr></thead>
+        <thead><tr><th>Measure</th><th>Group</th><th>CNN</th><th>GAN</th><th>Candidate B</th><th>Candidate C</th><th>Candidate UV</th><th>Candidate D</th><th>Candidate E2</th><th>Ranking / Winner</th></tr></thead>
         <tbody>{''.join(body)}</tbody>
       </table>
     </details>
@@ -1006,6 +1070,7 @@ def card(entry: dict) -> str:
 
           {candidate_topology_box(obs, "candidateB", "Candidate B", open_box=False)}
           {candidate_topology_box(obs, "candidateC", "Candidate C", open_box=True)}
+          {candidate_topology_box(obs, "candidateUV", "Candidate UV", open_box=False)}
           {candidate_topology_box(obs, "candidateD", "Candidate D", open_box=False)}
           {candidate_topology_box(obs, "candidateE2", "Candidate E2", open_box=False)}
 
@@ -1081,21 +1146,26 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-mt-gan-diagnostic')">MT picks GAN ({count('mt_gan_diagnostic')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateB')">MT-GAN → Candidate B ({count('mt_gan_flipped_to_candidateB')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateC')">MT-GAN → Candidate C ({count('mt_gan_flipped_to_candidateC')})</button>
+  <button onclick="showOnly('tag-mt-gan-flipped-to-candidateUV')">MT-GAN → Candidate UV ({count('mt_gan_flipped_to_candidateUV')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateD')">MT-GAN → Candidate D ({count('mt_gan_flipped_to_candidateD')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateE2')">MT-GAN → Candidate E2 ({count('mt_gan_flipped_to_candidateE2')})</button>
   <button onclick="showOnly('tag-candidateB-mt-winner')">Candidate B MT winner ({count('candidateB_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateC-mt-winner')">Candidate C MT winner ({count('candidateC_mt_winner')})</button>
+  <button onclick="showOnly('tag-candidateUV-mt-winner')">Candidate UV MT winner ({count('candidateUV_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateD-mt-winner')">Candidate D MT winner ({count('candidateD_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateE2-mt-winner')">Candidate E2 MT winner ({count('candidateE2_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateB-pd-improves-vs-cnn')">Candidate B improves PD vs CNN ({count('candidateB_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-pd-improves-vs-cnn')">Candidate C improves PD vs CNN ({count('candidateC_pd_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-candidateUV-pd-improves-vs-cnn')">Candidate UV improves PD vs CNN ({count('candidateUV_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateD-pd-improves-vs-cnn')">Candidate D improves PD vs CNN ({count('candidateD_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateE2-pd-improves-vs-cnn')">Candidate E2 improves PD vs CNN ({count('candidateE2_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateB-mt-improves-vs-cnn')">Candidate B improves MT vs CNN ({count('candidateB_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-mt-improves-vs-cnn')">Candidate C improves MT vs CNN ({count('candidateC_mt_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-candidateUV-mt-improves-vs-cnn')">Candidate UV improves MT vs CNN ({count('candidateUV_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateD-mt-improves-vs-cnn')">Candidate D improves MT vs CNN ({count('candidateD_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateE2-mt-improves-vs-cnn')">Candidate E2 improves MT vs CNN ({count('candidateE2_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-mt-improves-vs-candidateB')">Candidate C improves MT vs B ({count('candidateC_mt_improves_vs_candidateB')})</button>
+  <button onclick="showOnly('tag-candidateUV-mt-improves-vs-candidateC')">Candidate UV improves MT vs C ({count('candidateUV_mt_improves_vs_candidateC')})</button>
   <button onclick="showOnly('tag-candidateD-mt-improves-vs-candidateC')">Candidate D improves MT vs C ({count('candidateD_mt_improves_vs_candidateC')})</button>
   <button onclick="showOnly('tag-candidateE2-mt-improves-vs-candidateC')">Candidate E2 improves MT vs C ({count('candidateE2_mt_improves_vs_candidateC')})</button>
   <button onclick="showOnly('tag-topology-consensus-cnn')">PD=MT=CNN ({count('topology_consensus_cnn')})</button>
@@ -1105,7 +1175,7 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-adjacent-cluster-76-78')">Cluster 76–78</button>
   <button onclick="showOnly('tag-adjacent-cluster-90-93')">Cluster 90–93</button>
   <button onclick="showOnly('tag-adjacent-cluster-161-164')">Cluster 161–164</button>
-  <p class="muted">Each panel shows GT speed | CNN speed | Candidate B speed | Candidate C speed | Candidate D speed | Candidate E2 speed | GAN speed | absolute-error maps | Candidate-E2-minus-C/D difference maps.</p>
+  <p class="muted">Each panel shows GT speed | CNN speed | Candidate UV speed | Candidate B speed | Candidate C speed | Candidate D speed | Candidate E2 speed | GAN speed | absolute-error maps | Candidate-C-minus-UV and Candidate-E2-minus-C difference maps.</p>
 </header>
 <main>
 {cards}
@@ -1137,9 +1207,10 @@ def main() -> None:
 
     candb_topology = load_candidate_topology_rows(CANDIDATEB_TOPOLOGY_COMPARISON, "candidateB", "Candidate B")
     candc_topology = load_candidate_topology_rows(CANDIDATEC_TOPOLOGY_COMPARISON, "candidateC", "Candidate C")
+    canduv_topology = load_candidate_topology_rows(CANDIDATEUV_TOPOLOGY_COMPARISON, "candidateUV", "Candidate UV")
     candd_topology = load_candidate_topology_rows(CANDIDATED_TOPOLOGY_COMPARISON, "candidateD", "Candidate D")
     cande2_topology = load_candidate_topology_rows(CANDIDATEE2_TOPOLOGY_COMPARISON, "candidateE2", "Candidate E2")
-    for topology_rows in (candb_topology, candc_topology, candd_topology, cande2_topology):
+    for topology_rows in (candb_topology, candc_topology, canduv_topology, candd_topology, cande2_topology):
         for sid, r in topology_rows.items():
             obs.setdefault(sid, {})
             for k, v in r.items():
@@ -1156,9 +1227,9 @@ def main() -> None:
     print(f"selected_samples={len(samples)}")
     print("forced/extra samples:", " ".join(map(str, sorted(FORCED))))
 
-    gt = cnn = gan = candb = candc = candd = cande2 = pos = candb_pos = candc_pos = candd_pos = cande2_pos = None
+    gt = cnn = gan = candb = candc = canduv = candd = cande2 = pos = candb_pos = candc_pos = canduv_pos = candd_pos = cande2_pos = None
     if not args.no_panels:
-        gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos = load_arrays()
+        gt, cnn, gan, candb, candc, canduv, candd, cande2, pos, candb_pos, candc_pos, canduv_pos, candd_pos, cande2_pos = load_arrays()
 
     entries = []
     manifest = []
@@ -1174,8 +1245,8 @@ def main() -> None:
         full_ok = full_path.exists()
 
         if not args.no_panels:
-            crop_ok = make_panel(sid, gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos, row, ob, (0, 160, 0, 160), crop_path)
-            full_ok = make_panel(sid, gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos, row, ob, None, full_path)
+            crop_ok = make_panel(sid, gt, cnn, gan, candb, candc, canduv, candd, cande2, pos, candb_pos, candc_pos, canduv_pos, candd_pos, cande2_pos, row, ob, (0, 160, 0, 160), crop_path)
+            full_ok = make_panel(sid, gt, cnn, gan, candb, candc, canduv, candd, cande2, pos, candb_pos, candc_pos, canduv_pos, candd_pos, cande2_pos, row, ob, None, full_path)
 
         crop_rel = crop_path.relative_to(OUTDIR).as_posix() if crop_ok else ""
         full_rel = full_path.relative_to(OUTDIR).as_posix() if full_ok else ""
@@ -1220,6 +1291,10 @@ def main() -> None:
             "pd_winner_after_candidateC": ob.get("pd_winner_after_candidateC", ""),
             "pd_distance_candidateC": ob.get("pd_distance_candidateC", ""),
             "mt_distance_candidateC": ob.get("mt_distance_candidateC", ""),
+            "mt_winner_after_candidateUV": ob.get("mt_winner_after_candidateUV", ""),
+            "pd_winner_after_candidateUV": ob.get("pd_winner_after_candidateUV", ""),
+            "pd_distance_candidateUV": ob.get("pd_distance_candidateUV", ""),
+            "mt_distance_candidateUV": ob.get("mt_distance_candidateUV", ""),
             "mt_winner_after_candidateD": ob.get("mt_winner_after_candidateD", ""),
             "pd_winner_after_candidateD": ob.get("pd_winner_after_candidateD", ""),
             "pd_distance_candidateD": ob.get("pd_distance_candidateD", ""),
@@ -1248,6 +1323,8 @@ def main() -> None:
             "pd_distance_candidateB", "mt_distance_candidateB",
             "mt_winner_after_candidateC", "pd_winner_after_candidateC",
             "pd_distance_candidateC", "mt_distance_candidateC",
+            "mt_winner_after_candidateUV", "pd_winner_after_candidateUV",
+            "pd_distance_candidateUV", "mt_distance_candidateUV",
             "mt_winner_after_candidateD", "pd_winner_after_candidateD",
             "pd_distance_candidateD", "mt_distance_candidateD",
             "mt_winner_after_candidateE2", "pd_winner_after_candidateE2",
