@@ -15,7 +15,7 @@ What this version changes:
     plus the anchor/context samples:
         12, 16, 17, 18, 19, 20, 25, 77, 80, 91, 92, 154, 162, 163.
   - Regenerates crop and full-field PNG panels.
-  - Adds Candidate B, Candidate C, and Candidate D panels and topology comparison metadata when available.
+  - Adds Candidate B, Candidate C, Candidate D, and Candidate E2 panels and topology comparison metadata when available.
   - Rebuilds ttk_runs_fixed/visual_inspection/index.html with physics/domain breakdowns.
 
 Optional:
@@ -84,6 +84,7 @@ GAN_DIR = first_existing(
 CANDIDATEB_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateB"
 CANDIDATEC_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateC"
 CANDIDATED_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateD"
+CANDIDATEE2_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateE2"
 
 CANDIDATEB_TOPOLOGY_COMPARISON = (
     ROOT
@@ -106,6 +107,13 @@ CANDIDATED_TOPOLOGY_COMPARISON = (
     / "candidateD_topology"
     / "candidateD_topology_comparison.csv"
 )
+CANDIDATEE2_TOPOLOGY_COMPARISON = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateE2_topology"
+    / "candidateE2_topology_comparison.csv"
+)
 
 CANDIDATEB_EVAL = (
     ROOT
@@ -127,6 +135,13 @@ CANDIDATED_EVAL = (
     / "topology_finetuning"
     / "candidateD_eval"
     / "all_sample_metrics_candidateD.csv"
+)
+CANDIDATEE2_EVAL = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateE2_eval"
+    / "all_sample_metrics_candidateE2.csv"
 )
 
 FULL_BREAKDOWN = ROOT / "ttk_runs_fixed" / "report_tables" / "full_physics_domain_breakdown" / "physics_domain_breakdown_all_samples.csv"
@@ -182,6 +197,7 @@ FORCED = {
 CANDIDATEB_MT_GAN_RECOVERED = {18, 25, 63, 80}
 CANDIDATEC_MT_GAN_RECOVERED = {6, 18, 20, 25, 62, 63, 65, 68, 79, 80, 92}
 CANDIDATED_MT_GAN_RECOVERED = {25}
+CANDIDATEE2_MT_GAN_RECOVERED = {25}
 
 # Map legacy physics/domain table keys to all_sample_metrics_candidate*.csv keys.
 EVAL_METRIC_KEYS = {
@@ -205,6 +221,7 @@ EVAL_METRIC_KEYS = {
 RANK_METHODS = [
     ("candidateC", "Candidate C"),
     ("candidateD", "Candidate D"),
+    ("candidateE2", "Candidate E2"),
     ("candidateB", "Candidate B"),
     ("cnn", "CNN"),
     ("gan", "GAN"),
@@ -395,7 +412,7 @@ def load_candidate_eval_rows() -> dict[int, dict[str, dict[str, str]]]:
     """Load per-sample rows from Candidate B/C evaluation CSVs for 4-way metric rankings."""
     out: dict[int, dict[str, dict[str, str]]] = {}
 
-    for path in (CANDIDATEB_EVAL, CANDIDATEC_EVAL, CANDIDATED_EVAL):
+    for path in (CANDIDATEB_EVAL, CANDIDATEC_EVAL, CANDIDATED_EVAL, CANDIDATEE2_EVAL):
         for r in read_csv(path):
             try:
                 sid = sid_from(r)
@@ -416,6 +433,8 @@ def load_candidate_eval_rows() -> dict[int, dict[str, dict[str, str]]]:
                 methods["candidateC"] = methods[k]
             elif lk == "candidated" and "candidateD" not in methods:
                 methods["candidateD"] = methods[k]
+            elif lk == "candidatee2" and "candidateE2" not in methods:
+                methods["candidateE2"] = methods[k]
 
     if out:
         print(f"Loaded candidate evaluation metric rows for {len(out)} samples")
@@ -534,10 +553,35 @@ def infer_groups(sid: int, row: dict, obs: dict) -> list[str]:
     if np.isfinite(cd_mt) and np.isfinite(cc_mt) and cd_mt < cc_mt:
         groups.add("candidateD_mt_improves_vs_candidateC")
 
+    mt_after_e2 = str(obs.get("mt_winner_after_candidateE2", "")).strip().lower()
+    pd_after_e2 = str(obs.get("pd_winner_after_candidateE2", "")).strip().lower()
+
+    if sid in CANDIDATEE2_MT_GAN_RECOVERED:
+        groups.add("candidateE2_mt_gan_recovered")
+    if mt_after_e2 == "candidatee2":
+        groups.add("candidateE2_mt_winner")
+    if was_mt_gan and mt_after_e2 == "candidatee2":
+        groups.add("mt_gan_flipped_to_candidateE2")
+    if pd_after_e2 == "candidatee2":
+        groups.add("candidateE2_pd_winner")
+
+    ce2_pd = fnum(obs.get("pd_distance_candidateE2", ""))
+    ce2_mt = fnum(obs.get("mt_distance_candidateE2", ""))
+    if np.isfinite(ce2_pd) and np.isfinite(cnn_pd) and ce2_pd < cnn_pd:
+        groups.add("candidateE2_pd_improves_vs_cnn")
+    if np.isfinite(ce2_mt) and np.isfinite(cnn_mt) and ce2_mt < cnn_mt:
+        groups.add("candidateE2_mt_improves_vs_cnn")
+    if np.isfinite(ce2_pd) and np.isfinite(cc_pd) and ce2_pd < cc_pd:
+        groups.add("candidateE2_pd_improves_vs_candidateC")
+    if np.isfinite(ce2_mt) and np.isfinite(cc_mt) and ce2_mt < cc_mt:
+        groups.add("candidateE2_mt_improves_vs_candidateC")
+
     return sorted(groups)
 
 
 def question(sid: int, row: dict, obs: dict) -> str:
+    if sid in CANDIDATEE2_MT_GAN_RECOVERED:
+        return "Candidate E2 is the corrected TTK critical-pair loss recovered MT-GAN case: does fixed critical-pair supervision change visible structure, or is the improvement isolated?"
     if sid in CANDIDATED_MT_GAN_RECOVERED:
         return "Candidate D is the true PD-loss pilot's only recovered MT-GAN case: does the PD-refiner change visible structure, or is the improvement localized and metric-specific?"
     if sid in CANDIDATEC_MT_GAN_RECOVERED:
@@ -601,7 +645,8 @@ def load_arrays():
     candb_p = CANDIDATEB_DIR / "dataSR.npy"
     candc_p = CANDIDATEC_DIR / "dataSR.npy"
     candd_p = CANDIDATED_DIR / "dataSR.npy"
-    missing = [str(p) for p in (gt_p, cnn_p, gan_p, candb_p, candc_p, candd_p) if not p.exists()]
+    cande2_p = CANDIDATEE2_DIR / "dataSR.npy"
+    missing = [str(p) for p in (gt_p, cnn_p, gan_p, candb_p, candc_p, candd_p, cande2_p) if not p.exists()]
     if missing:
         raise FileNotFoundError("Missing NPY arrays:\n" + "\n".join(missing))
 
@@ -611,6 +656,7 @@ def load_arrays():
     candb = np.load(candb_p, mmap_mode="r")
     candc = np.load(candc_p, mmap_mode="r")
     candd = np.load(candd_p, mmap_mode="r")
+    cande2 = np.load(cande2_p, mmap_mode="r")
 
     idx_p = CNN_DIR / "idx.npy"
     if idx_p.exists():
@@ -640,7 +686,14 @@ def load_arrays():
         candd_idx = np.arange(candd.shape[0])
     candd_pos = {int(v): i for i, v in enumerate(candd_idx.tolist())}
 
-    return gt, cnn, gan, candb, candc, candd, pos, candb_pos, candc_pos, candd_pos
+    cande2_idx_p = CANDIDATEE2_DIR / "idx.npy"
+    if cande2_idx_p.exists():
+        cande2_idx = np.load(cande2_idx_p)
+    else:
+        cande2_idx = np.arange(cande2.shape[0])
+    cande2_pos = {int(v): i for i, v in enumerate(cande2_idx.tolist())}
+
+    return gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos
 
 def speed(a: np.ndarray) -> np.ndarray:
     if a.ndim == 3 and a.shape[-1] == 2:
@@ -663,8 +716,8 @@ def panel_title(sid: int, row: dict, obs: dict) -> str:
     )
 
 
-def make_panel(sid: int, gt, cnn, gan, candb, candc, candd,
-               pos: dict[int, int], candb_pos: dict[int, int], candc_pos: dict[int, int], candd_pos: dict[int, int],
+def make_panel(sid: int, gt, cnn, gan, candb, candc, candd, cande2,
+               pos: dict[int, int], candb_pos: dict[int, int], candc_pos: dict[int, int], candd_pos: dict[int, int], cande2_pos: dict[int, int],
                row: dict, obs: dict, crop, out: Path) -> bool:
     if sid not in pos:
         print(f"WARNING: sample {sid} not found in baseline idx.npy; skipping panel.")
@@ -678,17 +731,22 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd,
     if sid not in candd_pos:
         print(f"WARNING: sample {sid} not found in Candidate D idx.npy; skipping panel.")
         return False
+    if sid not in cande2_pos:
+        print(f"WARNING: sample {sid} not found in Candidate E2 idx.npy; skipping panel.")
+        return False
 
     i = pos[sid]
     j = candb_pos[sid]
     k = candc_pos[sid]
     m = candd_pos[sid]
+    n = cande2_pos[sid]
     gt_s = speed(np.asarray(gt[i]))
     cnn_s = speed(np.asarray(cnn[i]))
     gan_s = speed(np.asarray(gan[i]))
     candb_s = speed(np.asarray(candb[j]))
     candc_s = speed(np.asarray(candc[k]))
     candd_s = speed(np.asarray(candd[m]))
+    cande2_s = speed(np.asarray(cande2[n]))
 
     desc = "full field"
     if crop is not None:
@@ -698,6 +756,7 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd,
         candb_s = candb_s[y0:y1, x0:x1]
         candc_s = candc_s[y0:y1, x0:x1]
         candd_s = candd_s[y0:y1, x0:x1]
+        cande2_s = cande2_s[y0:y1, x0:x1]
         gan_s = gan_s[y0:y1, x0:x1]
         desc = f"crop y={y0}:{y1}, x={x0}:{x1}"
 
@@ -705,33 +764,34 @@ def make_panel(sid: int, gt, cnn, gan, candb, candc, candd,
     err_candb = np.abs(candb_s - gt_s)
     err_candc = np.abs(candc_s - gt_s)
     err_candd = np.abs(candd_s - gt_s)
+    err_cande2 = np.abs(cande2_s - gt_s)
     err_gan = np.abs(gan_s - gt_s)
-    diff_cd_cb = np.abs(candd_s - candb_s)
-    diff_cd_cc = np.abs(candd_s - candc_s)
+    diff_e2_cc = np.abs(cande2_s - candc_s)
+    diff_e2_cd = np.abs(cande2_s - candd_s)
 
-    vmin = float(min(np.nanmin(gt_s), np.nanmin(cnn_s), np.nanmin(candb_s), np.nanmin(candc_s), np.nanmin(candd_s), np.nanmin(gan_s)))
-    vmax = float(max(np.nanmax(gt_s), np.nanmax(cnn_s), np.nanmax(candb_s), np.nanmax(candc_s), np.nanmax(candd_s), np.nanmax(gan_s)))
-    emax = float(max(np.nanmax(err_cnn), np.nanmax(err_candb), np.nanmax(err_candc), np.nanmax(err_candd), np.nanmax(err_gan)))
-    dmax = float(max(np.nanmax(diff_cd_cb), np.nanmax(diff_cd_cc)))
+    vmin = float(min(np.nanmin(gt_s), np.nanmin(cnn_s), np.nanmin(candb_s), np.nanmin(candc_s), np.nanmin(candd_s), np.nanmin(cande2_s), np.nanmin(gan_s)))
+    vmax = float(max(np.nanmax(gt_s), np.nanmax(cnn_s), np.nanmax(candb_s), np.nanmax(candc_s), np.nanmax(candd_s), np.nanmax(cande2_s), np.nanmax(gan_s)))
+    emax = float(max(np.nanmax(err_cnn), np.nanmax(err_candb), np.nanmax(err_candc), np.nanmax(err_candd), np.nanmax(err_cande2), np.nanmax(err_gan)))
+    dmax = float(max(np.nanmax(diff_e2_cc), np.nanmax(diff_e2_cd)))
     if not np.isfinite(emax) or emax <= 0:
         emax = 1.0
     if not np.isfinite(dmax) or dmax <= 0:
         dmax = 1.0
 
-    fig, axes = plt.subplots(1, 13, figsize=(64, 5.2))
+    fig, axes = plt.subplots(1, 15, figsize=(74, 5.2))
     fields = [
-        gt_s, cnn_s, candb_s, candc_s, candd_s, gan_s,
-        err_cnn, err_candb, err_candc, err_candd, err_gan,
-        diff_cd_cb, diff_cd_cc,
+        gt_s, cnn_s, candb_s, candc_s, candd_s, cande2_s, gan_s,
+        err_cnn, err_candb, err_candc, err_candd, err_cande2, err_gan,
+        diff_e2_cc, diff_e2_cd,
     ]
     titles = [
-        "GT speed", "CNN speed", "Candidate B speed", "Candidate C speed", "Candidate D speed", "GAN speed",
-        "|CNN-GT|", "|CandB-GT|", "|CandC-GT|", "|CandD-GT|", "|GAN-GT|",
-        "|CandD-CandB|", "|CandD-CandC|",
+        "GT speed", "CNN speed", "Candidate B speed", "Candidate C speed", "Candidate D speed", "Candidate E2 speed", "GAN speed",
+        "|CNN-GT|", "|CandB-GT|", "|CandC-GT|", "|CandD-GT|", "|CandE2-GT|", "|GAN-GT|",
+        "|CandE2-CandC|", "|CandE2-CandD|",
     ]
 
     for ax, field, title in zip(axes, fields, titles):
-        if title.startswith("|CandD-Cand"):
+        if title.startswith("|CandE2-Cand"):
             im = ax.imshow(field, origin="lower", vmin=0, vmax=dmax)
         elif title.startswith("|"):
             im = ax.imshow(field, origin="lower", vmin=0, vmax=emax)
@@ -803,6 +863,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
             b_val = raw.get("candidateB", "")
             c_val = raw.get("candidateC", "")
             d_val = raw.get("candidateD", "")
+            e2_val = raw.get("candidateE2", "")
         else:
             # Fallback to legacy CNN/GAN-only breakdown.
             w = norm(row.get(f"{key}_winner", ""))
@@ -823,6 +884,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
             b_val = ""
             c_val = ""
             d_val = ""
+            e2_val = ""
 
         body.append(
             f"<tr><td>{H(label)}</td><td>{H(group)}</td>"
@@ -831,12 +893,14 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
             f"<td class='num'>{H(b_val)}</td>"
             f"<td class='num'>{H(c_val)}</td>"
             f"<td class='num'>{H(d_val)}</td>"
+            f"<td class='num'>{H(e2_val)}</td>"
             f"<td>{rank_cell}</td></tr>"
         )
 
     count_line = (
         f"Top-ranked: Candidate C {top_counts['candidateC']} | "
         f"Candidate D {top_counts['candidateD']} | "
+        f"Candidate E2 {top_counts['candidateE2']} | "
         f"Candidate B {top_counts['candidateB']} | "
         f"CNN {top_counts['cnn']} | GAN {top_counts['gan']}"
     )
@@ -848,9 +912,9 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
       <summary><b>Physics/domain metric breakdown</b>
         <span class="count">{H(count_line)}</span>
       </summary>
-      <p class="muted">Lower is better for these physics/domain error metrics. Ranking is better → worse using Candidate B/C/D evaluation CSVs when available.</p>
+      <p class="muted">Lower is better for these physics/domain error metrics. Ranking is better → worse using Candidate B/C/D/E2 evaluation CSVs when available.</p>
       <table class="metrics">
-        <thead><tr><th>Measure</th><th>Group</th><th>CNN</th><th>GAN</th><th>Candidate B</th><th>Candidate C</th><th>Candidate D</th><th>Ranking / Winner</th></tr></thead>
+        <thead><tr><th>Measure</th><th>Group</th><th>CNN</th><th>GAN</th><th>Candidate B</th><th>Candidate C</th><th>Candidate D</th><th>Candidate E2</th><th>Ranking / Winner</th></tr></thead>
         <tbody>{''.join(body)}</tbody>
       </table>
     </details>
@@ -943,6 +1007,7 @@ def card(entry: dict) -> str:
           {candidate_topology_box(obs, "candidateB", "Candidate B", open_box=False)}
           {candidate_topology_box(obs, "candidateC", "Candidate C", open_box=True)}
           {candidate_topology_box(obs, "candidateD", "Candidate D", open_box=False)}
+          {candidate_topology_box(obs, "candidateE2", "Candidate E2", open_box=False)}
 
           {metric_table(row, sid, entry.get("eval_rows", {}))}
 
@@ -1017,17 +1082,22 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateB')">MT-GAN → Candidate B ({count('mt_gan_flipped_to_candidateB')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateC')">MT-GAN → Candidate C ({count('mt_gan_flipped_to_candidateC')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateD')">MT-GAN → Candidate D ({count('mt_gan_flipped_to_candidateD')})</button>
+  <button onclick="showOnly('tag-mt-gan-flipped-to-candidateE2')">MT-GAN → Candidate E2 ({count('mt_gan_flipped_to_candidateE2')})</button>
   <button onclick="showOnly('tag-candidateB-mt-winner')">Candidate B MT winner ({count('candidateB_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateC-mt-winner')">Candidate C MT winner ({count('candidateC_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateD-mt-winner')">Candidate D MT winner ({count('candidateD_mt_winner')})</button>
+  <button onclick="showOnly('tag-candidateE2-mt-winner')">Candidate E2 MT winner ({count('candidateE2_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateB-pd-improves-vs-cnn')">Candidate B improves PD vs CNN ({count('candidateB_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-pd-improves-vs-cnn')">Candidate C improves PD vs CNN ({count('candidateC_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateD-pd-improves-vs-cnn')">Candidate D improves PD vs CNN ({count('candidateD_pd_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-candidateE2-pd-improves-vs-cnn')">Candidate E2 improves PD vs CNN ({count('candidateE2_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateB-mt-improves-vs-cnn')">Candidate B improves MT vs CNN ({count('candidateB_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-mt-improves-vs-cnn')">Candidate C improves MT vs CNN ({count('candidateC_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateD-mt-improves-vs-cnn')">Candidate D improves MT vs CNN ({count('candidateD_mt_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-candidateE2-mt-improves-vs-cnn')">Candidate E2 improves MT vs CNN ({count('candidateE2_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-mt-improves-vs-candidateB')">Candidate C improves MT vs B ({count('candidateC_mt_improves_vs_candidateB')})</button>
   <button onclick="showOnly('tag-candidateD-mt-improves-vs-candidateC')">Candidate D improves MT vs C ({count('candidateD_mt_improves_vs_candidateC')})</button>
+  <button onclick="showOnly('tag-candidateE2-mt-improves-vs-candidateC')">Candidate E2 improves MT vs C ({count('candidateE2_mt_improves_vs_candidateC')})</button>
   <button onclick="showOnly('tag-topology-consensus-cnn')">PD=MT=CNN ({count('topology_consensus_cnn')})</button>
   <button onclick="showOnly('tag-gan-metric-majority')">GAN metric majority ({count('gan_metric_majority')})</button>
   <button onclick="showOnly('tag-gan-majority-mt-rejects-gan')">GAN majority but MT≠GAN ({count('gan_majority_mt_rejects_gan')})</button>
@@ -1035,7 +1105,7 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-adjacent-cluster-76-78')">Cluster 76–78</button>
   <button onclick="showOnly('tag-adjacent-cluster-90-93')">Cluster 90–93</button>
   <button onclick="showOnly('tag-adjacent-cluster-161-164')">Cluster 161–164</button>
-  <p class="muted">Each panel shows GT speed | CNN speed | Candidate B speed | Candidate C speed | Candidate D speed | GAN speed | absolute-error maps | Candidate-D-minus-B/C difference maps.</p>
+  <p class="muted">Each panel shows GT speed | CNN speed | Candidate B speed | Candidate C speed | Candidate D speed | Candidate E2 speed | GAN speed | absolute-error maps | Candidate-E2-minus-C/D difference maps.</p>
 </header>
 <main>
 {cards}
@@ -1068,7 +1138,8 @@ def main() -> None:
     candb_topology = load_candidate_topology_rows(CANDIDATEB_TOPOLOGY_COMPARISON, "candidateB", "Candidate B")
     candc_topology = load_candidate_topology_rows(CANDIDATEC_TOPOLOGY_COMPARISON, "candidateC", "Candidate C")
     candd_topology = load_candidate_topology_rows(CANDIDATED_TOPOLOGY_COMPARISON, "candidateD", "Candidate D")
-    for topology_rows in (candb_topology, candc_topology, candd_topology):
+    cande2_topology = load_candidate_topology_rows(CANDIDATEE2_TOPOLOGY_COMPARISON, "candidateE2", "Candidate E2")
+    for topology_rows in (candb_topology, candc_topology, candd_topology, cande2_topology):
         for sid, r in topology_rows.items():
             obs.setdefault(sid, {})
             for k, v in r.items():
@@ -1085,9 +1156,9 @@ def main() -> None:
     print(f"selected_samples={len(samples)}")
     print("forced/extra samples:", " ".join(map(str, sorted(FORCED))))
 
-    gt = cnn = gan = candb = candc = candd = pos = candb_pos = candc_pos = candd_pos = None
+    gt = cnn = gan = candb = candc = candd = cande2 = pos = candb_pos = candc_pos = candd_pos = cande2_pos = None
     if not args.no_panels:
-        gt, cnn, gan, candb, candc, candd, pos, candb_pos, candc_pos, candd_pos = load_arrays()
+        gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos = load_arrays()
 
     entries = []
     manifest = []
@@ -1103,8 +1174,8 @@ def main() -> None:
         full_ok = full_path.exists()
 
         if not args.no_panels:
-            crop_ok = make_panel(sid, gt, cnn, gan, candb, candc, candd, pos, candb_pos, candc_pos, candd_pos, row, ob, (0, 160, 0, 160), crop_path)
-            full_ok = make_panel(sid, gt, cnn, gan, candb, candc, candd, pos, candb_pos, candc_pos, candd_pos, row, ob, None, full_path)
+            crop_ok = make_panel(sid, gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos, row, ob, (0, 160, 0, 160), crop_path)
+            full_ok = make_panel(sid, gt, cnn, gan, candb, candc, candd, cande2, pos, candb_pos, candc_pos, candd_pos, cande2_pos, row, ob, None, full_path)
 
         crop_rel = crop_path.relative_to(OUTDIR).as_posix() if crop_ok else ""
         full_rel = full_path.relative_to(OUTDIR).as_posix() if full_ok else ""
@@ -1153,6 +1224,10 @@ def main() -> None:
             "pd_winner_after_candidateD": ob.get("pd_winner_after_candidateD", ""),
             "pd_distance_candidateD": ob.get("pd_distance_candidateD", ""),
             "mt_distance_candidateD": ob.get("mt_distance_candidateD", ""),
+            "mt_winner_after_candidateE2": ob.get("mt_winner_after_candidateE2", ""),
+            "pd_winner_after_candidateE2": ob.get("pd_winner_after_candidateE2", ""),
+            "pd_distance_candidateE2": ob.get("pd_distance_candidateE2", ""),
+            "mt_distance_candidateE2": ob.get("mt_distance_candidateE2", ""),
             "was_mt_gan_win_before": ob.get("was_mt_gan_win_before", ""),
             "forced_reason": FORCED.get(sid, ""),
         })
@@ -1175,6 +1250,8 @@ def main() -> None:
             "pd_distance_candidateC", "mt_distance_candidateC",
             "mt_winner_after_candidateD", "pd_winner_after_candidateD",
             "pd_distance_candidateD", "mt_distance_candidateD",
+            "mt_winner_after_candidateE2", "pd_winner_after_candidateE2",
+            "pd_distance_candidateE2", "mt_distance_candidateE2",
             "was_mt_gan_win_before", "forced_reason"
         ],
     )
