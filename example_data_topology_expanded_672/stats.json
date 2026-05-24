@@ -1,0 +1,44 @@
+{
+  "n_samples": 672,
+  "hr_shape": [
+    672,
+    500,
+    500,
+    2
+  ],
+  "u": {
+    "mean": 2.101397772729164,
+    "std": 5.831966219951259,
+    "min": -23.36872673034668,
+    "max": 34.42293167114258
+  },
+  "v": {
+    "mean": 0.20813373900612248,
+    "std": 5.991745777427175,
+    "min": -25.523746490478516,
+    "max": 36.2430419921875
+  },
+  "speed": {
+    "mean": 7.580619619785039,
+    "std": 4.111720550407437,
+    "min": 0.0,
+    "max": 37.281411855337886,
+    "p50": 7.1016541896523,
+    "p90": 13.232826082924447,
+    "p95": 15.363014428071168,
+    "p99": 18.85433153174238
+  },
+  "phire_pretrained_normalization": {
+    "mu_u": 0.7684,
+    "mu_v": -0.4575,
+    "sig_u": 5.02455,
+    "sig_v": 5.9017,
+    "note": "These constants are unchanged; only compatibility is assessed here."
+  },
+  "normalization_compatibility": {
+    "u_z_of_expanded_mean": 0.26529694653832964,
+    "v_z_of_expanded_mean": 0.11278677991191054,
+    "compatible": true,
+    "note": "compatible=True when both channel means are within 3\u03c3 of the pretrained normalization center.  If True, the pretrained CNN can be applied directly.  If False, consider recomputing mu/sig or fine-tuning from the expanded dataset."
+  }
+}
