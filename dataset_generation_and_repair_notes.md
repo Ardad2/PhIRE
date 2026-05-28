@@ -4220,3 +4220,580 @@ models_fixed/topology_finetuning/wind_finetune_pilot_candidateC/
 ## Updated final takeaway with Candidate C
 
 The repaired/final pipeline now supports both post-hoc topology evaluation and an initial topology-aware fine-tuning result. Candidate B demonstrates that speed, gradient, and soft level-set losses can improve scalar fidelity and PD-like behavior. Candidate C demonstrates a stronger merge-tree result: adding a critical-value/topological-extrema proxy improves true MT distance, recovers more than half of the original MT-GAN cases, and preserves CNN-like direct fidelity. This provides concrete evidence that topology-derived training signals can improve scientific SR structure, while also showing that PD and MT remain distinct objectives.
+
+---
+
+# Part IX - Expanded seasonal dataset and expanded candidate ablations
+
+## Purpose
+
+This section records the expanded-data experiments performed after the original 168-sample candidate pilots. The goal was to test whether topology-aware fine-tuning effects were robust to training on samples that were not part of the final 168-sample benchmark.
+
+The expanded experiments use the original corrected 168-sample benchmark only for evaluation. Training is done on a separate 672-sample seasonal WIND Toolkit subset.
+
+## Expanded 672-sample dataset
+
+A new PhIRE-compatible dataset was generated from the same WIND Toolkit source family and same spatial crop as the corrected 168-sample benchmark. The dataset uses four non-overlapping 168-hour windows:
+
+| Window | WTK time-index range | Approximate start | Samples |
+|---|---:|---|---:|
+| Winter | 336-503 | 2007-01-15 00:00 | 168 |
+| Spring | 2160-2327 | 2007-04-01 00:00 | 168 |
+| Summer | 4344-4511 | 2007-07-01 00:00 | 168 |
+| Fall | 6552-6719 | 2007-10-01 00:00 | 168 |
+| Total | 336-6719 | - | 672 |
+
+The original benchmark uses WTK time indices 0-167, so the expanded training set has no temporal overlap with the benchmark.
+
+The generated data products were:
+
+```text
+example_data_topology_expanded_672/wind_LR-MR.tfrecord
+example_data_topology_expanded_672/wind_MR-HR.tfrecord
+example_data_topology_expanded_672/hr_stack.npy  # (672, 500, 500, 2)
+example_data_topology_expanded_672/mr_stack.npy  # (672, 100, 100, 2)
+example_data_topology_expanded_672/lr_stack.npy  # (672, 10, 10, 2)
+example_data_topology_expanded_672/manifest.csv
+example_data_topology_expanded_672/stats.json
+```
+
+Important validation checks:
+
+- HR/MR/LR array shapes matched the intended PhIRE hierarchy.
+- No NaN or infinite values were detected.
+- No WTK time index overlapped the benchmark range 0-167.
+- The expanded data were compatible with the pretrained PhIRE normalization constants.
+- The pretrained normalization was not changed, because the experiments fine-tune a released PhIRE checkpoint rather than train a new model from scratch.
+
+The endpoint issue encountered during generation was caused by the retired `developer.nrel.gov` HSDS endpoint. The working endpoint override was:
+
+```bash
+export HS_ENDPOINT="https://developer.nlr.gov/api/hsds"
+export HSDS_ENDPOINT="$HS_ENDPOINT"
+```
+
+## Expanded candidate definitions
+
+All expanded candidates were trained on:
+
+```text
+example_data_topology_expanded_672/wind_MR-HR.tfrecord
+```
+
+and evaluated on:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+All used the same pretrained CNN checkpoint, learning rate `1e-5`, batch size `4`, and 3 fine-tuning epochs.
+
+### Candidate UV-expanded-672
+
+Purpose: expanded-data fine-tuning-only control.
+
+Loss:
+
+```text
+L_total = L_uv
+```
+
+All auxiliary weights were set to zero:
+
+```text
+lambda_speed = 0.0
+lambda_grad = 0.0
+lambda_wpd = 0.0
+lambda_levelset = 0.0
+lambda_crit = 0.0
+```
+
+This tests whether changes in topology are caused simply by seeing 672 new samples during fine-tuning.
+
+### Candidate B-expanded-672
+
+Purpose: expanded-data physics/level-set ablation.
+
+Loss:
+
+```text
+L_total = L_uv
+        + 0.01 * L_speed
+        + 0.05 * L_grad
+        + 0.25 * L_levelset
+```
+
+with:
+
+```text
+lambda_wpd = 0.0
+lambda_crit = 0.0
+```
+
+This tests whether speed, gradient, and soft threshold-region supervision improve topology without using the critical-value/high-speed-extrema proxy.
+
+### Candidate C-expanded-672
+
+Purpose: expanded-data topology-inspired loss.
+
+Loss:
+
+```text
+L_total = L_uv
+        + 0.01  * L_speed
+        + 0.05  * L_grad
+        + 0.25  * L_levelset
+        + 0.001 * L_crit
+```
+
+The `L_crit` term targets high-speed local extrema and was intended to provide a simple differentiable proxy for topology-relevant critical values.
+
+## Expanded candidate output locations
+
+```text
+data_out/wind_finetune_candidateUV_expanded672/
+data_out/wind_finetune_candidateB_expanded672/
+data_out/wind_finetune_candidateC_expanded672/
+
+models_fixed/topology_finetuning/wind_finetune_candidateUV_expanded672/
+models_fixed/topology_finetuning/wind_finetune_candidateB_expanded672/
+models_fixed/topology_finetuning/wind_finetune_candidateC_expanded672/
+```
+
+## TTK topology evaluation workflow
+
+Each expanded candidate was evaluated using the same TTK pipeline as the earlier candidates. For each method, the target final checks were:
+
+```text
+VTI files: 336
+PD VTU files: 336
+MT port0 VTU files: 336
+phase_c_results.csv lines: 169
+```
+
+Candidate B-expanded-672 completed the full pipeline cleanly. Candidate UV-expanded-672 initially stopped during TTK extraction with partial counts:
+
+```text
+VTI: 336
+PD: 234
+MT: 233
+```
+
+A missing-only resume pass was used to fill the remaining SR PD/MT outputs. After organizing outputs into GT/SR folders, the final counts were:
+
+```text
+PD total: 336
+MT port0 total: 336
+PD GT/SR: 168 / 168
+MT GT/SR: 168 / 168
+phase_c_results.csv lines: 169
+```
+
+This confirmed that Candidate UV-expanded-672 had a valid full TTK result.
+
+## Final expanded-data topology results
+
+All distances below are TTK distances on the original corrected 168-sample benchmark. Lower is better.
+
+| Method | Training data | Objective | PD mean | MT mean | PD < CNN | MT < CNN | Original MT-GAN cases recovered |
+|---|---|---|---:|---:|---:|---:|---:|
+| CNN baseline | original PhIRE | released CNN | 27.4063 | 5.8678 | - | - | - |
+| GAN baseline | original PhIRE | released GAN | 20.8641 | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate UV-expanded-672 | 672 seasonal | `L_uv` only | 29.8747 | 6.2891 | 6/168 | 43/168 | 3/20 |
+| Candidate B-expanded-672 | 672 seasonal | `L_uv + L_speed + L_grad + L_levelset` | 23.7094 | 6.3124 | 167/168 | 36/168 | 5/20 |
+| Candidate C-expanded-672 | 672 seasonal | Candidate B + `L_crit` | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+
+## Interpretation
+
+The expanded-data ablation is scientifically useful because Candidate UV-expanded-672 worsened both PD and MT relative to CNN. Therefore, the PD gains of Candidate B-expanded-672 and Candidate C-expanded-672 are not explained by expanded fine-tuning alone.
+
+Candidate B-expanded-672 achieved the best expanded PD mean and beat CNN on PD for 167/168 samples, which suggests that speed, gradient, and soft level-set losses are useful for persistence-style topology.
+
+Candidate C-expanded-672 gave the best expanded MT behavior: it had lower MT mean than Candidate UV-expanded-672 and Candidate B-expanded-672, beat CNN on MT for 54/168 samples, and recovered 7/20 original MT-GAN cases. However, it still did not beat the original CNN mean MT distance.
+
+The key conclusion is that the current differentiable losses can influence topology, especially PD, but they do not fully encode merge-tree hierarchy. This supports the future direction of merge-tree-specific proxies or learned differentiable MT-distance surrogates.
+
+## Meeting-ready summary
+
+A concise verbal summary is:
+
+> I expanded the fine-tuning experiments to a non-overlapping 672-sample seasonal WIND Toolkit training set and evaluated all outputs on the original 168-sample benchmark. The UV-only expanded control worsened PD and MT, so expanded fine-tuning alone does not explain the topology gains. Candidate B-expanded and Candidate C-expanded both strongly improved PD, showing that the auxiliary physics/level-set losses transfer beyond the original benchmark week. Candidate C-expanded had the best MT behavior among the expanded models, but still did not beat the original CNN mean MT. This suggests that our current losses are useful topology-aware proxies, but that merge-tree hierarchy likely requires a more explicit MT-aware surrogate.
+
+
+---
+
+# Part VIII — Candidate Dpd-expanded-672 active PD-loss audit and results
+
+## Purpose
+
+This section records the correction and expanded-data rerun for the Candidate D family.
+During the expanded-candidate audit, the original Candidate D pilot was found to have
+implemented a differentiable PyTorch persistence-diagram loss but used
+`lambda_pd = 0.0`. Therefore, the original Candidate D run should be treated as a
+PD-gradient diagnostic / residual-refiner proxy rather than as an active PD-loss
+training experiment.
+
+Candidate Dpd-expanded-672 was introduced as the corrected active PD-loss experiment.
+It uses the same 672-sample non-overlapping seasonal training set as Candidate
+UV/B/C-expanded and evaluates on the original corrected 168-sample benchmark.
+
+## Expanded CNN SR training arrays
+
+Candidate Dpd trains a PyTorch residual refiner on frozen CNN SR outputs, so the first
+step was to generate pretrained CNN outputs on the expanded 672-sample training set.
+
+Verification before generation showed that `data_out/wind_mrhr_cnn_expanded672/` did not
+exist. After running paired CNN inference on
+`example_data_topology_expanded_672/wind_MR-HR.tfrecord`, the expected arrays were
+created:
+
+```text
+idx.npy    -> (672,)
+dataIN.npy -> (672, 100, 100, 2)
+dataGT.npy -> (672, 500, 500, 2)
+dataSR.npy -> (672, 500, 500, 2)
+```
+
+The TensorFlow `OUT_OF_RANGE: End of sequence` message appeared at the end of paired
+inference. This was expected and simply indicated that the TFRecord iterator had reached
+the end of the dataset.
+
+## Candidate Dpd-expanded-672 training configuration
+
+Candidate Dpd-expanded-672 uses a small PyTorch residual refiner:
+
+```text
+SR_Dpd = SR_CNN + 0.1 * body(SR_CNN)
+```
+
+The active training objective was:
+
+```text
+L_total = L_uv
+        + 0.01     * L_speed
+        + 0.05     * L_grad
+        + 0.001    * L_crit
+        + 0.001904 * L_PD
+```
+
+where `L_PD` is a differentiable Wasserstein-2 persistence-diagram loss computed on a
+100x100 crop. The coefficient `0.001904` was selected from the previous diagnostic to
+make the PD term approximately a 10% contribution relative to `L_uv` at initialization.
+
+The training log confirmed:
+
+```text
+lambda_pd = 0.001904
+PD gradient check passed
+L_PD computed every step and included in L_total
+```
+
+Training completed successfully and wrote:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateDpd_expanded672/refiner_final.pt
+data_out/wind_finetune_candidateDpd_expanded672/dataSR.npy
+data_out/wind_finetune_candidateDpd_expanded672/dataGT.npy
+data_out/wind_finetune_candidateDpd_expanded672/dataIN.npy
+data_out/wind_finetune_candidateDpd_expanded672/idx.npy
+```
+
+The final benchmark output arrays had the expected shapes:
+
+```text
+idx.npy    -> (168,)
+dataIN.npy -> (168, 100, 100, 2)
+dataGT.npy -> (168, 500, 500, 2)
+dataSR.npy -> (168, 500, 500, 2)
+```
+
+## Scalar/proxy evaluation
+
+The scalar/proxy evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/all_sample_metrics_candidateDpd_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/winner_counts_candidateDpd_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/pairwise_cnn_vs_candidateDpd_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/adjacent_cluster_table_candidateDpd_expanded672.csv
+docs/topology_finetuning_candidateDpd_expanded672_eval.md
+```
+
+## TTK topology completion
+
+The full TTK pipeline completed cleanly:
+
+```text
+VTI files       : 336 / 336
+PD VTU files    : 336 / 336
+MT port0 files  : 336 / 336
+phase_c_results : 169 lines
+```
+
+The final topology comparison report was written to:
+
+```text
+docs/topology_finetuning_candidateDpd_expanded672_topology_eval.md
+```
+
+## Final true-topology result
+
+Lower PD/MT distance is better.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | Original MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate UV-expanded-672 | 29.8747 | 6.2891 | 6/168 | 43/168 | 3/20 |
+| Candidate B-expanded-672 | 23.7094 | 6.3124 | 167/168 | 36/168 | 5/20 |
+| Candidate C-expanded-672 | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Candidate Dpd-expanded-672 | 28.7656 | 6.2210 | 0/168 | 23/168 | 1/20 |
+
+Candidate Dpd-expanded-672 does not improve mean PD or mean MT relative to the CNN
+baseline. It recovers one original MT-GAN case, sample 25, where MT distance improves to
+6.6562. However, the overall result is negative for full-field TTK topology metrics.
+
+## Interpretation
+
+The corrected interpretation is:
+
+- Original Candidate D: PD-capable residual refiner / gradient diagnostic, not an active
+  PD-loss training run because `lambda_pd = 0.0`.
+- Candidate Dpd-expanded-672: first active differentiable PD-loss run.
+- Candidate E2: active TTK-guided persistence critical-pair loss with nonzero
+  `lambda_ttkcv` and `lambda_ttkpers`.
+
+This means the earlier claim that Candidate D showed direct PD losses were ineffective
+was too strong. The revised conclusion is more precise: the active PD-loss experiment
+Candidate Dpd-expanded-672 shows that a naive cropped differentiable PD Wasserstein loss
+is not sufficient in this setting to improve final TTK PD or MT. Candidate E2 similarly
+shows that fixed persistence-pair supervision is feasible but not enough to improve the
+final true topology metrics. These results motivate specifically merge-tree-aware
+proxies or learned MT-distance surrogates.
+
+---
+
+# Part IX — Candidate E2-expanded-672 faithful TTK critical-pair expansion
+
+## Purpose
+
+Candidate E2-expanded-672 was added after the active differentiable PD-loss audit to complete the expanded-data comparison for the two explicit PD-oriented directions:
+
+- **Candidate Dpd-expanded-672**: differentiable PD Wasserstein loss computed in PyTorch.
+- **Candidate E2-expanded-672**: TTK-guided persistence critical-pair supervision, where TTK supplies birth/death vertices and PyTorch supervises scalar values and persistence gaps at those fixed positions.
+
+This run is scientifically important because Candidate E2, unlike the original Candidate D pilot, used active PD-pair loss terms. Expanding E2 to the same 672-sample seasonal training set makes the comparison with UV/B/C/Dpd-expanded more robust.
+
+## Safety correction: approximate helper was separated from faithful E2
+
+An early helper for E2-expanded constraints used scipy local maxima as birth vertices and the global minimum as the death vertex. This was only an approximation and not a faithful TTK critical-pair extraction. It was preserved only as a development reference:
+
+```text
+scripts/build_candidateE2approx_expanded672_constraints.py
+```
+
+To prevent accidental overwrite of the real E2 constraints, this approximate helper was patched to write to:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2approx_expanded672_constraints/
+```
+
+The faithful E2-expanded run uses:
+
+```text
+scripts/build_candidateE2_expanded672_ttk_constraints.py
+```
+
+which writes the real constraints to:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+## Faithful TTK constraint generation
+
+The faithful builder performs the following steps for each of the 672 expanded GT samples:
+
+1. Compute scalar speed from the expanded GT `[u,v]` field.
+2. Extract the 160 x 160 speed crop used in the rest of the topology evaluation.
+3. Write an ASCII VTI file with point-data array `wind_speed`.
+4. Run `ttkPersistenceDiagramCmd` through the `phire-ttk:latest` Docker image.
+5. Parse the resulting TTK PD VTU file using the same parser as the original E/E2 constraint extraction code.
+6. Extract actual TTK birth/death vertex IDs.
+7. Correct birth/death target values by reading GT speed directly from the NumPy array at those TTK vertex IDs.
+8. Store the result in the `TTKConstraints`-compatible NPZ format.
+
+The corrected target convention is:
+
+```text
+birth_val = speed_GT[birth_vid // 160, birth_vid % 160]
+death_val = speed_GT[death_vid // 160, death_vid % 160]
+persistence = |birth_val - death_val|
+```
+
+This preserves the key E2 idea: **TTK selects the topology-critical vertices, but the training targets come from the GT scalar field itself.**
+
+## Constraint build verification
+
+The faithful constraints were built successfully.
+
+Observed outputs:
+
+```text
+n_samples   : 672
+total pairs : 43008
+sample_count min/mean/max: 64 / 64.0 / 64
+birth_val range: 0.018310546875 to 28.528701782226562
+death_val range: 0.079345703125 to 31.125829696655273
+persistence range: 0.0 to 26.844085693359375
+```
+
+Intermediate TTK files:
+
+```text
+VTI files: 672
+TTK PD VTU files: 672
+```
+
+Sanity check:
+
+```text
+max birth_val error : 0.00e+00
+max death_val error : 0.00e+00
+Sanity check PASSED.
+```
+
+## Candidate E2-expanded-672 training configuration
+
+Candidate E2-expanded-672 uses the same residual-refiner setup as the other PyTorch topology-loss candidates:
+
+```text
+SR_E2 = SR_CNN + 0.1 * body(SR_CNN)
+```
+
+The pretrained PhIRE CNN remains frozen. Only the residual refiner is trained.
+
+Training input:
+
+```text
+data_out/wind_mrhr_cnn_expanded672/dataSR.npy  (672, 500, 500, 2)
+data_out/wind_mrhr_cnn_expanded672/dataGT.npy  (672, 500, 500, 2)
+```
+
+Evaluation input:
+
+```text
+data_out_fixed/wind_mrhr_cnn/
+```
+
+Final output:
+
+```text
+data_out/wind_finetune_candidateE2_expanded672/dataSR.npy
+data_out/wind_finetune_candidateE2_expanded672/dataGT.npy
+data_out/wind_finetune_candidateE2_expanded672/dataIN.npy
+data_out/wind_finetune_candidateE2_expanded672/idx.npy
+```
+
+The training objective was:
+
+```text
+L_E2 = L_uv
+     + 0.01  L_speed
+     + 0.05  L_grad
+     + 0.001 L_crit
+     + 0.25  L_levelset
+     + 0.04  L_TTKCV
+     + 0.02  L_TTKpers
+```
+
+where:
+
+```text
+L_TTKCV   = MSE at TTK birth/death vertices
+L_TTKpers = MSE between SR persistence gaps and GT persistence gaps
+```
+
+Training completed successfully in approximately 483.4 seconds, produced the final refiner checkpoint, and wrote valid 168-sample benchmark outputs. The output arrays were verified:
+
+```text
+idx.npy    (168,)
+dataIN.npy (168, 100, 100, 2)
+dataGT.npy (168, 500, 500, 2)
+dataSR.npy (168, 500, 500, 2)
+```
+
+## Scalar/proxy evaluation
+
+The scalar/proxy evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/all_sample_metrics_candidateE2_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/winner_counts_candidateE2_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/pairwise_cnn_vs_candidateE2_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/adjacent_cluster_table_candidateE2_expanded672.csv
+docs/topology_finetuning_candidateE2_expanded672_eval.md
+```
+
+## TTK topology evaluation
+
+The first topology extraction pass stopped partway through Stage 2, as happened for several previous candidates. The missing PD/MT outputs were completed using the missing-file resume procedure. Stage 3 then completed successfully:
+
+```text
+phase_c_results.csv lines: 169
+pd_pairwise_distances.csv written
+mt_pairwise_distances.csv written
+phase_c_summary.csv written
+phase_c_summary.txt written
+```
+
+Final topology comparison validation:
+
+```text
+candidateE2_expanded672 topology entries: 168 (PD valid: 168, MT valid: 168)
+Baseline CNN entries: 168, GAN entries: 168
+```
+
+## Final Candidate E2-expanded-672 topology result
+
+Lower is better for both PD and MT.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | Original MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | - | - | - |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate E2-expanded-672 | 28.6697 | 6.1622 | 0/168 | 24/168 | 2/20 |
+
+Recovered original MT-GAN cases:
+
+| sample_idx | MT CNN | MT GAN | MT Candidate E2-expanded | Winner after |
+|---:|---:|---:|---:|---|
+| 25 | 11.3716 | 10.5015 | 6.6751 | Candidate E2-expanded |
+| 92 | 5.7358 | 5.6779 | 5.6222 | Candidate E2-expanded |
+
+## Correct interpretation
+
+Candidate E2-expanded-672 is a faithful expanded-data TTK+PyTorch critical-pair experiment. It uses actual TTK PD birth/death vertices and active topology-pair losses. However, it does not improve mean PD or mean MT relative to CNN:
+
+```text
+PD: CNN = 27.4063, E2-expanded = 28.6697  (worse)
+MT: CNN = 5.8678,  E2-expanded = 6.1622   (worse)
+```
+
+It slightly improves over Candidate Dpd-expanded-672 in mean PD, mean MT, and recovered MT-GAN cases, but it still remains worse than CNN on both mean topology metrics and does not improve PD on any sample.
+
+This supports the emerging conclusion that **PD-oriented supervision is feasible but not automatically effective for final TTK topology metrics**, and that merge-tree improvement likely requires objectives that explicitly encode hierarchy: branch matching, saddle relationships, parent-child structure, or learned MT-distance surrogates.
+
+## Updated expanded-candidate matrix
+
+| Candidate | Main idea | PD mean | MT mean | PD < CNN | MT < CNN | Recovered MT-GAN |
+|---|---|---:|---:|---:|---:|---:|
+| UV-expanded | UV-only fine-tuning | 29.8747 | 6.2891 | 6/168 | 43/168 | 3/20 |
+| B-expanded | speed + gradient + soft level-set | 23.7094 | 6.3124 | 167/168 | 36/168 | 5/20 |
+| C-expanded | B + high-speed extrema proxy | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Dpd-expanded | active differentiable PD Wasserstein loss | 28.7656 | 6.2210 | 0/168 | 23/168 | 1/20 |
+| E2-expanded | actual TTK birth/death-pair supervision | 28.6697 | 6.1622 | 0/168 | 24/168 | 2/20 |
+
+## Meeting-ready summary
+
+The full expanded ablation now shows that UV-only fine-tuning worsens topology, while B/C proxy losses strongly improve PD. Candidate C-expanded gives the best expanded MT behavior, though it still does not beat CNN mean MT. In contrast, both direct PD-oriented variants, Dpd-expanded and E2-expanded, are feasible but do not improve final TTK PD/MT over CNN. This suggests that PD supervision and fixed critical-pair supervision are not enough by themselves; the next meaningful step is a merge-tree-specific hierarchy-aware proxy or surrogate.
