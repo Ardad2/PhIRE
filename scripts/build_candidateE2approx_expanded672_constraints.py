@@ -26,8 +26,14 @@ Input:
   data_out/wind_mrhr_cnn_expanded672/idx.npy      (672,)
 
 Output:
-  ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_constraints/
+  ttk_runs_fixed/topology_finetuning/candidateE2approx_expanded672_constraints/
     ttk_pd_critical_pairs_gtvalues.npz
+
+  NOTE: this helper writes to candidateE2APPROX_expanded672_constraints/ (not
+  candidateE2_expanded672_constraints/).  The real E2-expanded training script
+  (run_candidateE2_expanded672_ttkcrit_refiner.py) expects the faithful TTK
+  constraints at candidateE2_expanded672_constraints/.  This approximate output
+  must NOT be used as input to that training script.
 
 Usage (development/reference only):
   python3 scripts/build_candidateE2approx_expanded672_constraints.py
@@ -50,7 +56,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GT_PATH  = REPO_ROOT / 'data_out' / 'wind_mrhr_cnn_expanded672' / 'dataGT.npy'
 IDX_PATH = REPO_ROOT / 'data_out' / 'wind_mrhr_cnn_expanded672' / 'idx.npy'
 
-OUT_DIR = REPO_ROOT / 'ttk_runs_fixed' / 'topology_finetuning' / 'candidateE2_expanded672_constraints'
+OUT_DIR = REPO_ROOT / 'ttk_runs_fixed' / 'topology_finetuning' / 'candidateE2approx_expanded672_constraints'
 OUT_NPZ = OUT_DIR / 'ttk_pd_critical_pairs_gtvalues.npz'
 
 # ---------------------------------------------------------------------------
