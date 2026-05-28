@@ -5,6 +5,41 @@
 Candidate E2-expanded-672 = TTK-guided critical-pair loss residual refiner trained on
 the 672-sample expanded seasonal dataset, evaluated on the 168-sample benchmark.
 
+CandidateE2-expanded-672 uses **actual TTK persistence birth/death vertex IDs** extracted
+from GT persistence diagrams via `ttkPersistenceDiagramCmd`.  Target birth_val/death_val
+are corrected by reading GT scalar speed from the numpy array at the TTK vertex positions
+(same "corrected E2" convention as the original 168-sample E2 pilot).
+
+---
+
+## Constraint Pipeline
+
+### Faithful (use this for the main E2-expanded result)
+
+```
+scripts/build_candidateE2_expanded672_ttk_constraints.py
+```
+
+- Writes 672 ASCII VTI files (160×160 GT speed crop, no VTK required)
+- Runs `ttkPersistenceDiagramCmd` via Docker (`phire-ttk:latest`) on all VTIs in one bash loop
+- Parses each TTK VTU output using the same parser as `extract_ttk_pd_critical_pairs.py`
+- **Corrects** birth_val/death_val: reads GT numpy at TTK vertex positions
+  (exact match guaranteed; does not use scalar values from the VTU diagram coordinates)
+- Filters: persistence_frac=0.01, top_k=64 (same as Candidate E pilot)
+- Sanity-checks that stored values match GT speed at every stored vertex
+- Requires Docker
+
+### Approximate (development reference only, do not use)
+
+```
+scripts/build_candidateE2approx_expanded672_constraints.py
+```
+
+This earlier prototype uses **scipy local maxima as birth vertices** and the
+**global minimum as the death vertex** — NOT actual TTK persistence-diagram pairs.
+It was written before TTK was run on the expanded dataset and must not be used
+for the main CandidateE2-expanded result.
+
 ---
 
 ## Purpose
@@ -14,9 +49,8 @@ supervision generalises on the 672-sample expanded dataset.  It extends the Cand
 pilot (168 samples, argparse) with:
 
 - Hardcoded configuration for direct comparison with D/Dpd/UV/B/C-expanded-672
-- "Corrected" constraint targets: birth_val/death_val read from GT numpy arrays
-  (exact match guaranteed), not from TTK VTU files
-- Constraints generated without TTK using scipy local maxima on GT speed crops
+- Actual TTK persistence birth/death vertices (not scipy approximation)
+- "Corrected" target values: read from GT numpy at TTK vertex positions
 
 | Candidate | Key losses | Training data |
 |---|---|---|
@@ -72,18 +106,15 @@ L_ttkpers = MSE(sr_pers, gt_persistence)
 
 Persistence is stored unsigned (|birth_val - death_val|), direction-agnostic.
 
-### Constraint generation (no TTK required)
+### Vertex-ID coordinate convention
 
-`build_candidateE2_expanded672_constraints.py` generates constraints from GT numpy arrays
-using scipy/numpy local extrema detection:
+Consistent with TTKConstraints and the topology pipeline:
 
-- Birth vertices = local maxima of GT speed in 160×160 crop
-  (scipy `maximum_filter` with kernel 5×5)
-- Death vertex = global minimum of 160×160 crop (same for all pairs per sample)
-- Persistence = birth_val − death_val
-- Filter: persistence ≥ 0.01 × speed_range
-- Take top-64 pairs by persistence (descending)
-- Sanity check: stored birth_val/death_val verified against GT at each vertex
+```
+iy = vid // 160   (first numpy index — row)
+ix = vid % 160    (second numpy index — col)
+corrected_val = gt_speed[iy, ix]
+```
 
 ---
 
@@ -95,7 +126,9 @@ using scipy/numpy local extrema detection:
 | epochs | 3 | |
 | residual_scale | 0.1 | |
 | patch | 160 | vertex-ID encoding width for TTKConstraints |
-| top_k | 64 | max pairs per sample (from constraint builder) |
+| persistence_frac | 0.01 | same as E pilot |
+| top_k | 64 | max pairs per sample |
+| ttk_threads | 4 | TTK threads per VTI (sequential bash loop) |
 | seed | 42 | |
 
 ---
@@ -162,24 +195,32 @@ phire.test_paired(
 PY
 ```
 
-### Step 1: Build E2 constraints (no TTK required)
+### Step 1: Build faithful TTK constraints (requires Docker)
 
 ```bash
+# Ensure Docker is running and image is available:
+docker pull phire-ttk:latest
+
+# Run from repo root (native Python env is fine; Docker handles TTK):
 micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \
-    python scripts/build_candidateE2_expanded672_constraints.py
+    python scripts/build_candidateE2_expanded672_ttk_constraints.py
 # or:
-.venv_candidateD_pd/bin/python scripts/build_candidateE2_expanded672_constraints.py
+.venv_candidateD_pd/bin/python \
+    scripts/build_candidateE2_expanded672_ttk_constraints.py
 ```
 
-Verify:
-```bash
-python3 -c "
-import numpy as np
-npz = np.load('ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_constraints/ttk_pd_critical_pairs_gtvalues.npz', allow_pickle=True)
-print('n_samples:', int(npz['n_samples']))
-print('total pairs:', len(npz['birth_vid']))
-print('sample_idx range:', [int(npz['sample_idx'].min()), int(npz['sample_idx'].max())])
-"
+Expected output:
+```
+  n_samples   : 672
+  total pairs : <number>
+  Sanity check PASSED.
+```
+
+Intermediate VTI and VTU files are kept in:
+```
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_constraints/work/
+  vti/   672 ASCII VTI files
+  pd/    672 *_port_0.vtu files from TTK
 ```
 
 ### Step 2: Train CandidateE2-expanded-672
@@ -277,15 +318,17 @@ python3 scripts/build_candidate_topology_comparison.py \
 
 | Scenario | Exit |
 |---|---|
-| Expanded CNN SR arrays missing | 1 (clear error + generation command) |
-| Expanded CNN SR has wrong sample count | 1 |
-| Benchmark CNN SR missing | 1 |
-| Constraints NPZ missing | 1 (clear error + build command) |
+| Expanded GT arrays missing | 1 (clear error + generation command) |
+| Expanded GT has wrong sample count | 1 |
+| Docker not running or image missing | 1 (clear error + pull command) |
+| No VTU output for one or more samples | 1 |
+| Constraints NPZ missing (training script) | 1 |
 | Constraints NPZ has wrong sample count | 1 |
 | Training indices not in constraints | 1 |
 | Output overlaps protected path | 1 (safety check) |
 | L_ttkcv produces no model gradients at startup | RuntimeError |
 | Any loss NaN/inf during training | RuntimeError |
+| Sanity check fails (value mismatch) | 1 |
 | Output shape validation fails | 1 |
 
 ---
@@ -299,3 +342,9 @@ python3 scripts/build_candidate_topology_comparison.py \
 
 No torch_topological or gudhi required (unlike Dpd). TTK constraint overhead:
 ~1–2 ms/sample vs ~100 ms for L_PD in Dpd-expanded.
+
+The constraint builder (`build_candidateE2_expanded672_ttk_constraints.py`) requires
+Docker but runs natively for all Python work (VTI writing, VTU parsing, NPZ assembly).
+The previous approximate helper (`build_candidateE2approx_expanded672_constraints.py`)
+does not require Docker but uses scipy local-max/global-min approximations and must
+**not** be used for the main E2-expanded result.
