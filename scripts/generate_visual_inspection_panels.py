@@ -15,7 +15,7 @@ What this version changes:
     plus the anchor/context samples:
         12, 16, 17, 18, 19, 20, 25, 77, 80, 91, 92, 154, 162, 163.
   - Regenerates crop and full-field PNG panels.
-  - Adds Candidate UV, Candidate UV-expanded-672, Candidate B, Candidate B-expanded-672, Candidate C, Candidate C-expanded-672, Candidate D, Candidate Dpd-expanded-672, Candidate E2, and Candidate E2-expanded-672 panels and topology comparison metadata when available.
+  - Adds Candidate UV, Candidate UV-expanded-672, Candidate B, Candidate B-expanded-672, Candidate C, Candidate C-expanded-672, Candidate C-expanded-1344, Candidate C-expanded-2688, Candidate UV-expanded-1344, Candidate UV-expanded-2688, Candidate D, Candidate Dpd-expanded-672, Candidate E2, and Candidate E2-expanded-672 panels and topology comparison metadata when available.
   - Rebuilds ttk_runs_fixed/visual_inspection/index.html with physics/domain breakdowns.
 
 Optional:
@@ -85,8 +85,12 @@ CANDIDATEB_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateB"
 CANDIDATEB_EXPANDED672_DIR = ROOT / "data_out" / "wind_finetune_candidateB_expanded672"
 CANDIDATEC_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateC"
 CANDIDATEC_EXPANDED672_DIR = ROOT / "data_out" / "wind_finetune_candidateC_expanded672"
+CANDIDATEC_EXPANDED1344_DIR = ROOT / "data_out" / "wind_finetune_candidateC_expanded1344"
+CANDIDATEC_EXPANDED2688_DIR = ROOT / "data_out" / "wind_finetune_candidateC_expanded2688"
 CANDIDATEUV_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateUV"
 CANDIDATEUV_EXPANDED672_DIR = ROOT / "data_out" / "wind_finetune_candidateUV_expanded672"
+CANDIDATEUV_EXPANDED1344_DIR = ROOT / "data_out" / "wind_finetune_candidateUV_expanded1344"
+CANDIDATEUV_EXPANDED2688_DIR = ROOT / "data_out" / "wind_finetune_candidateUV_expanded2688"
 CANDIDATED_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateD"
 CANDIDATEDPD_EXPANDED672_DIR = ROOT / "data_out" / "wind_finetune_candidateDpd_expanded672"
 CANDIDATEE2_DIR = ROOT / "data_out" / "wind_finetune_pilot_candidateE2"
@@ -120,6 +124,20 @@ CANDIDATEC_EXPANDED672_TOPOLOGY_COMPARISON = (
     / "candidateC_expanded672_topology"
     / "candidateC_expanded672_topology_comparison.csv"
 )
+CANDIDATEC_EXPANDED1344_TOPOLOGY_COMPARISON = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateC_expanded1344_topology"
+    / "candidateC_expanded1344_topology_comparison.csv"
+)
+CANDIDATEC_EXPANDED2688_TOPOLOGY_COMPARISON = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateC_expanded2688_topology"
+    / "candidateC_expanded2688_topology_comparison.csv"
+)
 CANDIDATEUV_TOPOLOGY_COMPARISON = (
     ROOT
     / "ttk_runs_fixed"
@@ -133,6 +151,20 @@ CANDIDATEUV_EXPANDED672_TOPOLOGY_COMPARISON = (
     / "topology_finetuning"
     / "candidateUV_expanded672_topology"
     / "candidateUV_expanded672_topology_comparison.csv"
+)
+CANDIDATEUV_EXPANDED1344_TOPOLOGY_COMPARISON = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateUV_expanded1344_topology"
+    / "candidateUV_expanded1344_topology_comparison.csv"
+)
+CANDIDATEUV_EXPANDED2688_TOPOLOGY_COMPARISON = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateUV_expanded2688_topology"
+    / "candidateUV_expanded2688_topology_comparison.csv"
 )
 CANDIDATED_TOPOLOGY_COMPARISON = (
     ROOT
@@ -191,6 +223,20 @@ CANDIDATEC_EXPANDED672_EVAL = (
     / "candidateC_expanded672_eval"
     / "all_sample_metrics_candidateC_expanded672.csv"
 )
+CANDIDATEC_EXPANDED1344_EVAL = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateC_expanded1344_eval"
+    / "all_sample_metrics_candidateC_expanded1344.csv"
+)
+CANDIDATEC_EXPANDED2688_EVAL = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateC_expanded2688_eval"
+    / "all_sample_metrics_candidateC_expanded2688.csv"
+)
 CANDIDATEUV_EVAL = (
     ROOT
     / "ttk_runs_fixed"
@@ -204,6 +250,20 @@ CANDIDATEUV_EXPANDED672_EVAL = (
     / "topology_finetuning"
     / "candidateUV_expanded672_eval"
     / "all_sample_metrics_candidateUV_expanded672.csv"
+)
+CANDIDATEUV_EXPANDED1344_EVAL = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateUV_expanded1344_eval"
+    / "all_sample_metrics_candidateUV_expanded1344.csv"
+)
+CANDIDATEUV_EXPANDED2688_EVAL = (
+    ROOT
+    / "ttk_runs_fixed"
+    / "topology_finetuning"
+    / "candidateUV_expanded2688_eval"
+    / "all_sample_metrics_candidateUV_expanded2688.csv"
 )
 CANDIDATED_EVAL = (
     ROOT
@@ -288,6 +348,9 @@ CANDIDATEB_MT_GAN_RECOVERED = {18, 25, 63, 80}
 CANDIDATEC_MT_GAN_RECOVERED = {6, 18, 20, 25, 62, 63, 65, 68, 79, 80, 92}
 # Candidate C-expanded-672 recovered cases are inferred from its topology comparison CSV at runtime.
 CANDIDATEUV_MT_GAN_RECOVERED = {25}
+CANDIDATEUV_EXPANDED1344_MT_GAN_RECOVERED = {18, 25, 63, 68, 92}
+CANDIDATEC_EXPANDED2688_MT_GAN_RECOVERED = {6, 18, 20, 25, 62, 63, 65, 68, 77, 79}
+CANDIDATEUV_EXPANDED2688_MT_GAN_RECOVERED = {18, 25, 63, 68, 92}
 CANDIDATED_MT_GAN_RECOVERED = {25}
 CANDIDATEDPD_EXPANDED672_MT_GAN_RECOVERED = {25}
 CANDIDATEE2_MT_GAN_RECOVERED = {25}
@@ -315,8 +378,12 @@ EVAL_METRIC_KEYS = {
 RANK_METHODS = [
     ("candidateC", "Candidate C"),
     ("candidateC_expanded672", "Candidate C-expanded-672"),
+    ("candidateC_expanded1344", "Candidate C-expanded-1344"),
+    ("candidateC_expanded2688", "Candidate C-expanded-2688"),
     ("candidateB_expanded672", "Candidate B-expanded-672"),
     ("candidateUV_expanded672", "Candidate UV-expanded-672"),
+    ("candidateUV_expanded1344", "Candidate UV-expanded-1344"),
+    ("candidateUV_expanded2688", "Candidate UV-expanded-2688"),
     ("candidateUV", "Candidate UV"),
     ("candidateD", "Candidate D"),
     ("candidateDpd_expanded672", "Candidate Dpd-expanded-672"),
@@ -512,7 +579,7 @@ def load_candidate_eval_rows() -> dict[int, dict[str, dict[str, str]]]:
     """Load per-sample rows from Candidate B/C evaluation CSVs for 4-way metric rankings."""
     out: dict[int, dict[str, dict[str, str]]] = {}
 
-    for path in (CANDIDATEB_EVAL, CANDIDATEB_EXPANDED672_EVAL, CANDIDATEC_EVAL, CANDIDATEC_EXPANDED672_EVAL, CANDIDATEUV_EVAL, CANDIDATEUV_EXPANDED672_EVAL, CANDIDATED_EVAL, CANDIDATEDPD_EXPANDED672_EVAL, CANDIDATEE2_EVAL, CANDIDATEE2_EXPANDED672_EVAL):
+    for path in (CANDIDATEB_EVAL, CANDIDATEB_EXPANDED672_EVAL, CANDIDATEC_EVAL, CANDIDATEC_EXPANDED672_EVAL, CANDIDATEC_EXPANDED1344_EVAL, CANDIDATEC_EXPANDED2688_EVAL, CANDIDATEUV_EVAL, CANDIDATEUV_EXPANDED672_EVAL, CANDIDATEUV_EXPANDED1344_EVAL, CANDIDATEUV_EXPANDED2688_EVAL, CANDIDATED_EVAL, CANDIDATEDPD_EXPANDED672_EVAL, CANDIDATEE2_EVAL, CANDIDATEE2_EXPANDED672_EVAL):
         for r in read_csv(path):
             try:
                 sid = sid_from(r)
@@ -535,8 +602,16 @@ def load_candidate_eval_rows() -> dict[int, dict[str, dict[str, str]]]:
                 methods["candidateB_expanded672"] = methods[k]
             elif lk in {"candidatec_expanded672", "candidatecexpanded672"} and "candidateC_expanded672" not in methods:
                 methods["candidateC_expanded672"] = methods[k]
+            elif lk in {"candidatec_expanded1344", "candidatecexpanded1344"} and "candidateC_expanded1344" not in methods:
+                methods["candidateC_expanded1344"] = methods[k]
+            elif lk in {"candidatec_expanded2688", "candidatecexpanded2688"} and "candidateC_expanded2688" not in methods:
+                methods["candidateC_expanded2688"] = methods[k]
             elif lk in {"candidateuv_expanded672", "candidateuvexpanded672"} and "candidateUV_expanded672" not in methods:
                 methods["candidateUV_expanded672"] = methods[k]
+            elif lk in {"candidateuv_expanded1344", "candidateuvexpanded1344"} and "candidateUV_expanded1344" not in methods:
+                methods["candidateUV_expanded1344"] = methods[k]
+            elif lk in {"candidateuv_expanded2688", "candidateuvexpanded2688"} and "candidateUV_expanded2688" not in methods:
+                methods["candidateUV_expanded2688"] = methods[k]
             elif lk == "candidateuv" and "candidateUV" not in methods:
                 methods["candidateUV"] = methods[k]
             elif lk == "candidated" and "candidateD" not in methods:
@@ -663,12 +738,64 @@ def infer_groups(sid: int, row: dict, obs: dict) -> list[str]:
     if np.isfinite(cexp_mt) and np.isfinite(cc_mt) and cexp_mt < cc_mt:
         groups.add("candidateC_expanded672_mt_improves_vs_candidateC")
 
+    mt_after_c1344 = str(obs.get("mt_winner_after_candidateC_expanded1344", "")).strip().lower()
+    pd_after_c1344 = str(obs.get("pd_winner_after_candidateC_expanded1344", "")).strip().lower()
+    c1344_pd = fnum(obs.get("pd_distance_candidateC_expanded1344", ""))
+    c1344_mt = fnum(obs.get("mt_distance_candidateC_expanded1344", ""))
+    if mt_after_c1344 == "candidatec_expanded1344":
+        groups.add("candidateC_expanded1344_mt_winner")
+    if was_mt_gan and mt_after_c1344 == "candidatec_expanded1344":
+        groups.add("mt_gan_flipped_to_candidateC_expanded1344")
+    if pd_after_c1344 == "candidatec_expanded1344":
+        groups.add("candidateC_expanded1344_pd_winner")
+    if np.isfinite(c1344_pd) and np.isfinite(cnn_pd) and c1344_pd < cnn_pd:
+        groups.add("candidateC_expanded1344_pd_improves_vs_cnn")
+    if np.isfinite(c1344_mt) and np.isfinite(cnn_mt) and c1344_mt < cnn_mt:
+        groups.add("candidateC_expanded1344_mt_improves_vs_cnn")
+    if np.isfinite(c1344_pd) and np.isfinite(cexp_pd) and c1344_pd < cexp_pd:
+        groups.add("candidateC_expanded1344_pd_improves_vs_candidateC_expanded672")
+    if np.isfinite(c1344_mt) and np.isfinite(cexp_mt) and c1344_mt < cexp_mt:
+        groups.add("candidateC_expanded1344_mt_improves_vs_candidateC_expanded672")
 
+    uv1344_pd = fnum(obs.get("pd_distance_candidateUV_expanded1344", ""))
+    uv1344_mt = fnum(obs.get("mt_distance_candidateUV_expanded1344", ""))
+    if np.isfinite(c1344_pd) and np.isfinite(uv1344_pd) and c1344_pd < uv1344_pd:
+        groups.add("candidateC_expanded1344_pd_improves_vs_candidateUV_expanded1344")
+    if np.isfinite(c1344_mt) and np.isfinite(uv1344_mt) and c1344_mt < uv1344_mt:
+        groups.add("candidateC_expanded1344_mt_improves_vs_candidateUV_expanded1344")
+
+    mt_after_c2688 = str(obs.get("mt_winner_after_candidateC_expanded2688", "")).strip().lower()
+    pd_after_c2688 = str(obs.get("pd_winner_after_candidateC_expanded2688", "")).strip().lower()
+    c2688_pd = fnum(obs.get("pd_distance_candidateC_expanded2688", ""))
+    c2688_mt = fnum(obs.get("mt_distance_candidateC_expanded2688", ""))
+    if mt_after_c2688 == "candidatec_expanded2688":
+        groups.add("candidateC_expanded2688_mt_winner")
+    if was_mt_gan and mt_after_c2688 == "candidatec_expanded2688":
+        groups.add("mt_gan_flipped_to_candidateC_expanded2688")
+    if pd_after_c2688 == "candidatec_expanded2688":
+        groups.add("candidateC_expanded2688_pd_winner")
+    if np.isfinite(c2688_pd) and np.isfinite(cnn_pd) and c2688_pd < cnn_pd:
+        groups.add("candidateC_expanded2688_pd_improves_vs_cnn")
+    if np.isfinite(c2688_mt) and np.isfinite(cnn_mt) and c2688_mt < cnn_mt:
+        groups.add("candidateC_expanded2688_mt_improves_vs_cnn")
+    if np.isfinite(c2688_pd) and np.isfinite(c1344_pd) and c2688_pd < c1344_pd:
+        groups.add("candidateC_expanded2688_pd_improves_vs_candidateC_expanded1344")
+    if np.isfinite(c2688_mt) and np.isfinite(c1344_mt) and c2688_mt < c1344_mt:
+        groups.add("candidateC_expanded2688_mt_improves_vs_candidateC_expanded1344")
+
+    uv2688_pd = fnum(obs.get("pd_distance_candidateUV_expanded2688", ""))
+    uv2688_mt = fnum(obs.get("mt_distance_candidateUV_expanded2688", ""))
+    if np.isfinite(c2688_pd) and np.isfinite(uv2688_pd) and c2688_pd < uv2688_pd:
+        groups.add("candidateC_expanded2688_pd_improves_vs_candidateUV_expanded2688")
+    if np.isfinite(c2688_mt) and np.isfinite(uv2688_mt) and c2688_mt < uv2688_mt:
+        groups.add("candidateC_expanded2688_mt_improves_vs_candidateUV_expanded2688")
 
     # Expanded-data ablation controls: Candidate B-expanded-672 and Candidate UV-expanded-672.
     for exp_key, exp_group in [
         ("candidateB_expanded672", "candidateB_expanded672"),
         ("candidateUV_expanded672", "candidateUV_expanded672"),
+        ("candidateUV_expanded1344", "candidateUV_expanded1344"),
+        ("candidateUV_expanded2688", "candidateUV_expanded2688"),
     ]:
         mt_after_exp = str(obs.get(f"mt_winner_after_{exp_key}", "")).strip().lower()
         pd_after_exp = str(obs.get(f"pd_winner_after_{exp_key}", "")).strip().lower()
@@ -791,6 +918,10 @@ def question(sid: int, row: dict, obs: dict) -> str:
         return "Candidate E2 is the corrected TTK critical-pair loss recovered MT-GAN case: does fixed critical-pair supervision change visible structure, or is the improvement isolated?"
     if sid in CANDIDATED_MT_GAN_RECOVERED:
         return "Candidate D is the true PD-loss pilot's only recovered MT-GAN case: does the PD-refiner change visible structure, or is the improvement localized and metric-specific?"
+    if str(obs.get("mt_winner_after_candidateC_expanded1344", "")).strip().lower() == "candidatec_expanded1344":
+        return "Candidate C-expanded-1344 recovers this case after larger seasonal training: does the extra training data strengthen topology-relevant peaks or change merge-tree hierarchy relative to C-expanded-672?"
+    if str(obs.get("mt_winner_after_candidateUV_expanded1344", "")).strip().lower() == "candidateuv_expanded1344":
+        return "Candidate UV-expanded-1344 recovers this case under UV-only training: compare against Candidate C-expanded-1344 to isolate whether auxiliary topology-aware losses are helpful."
     if str(obs.get("mt_winner_after_candidateC_expanded672", "")).strip().lower() == "candidatec_expanded672":
         return "Candidate C-expanded-672 recovers this case after training on non-overlapping seasonal data: does the expanded model improve visible PD-style structure or merge-tree hierarchy relative to Candidate C?"
     if str(obs.get("mt_winner_after_candidateB_expanded672", "")).strip().lower() == "candidateb_expanded672":
@@ -861,13 +992,17 @@ def load_arrays():
     candbexp_p = CANDIDATEB_EXPANDED672_DIR / "dataSR.npy"
     candc_p = CANDIDATEC_DIR / "dataSR.npy"
     candcexp_p = CANDIDATEC_EXPANDED672_DIR / "dataSR.npy"
+    candc1344_p = CANDIDATEC_EXPANDED1344_DIR / "dataSR.npy"
+    candc2688_p = CANDIDATEC_EXPANDED2688_DIR / "dataSR.npy"
     canduv_p = CANDIDATEUV_DIR / "dataSR.npy"
     canduvexp_p = CANDIDATEUV_EXPANDED672_DIR / "dataSR.npy"
+    canduv1344_p = CANDIDATEUV_EXPANDED1344_DIR / "dataSR.npy"
+    canduv2688_p = CANDIDATEUV_EXPANDED2688_DIR / "dataSR.npy"
     candd_p = CANDIDATED_DIR / "dataSR.npy"
     canddpd_p = CANDIDATEDPD_EXPANDED672_DIR / "dataSR.npy"
     cande2_p = CANDIDATEE2_DIR / "dataSR.npy"
     cande2exp_p = CANDIDATEE2_EXPANDED672_DIR / "dataSR.npy"
-    missing = [str(p) for p in (gt_p, cnn_p, gan_p, candb_p, candbexp_p, candc_p, candcexp_p, canduv_p, canduvexp_p, candd_p, canddpd_p, cande2_p, cande2exp_p) if not p.exists()]
+    missing = [str(p) for p in (gt_p, cnn_p, gan_p, candb_p, candbexp_p, candc_p, candcexp_p, candc1344_p, candc2688_p, canduv_p, canduvexp_p, canduv1344_p, canduv2688_p, candd_p, canddpd_p, cande2_p, cande2exp_p) if not p.exists()]
     if missing:
         raise FileNotFoundError("Missing NPY arrays:\n" + "\n".join(missing))
 
@@ -878,8 +1013,12 @@ def load_arrays():
     candbexp = np.load(candbexp_p, mmap_mode="r")
     candc = np.load(candc_p, mmap_mode="r")
     candcexp = np.load(candcexp_p, mmap_mode="r")
+    candc1344 = np.load(candc1344_p, mmap_mode="r")
+    candc2688 = np.load(candc2688_p, mmap_mode="r")
     canduv = np.load(canduv_p, mmap_mode="r")
     canduvexp = np.load(canduvexp_p, mmap_mode="r")
+    canduv1344 = np.load(canduv1344_p, mmap_mode="r")
+    canduv2688 = np.load(canduv2688_p, mmap_mode="r")
     candd = np.load(candd_p, mmap_mode="r")
     canddpd = np.load(canddpd_p, mmap_mode="r")
     cande2 = np.load(cande2_p, mmap_mode="r")
@@ -920,6 +1059,20 @@ def load_arrays():
         candcexp_idx = np.arange(candcexp.shape[0])
     candcexp_pos = {int(v): i for i, v in enumerate(candcexp_idx.tolist())}
 
+    candc1344_idx_p = CANDIDATEC_EXPANDED1344_DIR / "idx.npy"
+    if candc1344_idx_p.exists():
+        candc1344_idx = np.load(candc1344_idx_p)
+    else:
+        candc1344_idx = np.arange(candc1344.shape[0])
+    candc1344_pos = {int(v): i for i, v in enumerate(candc1344_idx.tolist())}
+
+    candc2688_idx_p = CANDIDATEC_EXPANDED2688_DIR / "idx.npy"
+    if candc2688_idx_p.exists():
+        candc2688_idx = np.load(candc2688_idx_p)
+    else:
+        candc2688_idx = np.arange(candc2688.shape[0])
+    candc2688_pos = {int(v): i for i, v in enumerate(candc2688_idx.tolist())}
+
     canduv_idx_p = CANDIDATEUV_DIR / "idx.npy"
     if canduv_idx_p.exists():
         canduv_idx = np.load(canduv_idx_p)
@@ -933,6 +1086,20 @@ def load_arrays():
     else:
         canduvexp_idx = np.arange(canduvexp.shape[0])
     canduvexp_pos = {int(v): i for i, v in enumerate(canduvexp_idx.tolist())}
+
+    canduv1344_idx_p = CANDIDATEUV_EXPANDED1344_DIR / "idx.npy"
+    if canduv1344_idx_p.exists():
+        canduv1344_idx = np.load(canduv1344_idx_p)
+    else:
+        canduv1344_idx = np.arange(canduv1344.shape[0])
+    canduv1344_pos = {int(v): i for i, v in enumerate(canduv1344_idx.tolist())}
+
+    canduv2688_idx_p = CANDIDATEUV_EXPANDED2688_DIR / "idx.npy"
+    if canduv2688_idx_p.exists():
+        canduv2688_idx = np.load(canduv2688_idx_p)
+    else:
+        canduv2688_idx = np.arange(canduv2688.shape[0])
+    canduv2688_pos = {int(v): i for i, v in enumerate(canduv2688_idx.tolist())}
 
     candd_idx_p = CANDIDATED_DIR / "idx.npy"
     if candd_idx_p.exists():
@@ -962,7 +1129,7 @@ def load_arrays():
         cande2exp_idx = np.arange(cande2exp.shape[0])
     cande2exp_pos = {int(v): i for i, v in enumerate(cande2exp_idx.tolist())}
 
-    return gt, cnn, gan, candb, candbexp, candc, candcexp, canduv, canduvexp, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, canduv_pos, canduvexp_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos
+    return gt, cnn, gan, candb, candbexp, candc, candcexp, candc1344, candc2688, canduv, canduvexp, canduv1344, canduv2688, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, candc1344_pos, candc2688_pos, canduv_pos, canduvexp_pos, canduv1344_pos, canduv2688_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos
 
 def speed(a: np.ndarray) -> np.ndarray:
     if a.ndim == 3 and a.shape[-1] == 2:
@@ -985,8 +1152,8 @@ def panel_title(sid: int, row: dict, obs: dict) -> str:
     )
 
 
-def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv, canduvexp, candd, canddpd, cande2, cande2exp,
-               pos: dict[int, int], candb_pos: dict[int, int], candbexp_pos: dict[int, int], candc_pos: dict[int, int], candcexp_pos: dict[int, int], canduv_pos: dict[int, int], canduvexp_pos: dict[int, int], candd_pos: dict[int, int], canddpd_pos: dict[int, int], cande2_pos: dict[int, int], cande2exp_pos: dict[int, int],
+def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, candc1344, candc2688, canduv, canduvexp, canduv1344, canduv2688, candd, canddpd, cande2, cande2exp,
+               pos: dict[int, int], candb_pos: dict[int, int], candbexp_pos: dict[int, int], candc_pos: dict[int, int], candcexp_pos: dict[int, int], candc1344_pos: dict[int, int], candc2688_pos: dict[int, int], canduv_pos: dict[int, int], canduvexp_pos: dict[int, int], canduv1344_pos: dict[int, int], canduv2688_pos: dict[int, int], candd_pos: dict[int, int], canddpd_pos: dict[int, int], cande2_pos: dict[int, int], cande2exp_pos: dict[int, int],
                row: dict, obs: dict, crop, out: Path) -> bool:
     if sid not in pos:
         print(f"WARNING: sample {sid} not found in baseline idx.npy; skipping panel.")
@@ -1003,11 +1170,23 @@ def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv,
     if sid not in candcexp_pos:
         print(f"WARNING: sample {sid} not found in Candidate C-expanded-672 idx.npy; skipping panel.")
         return False
+    if sid not in candc1344_pos:
+        print(f"WARNING: sample {sid} not found in Candidate C-expanded-1344 idx.npy; skipping panel.")
+        return False
+    if sid not in candc2688_pos:
+        print(f"WARNING: sample {sid} not found in Candidate C-expanded-2688 idx.npy; skipping panel.")
+        return False
     if sid not in canduv_pos:
         print(f"WARNING: sample {sid} not found in Candidate UV idx.npy; skipping panel.")
         return False
     if sid not in canduvexp_pos:
         print(f"WARNING: sample {sid} not found in Candidate UV-expanded-672 idx.npy; skipping panel.")
+        return False
+    if sid not in canduv1344_pos:
+        print(f"WARNING: sample {sid} not found in Candidate UV-expanded-1344 idx.npy; skipping panel.")
+        return False
+    if sid not in canduv2688_pos:
+        print(f"WARNING: sample {sid} not found in Candidate UV-expanded-2688 idx.npy; skipping panel.")
         return False
     if sid not in candd_pos:
         print(f"WARNING: sample {sid} not found in Candidate D idx.npy; skipping panel.")
@@ -1027,8 +1206,12 @@ def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv,
     jb = candbexp_pos[sid]
     k = candc_pos[sid]
     x = candcexp_pos[sid]
+    x1344 = candc1344_pos[sid]
+    x2688 = candc2688_pos[sid]
     u = canduv_pos[sid]
     ux = canduvexp_pos[sid]
+    ux1344 = canduv1344_pos[sid]
+    ux2688 = canduv2688_pos[sid]
     m = candd_pos[sid]
     mpd = canddpd_pos[sid]
     n = cande2_pos[sid]
@@ -1040,8 +1223,12 @@ def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv,
     candbexp_s = speed(np.asarray(candbexp[jb]))
     candc_s = speed(np.asarray(candc[k]))
     candcexp_s = speed(np.asarray(candcexp[x]))
+    candc1344_s = speed(np.asarray(candc1344[x1344]))
+    candc2688_s = speed(np.asarray(candc2688[x2688]))
     canduv_s = speed(np.asarray(canduv[u]))
     canduvexp_s = speed(np.asarray(canduvexp[ux]))
+    canduv1344_s = speed(np.asarray(canduv1344[ux1344]))
+    canduv2688_s = speed(np.asarray(canduv2688[ux2688]))
     candd_s = speed(np.asarray(candd[m]))
     canddpd_s = speed(np.asarray(canddpd[mpd]))
     cande2_s = speed(np.asarray(cande2[n]))
@@ -1056,8 +1243,12 @@ def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv,
         candbexp_s = candbexp_s[y0:y1, x0:x1]
         candc_s = candc_s[y0:y1, x0:x1]
         candcexp_s = candcexp_s[y0:y1, x0:x1]
+        candc1344_s = candc1344_s[y0:y1, x0:x1]
+        candc2688_s = candc2688_s[y0:y1, x0:x1]
         canduv_s = canduv_s[y0:y1, x0:x1]
         canduvexp_s = canduvexp_s[y0:y1, x0:x1]
+        canduv1344_s = canduv1344_s[y0:y1, x0:x1]
+        canduv2688_s = canduv2688_s[y0:y1, x0:x1]
         candd_s = candd_s[y0:y1, x0:x1]
         canddpd_s = canddpd_s[y0:y1, x0:x1]
         cande2_s = cande2_s[y0:y1, x0:x1]
@@ -1071,7 +1262,11 @@ def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv,
     err_candc = np.abs(candc_s - gt_s)
     err_canduv = np.abs(canduv_s - gt_s)
     err_canduvexp = np.abs(canduvexp_s - gt_s)
+    err_canduv1344 = np.abs(canduv1344_s - gt_s)
+    err_canduv2688 = np.abs(canduv2688_s - gt_s)
     err_candcexp = np.abs(candcexp_s - gt_s)
+    err_candc1344 = np.abs(candc1344_s - gt_s)
+    err_candc2688 = np.abs(candc2688_s - gt_s)
     err_candd = np.abs(candd_s - gt_s)
     err_canddpd = np.abs(canddpd_s - gt_s)
     err_cande2 = np.abs(cande2_s - gt_s)
@@ -1079,33 +1274,44 @@ def make_panel(sid: int, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv,
     err_gan = np.abs(gan_s - gt_s)
     diff_c_uv = np.abs(candc_s - canduv_s)
     diff_cexp_c = np.abs(candcexp_s - candc_s)
+    diff_c1344_cexp = np.abs(candc1344_s - candcexp_s)
+    diff_c1344_c = np.abs(candc1344_s - candc_s)
     diff_cexp_bexp = np.abs(candcexp_s - candbexp_s)
     diff_cexp_uvexp = np.abs(candcexp_s - canduvexp_s)
+    diff_c1344_uv1344 = np.abs(candc1344_s - canduv1344_s)
+    diff_c2688_uv2688 = np.abs(candc2688_s - canduv2688_s)
+    diff_c2688_c1344 = np.abs(candc2688_s - candc1344_s)
+    diff_uv2688_uv1344 = np.abs(canduv2688_s - canduv1344_s)
+    diff_uv1344_uvexp = np.abs(canduv1344_s - canduvexp_s)
     diff_e2_cc = np.abs(cande2_s - candc_s)
     diff_dpd_cexp = np.abs(canddpd_s - candcexp_s)
     diff_e2exp_e2 = np.abs(cande2exp_s - cande2_s)
     diff_e2exp_cexp = np.abs(cande2exp_s - candcexp_s)
 
-    vmin = float(min(np.nanmin(gt_s), np.nanmin(cnn_s), np.nanmin(candb_s), np.nanmin(candbexp_s), np.nanmin(candc_s), np.nanmin(candcexp_s), np.nanmin(canduv_s), np.nanmin(canduvexp_s), np.nanmin(candd_s), np.nanmin(canddpd_s), np.nanmin(cande2_s), np.nanmin(cande2exp_s), np.nanmin(gan_s)))
-    vmax = float(max(np.nanmax(gt_s), np.nanmax(cnn_s), np.nanmax(candb_s), np.nanmax(candbexp_s), np.nanmax(candc_s), np.nanmax(candcexp_s), np.nanmax(canduv_s), np.nanmax(canduvexp_s), np.nanmax(candd_s), np.nanmax(canddpd_s), np.nanmax(cande2_s), np.nanmax(cande2exp_s), np.nanmax(gan_s)))
-    emax = float(max(np.nanmax(err_cnn), np.nanmax(err_canduv), np.nanmax(err_canduvexp), np.nanmax(err_candb), np.nanmax(err_candbexp), np.nanmax(err_candc), np.nanmax(err_candcexp), np.nanmax(err_candd), np.nanmax(err_canddpd), np.nanmax(err_cande2), np.nanmax(err_cande2exp), np.nanmax(err_gan)))
-    dmax = float(max(np.nanmax(diff_c_uv), np.nanmax(diff_cexp_c), np.nanmax(diff_cexp_bexp), np.nanmax(diff_cexp_uvexp), np.nanmax(diff_e2_cc), np.nanmax(diff_dpd_cexp), np.nanmax(diff_e2exp_e2), np.nanmax(diff_e2exp_cexp)))
+    vmin = float(min(np.nanmin(gt_s), np.nanmin(cnn_s), np.nanmin(candb_s), np.nanmin(candbexp_s), np.nanmin(candc_s), np.nanmin(candcexp_s), np.nanmin(candc1344_s), np.nanmin(candc2688_s), np.nanmin(canduv_s), np.nanmin(canduvexp_s), np.nanmin(canduv1344_s), np.nanmin(canduv2688_s), np.nanmin(candd_s), np.nanmin(canddpd_s), np.nanmin(cande2_s), np.nanmin(cande2exp_s), np.nanmin(gan_s)))
+    vmax = float(max(np.nanmax(gt_s), np.nanmax(cnn_s), np.nanmax(candb_s), np.nanmax(candbexp_s), np.nanmax(candc_s), np.nanmax(candcexp_s), np.nanmax(candc1344_s), np.nanmax(candc2688_s), np.nanmax(canduv_s), np.nanmax(canduvexp_s), np.nanmax(canduv1344_s), np.nanmax(canduv2688_s), np.nanmax(candd_s), np.nanmax(canddpd_s), np.nanmax(cande2_s), np.nanmax(cande2exp_s), np.nanmax(gan_s)))
+    emax = float(max(np.nanmax(err_cnn), np.nanmax(err_canduv), np.nanmax(err_canduvexp), np.nanmax(err_canduv1344), np.nanmax(err_canduv2688), np.nanmax(err_candb), np.nanmax(err_candbexp), np.nanmax(err_candc), np.nanmax(err_candcexp), np.nanmax(err_candc1344), np.nanmax(err_candc2688), np.nanmax(err_candd), np.nanmax(err_canddpd), np.nanmax(err_cande2), np.nanmax(err_cande2exp), np.nanmax(err_gan)))
+    dmax = float(max(np.nanmax(diff_c_uv), np.nanmax(diff_cexp_c), np.nanmax(diff_cexp_bexp), np.nanmax(diff_cexp_uvexp), np.nanmax(diff_c1344_cexp), np.nanmax(diff_c1344_c), np.nanmax(diff_c1344_uv1344), np.nanmax(diff_c2688_uv2688), np.nanmax(diff_c2688_c1344), np.nanmax(diff_uv2688_uv1344), np.nanmax(diff_uv1344_uvexp), np.nanmax(diff_e2_cc), np.nanmax(diff_dpd_cexp), np.nanmax(diff_e2exp_e2), np.nanmax(diff_e2exp_cexp)))
     if not np.isfinite(emax) or emax <= 0:
         emax = 1.0
     if not np.isfinite(dmax) or dmax <= 0:
         dmax = 1.0
 
-    fig, axes = plt.subplots(1, 29, figsize=(145, 5.2))
+    fig, axes = plt.subplots(1, 1, figsize=(5, 5.2))  # replaced below after fields are assembled
     fields = [
-        gt_s, cnn_s, canduv_s, canduvexp_s, candb_s, candbexp_s, candc_s, candcexp_s, candd_s, canddpd_s, cande2_s, cande2exp_s, gan_s,
-        err_cnn, err_canduv, err_canduvexp, err_candb, err_candbexp, err_candc, err_candcexp, err_candd, err_canddpd, err_cande2, err_cande2exp, err_gan,
-        diff_cexp_uvexp, diff_cexp_bexp, diff_cexp_c, diff_dpd_cexp, diff_e2exp_e2, diff_e2exp_cexp,
+        gt_s, cnn_s, canduv_s, canduvexp_s, canduv1344_s, canduv2688_s, candb_s, candbexp_s, candc_s, candcexp_s, candc1344_s, candc2688_s, candd_s, canddpd_s, cande2_s, cande2exp_s, gan_s,
+        err_cnn, err_canduv, err_canduvexp, err_canduv1344, err_canduv2688, err_candb, err_candbexp, err_candc, err_candcexp, err_candc1344, err_candc2688, err_candd, err_canddpd, err_cande2, err_cande2exp, err_gan,
+        diff_cexp_uvexp, diff_c1344_uv1344, diff_c2688_uv2688, diff_c2688_c1344, diff_uv2688_uv1344, diff_uv1344_uvexp, diff_cexp_bexp, diff_cexp_c, diff_c1344_cexp, diff_c1344_c, diff_dpd_cexp, diff_e2exp_e2, diff_e2exp_cexp,
     ]
     titles = [
-        "GT speed", "CNN speed", "CandUV speed", "CandUV-exp speed", "CandB speed", "CandB-exp speed", "CandC speed", "CandC-exp speed", "CandD speed", "CandDpd-exp speed", "CandE2 speed", "CandE2-exp speed", "GAN speed",
-        "|CNN-GT|", "|UV-GT|", "|UVexp-GT|", "|B-GT|", "|Bexp-GT|", "|C-GT|", "|Cexp-GT|", "|D-GT|", "|Dpd-GT|", "|E2-GT|", "|E2exp-GT|", "|GAN-GT|",
-        "|Cexp-UVexp|", "|Cexp-Bexp|", "|Cexp-C|", "|Dpd-Cexp|", "|E2exp-E2|", "|E2exp-Cexp|",
+        "GT speed", "CNN speed", "CandUV speed", "CandUV-exp speed", "CandUV-1344 speed", "CandUV-2688 speed", "CandB speed", "CandB-exp speed", "CandC speed", "CandC-exp speed", "CandC-1344 speed", "CandC-2688 speed", "CandD speed", "CandDpd-exp speed", "CandE2 speed", "CandE2-exp speed", "GAN speed",
+        "|CNN-GT|", "|UV-GT|", "|UVexp-GT|", "|UV1344-GT|", "|UV2688-GT|", "|B-GT|", "|Bexp-GT|", "|C-GT|", "|Cexp-GT|", "|C1344-GT|", "|C2688-GT|", "|D-GT|", "|Dpd-GT|", "|E2-GT|", "|E2exp-GT|", "|GAN-GT|",
+        "|Cexp-UVexp|", "|C1344-UV1344|", "|C2688-UV2688|", "|C2688-C1344|", "|UV2688-UV1344|", "|UV1344-UVexp|", "|Cexp-Bexp|", "|Cexp-C|", "|C1344-Cexp|", "|C1344-C|", "|Dpd-Cexp|", "|E2exp-E2|", "|E2exp-Cexp|",
     ]
+    fig, axes = plt.subplots(1, len(fields), figsize=(5 * len(fields), 5.2))
+    if len(fields) == 1:
+        axes = [axes]
+
 
     for ax, field, title in zip(axes, fields, titles):
         if title.startswith("|Cexp-") or title.startswith("|CandC-") or title.startswith("|CandE2-"):
@@ -1234,7 +1440,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
 
     count_line = (
         f"Top-ranked: Candidate C {top_counts['candidateC']} | "
-        f"Candidate C-expanded-672 {top_counts['candidateC_expanded672']} | "
+        f"Candidate C-expanded-672 {top_counts['candidateC_expanded672']} | Candidate C-expanded-1344 {top_counts['candidateC_expanded1344']} | "
         f"Candidate B-expanded-672 {top_counts['candidateB_expanded672']} | "
         f"Candidate UV {top_counts['candidateUV']} | "
         f"Candidate UV-expanded-672 {top_counts['candidateUV_expanded672']} | "
@@ -1253,7 +1459,7 @@ def metric_table(row: dict, sid: int, eval_rows: dict[int, dict[str, dict[str, s
       </summary>
       <p class="muted">Lower is better for these physics/domain error metrics. Ranking is better -> worse using candidate evaluation CSVs when available.</p>
       <table class="metrics">
-        <thead><tr><th>Measure</th><th>Group</th><th>CNN</th><th>GAN</th><th>Candidate B</th><th>Candidate C</th><th>Candidate C-expanded-672</th><th>Candidate B-expanded-672</th><th>Candidate UV</th><th>Candidate UV-expanded-672</th><th>Candidate D</th><th>Candidate Dpd-exp</th><th>Candidate E2</th><th>Candidate E2-exp</th><th>Ranking / Winner</th></tr></thead>
+        <thead><tr><th>Measure</th><th>Group</th><th>CNN</th><th>GAN</th><th>Candidate B</th><th>Candidate C</th><th>Candidate C-expanded-672</th><th>Candidate C-expanded-1344</th><th>Candidate B-expanded-672</th><th>Candidate UV</th><th>Candidate UV-expanded-672</th><th>Candidate D</th><th>Candidate Dpd-exp</th><th>Candidate E2</th><th>Candidate E2-exp</th><th>Ranking / Winner</th></tr></thead>
         <tbody>{''.join(body)}</tbody>
       </table>
     </details>
@@ -1349,6 +1555,8 @@ def card(entry: dict) -> str:
           {candidate_topology_box(obs, "candidateC_expanded672", "Candidate C-expanded-672", open_box=False)}
           {candidate_topology_box(obs, "candidateUV", "Candidate UV", open_box=False)}
           {candidate_topology_box(obs, "candidateUV_expanded672", "Candidate UV-expanded-672", open_box=False)}
+          {candidate_topology_box(obs, "candidateUV_expanded1344", "Candidate UV-expanded-1344", open_box=False)}
+          {candidate_topology_box(obs, "candidateUV_expanded2688", "Candidate UV-expanded-2688", open_box=False)}
           {candidate_topology_box(obs, "candidateD", "Candidate D", open_box=False)}
           {candidate_topology_box(obs, "candidateDpd_expanded672", "Candidate Dpd-expanded-672", open_box=False)}
           {candidate_topology_box(obs, "candidateE2", "Candidate E2", open_box=False)}
@@ -1427,6 +1635,7 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateB')">MT-GAN &rarr; Candidate B ({count('mt_gan_flipped_to_candidateB')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateC')">MT-GAN &rarr; Candidate C ({count('mt_gan_flipped_to_candidateC')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateC-expanded672')">MT-GAN &rarr; Candidate C-exp672 ({count('mt_gan_flipped_to_candidateC_expanded672')})</button>
+  <button onclick="showOnly('tag-mt-gan-flipped-to-candidateC-expanded1344')">MT-GAN &rarr; Candidate C-exp1344 ({count('mt_gan_flipped_to_candidateC_expanded1344')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateUV')">MT-GAN &rarr; Candidate UV ({count('mt_gan_flipped_to_candidateUV')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateD')">MT-GAN &rarr; Candidate D ({count('mt_gan_flipped_to_candidateD')})</button>
   <button onclick="showOnly('tag-mt-gan-flipped-to-candidateDpd-expanded672')">MT-GAN &rarr; Candidate Dpd-exp672 ({count('mt_gan_flipped_to_candidateDpd_expanded672')})</button>
@@ -1434,6 +1643,7 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-candidateB-mt-winner')">Candidate B MT winner ({count('candidateB_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateC-mt-winner')">Candidate C MT winner ({count('candidateC_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateC-expanded672-mt-winner')">Candidate C-exp672 MT winner ({count('candidateC_expanded672_mt_winner')})</button>
+  <button onclick="showOnly('tag-candidateC-expanded1344-mt-winner')">Candidate C-exp1344 MT winner ({count('candidateC_expanded1344_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateUV-mt-winner')">Candidate UV MT winner ({count('candidateUV_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateD-mt-winner')">Candidate D MT winner ({count('candidateD_mt_winner')})</button>
   <button onclick="showOnly('tag-candidateDpd-expanded672-mt-winner')">Candidate Dpd-expanded MT winner ({count('candidateDpd_expanded672_mt_winner')})</button>
@@ -1441,6 +1651,7 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-candidateB-pd-improves-vs-cnn')">Candidate B improves PD vs CNN ({count('candidateB_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-pd-improves-vs-cnn')">Candidate C improves PD vs CNN ({count('candidateC_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-expanded672-pd-improves-vs-cnn')">Candidate C-exp672 improves PD vs CNN ({count('candidateC_expanded672_pd_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-candidateC-expanded1344-pd-improves-vs-cnn')">Candidate C-exp1344 improves PD vs CNN ({count('candidateC_expanded1344_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateUV-pd-improves-vs-cnn')">Candidate UV improves PD vs CNN ({count('candidateUV_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateD-pd-improves-vs-cnn')">Candidate D improves PD vs CNN ({count('candidateD_pd_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateDpd-expanded672-pd-improves-vs-cnn')">Candidate Dpd-exp improves PD vs CNN ({count('candidateDpd_expanded672_pd_improves_vs_cnn')})</button>
@@ -1448,6 +1659,10 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-candidateB-mt-improves-vs-cnn')">Candidate B improves MT vs CNN ({count('candidateB_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-mt-improves-vs-cnn')">Candidate C improves MT vs CNN ({count('candidateC_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateC-expanded672-mt-improves-vs-cnn')">Candidate C-exp672 improves MT vs CNN ({count('candidateC_expanded672_mt_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-candidateC-expanded1344-mt-improves-vs-cnn')">Candidate C-exp1344 improves MT vs CNN ({count('candidateC_expanded1344_mt_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-mt-gan-flipped-to-candidateUV-expanded1344')">MT-GAN &rarr; Candidate UV-exp1344 ({count('mt_gan_flipped_to_candidateUV_expanded1344')})</button>
+  <button onclick="showOnly('tag-candidateUV-expanded1344-pd-improves-vs-cnn')">Candidate UV-exp1344 improves PD vs CNN ({count('candidateUV_expanded1344_pd_improves_vs_cnn')})</button>
+  <button onclick="showOnly('tag-candidateUV-expanded1344-mt-improves-vs-cnn')">Candidate UV-exp1344 improves MT vs CNN ({count('candidateUV_expanded1344_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateUV-mt-improves-vs-cnn')">Candidate UV improves MT vs CNN ({count('candidateUV_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateD-mt-improves-vs-cnn')">Candidate D improves MT vs CNN ({count('candidateD_mt_improves_vs_cnn')})</button>
   <button onclick="showOnly('tag-candidateDpd-expanded672-mt-improves-vs-cnn')">Candidate Dpd-exp improves MT vs CNN ({count('candidateDpd_expanded672_mt_improves_vs_cnn')})</button>
@@ -1470,7 +1685,7 @@ function showOnly(cls) {{
   <button onclick="showOnly('tag-adjacent-cluster-76-78')">Cluster 76–78</button>
   <button onclick="showOnly('tag-adjacent-cluster-90-93')">Cluster 90–93</button>
   <button onclick="showOnly('tag-adjacent-cluster-161-164')">Cluster 161–164</button>
-  <p class="muted">Each panel shows GT speed | CNN speed | Candidate UV | Candidate UV-expanded-672 | Candidate B | Candidate B-expanded-672 | Candidate C | Candidate C-expanded-672 | Candidate D | Candidate Dpd-expanded-672 | Candidate E2 | Candidate E2-expanded-672 | GAN, followed by absolute-error maps and expanded-candidate difference maps.</p>
+  <p class="muted">Each panel shows GT speed | CNN speed | Candidate UV | Candidate UV-expanded-672 | Candidate B | Candidate B-expanded-672 | Candidate C | Candidate C-expanded-672 | Candidate C-expanded-1344 | Candidate D | Candidate Dpd-expanded-672 | Candidate E2 | Candidate E2-expanded-672 | GAN, followed by absolute-error maps and expanded-candidate difference maps.</p>
 </header>
 <main>
 {cards}
@@ -1504,13 +1719,17 @@ def main() -> None:
     candbexp_topology = load_candidate_topology_rows(CANDIDATEB_EXPANDED672_TOPOLOGY_COMPARISON, "candidateB_expanded672", "Candidate B-expanded-672")
     candc_topology = load_candidate_topology_rows(CANDIDATEC_TOPOLOGY_COMPARISON, "candidateC", "Candidate C")
     candcexp_topology = load_candidate_topology_rows(CANDIDATEC_EXPANDED672_TOPOLOGY_COMPARISON, "candidateC_expanded672", "Candidate C-expanded-672")
+    candc1344_topology = load_candidate_topology_rows(CANDIDATEC_EXPANDED1344_TOPOLOGY_COMPARISON, "candidateC_expanded1344", "Candidate C-expanded-1344")
+    candc2688_topology = load_candidate_topology_rows(CANDIDATEC_EXPANDED2688_TOPOLOGY_COMPARISON, "candidateC_expanded2688", "Candidate C-expanded-2688")
     canduv_topology = load_candidate_topology_rows(CANDIDATEUV_TOPOLOGY_COMPARISON, "candidateUV", "Candidate UV")
     canduvexp_topology = load_candidate_topology_rows(CANDIDATEUV_EXPANDED672_TOPOLOGY_COMPARISON, "candidateUV_expanded672", "Candidate UV-expanded-672")
+    canduv1344_topology = load_candidate_topology_rows(CANDIDATEUV_EXPANDED1344_TOPOLOGY_COMPARISON, "candidateUV_expanded1344", "Candidate UV-expanded-1344")
+    canduv2688_topology = load_candidate_topology_rows(CANDIDATEUV_EXPANDED2688_TOPOLOGY_COMPARISON, "candidateUV_expanded2688", "Candidate UV-expanded-2688")
     candd_topology = load_candidate_topology_rows(CANDIDATED_TOPOLOGY_COMPARISON, "candidateD", "Candidate D")
     canddpd_topology = load_candidate_topology_rows(CANDIDATEDPD_EXPANDED672_TOPOLOGY_COMPARISON, "candidateDpd_expanded672", "Candidate Dpd-expanded-672")
     cande2_topology = load_candidate_topology_rows(CANDIDATEE2_TOPOLOGY_COMPARISON, "candidateE2", "Candidate E2")
     cande2exp_topology = load_candidate_topology_rows(CANDIDATEE2_EXPANDED672_TOPOLOGY_COMPARISON, "candidateE2_expanded672", "Candidate E2-expanded-672")
-    for topology_rows in (candb_topology, candbexp_topology, candc_topology, candcexp_topology, canduv_topology, canduvexp_topology, candd_topology, canddpd_topology, cande2_topology, cande2exp_topology):
+    for topology_rows in (candb_topology, candbexp_topology, candc_topology, candcexp_topology, candc1344_topology, candc2688_topology, canduv_topology, canduvexp_topology, canduv1344_topology, canduv2688_topology, candd_topology, canddpd_topology, cande2_topology, cande2exp_topology):
         for sid, r in topology_rows.items():
             obs.setdefault(sid, {})
             for k, v in r.items():
@@ -1527,9 +1746,9 @@ def main() -> None:
     print(f"selected_samples={len(samples)}")
     print("forced/extra samples:", " ".join(map(str, sorted(FORCED))))
 
-    gt = cnn = gan = candb = candbexp = candc = candcexp = canduv = canduvexp = candd = canddpd = cande2 = cande2exp = pos = candb_pos = candbexp_pos = candc_pos = candcexp_pos = canduv_pos = canduvexp_pos = candd_pos = canddpd_pos = cande2_pos = cande2exp_pos = None
+    gt = cnn = gan = candb = candbexp = candc = candcexp = candc1344 = candc2688 = canduv = canduvexp = canduv1344 = canduv2688 = candd = canddpd = cande2 = cande2exp = pos = candb_pos = candbexp_pos = candc_pos = candcexp_pos = candc1344_pos = candc2688_pos = canduv_pos = canduvexp_pos = canduv1344_pos = canduv2688_pos = candd_pos = canddpd_pos = cande2_pos = cande2exp_pos = None
     if not args.no_panels:
-        gt, cnn, gan, candb, candbexp, candc, candcexp, canduv, canduvexp, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, canduv_pos, canduvexp_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos = load_arrays()
+        gt, cnn, gan, candb, candbexp, candc, candcexp, candc1344, candc2688, canduv, canduvexp, canduv1344, canduv2688, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, candc1344_pos, candc2688_pos, canduv_pos, canduvexp_pos, canduv1344_pos, canduv2688_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos = load_arrays()
 
     entries = []
     manifest = []
@@ -1545,8 +1764,8 @@ def main() -> None:
         full_ok = full_path.exists()
 
         if not args.no_panels:
-            crop_ok = make_panel(sid, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv, canduvexp, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, canduv_pos, canduvexp_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos, row, ob, (0, 160, 0, 160), crop_path)
-            full_ok = make_panel(sid, gt, cnn, gan, candb, candbexp, candc, candcexp, canduv, canduvexp, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, canduv_pos, canduvexp_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos, row, ob, None, full_path)
+            crop_ok = make_panel(sid, gt, cnn, gan, candb, candbexp, candc, candcexp, candc1344, candc2688, canduv, canduvexp, canduv1344, canduv2688, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, candc1344_pos, candc2688_pos, canduv_pos, canduvexp_pos, canduv1344_pos, canduv2688_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos, row, ob, (0, 160, 0, 160), crop_path)
+            full_ok = make_panel(sid, gt, cnn, gan, candb, candbexp, candc, candcexp, candc1344, candc2688, canduv, canduvexp, canduv1344, canduv2688, candd, canddpd, cande2, cande2exp, pos, candb_pos, candbexp_pos, candc_pos, candcexp_pos, candc1344_pos, candc2688_pos, canduv_pos, canduvexp_pos, canduv1344_pos, canduv2688_pos, candd_pos, canddpd_pos, cande2_pos, cande2exp_pos, row, ob, None, full_path)
 
         crop_rel = crop_path.relative_to(OUTDIR).as_posix() if crop_ok else ""
         full_rel = full_path.relative_to(OUTDIR).as_posix() if full_ok else ""
@@ -1595,6 +1814,22 @@ def main() -> None:
             "pd_winner_after_candidateC_expanded672": ob.get("pd_winner_after_candidateC_expanded672", ""),
             "pd_distance_candidateC_expanded672": ob.get("pd_distance_candidateC_expanded672", ""),
             "mt_distance_candidateC_expanded672": ob.get("mt_distance_candidateC_expanded672", ""),
+            "mt_winner_after_candidateC_expanded1344": ob.get("mt_winner_after_candidateC_expanded1344", ""),
+            "pd_winner_after_candidateC_expanded1344": ob.get("pd_winner_after_candidateC_expanded1344", ""),
+            "pd_distance_candidateC_expanded1344": ob.get("pd_distance_candidateC_expanded1344", ""),
+            "mt_distance_candidateC_expanded1344": ob.get("mt_distance_candidateC_expanded1344", ""),
+            "mt_winner_after_candidateC_expanded2688": ob.get("mt_winner_after_candidateC_expanded2688", ""),
+            "pd_winner_after_candidateC_expanded2688": ob.get("pd_winner_after_candidateC_expanded2688", ""),
+            "pd_distance_candidateC_expanded2688": ob.get("pd_distance_candidateC_expanded2688", ""),
+            "mt_distance_candidateC_expanded2688": ob.get("mt_distance_candidateC_expanded2688", ""),
+            "mt_winner_after_candidateUV_expanded1344": ob.get("mt_winner_after_candidateUV_expanded1344", ""),
+            "pd_winner_after_candidateUV_expanded1344": ob.get("pd_winner_after_candidateUV_expanded1344", ""),
+            "pd_distance_candidateUV_expanded1344": ob.get("pd_distance_candidateUV_expanded1344", ""),
+            "mt_distance_candidateUV_expanded1344": ob.get("mt_distance_candidateUV_expanded1344", ""),
+            "mt_winner_after_candidateUV_expanded2688": ob.get("mt_winner_after_candidateUV_expanded2688", ""),
+            "pd_winner_after_candidateUV_expanded2688": ob.get("pd_winner_after_candidateUV_expanded2688", ""),
+            "pd_distance_candidateUV_expanded2688": ob.get("pd_distance_candidateUV_expanded2688", ""),
+            "mt_distance_candidateUV_expanded2688": ob.get("mt_distance_candidateUV_expanded2688", ""),
             "mt_winner_after_candidateUV": ob.get("mt_winner_after_candidateUV", ""),
             "pd_winner_after_candidateUV": ob.get("pd_winner_after_candidateUV", ""),
             "pd_distance_candidateUV": ob.get("pd_distance_candidateUV", ""),
@@ -1637,6 +1872,14 @@ def main() -> None:
             "pd_distance_candidateC", "mt_distance_candidateC",
             "mt_winner_after_candidateC_expanded672", "pd_winner_after_candidateC_expanded672",
             "pd_distance_candidateC_expanded672", "mt_distance_candidateC_expanded672",
+            "mt_winner_after_candidateC_expanded1344", "pd_winner_after_candidateC_expanded1344",
+            "pd_distance_candidateC_expanded1344", "mt_distance_candidateC_expanded1344",
+            "mt_winner_after_candidateC_expanded2688", "pd_winner_after_candidateC_expanded2688",
+            "pd_distance_candidateC_expanded2688", "mt_distance_candidateC_expanded2688",
+            "mt_winner_after_candidateUV_expanded1344", "pd_winner_after_candidateUV_expanded1344",
+            "pd_distance_candidateUV_expanded1344", "mt_distance_candidateUV_expanded1344",
+            "mt_winner_after_candidateUV_expanded2688", "pd_winner_after_candidateUV_expanded2688",
+            "pd_distance_candidateUV_expanded2688", "mt_distance_candidateUV_expanded2688",
             "mt_winner_after_candidateUV", "pd_winner_after_candidateUV",
             "pd_distance_candidateUV", "mt_distance_candidateUV",
             "mt_winner_after_candidateD", "pd_winner_after_candidateD",

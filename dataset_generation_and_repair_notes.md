@@ -4797,3 +4797,581 @@ This supports the emerging conclusion that **PD-oriented supervision is feasible
 ## Meeting-ready summary
 
 The full expanded ablation now shows that UV-only fine-tuning worsens topology, while B/C proxy losses strongly improve PD. Candidate C-expanded gives the best expanded MT behavior, though it still does not beat CNN mean MT. In contrast, both direct PD-oriented variants, Dpd-expanded and E2-expanded, are feasible but do not improve final TTK PD/MT over CNN. This suggests that PD supervision and fixed critical-pair supervision are not enough by themselves; the next meaningful step is a merge-tree-specific hierarchy-aware proxy or surrogate.
+
+---
+
+# Part IX — Candidate C-expanded-1344 scaling experiment
+
+## Purpose
+
+After the 672-sample expanded-data ablation, Candidate C was scaled to a larger
+1344-sample non-overlapping seasonal training set. The purpose was to test whether the
+Candidate C topology-aware proxy loss remains robust as the amount of training data grows,
+while still evaluating on the same corrected 168-sample benchmark.
+
+Candidate C uses the same objective as before:
+
+```text
+L_C = L_uv
+    + 0.01  L_speed
+    + 0.05  L_grad
+    + 0.25  L_levelset
+    + 0.001 L_crit
+```
+
+where `L_crit` is the high-speed local-extrema / critical-value proxy. No loss weights or
+hyperparameters were changed relative to Candidate C-expanded-672; only the training set
+size was increased.
+
+## Dataset generated
+
+A new expanded dataset was generated at:
+
+```text
+example_data_topology_expanded_1344/
+```
+
+The dry run verified the same spatial crop as the previous corrected datasets:
+
+```text
+Nearest grid center: 39.4998 N, -75.0064 W
+Crop: rows 720:1220, cols 2102:2602
+```
+
+The dataset contains eight non-overlapping 168-hour windows, two per season:
+
+| Window | WTK indices | Samples |
+|---|---:|---:|
+| winter_1 | 336-503 | 168 |
+| winter_2 | 504-671 | 168 |
+| spring_1 | 2160-2327 | 168 |
+| spring_2 | 2328-2495 | 168 |
+| summer_1 | 4344-4511 | 168 |
+| summer_2 | 4512-4679 | 168 |
+| fall_1 | 6552-6719 | 168 |
+| fall_2 | 6720-6887 | 168 |
+| **Total** |  | **1344** |
+
+All windows are disjoint from the benchmark WTK indices `0..167`.
+
+## Dataset verification
+
+The generated arrays were verified as:
+
+| File | Shape | dtype | min | max |
+|---|---:|---|---:|---:|
+| `hr_stack.npy` | `(1344, 500, 500, 2)` | `float64` | -29.2494 | 37.1275 |
+| `mr_stack.npy` | `(1344, 100, 100, 2)` | `float64` | -27.6688 | 31.8134 |
+| `lr_stack.npy` | `(1344, 10, 10, 2)` | `float64` | -20.1521 | 21.8779 |
+
+Additional generated files:
+
+```text
+wind_MR-HR.tfrecord  5,591,262,976 bytes
+wind_LR-MR.tfrecord    217,398,592 bytes
+manifest.csv           401,699 bytes
+stats.json               1,218 bytes
+```
+
+The pretrained PhIRE normalization remained compatible with the expanded dataset:
+
+```text
+normalization compatible: True
+u_z = 0.4789
+v_z = 0.0649
+```
+
+## Training and benchmark inference
+
+Candidate C-expanded-1344 was trained from the pretrained CNN checkpoint on:
+
+```text
+example_data_topology_expanded_1344/wind_MR-HR.tfrecord
+```
+
+and evaluated on the fixed corrected benchmark:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+The final benchmark outputs were written to:
+
+```text
+data_out/wind_finetune_candidateC_expanded1344/
+```
+
+Verified output arrays:
+
+| File | Shape | dtype | min | max |
+|---|---:|---|---:|---:|
+| `idx.npy` | `(168,)` | `int64` | 0 | 167 |
+| `dataIN.npy` | `(168, 100, 100, 2)` | `float64` | -21.5213 | 26.9345 |
+| `dataGT.npy` | `(168, 500, 500, 2)` | `float64` | -30.4676 | 30.8122 |
+| `dataSR.npy` | `(168, 500, 500, 2)` | `float64` | -27.1581 | 28.7150 |
+
+The TensorFlow `OUT_OF_RANGE: End of sequence` message during paired inference was expected
+and indicates that the dataset iterator completed.
+
+## Scalar / physics / domain evaluation
+
+The scalar/physics/domain evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/all_sample_metrics_candidateC_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/winner_counts_candidateC_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/pairwise_cnn_vs_candidateC_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/adjacent_cluster_table_candidateC_expanded1344.csv
+docs/topology_finetuning_candidateC_expanded1344_eval.md
+```
+
+`skimage` SSIM was unavailable because of a NumPy binary incompatibility, so SSIM values
+were reported as `NaN` by the current environment. Other physics/domain metrics were still
+computed.
+
+## TTK topology evaluation
+
+The first TTK extraction pass stopped partway through Stage 2, as seen in earlier candidate
+runs. A missing-only resume pass completed the PD/MT extraction successfully:
+
+```text
+PD: 336
+MT: 336
+Failures: none
+```
+
+Stage 3 distance computation completed and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/pd_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/mt_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/phase_c_summary.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/phase_c_summary.txt
+```
+
+The final `phase_c_results.csv` had 169 lines, corresponding to 168 evaluated samples plus
+header.
+
+## Final topology comparison result
+
+The final topology comparison reported:
+
+```text
+candidateC_expanded1344 topology entries: 168 (PD valid: 168, MT valid: 168)
+PD: CNN=27.4063, GAN=20.8641, candidateC_expanded1344=22.8623
+MT: CNN=5.8678, GAN=8.3481, candidateC_expanded1344=6.1236
+PD candidateC_expanded1344 < CNN: 168/168
+MT candidateC_expanded1344 < CNN: 49/168
+PD candidateC_expanded1344 < GAN: 17/168
+MT-GAN wins -> candidateC_expanded1344: 9/20, still GAN: 11, now CNN: 0
+```
+
+Summary table:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | Recovered MT-GAN |
+|---|---:|---:|---:|---:|---:|
+| CNN | 27.4063 | **5.8678** | - | - | - |
+| GAN | **20.8641** | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate C-expanded-672 | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Candidate C-expanded-1344 | **22.8623** | 6.1236 | **168/168** | 49/168 | **9/20** |
+
+Candidate C-expanded-1344 improves PD over CNN on all 168 benchmark samples and improves
+mean PD further relative to Candidate C-expanded-672. It also recovers 9 of the 20 original
+MT-GAN cases, compared with 7/20 for Candidate C-expanded-672. However, mean MT remains
+worse than the original CNN baseline, which supports the current interpretation: Candidate C
+scales well for persistence-style topology and selected MT cases, but it is still not a full
+merge-tree hierarchy loss.
+
+The matching next ablation is `CandidateUV-expanded-1344`, trained on the same 1344-sample
+dataset with only `L_uv`, to verify that the Candidate C gains are not simply caused by
+larger-data fine-tuning.
+
+
+---
+
+# Part IX — Candidate C / UV 1344-sample expanded ablation update (2026-05-29)
+
+## Purpose
+
+After the 672-sample seasonal ablation, the Candidate C proxy-loss experiment was
+scaled to a larger 1344-sample non-overlapping seasonal dataset, and a matching
+UV-only ablation was run on the exact same 1344-sample dataset. This pair is the
+current cleanest test of whether Candidate C's topology-aware proxy losses improve
+true topology metrics beyond generic larger-data fine-tuning.
+
+## 1344-sample dataset
+
+The expanded dataset uses the same Mid-Atlantic 500 x 500 spatial crop centered at
+39.5 N, -75.0 W, with the same WIND Toolkit variables and PhIRE preprocessing as the
+672-sample dataset. It contains eight non-overlapping 168-hour windows:
+
+| Window | WTK start | WTK end | Samples |
+|---|---:|---:|---:|
+| winter_1 | 336 | 503 | 168 |
+| winter_2 | 504 | 671 | 168 |
+| spring_1 | 2160 | 2327 | 168 |
+| spring_2 | 2328 | 2495 | 168 |
+| summer_1 | 4344 | 4511 | 168 |
+| summer_2 | 4512 | 4679 | 168 |
+| fall_1 | 6552 | 6719 | 168 |
+| fall_2 | 6720 | 6887 | 168 |
+
+The generated arrays were verified as:
+
+- `hr_stack.npy`: `(1344, 500, 500, 2)`
+- `mr_stack.npy`: `(1344, 100, 100, 2)`
+- `lr_stack.npy`: `(1344, 10, 10, 2)`
+- `wind_MR-HR.tfrecord`: written successfully
+- `wind_LR-MR.tfrecord`: written successfully
+- no overlap with the held-out benchmark WTK indices `0..167`
+- normalization compatibility: `True`, with `u_z=0.4789`, `v_z=0.0649`
+
+The build emitted NumPy/TensorFlow compatibility warnings during `utils` import, but
+completed successfully and wrote the NPY stacks, TFRecords, manifest, stats JSON, and
+expanded dataset notes.
+
+## Candidate C-expanded-1344
+
+Candidate C-expanded-1344 was trained on the 1344-sample dataset and evaluated on the
+fixed 168-sample benchmark. The loss was unchanged from Candidate C-expanded-672:
+
+```text
+L_C = L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset + 0.001 L_crit
+```
+
+The benchmark inference outputs were verified:
+
+- `idx.npy`: `(168,)`, range `0..167`
+- `dataIN.npy`: `(168, 100, 100, 2)`
+- `dataGT.npy`: `(168, 500, 500, 2)`
+- `dataSR.npy`: `(168, 500, 500, 2)`
+
+Scalar/physics/domain evaluation completed and wrote:
+
+- `ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/all_sample_metrics_candidateC_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/winner_counts_candidateC_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/pairwise_cnn_vs_candidateC_expanded1344.csv`
+- `docs/topology_finetuning_candidateC_expanded1344_eval.md`
+
+SSIM was unavailable in the current Spark environment due to a scikit-image / NumPy
+binary incompatibility and should be recomputed in a compatible environment if needed.
+
+The TTK topology pipeline initially stopped early, then was resumed successfully. Final
+counts were:
+
+- VTI: `336`
+- PD VTU: `336`
+- MT port-0 VTU: `336`
+- `phase_c_results.csv`: `169` lines including header
+
+The final true-topology comparison was:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | Recovered MT-GAN |
+|---|---:|---:|---:|---:|---:|---:|
+| CNN | 27.4063 | 5.8678 | — | — | — | — |
+| GAN | 20.8641 | 8.3481 | 166/168 | 20/168 | — | 20/20 |
+| Candidate C-expanded-1344 | 22.8623 | 6.1236 | 168/168 | 49/168 | 17/168 | 9/20 |
+
+The recovered original MT-GAN cases were samples `6, 18, 25, 62, 68, 77, 79, 80, 82`.
+
+## Candidate UV-expanded-1344
+
+Candidate UV-expanded-1344 is the matching larger-data control for Candidate C-expanded-1344.
+It used the same 1344 training samples, same pretrained CNN checkpoint, same learning
+rate, same batch size, and same number of epochs, but used only:
+
+```text
+L_total = L_uv
+```
+
+All auxiliary losses were set to zero:
+
+```text
+lambda_speed = lambda_grad = lambda_wpd = lambda_levelset = lambda_crit = 0
+```
+
+Training completed successfully. The log confirmed that auxiliary raw losses were computed
+for diagnostics, but all weighted auxiliary terms were zero and `total_loss = L_uv`.
+The benchmark inference outputs were verified:
+
+- `idx.npy`: `(168,)`, range `0..167`
+- `dataIN.npy`: `(168, 100, 100, 2)`
+- `dataGT.npy`: `(168, 500, 500, 2)`
+- `dataSR.npy`: `(168, 500, 500, 2)`
+
+Scalar/physics/domain evaluation completed and wrote:
+
+- `ttk_runs_fixed/topology_finetuning/candidateUV_expanded1344_eval/all_sample_metrics_candidateUV_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateUV_expanded1344_eval/winner_counts_candidateUV_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateUV_expanded1344_eval/pairwise_cnn_vs_candidateUV_expanded1344.csv`
+- `docs/topology_finetuning_candidateUV_expanded1344_eval.md`
+
+The TTK topology pipeline initially stopped early at `VTI=336`, `PD=53`, `MT=52`, then
+was resumed and completed. The final topology comparison reported 168 valid PD and MT
+entries.
+
+The final true-topology comparison was:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | Recovered MT-GAN |
+|---|---:|---:|---:|---:|---:|---:|
+| Candidate UV-expanded-1344 | 29.5514 | 6.0787 | 10/168 | 54/168 | 0/168 | 5/20 |
+
+The recovered original MT-GAN cases were samples `18, 25, 63, 68, 92`.
+
+## Interpretation of the 1344-sample pair
+
+The 1344-sample pair is important because Candidate C-expanded-1344 and Candidate
+UV-expanded-1344 differ only in the auxiliary loss terms. The results show:
+
+- Candidate C-expanded-1344 strongly improves PD over CNN: `22.8623` vs `27.4063`.
+- Candidate UV-expanded-1344 worsens PD over CNN: `29.5514` vs `27.4063`.
+- Candidate C-expanded-1344 improves PD on `168/168` samples, while UV-expanded-1344
+  improves PD on only `10/168` samples.
+- Candidate C-expanded-1344 recovers more original MT-GAN cases (`9/20`) than
+  UV-expanded-1344 (`5/20`).
+- Neither 1344-sample run improves mean MT over the CNN baseline.
+- UV-expanded-1344 has slightly lower mean MT than Candidate C-expanded-1344
+  (`6.0787` vs `6.1236`), so the MT story remains mixed and should not be overclaimed.
+
+The paper-safe conclusion is that Candidate C's auxiliary topology-aware proxy losses
+are responsible for the large persistence-diagram improvement, but the current proxy is
+not yet a complete merge-tree hierarchy loss. Conventional metrics (PSNR/SSIM when
+available, speed/WPD/gradient/PSD/exceedance metrics) should be reported alongside the
+true topology metrics to make the topology-fidelity trade-off explicit.
+
+---
+
+# Part VIII — Candidate C / UV Expanded-2688 Scaling Study
+
+## Purpose
+
+After Candidate C-expanded-1344 showed strong persistence-diagram improvement, the Candidate C training set was doubled again to 2688 non-overlapping seasonal samples. The purpose was to test whether the Candidate C topology-aware proxy loss remains robust as training data increases, and to verify the result with a matched UV-only ablation on the exact same 2688-sample dataset.
+
+## 2688-sample dataset
+
+The 2688-sample dataset was generated with `scripts/build_wind_mrhr_expanded_dataset_2688.py`. It uses the same spatial crop and PhIRE preprocessing as the corrected benchmark and earlier expanded datasets:
+
+- center: 39.5°N, -75.0°W
+- nearest grid center: approximately 39.4998°N, -75.0064°W
+- crop: rows 720:1220, cols 2102:2602
+- HR: 500 × 500 × 2
+- MR: 100 × 100 × 2
+- LR: 10 × 10 × 2
+- variables: `windspeed_100m`, `winddirection_100m`
+- vector conversion: `u = -speed * sin(theta)`, `v = -speed * cos(theta)`
+
+The temporal windows are 16 non-overlapping 168-hour windows, four per season:
+
+| Season/window | WTK index range |
+|---|---:|
+| winter_1 | 336-503 |
+| winter_2 | 504-671 |
+| winter_3 | 672-839 |
+| winter_4 | 840-1007 |
+| spring_1 | 2160-2327 |
+| spring_2 | 2328-2495 |
+| spring_3 | 2496-2663 |
+| spring_4 | 2664-2831 |
+| summer_1 | 4344-4511 |
+| summer_2 | 4512-4679 |
+| summer_3 | 4680-4847 |
+| summer_4 | 4848-5015 |
+| fall_1 | 6552-6719 |
+| fall_2 | 6720-6887 |
+| fall_3 | 6888-7055 |
+| fall_4 | 7056-7223 |
+
+The expanded set has no overlap with the held-out benchmark WTK indices 0-167.
+
+## Dataset validation
+
+The 2688-sample dataset was built successfully with the NLR HSDS endpoint:
+
+```bash
+export HS_ENDPOINT="https://developer.nlr.gov/api/hsds"
+export HSDS_ENDPOINT="$HS_ENDPOINT"
+python3 scripts/build_wind_mrhr_expanded_dataset_2688.py \
+  --out-dir example_data_topology_expanded_2688
+```
+
+Validation output:
+
+| Artifact | Shape | Speed range |
+|---|---:|---:|
+| `hr_stack.npy` | `(2688, 500, 500, 2)` | 0.0000 to 44.3464 |
+| `mr_stack.npy` | `(2688, 100, 100, 2)` | 0.0000 to 39.1591 |
+| `lr_stack.npy` | `(2688, 10, 10, 2)` | 0.0000 to 30.4480 |
+
+Additional build checks:
+
+- no NaN/Inf in HR/MR/LR stacks,
+- no WTK overlap with benchmark indices 0-167,
+- u range: -37.500 to 37.127,
+- v range: -39.461 to 38.160,
+- speed range: 0.000 to 44.346,
+- normalization compatible with pretrained PhIRE constants: `compatible=True`, `u_z=0.46`, `v_z=0.10`.
+
+## Candidate C-expanded-2688
+
+Candidate C-expanded-2688 was trained with the same Candidate C objective and hyperparameters as Candidate C-expanded-1344:
+
+```text
+L_C = L_uv
+    + 0.01  L_speed
+    + 0.05  L_grad
+    + 0.25  L_levelset
+    + 0.001 L_crit
+```
+
+Training data:
+
+```text
+example_data_topology_expanded_2688/wind_MR-HR.tfrecord
+```
+
+Evaluation data:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+Candidate C-expanded-2688 output validation:
+
+| Artifact | Shape | Min/max |
+|---|---:|---:|
+| `idx.npy` | `(168,)` | 0 to 167 |
+| `dataIN.npy` | `(168, 100, 100, 2)` | -21.5213 to 26.9345 |
+| `dataGT.npy` | `(168, 500, 500, 2)` | -30.4676 to 30.8122 |
+| `dataSR.npy` | `(168, 500, 500, 2)` | -27.4534 to 29.3187 |
+
+Scalar/physics/domain evaluation completed and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_eval/all_sample_metrics_candidateC_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_eval/pairwise_cnn_vs_candidateC_expanded2688.csv
+```
+
+TTK topology evaluation completed successfully:
+
+| Check | Count |
+|---|---:|
+| VTI files | 336 |
+| PD VTU files | 336 |
+| MT port-0 VTU files | 336 |
+| `phase_c_results.csv` lines | 169 |
+
+Final topology summary:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|---:|
+| CNN | 27.4063 | 5.8678 | — | — | — | — |
+| GAN | 20.8641 | 8.3481 | 166/168 | 20/168 | — | 20/20 |
+| Candidate C-expanded-2688 | 22.4944 | 6.0803 | 168/168 | 52/168 | 20/168 | 10/20 |
+
+Interpretation:
+
+- Candidate C-expanded-2688 improves PD over CNN on all 168 benchmark samples.
+- It improves mean PD further than Candidate C-expanded-1344.
+- It beats GAN on PD for 20/168 samples.
+- It recovers 10/20 original MT-GAN cases.
+- Mean MT remains worse than CNN, so the method improves persistence-style topology more robustly than full merge-tree hierarchy.
+
+## Candidate UV-expanded-2688 ablation
+
+Candidate UV-expanded-2688 is the matched data-volume control for Candidate C-expanded-2688. It trains on the same 2688-sample dataset with the same checkpoint, learning rate, batch size, and epochs, but uses only:
+
+```text
+L_UV = L_uv
+```
+
+All auxiliary weights are zero:
+
+```text
+lambda_speed = lambda_grad = lambda_wpd = lambda_levelset = lambda_crit = 0
+```
+
+Candidate UV-expanded-2688 output validation:
+
+| Artifact | Shape | Min/max |
+|---|---:|---:|
+| `idx.npy` | `(168,)` | 0 to 167 |
+| `dataIN.npy` | `(168, 100, 100, 2)` | -21.5213 to 26.9345 |
+| `dataGT.npy` | `(168, 500, 500, 2)` | -30.4676 to 30.8122 |
+| `dataSR.npy` | `(168, 500, 500, 2)` | -25.9588 to 28.0704 |
+
+Scalar/physics/domain evaluation completed and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_eval/all_sample_metrics_candidateUV_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_eval/pairwise_cnn_vs_candidateUV_expanded2688.csv
+```
+
+TTK topology extraction initially stopped partway, as in earlier candidate runs, but was completed by resuming missing PD/MT files. The final topology report has 168 valid PD and MT entries.
+
+Final UV-expanded-2688 topology summary:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|---:|
+| Candidate UV-expanded-2688 | 29.6121 | 6.0119 | 9/168 | 64/168 | 0/168 | 5/20 |
+
+## Candidate C vs UV at 2688 samples
+
+The 2688-sample ablation directly addresses whether the Candidate C gains are merely a result of fine-tuning on more data.
+
+Topology comparison:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|
+| Candidate UV-expanded-2688 | 29.6121 | 6.0119 | 9/168 | 64/168 | 5/20 |
+| Candidate C-expanded-2688 | 22.4944 | 6.0803 | 168/168 | 52/168 | 10/20 |
+
+Interpretation:
+
+- UV-only fine-tuning improves direct reconstruction metrics but worsens PD relative to CNN.
+- Candidate C-expanded-2688 improves PD strongly relative to CNN and UV.
+- Therefore, the PD improvement is not explained by larger-data fine-tuning alone.
+- Mean MT remains mixed: UV has slightly better mean MT, while Candidate C recovers more of the original MT-GAN cases.
+
+Representative non-topology comparison:
+
+| Metric | CNN | UV-2688 | C-2688 | Main interpretation |
+|---|---:|---:|---:|---|
+| PSNR-UV ↑ | 31.1925 | 33.7892 | 33.4807 | UV best direct reconstruction |
+| Speed MAE ↓ | 0.6941 | 0.4958 | 0.5147 | UV best pointwise speed |
+| Speed RMSE ↓ | 1.1078 | 0.8555 | 0.8796 | UV best pointwise speed |
+| WPD bias abs ↓ | 35.3439 | 31.3033 | 7.9858 | C much better aggregate WPD bias |
+| WPD MAE ↓ | 231.6709 | 158.9769 | 165.9447 | UV slightly better direct WPD error |
+| WPD W1 ↓ | 45.2713 | 39.3927 | 16.1544 | C much better WPD distribution |
+| Gradient MAE ↓ | 0.3491 | 0.3247 | 0.3105 | C best gradient magnitude error |
+| Gradient W1 ↓ | 0.2329 | 0.2496 | 0.1942 | C best gradient distribution |
+| Exceedance p95 abs Δ ↓ | 0.0089 | 0.0062 | 0.0019 | C best high-speed exceedance |
+| Component curve L1 ↓ | 115.5278 | 141.9157 | 112.7014 | C best aggregate component proxy |
+
+Metric-count summary excluding SSIM:
+
+| Scale | C better than CNN | UV better than CNN | C better than matched UV |
+|---|---:|---:|---:|
+| 168-sample pilot | 22/25 | 13/25 | 19/25 |
+| 672 seasonal | 21/25 | 14/25 | 20/25 |
+| 1344 seasonal | 21/25 | 13/25 | 20/25 |
+| 2688 seasonal | 21/25 | 13/25 | 20/25 |
+
+## SSIM status and recomputation plan
+
+SSIM is currently unavailable in the candidate metric CSVs because the Spark environment reports a scikit-image/NumPy binary incompatibility:
+
+```text
+ValueError('numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject')
+```
+
+This is an environment issue, not a model result. Since all candidate output arrays are already saved, SSIM can be recomputed without rerunning training or topology.
+
+Recommended next step:
+
+1. Create a clean isolated Python environment with compatible `numpy` and `scikit-image` versions.
+2. Load `dataGT.npy` and `dataSR.npy` for CNN, UV, and Candidate C.
+3. Compute SSIM consistently on the same 168 benchmark samples, preferably on scalar speed and optionally on the u/v channels separately.
+4. Regenerate or patch only the non-topology metric tables.
+
+Until this is done, report SSIM as unavailable rather than as a win/loss.
