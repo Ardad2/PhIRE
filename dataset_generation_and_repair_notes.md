@@ -5375,3 +5375,132 @@ Recommended next step:
 4. Regenerate or patch only the non-topology metric tables.
 
 Until this is done, report SSIM as unavailable rather than as a win/loss.
+
+---
+
+# Part XII — Recomputed SSIM scale sweep for Candidate C and UV ablations
+
+## Purpose
+
+The original scalar/physics/domain evaluation script produced `NaN` SSIM values because the Spark Python environment had a `scikit-image`/NumPy binary incompatibility. This was an environment issue, not a failure of the saved model outputs. Since every candidate already saved aligned `idx.npy`, `dataGT.npy`, and `dataSR.npy` arrays on the common 168-sample benchmark, SSIM was recomputed as a standalone post-processing pass in a clean Python virtual environment.
+
+This pass was designed to answer two questions:
+
+1. Does Candidate C preserve or improve structural similarity relative to the original CNN baseline?
+2. Are SSIM gains mainly caused by ordinary UV-only fine-tuning, or by Candidate C's auxiliary topology/physics proxy losses?
+
+## Clean SSIM environment
+
+A separate virtual environment was created and verified:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 -m venv .venv_ssim
+PYTHONNOUSERSITE=1 .venv_ssim/bin/python -m pip install --upgrade pip
+PYTHONNOUSERSITE=1 .venv_ssim/bin/python -m pip install \
+  "numpy==1.26.4" \
+  "scikit-image==0.22.0" \
+  "pandas" \
+  "tabulate"
+```
+
+Verification output:
+
+```text
+numpy: 1.26.4
+skimage: 0.22.0
+SSIM import OK: True
+```
+
+The missing `tabulate` dependency only affected Markdown formatting through `pandas.DataFrame.to_markdown()`. The SSIM CSV files had already been written before that formatting failure. Installing `tabulate` allowed the Markdown summary to be generated from the already-written CSVs without recomputing SSIM.
+
+## SSIM definitions
+
+Two SSIM variants were computed for each method/sample:
+
+- `ssim_speed`: SSIM on scalar wind-speed magnitude fields, where `speed = sqrt(u^2 + v^2)`.
+- `ssim_uv_mean`: average of separate SSIM scores on the `u` and `v` vector components.
+
+For the paper, `ssim_speed` is the most topology-aligned SSIM because PD/MT are computed on scalar wind-speed fields. `ssim_uv_mean` is kept as a vector-fidelity side metric.
+
+## Methods evaluated
+
+All methods were evaluated on the same 168-sample corrected benchmark:
+
+- CNN baseline
+- GAN baseline
+- Candidate C pilot, 168 training samples
+- Candidate C-expanded-672
+- Candidate C-expanded-1344
+- Candidate C-expanded-2688
+- Candidate UV pilot, 168 training samples
+- Candidate UV-expanded-672
+- Candidate UV-expanded-1344
+- Candidate UV-expanded-2688
+
+The 168-sample pilot runs are in-corpus/pilot controls. The expanded 672/1344/2688 runs are trained on non-overlapping seasonal windows and evaluated on the fixed 168-sample benchmark.
+
+## Generated SSIM artifacts
+
+The recomputation wrote:
+
+```text
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_per_sample_scale_sweep.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_summary_scale_sweep.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_pairwise_vs_cnn.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_wins_vs_cnn.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_candidateC_vs_UV_by_scale.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_candidateC_vs_UV_by_scale_summary.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_scale_sweep_summary.md
+```
+
+## Summary by method
+
+| Method | Family | Training size | n | Speed SSIM mean | Mean u/v SSIM |
+|---|---|---:|---:|---:|---:|
+| CNN | baseline | baseline | 168 | 0.741175 | 0.771031 |
+| GAN | baseline | baseline | 168 | 0.677418 | 0.698833 |
+| Candidate C | candidateC | 168 | 168 | 0.777743 | 0.809682 |
+| Candidate C-expanded-672 | candidateC | 672 | 168 | 0.794862 | 0.830481 |
+| Candidate C-expanded-1344 | candidateC | 1344 | 168 | 0.804386 | 0.840138 |
+| Candidate C-expanded-2688 | candidateC | 2688 | 168 | 0.812622 | 0.848110 |
+| Candidate UV | candidateUV | 168 | 168 | 0.775180 | 0.811189 |
+| Candidate UV-expanded-672 | candidateUV | 672 | 168 | 0.795236 | 0.835095 |
+| Candidate UV-expanded-1344 | candidateUV | 1344 | 168 | 0.805511 | 0.845448 |
+| Candidate UV-expanded-2688 | candidateUV | 2688 | 168 | 0.813443 | 0.853551 |
+
+## Wins versus CNN
+
+| Method | Training size | Speed SSIM > CNN | Mean delta speed SSIM vs CNN | Mean delta u/v SSIM vs CNN |
+|---|---:|---:|---:|---:|
+| Candidate C | 168 | 166/168 | +0.036568 | +0.038651 |
+| Candidate C-expanded-672 | 672 | 168/168 | +0.053686 | +0.059451 |
+| Candidate C-expanded-1344 | 1344 | 168/168 | +0.063211 | +0.069108 |
+| Candidate C-expanded-2688 | 2688 | 168/168 | +0.071447 | +0.077080 |
+| Candidate UV | 168 | 166/168 | +0.034005 | +0.040159 |
+| Candidate UV-expanded-672 | 672 | 168/168 | +0.054061 | +0.064065 |
+| Candidate UV-expanded-1344 | 1344 | 168/168 | +0.064336 | +0.074417 |
+| Candidate UV-expanded-2688 | 2688 | 168/168 | +0.072268 | +0.082520 |
+| GAN | baseline | 3/168 | -0.063757 | -0.072198 |
+
+## Candidate C versus UV by training size
+
+| Training size | n | C speed SSIM > UV | C u/v SSIM > UV | Mean C - UV speed SSIM | Mean C - UV u/v SSIM |
+|---:|---:|---:|---:|---:|---:|
+| 168 | 168 | 135/168 | 38/168 | +0.002563 | -0.001507 |
+| 672 | 168 | 81/168 | 3/168 | -0.000374 | -0.004614 |
+| 1344 | 168 | 47/168 | 1/168 | -0.001125 | -0.005309 |
+| 2688 | 168 | 54/168 | 2/168 | -0.000821 | -0.005440 |
+
+## Interpretation
+
+The SSIM recomputation confirms that both Candidate C and UV-only fine-tuning improve structural similarity relative to the original CNN baseline. Candidate C-expanded-2688 improves speed SSIM from `0.741175` to `0.812622`, and mean u/v SSIM from `0.771031` to `0.848110`. Therefore, Candidate C's topology improvements are not obtained by degrading structural similarity.
+
+At the same time, UV-only fine-tuning is slightly better than Candidate C on SSIM at larger training sizes. Candidate UV-expanded-2688 reaches speed SSIM `0.813443` and mean u/v SSIM `0.853551`, compared with Candidate C-expanded-2688 at `0.812622` and `0.848110`. This matches the PSNR and pointwise-error pattern: UV-only fine-tuning is the strongest pure reconstruction/SSIM control.
+
+The important conclusion is therefore a trade-off rather than a universal win. UV-only fine-tuning explains much of the SSIM and direct reconstruction improvement, but it does not explain the PD improvement. Candidate UV-expanded-2688 worsens PD relative to CNN, while Candidate C-expanded-2688 strongly improves PD. Thus Candidate C retains most of the SSIM/reconstruction gain from fine-tuning while shifting the scalar field toward persistence-relevant and domain-structured behavior.
+
+## Paper-ready takeaway
+
+> Recomputed SSIM shows that Candidate C does not improve topology by damaging conventional structural quality. Candidate C-expanded-2688 improves speed SSIM from 0.7412 to 0.8126 relative to CNN. UV-only fine-tuning is slightly higher on SSIM, indicating that SSIM gains are primarily driven by ordinary reconstruction fine-tuning. However, UV does not reproduce Candidate C's PD improvement, so Candidate C's contribution is best framed as a topology-aware trade-off: it preserves most SSIM and pointwise-fidelity gains while producing substantially better persistence-style topology and structure-sensitive domain behavior.
