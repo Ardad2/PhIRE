@@ -88,6 +88,16 @@ _PROTECTED = [
 
 _EPS = 1e-8
 
+# Normalization constants matching the TF1 PhIRE/Candidate B/C convention
+# (PhIREGANs' mu_sig=[[0.7684, -0.4575], [5.02455, 5.9017]]). dataSR.npy /
+# dataGT.npy are already physical (denormalized) [u, v] -- see
+# PhIREGANs.test_paired(), which applies `mu_sig[1]*batch + mu_sig[0]`
+# before saving. L_uv must be computed on NORMALIZED [u, v] to match
+# sr_network.py's content_loss (computed on normalized x_HR/x_SR); the
+# scalar-speed losses below intentionally keep operating on physical units.
+_MU_UV    = (0.7684, -0.4575)
+_SIGMA_UV = (5.02455, 5.9017)
+
 
 # ── Model ─────────────────────────────────────────────────────────────────────
 
@@ -141,8 +151,17 @@ def _grad_mag_t(s: torch.Tensor) -> torch.Tensor:
     return torch.sqrt(dx * dx + dy * dy + _EPS)
 
 
+def _normalize_uv(uv: torch.Tensor) -> torch.Tensor:
+    """(B, 2, H, W) physical [u, v] -> normalized [u, v] (see _MU_UV/_SIGMA_UV)."""
+    mu    = torch.tensor(_MU_UV,    dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    sigma = torch.tensor(_SIGMA_UV, dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    return (uv - mu) / sigma
+
+
 def l_uv(sr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-    return F.mse_loss(sr, gt)
+    """MSE on NORMALIZED [u, v] (matches sr_network.py's content_loss).
+    sr/gt are physical [u, v] as loaded from dataSR.npy/dataGT.npy."""
+    return F.mse_loss(_normalize_uv(sr), _normalize_uv(gt))
 
 
 def l_speed(sr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
