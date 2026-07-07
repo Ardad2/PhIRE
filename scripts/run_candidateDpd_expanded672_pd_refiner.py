@@ -1,14 +1,8 @@
 #!/usr/bin/env python3
 """
-Candidate Dpd-expanded-672: PyTorch residual refiner with genuine direct PD
-Wasserstein loss, trained on expanded 672-sample seasonal CNN SR outputs,
-evaluated on the original corrected 168-sample benchmark.
-
-This script is the genuine PD-loss variant of candidateD_expanded672.
-The only difference from candidateD_expanded672 is LAMBDA_PD:
-
-    candidateD_expanded672   — lambda_pd = 0.0  (PD diagnostic only; pilot-faithful)
-    candidateDpd_expanded672 — lambda_pd = 0.001904  (genuine PD training)
+Candidate D-expanded-672: PyTorch residual refiner with PD Wasserstein loss,
+trained on expanded 672-sample seasonal CNN SR outputs, evaluated on the
+original corrected 168-sample benchmark.
 
 Architecture (unchanged from Candidate D pilot)
 -----------------------------------------------
@@ -19,21 +13,17 @@ RefinerNet is a small residual CNN that post-processes frozen baseline CNN SR:
 body is zero-initialized, so SR_D == SR_CNN at t=0.  Gradients flow only
 through the RefinerNet parameters; the pretrained PhIRE CNN is never touched.
 
-Loss configuration
-------------------
+Loss configuration (unchanged from Candidate D pilot)
+------------------------------------------------------
     L_total = L_uv
-            + 0.01    * L_speed
-            + 0.05    * L_grad
-            + 0.001   * L_crit      (pool-3 maxima proxy, z=1.0)
-            + 0.001904 * L_PD       (PD Wasserstein-2; genuine training)
+            + 0.01  * L_speed
+            + 0.05  * L_grad
+            + 0.001 * L_crit    (pool-3 maxima proxy, z=1.0)
+            + 0.0   * L_PD      (PD Wasserstein; lambda_pd=0 → monitoring only)
 
-LAMBDA_PD = 0.001904 targets 10% of L_uv, as recommended by the Candidate D
-pilot diagnostic (L_PD / L_uv ≈ 52.5× on synthetic data →
-lambda_pd = 0.10 / 52.5 ≈ 0.001904).
-
-L_PD is the Wasserstein-2 distance between superlevel-set persistence diagrams
-of GT-normalized scalar wind speed, computed via torch_topological
-CubicalComplex on a 100×100 spatial crop.
+lambda_pd=0 matches the Candidate D pilot.  PD gradients are verified at
+startup so lambda_pd can be raised if desired.  Recommended lambda_pd values
+from the pilot diagnostic (on synthetic data): 0.001904 (10%), 0.004759 (25%).
 
 Workflow
 --------
@@ -43,7 +33,7 @@ Phase 1  Train RefinerNet for 3 epochs on expanded 672-sample CNN SR outputs.
            SR=dataSR.npy (672, 500, 500, 2)  GT=dataGT.npy (672, 500, 500, 2)
 Phase 2  Apply trained RefinerNet to 168-sample benchmark CNN SR outputs.
          Eval input:  data_out_fixed/wind_mrhr_cnn/
-         Output:      data_out/wind_finetune_candidateDpd_expanded672/
+         Output:      data_out/wind_finetune_candidateD_expanded672/
            dataSR.npy (168, 500, 500, 2)   dataGT.npy (168, 500, 500, 2)
            dataIN.npy (168, 100, 100, 2)   idx.npy    (168,)
 Phase 3  Validate output shapes + print min/max.
@@ -51,6 +41,10 @@ Phase 3  Validate output shapes + print min/max.
 Generating the expanded CNN SR training arrays (TF1 PhIREGANs, on Spark)
 -------------------------------------------------------------------------
 If data_out/wind_mrhr_cnn_expanded672/ does not exist, run first:
+
+    python3 scripts/generate_cnn_expanded672_inference.py
+
+or manually:
 
     python3 - <<'PY'
     import sys; sys.path.insert(0, '.')
@@ -74,13 +68,13 @@ Environment
 -----------
 Requires either:
     micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \\
-        python scripts/run_candidateDpd_expanded672_pd_refiner.py
+        python scripts/run_candidateD_expanded672_pd_refiner.py
 or:
-    .venv_candidateD_pd/bin/python scripts/run_candidateDpd_expanded672_pd_refiner.py
+    .venv_candidateD_pd/bin/python scripts/run_candidateD_expanded672_pd_refiner.py
 
 Do NOT add external tee — this script mirrors stdout/stderr to the log file
 internally:
-    logs/wind_finetune_candidateDpd_expanded672.log
+    logs/wind_finetune_candidateD_expanded672.log
 
 GUDHI compatibility
 -------------------
@@ -90,13 +84,13 @@ See docs/candidateD_pd_gradient_smoke.md for details.
 
 Scientific motivation
 ---------------------
-CandidateDpd-expanded-672 is the genuine direct PD-loss run on the expanded
-dataset.  Comparison with:
-  candidateD_expanded672    — same setup but lambda_pd=0 (confirms PD adds value)
-  candidateUV_expanded672   — isolates contribution of all aux losses including PD
-  candidateB_expanded672    — soft level-set vs PD on expanded data
-  candidateC_expanded672    — extrema proxy vs PD on expanded data
-  candidateD (pilot, 168)   — expanded data effect with genuine PD loss
+CandidateD-expanded-672 tests whether the direct differentiable PD-loss
+approach generalises when trained on the same non-overlapping 672-sample
+seasonal dataset used by CandidateUV/B/C-expanded.  Comparison with:
+  candidateUV_expanded672 — isolates contribution of L_speed/L_grad/L_crit/L_PD
+  candidateB_expanded672  — isolates contribution of soft level-set vs PD
+  candidateC_expanded672  — isolates contribution of L_PD vs L_crit
+  candidateD (pilot)      — isolates effect of expanded training data
 
 Normalisation constants (pretrained PhIRE; never changed)
   mu  = [0.7684, -0.4575]
@@ -114,7 +108,6 @@ Protected directories — never overwritten:
   data_out/wind_finetune_candidateUV_expanded672/
   data_out/wind_finetune_candidateB_expanded672/
   data_out/wind_finetune_candidateC_expanded672/
-  data_out/wind_finetune_candidateD_expanded672/
   example_data_fixed/
   example_data_topology_expanded_672/
   models_fixed/topology_finetuning/wind_finetune_pilot_candidateB/
@@ -126,7 +119,6 @@ Protected directories — never overwritten:
   models_fixed/topology_finetuning/wind_finetune_candidateUV_expanded672/
   models_fixed/topology_finetuning/wind_finetune_candidateB_expanded672/
   models_fixed/topology_finetuning/wind_finetune_candidateC_expanded672/
-  models_fixed/topology_finetuning/wind_finetune_candidateD_expanded672/
 """
 
 from __future__ import annotations
@@ -157,9 +149,9 @@ TRAIN_CNN_DIR = REPO_ROOT / 'data_out' / 'wind_mrhr_cnn_expanded672'
 EVAL_CNN_DIR  = REPO_ROOT / 'data_out_fixed' / 'wind_mrhr_cnn'
 
 # Outputs
-MODEL_DIR = REPO_ROOT / 'models_fixed' / 'topology_finetuning' / 'wind_finetune_candidateDpd_expanded672'
-OUT_DIR   = REPO_ROOT / 'data_out' / 'wind_finetune_candidateDpd_expanded672'
-LOG_PATH  = REPO_ROOT / 'logs' / 'wind_finetune_candidateDpd_expanded672.log'
+MODEL_DIR = REPO_ROOT / 'models_fixed' / 'topology_finetuning' / 'wind_finetune_candidateD_expanded672'
+OUT_DIR   = REPO_ROOT / 'data_out' / 'wind_finetune_candidateD_expanded672'
+LOG_PATH  = REPO_ROOT / 'logs' / 'wind_finetune_candidateD_expanded672.log'
 
 _PROTECTED = [
     REPO_ROOT / 'data_out_fixed' / 'wind_mrhr_cnn',
@@ -173,7 +165,6 @@ _PROTECTED = [
     REPO_ROOT / 'data_out' / 'wind_finetune_candidateUV_expanded672',
     REPO_ROOT / 'data_out' / 'wind_finetune_candidateB_expanded672',
     REPO_ROOT / 'data_out' / 'wind_finetune_candidateC_expanded672',
-    REPO_ROOT / 'data_out' / 'wind_finetune_candidateD_expanded672',
     REPO_ROOT / 'example_data_fixed',
     REPO_ROOT / 'example_data_topology_expanded_672',
     REPO_ROOT / 'models_fixed' / 'topology_finetuning' / 'wind_finetune_pilot_candidateB',
@@ -185,18 +176,17 @@ _PROTECTED = [
     REPO_ROOT / 'models_fixed' / 'topology_finetuning' / 'wind_finetune_candidateUV_expanded672',
     REPO_ROOT / 'models_fixed' / 'topology_finetuning' / 'wind_finetune_candidateB_expanded672',
     REPO_ROOT / 'models_fixed' / 'topology_finetuning' / 'wind_finetune_candidateC_expanded672',
-    REPO_ROOT / 'models_fixed' / 'topology_finetuning' / 'wind_finetune_candidateD_expanded672',
 ]
 
 # ---------------------------------------------------------------------------
-# Loss configuration
+# Loss configuration — matches Candidate D pilot exactly
 # ---------------------------------------------------------------------------
-LR             = 1e-4    # Adam learning rate (same as Candidate D pilot)
+LR             = 1e-4    # Adam learning rate (pilot: 0.0001)
 EPOCHS         = 3
 LAMBDA_SPEED   = 0.01
 LAMBDA_GRAD    = 0.05
 LAMBDA_CRIT    = 0.001
-LAMBDA_PD      = 0.001904  # 10% of L_uv; from pilot diagnostic (L_PD/L_uv ≈ 52.5×)
+LAMBDA_PD      = 0.0     # PD Wasserstein weight (pilot ran with 0; monitoring only)
 PD_CROP_SIZE   = 100     # Spatial crop for L_PD (100×100)
 PD_EVERY       = 1       # Compute L_PD every N steps
 RESIDUAL_SCALE = 0.1
@@ -206,6 +196,16 @@ N_TRAIN   = 672   # expected training samples
 N_EVAL    = 168   # expected evaluation samples
 
 _EPS = 1e-8
+
+# Normalization constants matching the TF1 PhIRE/Candidate B/C convention
+# (PhIREGANs' mu_sig=[[0.7684, -0.4575], [5.02455, 5.9017]]). dataSR.npy /
+# dataGT.npy are already physical (denormalized) [u, v] -- see
+# PhIREGANs.test_paired(), which applies `mu_sig[1]*batch + mu_sig[0]`
+# before saving. L_uv must be computed on NORMALIZED [u, v] to match
+# sr_network.py's content_loss (computed on normalized x_HR/x_SR); the
+# scalar-speed losses below intentionally keep operating on physical units.
+_MU_UV    = (0.7684, -0.4575)
+_SIGMA_UV = (5.02455, 5.9017)
 
 # ---------------------------------------------------------------------------
 # _Tee: mirror stdout/stderr to log file (same pattern as expanded scripts)
@@ -253,7 +253,7 @@ def _apply_gudhi_compat_patch() -> str:
             "torch_topological not found.\n"
             "Run inside .mamba_candidateD_pd or .venv_candidateD_pd:\n"
             "  micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \\\n"
-            "      python scripts/run_candidateDpd_expanded672_pd_refiner.py"
+            "      python scripts/run_candidateD_expanded672_pd_refiner.py"
         )
 
     src_path = Path(_mod.__file__)
@@ -372,8 +372,17 @@ def _grad_mag_t(s: torch.Tensor) -> torch.Tensor:
     return torch.sqrt(dx * dx + dy * dy + _EPS)
 
 
+def _normalize_uv(uv: torch.Tensor) -> torch.Tensor:
+    """(B, 2, H, W) physical [u, v] -> normalized [u, v] (see _MU_UV/_SIGMA_UV)."""
+    mu    = torch.tensor(_MU_UV,    dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    sigma = torch.tensor(_SIGMA_UV, dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    return (uv - mu) / sigma
+
+
 def l_uv(sr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
-    return F.mse_loss(sr, gt)
+    """MSE on NORMALIZED [u, v] (matches sr_network.py's content_loss).
+    sr/gt are physical [u, v] as loaded from dataSR.npy/dataGT.npy."""
+    return F.mse_loss(_normalize_uv(sr), _normalize_uv(gt))
 
 
 def l_speed(sr: torch.Tensor, gt: torch.Tensor) -> torch.Tensor:
@@ -494,7 +503,7 @@ def _safety_check() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Training epoch
+# Training epoch  (identical logic to Candidate D pilot)
 # ---------------------------------------------------------------------------
 
 def run_epoch(
@@ -513,7 +522,7 @@ def run_epoch(
     random.shuffle(indices)
 
     running = {k: 0.0 for k in ('uv', 'speed', 'grad', 'crit', 'pd', 'total')}
-    pd_checked_grad = False  # LAMBDA_PD > 0: verify gradient flow on first PD step
+    pd_checked_grad = (LAMBDA_PD == 0.0)  # skip check if lambda_pd=0
 
     for step, i in enumerate(indices):
         sr_t = torch.tensor(sr_all[i:i+1], device=device)
@@ -534,28 +543,28 @@ def run_epoch(
             + LAMBDA_CRIT  * val_crit
         )
 
-        # L_PD: genuine training term (LAMBDA_PD = 0.001904; computed every step)
-        val_pd = l_pd(refined, gt_t, cubical, w_loss_fn, crop=PD_CROP_SIZE)
-        if torch.isnan(val_pd) or torch.isinf(val_pd):
-            raise RuntimeError(
-                f"L_PD is NaN/inf at epoch {epoch} step {step}. Aborting. "
-                "Try reducing LAMBDA_PD or PD_CROP_SIZE."
-            )
-        loss = loss + LAMBDA_PD * val_pd
+        val_pd = torch.zeros((), device=device)
+        use_pd = (LAMBDA_PD > 0.0) and (step % PD_EVERY == 0)
+        if use_pd:
+            val_pd = l_pd(refined, gt_t, cubical, w_loss_fn, crop=PD_CROP_SIZE)
+            if torch.isnan(val_pd) or torch.isinf(val_pd):
+                raise RuntimeError(
+                    f"L_PD is NaN/inf at epoch {epoch} step {step}. Aborting. "
+                    "Try reducing LAMBDA_PD or PD_CROP_SIZE."
+                )
+            loss = loss + LAMBDA_PD * val_pd
 
         loss.backward()
 
-        # Verify PD gradients reach model params on the first step of every epoch
-        if not pd_checked_grad:
+        if use_pd and not pd_checked_grad:
             has_grad = any(
                 p.grad is not None and (p.grad != 0).any()
                 for p in model.parameters()
             )
             if not has_grad:
                 raise RuntimeError(
-                    f"LAMBDA_PD={LAMBDA_PD} > 0 but L_PD produced no gradients to "
-                    "model parameters at epoch %d step %d. "
-                    "Check GUDHI patch. Aborting." % (epoch, step)
+                    "LAMBDA_PD > 0 but L_PD produced no gradients to model parameters. "
+                    "Check GUDHI patch. Aborting."
                 )
             pd_checked_grad = True
             logging.info('[train] PD gradient check passed at epoch %d step %d.', epoch, step)
@@ -682,7 +691,7 @@ def main() -> None:
 
     # ── Banner ───────────────────────────────────────────────────────────
     print('=' * 64)
-    print('Candidate Dpd-expanded-672: genuine PD-loss residual refiner')
+    print('Candidate D-expanded-672: PD residual refiner')
     print('=' * 64)
     print(f'  Training CNN SR  : {TRAIN_CNN_DIR}')
     print(f'  Eval CNN SR      : {EVAL_CNN_DIR}')
@@ -693,19 +702,17 @@ def main() -> None:
     print('  Architecture:')
     print('    SR_D = SR_CNN + 0.1 * body(SR_CNN)  [body zero-init]')
     print()
-    print('  Loss configuration (genuine PD training):')
+    print('  Loss configuration (Candidate D pilot — unchanged):')
     print(f'  lambda_speed = {LAMBDA_SPEED}')
     print(f'  lambda_grad  = {LAMBDA_GRAD}')
     print(f'  lambda_crit  = {LAMBDA_CRIT}  (pool=3, z=1.0)')
-    print(f'  lambda_pd    = {LAMBDA_PD}  (PD Wasserstein-2; genuine training)')
-    print(f'    [lambda_pd targets 10% of L_uv; from pilot diagnostic L_PD/L_uv≈52.5×]')
+    print(f'  lambda_pd    = {LAMBDA_PD}    (PD Wasserstein; 0 = monitoring only)')
     print()
-    print('  Hyperparameters:')
+    print('  Hyperparameters (Candidate D pilot — unchanged):')
     print(f'  lr             = {LR}')
     print(f'  epochs         = {EPOCHS}')
     print(f'  residual_scale = {RESIDUAL_SCALE}')
     print(f'  pd_crop_size   = {PD_CROP_SIZE}')
-    print(f'  pd_every       = {PD_EVERY}  (L_PD computed every step)')
     print(f'  seed           = {SEED}')
     print()
     print('  Normalisation (pretrained; unchanged):')
@@ -784,16 +791,20 @@ def main() -> None:
     # ── Phase 1: Training on 672-sample expanded CNN SR outputs ───────────
     print('=' * 64)
     print('Phase 1: Training on 672-sample expanded CNN SR outputs')
-    print(f'         lambda_pd = {LAMBDA_PD} (genuine PD training)')
     print('=' * 64)
 
     logger.info('Loading training data …')
     sr_train, gt_train, _inp_train, _idx_train = load_data(TRAIN_CNN_DIR)
     logger.info('Training arrays: SR=%s  GT=%s', sr_train.shape, gt_train.shape)
-    logger.info(
-        'lambda_pd=%.6f — L_PD computed every %d steps and included in L_total.',
-        LAMBDA_PD, PD_EVERY,
-    )
+
+    if LAMBDA_PD == 0.0:
+        logger.info(
+            'lambda_pd=0 — L_PD excluded from training loss (diagnostic monitoring only).'
+        )
+    else:
+        logger.info(
+            'lambda_pd=%.4g — L_PD will be computed every %d steps.', LAMBDA_PD, PD_EVERY
+        )
 
     optimizer  = torch.optim.Adam(model.parameters(), lr=LR)
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
@@ -855,17 +866,17 @@ def main() -> None:
     print('Next steps:')
     print('  Evaluate:')
     print('    python3 scripts/evaluate_finetune_candidate.py \\')
-    print('      --candidate-name candidateDpd_expanded672 \\')
-    print('      --candidate-dir  data_out/wind_finetune_candidateDpd_expanded672 \\')
+    print('      --candidate-name candidateD_expanded672 \\')
+    print('      --candidate-dir  data_out/wind_finetune_candidateD_expanded672 \\')
     print('      --cnn-dir        data_out_fixed/wind_mrhr_cnn \\')
     print('      --gan-dir        data_out_fixed/wind_mrhr_gan \\')
     print('      --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \\')
-    print('      --out-dir        ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval')
+    print('      --out-dir        ttk_runs_fixed/topology_finetuning/candidateD_expanded672_eval')
     print()
     print('  TTK topology pipeline:')
     print('    bash scripts/run_candidate_topology_pipeline.sh \\')
-    print('      --method   candidateDpd_expanded672 \\')
-    print('      --data-dir data_out/wind_finetune_candidateDpd_expanded672')
+    print('      --method   candidateD_expanded672 \\')
+    print('      --data-dir data_out/wind_finetune_candidateD_expanded672')
     print('=' * 64)
 
 

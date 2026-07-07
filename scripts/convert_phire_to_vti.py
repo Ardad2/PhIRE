@@ -95,6 +95,20 @@ def load_sample(npy_path: str, idx: int) -> np.ndarray:
 def make_vti_from_scalar(scalar_2d: np.ndarray, array_name: str, out_vti: str, ascii: bool = True) -> None:
     """
     Write a 2D scalar field as VTK ImageData (.vti). Uses x=width (cols), y=height (rows).
+
+    Coordinate convention: scalar_2d[y, x] -> VTK point (x, y). VTK's
+    vtkImageData stores points with pointId = ix + iy*dimX (x varies
+    fastest). SetDimensions(W, H, 1) declares dimX=W, so the flat buffer
+    handed to VTK must vary the array's column axis (W, x) fastest and its
+    row axis (H, y) slowest -- i.e. ordinary C/row-major order. Using
+    ravel(order="C") on a (H, W) array does exactly this: flat[ix + iy*W]
+    == scalar_2d[iy, ix], matching the stated convention.
+
+    (Historical note: an earlier version used ravel(order="F"), which
+    varies the row axis fastest instead -- this silently transposed every
+    written field for square patches, and produced fully scrambled data for
+    non-square ones. See docs/candidateD_E_topology_audit.md Section 2.3 and
+    docs/candidateD_E_infra_fix_notes.md.)
     """
     scalar_2d = np.asarray(scalar_2d, dtype=np.float32)
     if scalar_2d.ndim != 2:
@@ -108,8 +122,9 @@ def make_vti_from_scalar(scalar_2d: np.ndarray, array_name: str, out_vti: str, a
     img.SetSpacing(1.0, 1.0, 1.0)
     img.SetOrigin(0.0, 0.0, 0.0)
 
-    # VTK expects data ordered with x varying fastest; ravel(order="F") is reliable here.
-    flat = np.ascontiguousarray(scalar_2d).ravel(order="F")
+    # VTK expects data ordered with x (the W axis) varying fastest; ordinary
+    # C/row-major ravel of a (H, W) array does this: flat[ix + iy*W] == scalar_2d[iy, ix].
+    flat = np.ascontiguousarray(scalar_2d).ravel(order="C")
     vtk_arr = numpy_to_vtk(flat, deep=True, array_type=vtk.VTK_FLOAT)
     vtk_arr.SetName(array_name)
 
