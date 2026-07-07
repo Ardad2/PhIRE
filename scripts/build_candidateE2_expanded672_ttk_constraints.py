@@ -60,6 +60,7 @@ See also:
 
 from __future__ import annotations
 
+import argparse
 import re
 import subprocess
 import sys
@@ -76,16 +77,21 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 GT_PATH  = REPO_ROOT / "data_out" / "wind_mrhr_cnn_expanded672" / "dataGT.npy"
 IDX_PATH = REPO_ROOT / "data_out" / "wind_mrhr_cnn_expanded672" / "idx.npy"
 
-OUT_DIR  = (
+# Historical defaults (unchanged): used when --out-dir/--vti-dir/--pd-dir are
+# not passed on the command line, so old invocations keep working exactly as
+# before. Pass --out-dir (and optionally --vti-dir/--pd-dir/--vti-label) to
+# write to a fresh location instead of overwriting these -- e.g. to rebuild
+# constraints against the fixed VTI writer without touching the pre-fix
+# candidateE2_expanded672_constraints/ output.
+_DEFAULT_OUT_DIR  = (
     REPO_ROOT
     / "ttk_runs_fixed"
     / "topology_finetuning"
     / "candidateE2_expanded672_constraints"
 )
-OUT_NPZ  = OUT_DIR / "ttk_pd_critical_pairs_gtvalues.npz"
-WORK_DIR = OUT_DIR / "work"
-VTI_DIR  = WORK_DIR / "vti"
-PD_DIR   = WORK_DIR / "pd"
+_DEFAULT_VTI_DIR  = _DEFAULT_OUT_DIR / "work" / "vti"
+_DEFAULT_PD_DIR   = _DEFAULT_OUT_DIR / "work" / "pd"
+_DEFAULT_VTI_LABEL = "candidateE2expanded672_GT"
 
 # ---------------------------------------------------------------------------
 # Parameters (matching Candidate E pilot for comparability)
@@ -97,9 +103,24 @@ DOCKER_IMAGE     = "phire-ttk:latest"
 THREADS          = 4         # TTK threads per VTI; each TTK call is sequential
 N_EXPECTED       = 672
 
-# VTI filename label (must not contain spaces; _s{wtk_idx}_ embeds sample index)
-_VTI_LABEL       = "candidateE2expanded672_GT"
 _SAMPLE_IDX_RE   = re.compile(r"_s(\d+)_")
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--out-dir", type=Path, default=None,
+                    help=f"Output directory for the constraints NPZ "
+                         f"(default: {_DEFAULT_OUT_DIR})")
+    p.add_argument("--vti-dir", type=Path, default=None,
+                    help="Directory to write GT VTI files to "
+                         "(default: <out-dir>/work/vti)")
+    p.add_argument("--pd-dir", type=Path, default=None,
+                    help="Directory for TTK's VTU output "
+                         "(default: <out-dir>/work/pd)")
+    p.add_argument("--vti-label", type=str, default=_DEFAULT_VTI_LABEL,
+                    help=f"VTI filename label prefix (default: {_DEFAULT_VTI_LABEL})")
+    return p
 
 
 # ---------------------------------------------------------------------------
@@ -145,13 +166,22 @@ def _write_vti_ascii(
     """
     Write a 2D scalar field as an ASCII VTK ImageData (.vti) file.
 
-    Data layout matches make_vti_from_scalar in convert_phire_to_vti.py:
-    - SetDimensions(W, H, 1) → VTK point i at (ix=i%W, iy=i//W)
-    - Values written with F-order ravel: flat[i] = field[i%H, i//H]
-    - For our square 160×160 patch F-order == C-order (identical arrays)
+    Coordinate convention: field2d[y, x] -> VTK point (x, y), matching the
+    fixed make_vti_from_scalar in convert_phire_to_vti.py. VTK point i is at
+    (ix=i%W, iy=i//W) given SetDimensions(W, H, 1) (x fastest), so the flat
+    buffer must vary the column axis (W, x) fastest -- ordinary C/row-major
+    ravel of a (H, W) array: flat[i] = field[i//W, i%W].
+
+    (Historical note: an earlier version used ravel(order="F"), which
+    varies the row axis fastest instead and incorrectly claimed "F-order ==
+    C-order" for square patches -- that claim is false in general (it only
+    holds if the field happens to be symmetric across its diagonal, which
+    wind fields are not) and silently transposed every constraint vertex
+    coordinate. See docs/candidateD_E_topology_audit.md Section 2.3 and
+    docs/candidateD_E_infra_fix_notes.md.)
     """
     H, W = field2d.shape
-    flat  = field2d.astype(np.float32).ravel(order="F")
+    flat  = field2d.astype(np.float32).ravel(order="C")
 
     # Write 8 values per line for readability
     chunks = []
@@ -407,13 +437,29 @@ def _sanity_check(gt: np.ndarray, idx_all: np.ndarray, npz_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    args = build_arg_parser().parse_args()
+
+    out_dir   = args.out_dir if args.out_dir is not None else _DEFAULT_OUT_DIR
+    out_npz   = out_dir / "ttk_pd_critical_pairs_gtvalues.npz"
+    work_dir  = out_dir / "work"
+    vti_dir   = args.vti_dir if args.vti_dir is not None else (
+        _DEFAULT_VTI_DIR if args.out_dir is None else work_dir / "vti"
+    )
+    pd_dir    = args.pd_dir if args.pd_dir is not None else (
+        _DEFAULT_PD_DIR if args.out_dir is None else work_dir / "pd"
+    )
+    vti_label = args.vti_label
+
     print("=" * 64)
     print("Build CandidateE2-expanded-672 TTK constraints (faithful)")
     print("=" * 64)
     print(f"  GT input    : {GT_PATH}")
     print(f"  IDX input   : {IDX_PATH}")
-    print(f"  Output NPZ  : {OUT_NPZ}")
-    print(f"  Work dir    : {WORK_DIR}")
+    print(f"  Output NPZ  : {out_npz}")
+    print(f"  Work dir    : {work_dir}")
+    print(f"  VTI dir     : {vti_dir}")
+    print(f"  PD dir      : {pd_dir}")
+    print(f"  VTI label   : {vti_label}")
     print(f"  PATCH       : {PATCH}")
     print(f"  TOP_K       : {TOP_K}")
     print(f"  PERS_FRAC   : {PERSISTENCE_FRAC}")
@@ -484,22 +530,22 @@ def main() -> None:
     print()
 
     # ── Phase 2: Write VTI files ──────────────────────────────────────────
-    VTI_DIR.mkdir(parents=True, exist_ok=True)
-    vti_paths = sorted(VTI_DIR.glob(f"{_VTI_LABEL}_s*.vti"))
+    vti_dir.mkdir(parents=True, exist_ok=True)
+    vti_paths = sorted(vti_dir.glob(f"{vti_label}_s*.vti"))
     if len(vti_paths) == N_EXPECTED:
-        print(f"[phase2] {N_EXPECTED} VTI files already exist in {VTI_DIR} — skipping.")
+        print(f"[phase2] {N_EXPECTED} VTI files already exist in {vti_dir} — skipping.")
     else:
-        print(f"[phase2] Writing {N_EXPECTED} ASCII VTI files to {VTI_DIR} …")
+        print(f"[phase2] Writing {N_EXPECTED} ASCII VTI files to {vti_dir} …")
         t0 = time.perf_counter()
         for i in range(N_EXPECTED):
             wtk_idx = int(idx_all[i])
             speed_crop = _speed(np.asarray(gt[i, :PATCH, :PATCH, :]))
-            vti_name = f"{_VTI_LABEL}_s{wtk_idx}_speed_p{PATCH}_x0_y0.vti"
-            _write_vti_ascii(VTI_DIR / vti_name, speed_crop)
+            vti_name = f"{vti_label}_s{wtk_idx}_speed_p{PATCH}_x0_y0.vti"
+            _write_vti_ascii(vti_dir / vti_name, speed_crop)
             if (i + 1) % 100 == 0 or i == 0:
                 print(f"  [{i + 1:4d}/{N_EXPECTED}]  {vti_name}")
         elapsed = time.perf_counter() - t0
-        vti_paths = sorted(VTI_DIR.glob(f"{_VTI_LABEL}_s*.vti"))
+        vti_paths = sorted(vti_dir.glob(f"{vti_label}_s*.vti"))
         print(f"  Written {len(vti_paths)} VTI files in {elapsed:.1f}s")
         if len(vti_paths) != N_EXPECTED:
             sys.exit(
@@ -508,27 +554,27 @@ def main() -> None:
     print()
 
     # ── Phase 3: Run TTK via Docker ────────────────────────────────────────
-    n_vtu_existing = len(list(PD_DIR.glob("*_port_0.vtu")))
+    n_vtu_existing = len(list(pd_dir.glob("*_port_0.vtu")))
     if n_vtu_existing >= N_EXPECTED:
         print(
-            f"[phase3] {n_vtu_existing} *_port_0.vtu files already exist in {PD_DIR} — "
+            f"[phase3] {n_vtu_existing} *_port_0.vtu files already exist in {pd_dir} — "
             "skipping Docker run."
         )
     else:
-        _run_ttk_docker(VTI_DIR, PD_DIR)
+        _run_ttk_docker(vti_dir, pd_dir)
     print()
 
     # ── Phase 4: Discover VTU files ───────────────────────────────────────
     # TTK writes: {prefix}_pd_port_0.vtu  for ttkPersistenceDiagramCmd
-    vtu_files = sorted(PD_DIR.glob("*_port_0.vtu"))
+    vtu_files = sorted(pd_dir.glob("*_port_0.vtu"))
     if len(vtu_files) == 0:
         # Fallback: any .vtu (handles TTK versions that don't append _port_0)
-        vtu_files = sorted(PD_DIR.glob("*.vtu"))
+        vtu_files = sorted(pd_dir.glob("*.vtu"))
 
-    print(f"[phase4] Found {len(vtu_files)} VTU files in {PD_DIR}")
+    print(f"[phase4] Found {len(vtu_files)} VTU files in {pd_dir}")
     if len(vtu_files) == 0:
         sys.exit(
-            f"[error] No VTU files found in {PD_DIR}.\n"
+            f"[error] No VTU files found in {pd_dir}.\n"
             "  Check Docker logs above for TTK errors."
         )
 
@@ -645,10 +691,10 @@ def main() -> None:
     print()
 
     # ── Phase 7: Write NPZ ────────────────────────────────────────────────
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    print(f"[phase7] Writing: {OUT_NPZ}")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    print(f"[phase7] Writing: {out_npz}")
     np.savez(
-        str(OUT_NPZ),
+        str(out_npz),
         n_samples    = np.int64(N_EXPECTED),
         sample_idx   = sample_idx_arr,
         sample_start = sample_start_arr,
@@ -661,7 +707,7 @@ def main() -> None:
     )
 
     # Quick structural verification
-    check = np.load(str(OUT_NPZ), allow_pickle=True)
+    check = np.load(str(out_npz), allow_pickle=True)
     required = {
         "n_samples", "sample_idx", "sample_start", "sample_count",
         "birth_vid", "death_vid", "birth_val", "death_val", "persistence",
@@ -685,14 +731,14 @@ def main() -> None:
     print()
 
     # ── Phase 8: Sanity check ─────────────────────────────────────────────
-    _sanity_check(gt, idx_all, OUT_NPZ)
+    _sanity_check(gt, idx_all, out_npz)
 
     # ── Done ──────────────────────────────────────────────────────────────
     print()
     print("=" * 64)
     print("Done.")
-    print(f"  Output NPZ : {OUT_NPZ}")
-    print(f"  Work dir   : {WORK_DIR}  (VTI + VTU files kept for inspection)")
+    print(f"  Output NPZ : {out_npz}")
+    print(f"  Work dir   : {work_dir}  (VTI + VTU files kept for inspection)")
     print()
     print("Next step: train CandidateE2-expanded-672:")
     print("  micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \\")

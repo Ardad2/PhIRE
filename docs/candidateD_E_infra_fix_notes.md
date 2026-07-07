@@ -178,3 +178,56 @@ record), anything under `data_out*/`, `ttk_runs*/`, `models_fixed/`, or any
 other existing experiment artifact.
 
 Not committed or pushed, per instructions.
+
+---
+
+## 5. Update — Step 3: E2 constraint regeneration (Section 2.3 continued)
+
+**Important discovery:** `build_candidateE2_expanded672_ttk_constraints.py`
+does **not** call `make_vti_from_scalar()` from `convert_phire_to_vti.py` —
+it has its own independent ASCII VTI writer, `_write_vti_ascii()`, with the
+exact same `ravel(order="F")` bug, plus an incorrect comment claiming
+"F-order == C-order" for square patches (false in general — see Section
+2.3 of `candidateD_E_topology_audit.md`; it only holds for a
+diagonally-symmetric field, which wind fields are not). **Fixing
+`convert_phire_to_vti.py` alone did not fix the E2 constraint pipeline.**
+This has now also been fixed (`ravel(order="C")`, corrected docstring).
+
+**CLI changes** (minimal, old defaults unchanged): added `--out-dir`,
+`--vti-dir`, `--pd-dir`, `--vti-label` to
+`build_candidateE2_expanded672_ttk_constraints.py`. Running the script with
+no arguments behaves exactly as before (writes to
+`ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_constraints/`).
+`extract_ttk_pd_critical_pairs.py` needed no changes — `--out-dir` was
+already a required (non-hardcoded) argument.
+
+**Real regeneration status: not run.** This environment has no running
+Docker daemon (attempting to start it fails with a permission error —
+sandboxed, cannot be worked around), no `phire-ttk:latest` image, and no
+real `data_out/wind_mrhr_cnn_expanded672/{dataGT,idx}.npy` (the 672-sample
+expanded dataset does not exist in this checkout). Consequently:
+
+- The fixed VTI writer and the new CLI plumbing were verified with real VTK
+  write/read round-trips and a Docker-free smoke test
+  (`scripts/smoke_test_candidateE2_fixed_constraints.py`, new file) against
+  **fabricated synthetic data only**, written to
+  `diagnostics/candidateE2_fixed_constraints/smoke_test/` — never to any
+  `ttk_runs_fixed/...` path. All checks passed (VTI coordinate mapping
+  correct; `_sanity_check()` correctly passes on correct data and correctly
+  fails on deliberately-transposed fabricated data).
+- No files under `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/`
+  or `.../candidateE2_fixed_vti/` were created — the real, Docker-dependent
+  regeneration against real data has not happened yet and must be run where
+  Docker + the real dataset exist (e.g. Spark), using:
+
+  ```bash
+  python3 scripts/build_candidateE2_expanded672_ttk_constraints.py \
+    --out-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints \
+    --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_vti
+  ```
+
+  This does not touch the old `candidateE2_expanded672_constraints/` output.
+
+Files added this round: `scripts/smoke_test_candidateE2_fixed_constraints.py`,
+`diagnostics/candidateE2_fixed_constraints/smoke_test/` (synthetic-only).
+Files modified: `scripts/build_candidateE2_expanded672_ttk_constraints.py`.
