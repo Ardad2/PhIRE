@@ -13,7 +13,7 @@ Loss configuration:
             + 0.04  * L_ttkcv         (MSE at TTK critical vertices)
             + 0.02  * L_ttkpers       (persistence-gap MSE)
 
-TTK constraints are pre-computed by build_candidateE2_fixed_constraints.py
+TTK constraints are pre-computed by build_candidateE2_expanded672_constraints.py
 from the expanded GT arrays.  Birth/death vertex target values are read from GT
 numpy arrays directly (exact match guaranteed).
 
@@ -21,14 +21,14 @@ Workflow:
   Phase 1 — Training:  train RefinerNet on 672 expanded CNN SR outputs
             Input:  data_out/wind_mrhr_cnn_expanded672/  (dataSR.npy, dataGT.npy)
             Constraints: ttk_runs_fixed/topology_finetuning/
-                           candidateE2_fixed_constraints/
+                           candidateE2_expanded672_constraints/
                            ttk_pd_critical_pairs_gtvalues.npz
             Output: models_fixed/topology_finetuning/
-                      wind_finetune_candidateE2_fixed/
+                      wind_finetune_candidateE2_expanded672/
 
   Phase 2 — Evaluation: apply trained refiner to 168-sample benchmark CNN SR
             Input:  data_out_fixed/wind_mrhr_cnn/  (dataSR.npy, dataGT.npy)
-            Output: data_out/wind_finetune_candidateE2_fixed/
+            Output: data_out/wind_finetune_candidateE2_expanded672/
                       dataSR.npy (168, 500, 500, 2)
                       dataGT.npy (168, 500, 500, 2)
                       dataIN.npy (168, 100, 100, 2)
@@ -66,15 +66,15 @@ CONSTRAINTS_NPZ = (
     REPO_ROOT
     / "ttk_runs_fixed"
     / "topology_finetuning"
-    / "candidateE2_fixed_constraints"
+    / "candidateE2_expanded672_constraints"
     / "ttk_pd_critical_pairs_gtvalues.npz"
 )
 MODEL_DIR = (
     REPO_ROOT / "models_fixed" / "topology_finetuning"
-    / "wind_finetune_candidateE2_fixed"
+    / "wind_finetune_candidateE2_expanded672"
 )
-OUT_DIR  = REPO_ROOT / "data_out" / "wind_finetune_candidateE2_fixed"
-LOG_PATH = REPO_ROOT / "logs"    / "wind_finetune_candidateE2_fixed.log"
+OUT_DIR  = REPO_ROOT / "data_out" / "wind_finetune_candidateE2_expanded672"
+LOG_PATH = REPO_ROOT / "logs"    / "wind_finetune_candidateE2_expanded672.log"
 
 # ── Hyperparameters ────────────────────────────────────────────────────────────
 
@@ -343,7 +343,7 @@ class TTKConstraints:
         if missing:
             raise ValueError(
                 f"Constraints NPZ missing required keys: {missing}. "
-                "Re-run build_candidateE2_fixed_constraints.py."
+                "Re-run build_candidateE2_expanded672_constraints.py."
             )
 
         self.n_samples    = int(npz["n_samples"])
@@ -519,7 +519,7 @@ def _check_preconditions() -> None:
         sys.exit(
             f"[error] Constraints NPZ not found: {CONSTRAINTS_NPZ}\n"
             "  Generate it first:\n"
-            "    python3 scripts/build_candidateE2_fixed_constraints.py"
+            "    python3 scripts/build_candidateE2_expanded672_constraints.py"
         )
 
     npz = np.load(CONSTRAINTS_NPZ, allow_pickle=True)
@@ -527,7 +527,7 @@ def _check_preconditions() -> None:
     if n_constraints != N_TRAIN:
         sys.exit(
             f"[error] Constraints NPZ has {n_constraints} samples; expected {N_TRAIN}.\n"
-            "  Re-run: python3 scripts/build_candidateE2_fixed_constraints.py"
+            "  Re-run: python3 scripts/build_candidateE2_expanded672_constraints.py"
         )
 
     # Output paths safety
@@ -766,7 +766,7 @@ def main() -> None:
             sys.exit(
                 f"[error] {len(missing_ids)} training sample IDs not in constraints NPZ.\n"
                 f"  Missing (first 10): {missing_ids[:10]}\n"
-                "  Re-run: python3 scripts/build_candidateE2_fixed_constraints.py"
+                "  Re-run: python3 scripts/build_candidateE2_expanded672_constraints.py"
             )
         print(f"  All {len(idx_train)} training indices found in constraints.")
 
