@@ -5504,3 +5504,403 @@ The important conclusion is therefore a trade-off rather than a universal win. U
 ## Paper-ready takeaway
 
 > Recomputed SSIM shows that Candidate C does not improve topology by damaging conventional structural quality. Candidate C-expanded-2688 improves speed SSIM from 0.7412 to 0.8126 relative to CNN. UV-only fine-tuning is slightly higher on SSIM, indicating that SSIM gains are primarily driven by ordinary reconstruction fine-tuning. However, UV does not reproduce Candidate C's PD improvement, so Candidate C's contribution is best framed as a topology-aware trade-off: it preserves most SSIM and pointwise-fidelity gains while producing substantially better persistence-style topology and structure-sensitive domain behavior.
+---
+
+# Part XIII — Post-submission Candidate D/Dpd/E/E2 infrastructure repair and E2-fixed low-lambda audit
+
+## Purpose
+
+This section records the post-submission audit and repair of the Candidate D/Dpd/E/E2 infrastructure. It is **not** part of the submitted TopoInVis paper's central result. The submitted paper primarily used Candidate C and the repaired/final CNN/GAN baseline pipeline. The E2 work documented here should be treated as future-work evidence and as an explanation of why the earlier Candidate D/Dpd/E/E2 experiments were unreliable before the infrastructure repairs.
+
+The main conclusion is:
+
+> After fixing the PyTorch `L_uv` scale and the VTI coordinate mapping, the original Candidate E2 TTK-critical-pair weights were too strong and degraded pointwise fidelity. A 10× lower-weight E2-fixed run restored near-CNN fidelity while improving several distributional, gradient, exceedance, component-count, and true topology metrics. The low-lambda run modestly improved PD relative to CNN and more clearly improved MT relative to CNN/GAN, but it did not close the GAN PD gap.
+
+## XIII.1 Infrastructure bugs repaired
+
+### Bug 1 — `L_uv` normalization in PyTorch RefinerNet scripts
+
+The PyTorch RefinerNet scripts for Candidate D/Dpd/E/E2 loaded `dataSR.npy` and `dataGT.npy` as already denormalized physical-unit `[u, v]` arrays. However, the PyTorch `l_uv(sr, gt)` term had been computing MSE directly in physical units. This was inconsistent with the TF1 Candidate B/C convention, where the vector reconstruction loss is computed in normalized vector space, while scalar-speed and topology-inspired losses operate in physical units.
+
+The fix applied to the D/Dpd/E/E2 refiner scripts was:
+
+```python
+_MU_UV = (0.7684, -0.4575)
+_SIGMA_UV = (5.02455, 5.9017)
+
+def _normalize_uv(uv):
+    mu = torch.tensor(_MU_UV, dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    sigma = torch.tensor(_SIGMA_UV, dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    return (uv - mu) / sigma
+
+def l_uv(sr, gt):
+    return F.mse_loss(_normalize_uv(sr), _normalize_uv(gt))
+```
+
+Important interpretation:
+
+- `L_uv` now matches the normalized-vector convention used by earlier Candidate B/C fine-tuning.
+- `_speed_t`, `l_speed`, `l_grad`, `l_crit`, and TTK/PD-style scalar losses remain in physical speed units.
+- This changes the effective loss balance for Candidate D/Dpd/E/E2 and therefore requires lambda retuning.
+
+A real Torch sanity check showed that normalized `L_uv` was about 29× smaller than the raw physical-unit MSE on the tested tensors, consistent with the expected scale change from the vector standard deviations.
+
+### Bug 2 — VTI coordinate mapping
+
+The VTI writer had used Fortran-order flattening with `SetDimensions(W, H, 1)`. VTK uses point IDs of the form:
+
+```text
+pointId = ix + iy * W
+```
+
+Therefore the correct mapping is:
+
+```text
+scalar_2d[y, x] -> VTK point (x, y)
+```
+
+and the correct flattening is:
+
+```python
+flat = np.ascontiguousarray(scalar_2d).ravel(order="C")
+```
+
+This fix was applied both to:
+
+- `scripts/convert_phire_to_vti.py`
+- the independent internal writer `_write_vti_ascii()` inside `scripts/build_candidateE2_expanded672_ttk_constraints.py`
+
+The second location was important because the Candidate E2 constraint builder does **not** call `convert_phire_to_vti.py`; it had its own VTI writer and therefore needed the same coordinate fix.
+
+Validation scripts:
+
+```bash
+python3 scripts/verify_vti_coordinate_mapping.py
+python3 scripts/smoke_test_candidateE2_fixed_constraints.py
+```
+
+Both checks passed. The non-square VTK read/write test confirmed that `grid[x, y] == scalar_2d[y, x]`, and the synthetic E2 smoke test confirmed the fixed internal writer on 160×160 synthetic VTI files.
+
+## XIII.2 Fixed Candidate E2 constraint regeneration
+
+The fixed Candidate E2 constraints were regenerated from scratch into new directories so they would not collide with stale `candidateE2_expanded672_constraints` artifacts.
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \
+  python scripts/build_candidateE2_expanded672_ttk_constraints.py \
+    --out-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints \
+    --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_vti \
+    --vti-label candidateE2fixed_GT
+```
+
+Final constraint artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+Validated regeneration summary:
+
+| Quantity | Value |
+|---|---:|
+| samples | 672 |
+| total pairs | 43008 |
+| pairs/sample | 64 |
+| birth value range | [0.0183, 25.1930] |
+| persistence range | [0.9827, 20.7739] |
+| max stored birth-value error | 0.00e+00 |
+| max stored death-value error | 0.00e+00 |
+
+Interpretation of the `0.00e+00` stored-value check:
+
+- It confirms internal consistency between stored vertex IDs and stored target values in the NPZ.
+- It should not be overinterpreted as a standalone proof of the VTI coordinate fix.
+- The stronger coordinate-mapping evidence is the corrected code path plus the VTK read-back regression test and synthetic smoke test.
+
+## XIII.3 High-lambda E2-fixed rerun: repaired infrastructure but bad loss balance
+
+The original Candidate E2 training script was patched to point to the fixed constraints and new output directories:
+
+```text
+CONSTRAINTS_NPZ : ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+MODEL_DIR       : models_fixed/topology_finetuning/wind_finetune_candidateE2_fixed
+OUT_DIR         : data_out/wind_finetune_candidateE2_fixed
+LOG_PATH        : logs/wind_finetune_candidateE2_fixed.log
+```
+
+Training configuration retained the original E2 TTK weights:
+
+```text
+LAMBDA_TTKCV    = 0.04
+LAMBDA_TTKPERS  = 0.02
+EPOCHS          = 3
+LR              = 1e-4
+RESIDUAL_SCALE  = 0.1
+```
+
+Training completed successfully and wrote valid 168-sample benchmark arrays:
+
+```text
+data_out/wind_finetune_candidateE2_fixed/dataSR.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed/idx.npy     (168,)
+```
+
+No NaNs were observed. However, the physical speed range already showed a warning sign:
+
+| Quantity | Value |
+|---|---:|
+| SR speed max | 44.5880 |
+| GT speed max | 33.9885 |
+| mean absolute speed error | 0.75063 |
+
+Cheap scalar/physics/domain evaluation confirmed that the high-lambda E2-fixed run degraded fidelity relative to the CNN baseline:
+
+| Metric | CNN mean | E2-fixed high-lambda mean | Δ candidate − CNN | Improved / 168 | Worsened / 168 |
+|---|---:|---:|---:|---:|---:|
+| PSNR-u/v | 31.1925 | 30.5559 | -0.6366 | 0 | 168 |
+| speed MAE | 0.6941 | 0.7506 | +0.0566 | 0 | 168 |
+| speed RMSE | 1.1078 | 1.1809 | +0.0731 | 0 | 168 |
+| WPD MAE | 231.671 | 254.356 | +22.685 | 0 | 168 |
+| WPD RMSE | 448.692 | 491.495 | +42.803 | 0 | 168 |
+| WPD W1 | 45.271 | 69.656 | +24.385 | 34 | 134 |
+| PSD log L2 | 0.8335 | 0.7668 | -0.0667 | 136 | 32 |
+| gradient MAE | 0.3491 | 0.3476 | -0.0015 | 105 | 63 |
+| gradient W1 | 0.2329 | 0.1624 | -0.0705 | 168 | 0 |
+| component curve L1 | 115.528 | 94.643 | -20.885 | 168 | 0 |
+
+Interpretation:
+
+- The repaired high-lambda E2 run is a useful negative result.
+- The original TTK-critical-pair weights became too strong after the `L_uv` normalization fix.
+- The model improved some structure/proxy metrics but harmed core field reconstruction and WPD metrics.
+- The expensive TTK topology pass was not run for this high-lambda version because the cheap evaluation already showed broad fidelity regression.
+
+## XIII.4 Low-lambda E2-fixed rerun
+
+A 10× lower-weight E2-fixed script was created to test whether the repaired infrastructure could produce a useful result once the TTK-critical-pair terms were retuned:
+
+```text
+script: scripts/run_candidateE2_fixed_lowlambda_ttkcrit_refiner.py
+CONSTRAINTS_NPZ : ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+MODEL_DIR       : models_fixed/topology_finetuning/wind_finetune_candidateE2_fixed_lowlambda
+OUT_DIR         : data_out/wind_finetune_candidateE2_fixed_lowlambda
+LOG_PATH        : logs/wind_finetune_candidateE2_fixed_lowlambda.log
+LAMBDA_TTKCV    = 0.004
+LAMBDA_TTKPERS  = 0.002
+```
+
+Training completed successfully, and the 168-sample benchmark outputs passed shape validation:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda/dataSR.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda/idx.npy     (168,)
+```
+
+Physical speed sanity check:
+
+| Quantity | Value |
+|---|---:|
+| SR vector range | [-31.0852, 31.1981] |
+| GT vector range | [-30.4676, 30.8122] |
+| SR speed range | [0.0014, 43.5240] |
+| GT speed range | [0.0122, 33.9885] |
+| mean absolute speed error | 0.695157 |
+
+The maximum SR speed remained higher than the GT maximum, but the mean speed error returned to near-CNN level.
+
+### Cheap scalar/physics/domain evaluation
+
+Command:
+
+```bash
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateE2_fixed_lowlambda \
+  --candidate-dir  data_out/wind_finetune_candidateE2_fixed_lowlambda \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_eval
+```
+
+Key comparison against CNN:
+
+| Metric | CNN mean | E2-fixed low-lambda mean | Δ candidate − CNN | Improved / 168 | Worsened / 168 |
+|---|---:|---:|---:|---:|---:|
+| PSNR-u/v | 31.1925 | 31.1573 | -0.0352 | 32 | 136 |
+| speed MAE | 0.6941 | 0.6952 | +0.0011 | 88 | 80 |
+| speed RMSE | 1.1078 | 1.1099 | +0.0022 | 71 | 97 |
+| WPD bias abs | 35.3439 | 12.5397 | -22.8043 | 152 | 16 |
+| WPD MAE | 231.671 | 232.196 | +0.5253 | 78 | 90 |
+| WPD RMSE | 448.692 | 449.213 | +0.5214 | 86 | 82 |
+| WPD W1 | 45.2713 | 29.8082 | -15.4631 | 138 | 30 |
+| PSD log L2 | 0.8335 | 0.8130 | -0.0205 | 114 | 54 |
+| PSD slope abs delta | 0.9150 | 0.8806 | -0.0344 | 131 | 37 |
+| gradient MAE | 0.3491 | 0.3457 | -0.0034 | 161 | 7 |
+| gradient W1 | 0.2329 | 0.2163 | -0.0167 | 146 | 22 |
+| gradient kurtosis abs delta | 3.7004 | 3.9368 | +0.2364 | 71 | 97 |
+| exceed abs t10 | 0.0066 | 0.0050 | -0.0016 | 109 | 59 |
+| exceed abs t15 | 0.0062 | 0.0037 | -0.0025 | 132 | 36 |
+| exceed abs p90 | 0.0103 | 0.0054 | -0.0049 | 143 | 25 |
+| exceed abs p95 | 0.0089 | 0.0051 | -0.0038 | 147 | 21 |
+| exceed abs p99 | 0.0043 | 0.0031 | -0.0011 | 144 | 24 |
+| component curve L1 | 115.528 | 109.440 | -6.0873 | 140 | 27 |
+
+Interpretation:
+
+- Low-lambda E2-fixed is no longer a catastrophic fidelity regression.
+- PSNR and speed errors are nearly tied with CNN rather than clearly better.
+- Many distributional, gradient, exceedance, and component-count metrics improve.
+- WPD bias and WPD W1 improve strongly, while WPD MAE/RMSE remain essentially tied or slightly worse.
+
+## XIII.5 Low-lambda true topology evaluation with TTK
+
+The true TTK topology evaluation was run only for the low-lambda E2-fixed result.
+
+Command:
+
+```bash
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateE2_fixed_lowlambda \
+  --data-dir data_out/wind_finetune_candidateE2_fixed_lowlambda \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology \
+  --n-samples 168
+```
+
+The topology pipeline completed with:
+
+```text
+PD valid samples: 168
+MT valid samples: 168
+```
+
+Main TTK comparison:
+
+| Metric | CNN baseline | GAN baseline | E2-fixed low-lambda |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 27.1011 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7522 |
+| PD wins vs CNN | — | 166/168 | 130/168 |
+| MT wins vs CNN | — | 20/168 | 113/168 |
+| PD beats GAN | — | — | 2/168 |
+| MT beats GAN | — | — | 153/168 |
+
+Additional MT-GAN diagnostic:
+
+```text
+Original MT-GAN baseline wins: 20 samples
+E2-fixed low-lambda takes over from GAN on MT: 6/20
+Still GAN after E2-fixed low-lambda: 14/20
+Now CNN: 0/20
+```
+
+Winner distribution after adding E2-fixed low-lambda:
+
+| Metric family | CNN wins | GAN wins | E2-fixed low-lambda wins |
+|---|---:|---:|---:|
+| PD distance | 2 | 166 | 0 |
+| MT distance | 53 | 14 | 101 |
+
+Interpretation:
+
+- E2-fixed low-lambda gives a small mean PD improvement over CNN (`27.4063 -> 27.1011`) and lower PD than CNN on 130/168 samples.
+- E2-fixed low-lambda does **not** close the GAN PD gap. GAN remains much better on PD on average, and E2-fixed low-lambda beats GAN on PD for only 2/168 samples.
+- E2-fixed low-lambda gives a clearer MT improvement, improving mean MT relative to CNN (`5.8678 -> 5.7522`) and winning MT on 101/168 samples in the three-way CNN/GAN/E2 comparison.
+- This suggests the repaired E2 fixed-index supervision is more promising for merge-tree-style structural refinement than for reproducing GAN-like persistence-diagram behavior.
+
+## XIII.6 Final interpretation of the E2 repair audit
+
+The repaired E2 experiments support the following interpretation:
+
+1. The infrastructure fixes were necessary. Candidate D/Dpd/E/E2 results produced before the `L_uv` normalization fix and VTI coordinate fix should not be treated as final evidence.
+2. Candidate C remains meaningful because it did not depend on the TTK fixed-index constraint pipeline affected by the VTI-coordinate bug.
+3. The original high-lambda E2 configuration is best treated as a negative control after repair: it overemphasizes sparse fixed critical-pair supervision and harms global field fidelity.
+4. The low-lambda E2-fixed configuration is a valid positive ablation: it restores near-CNN pointwise fidelity while improving several domain/proxy metrics and modestly improving true topology relative to CNN.
+5. E2-fixed low-lambda is not a GAN-level PD method. Its strongest evidence is in MT distance and structure-sensitive metrics, not in PD bottleneck distance.
+
+Paper/future-work framing:
+
+> Post-submission infrastructure repairs showed that the original E2 fixed-index TTK-critical-pair losses required retuning after correcting vector-loss normalization and VTI coordinate mapping. With the original weights, E2-fixed degraded pointwise fidelity. Reducing the TTK-critical-pair weights by 10× restored near-CNN fidelity and produced small PD improvements and stronger MT improvements relative to CNN. These results are useful for future work, but they do not change the submitted paper's main Candidate C narrative.
+
+## XIII.7 Files and artifacts to preserve
+
+Code / documentation:
+
+```text
+scripts/convert_phire_to_vti.py
+scripts/build_candidateE2_expanded672_ttk_constraints.py
+scripts/verify_vti_coordinate_mapping.py
+scripts/smoke_test_candidateE2_fixed_constraints.py
+scripts/run_candidateD_pd_refiner.py
+scripts/run_candidateD_expanded672_pd_refiner.py
+scripts/run_candidateDpd_expanded672_pd_refiner.py
+scripts/run_candidateE_ttkcrit_refiner.py
+scripts/run_candidateE2_expanded672_ttkcrit_refiner.py
+scripts/run_candidateE2_fixed_lowlambda_ttkcrit_refiner.py
+docs/candidateD_E_infra_fix_notes.md
+```
+
+Generated constraints and E2-fixed outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_vti/
+data_out/wind_finetune_candidateE2_fixed/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_eval/
+data_out/wind_finetune_candidateE2_fixed_lowlambda/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_eval/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology_vti/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology/
+docs/topology_finetuning_candidateE2_fixed_lowlambda_eval.md
+docs/topology_finetuning_candidateE2_fixed_lowlambda_topology_eval.md
+```
+
+Important storage note:
+
+- Track lightweight scripts and documentation in Git.
+- Avoid committing large generated `.npy`, `.vti`, `.vtu`, and full `ttk_runs_fixed/...` directories unless the repository is intentionally configured for generated artifacts.
+- At minimum, preserve the exact commands, logs, summary CSVs, and reports needed to regenerate or audit the E2-fixed outputs.
+
+## XIII.8 Codex consistency-audit prompt
+
+Use the following prompt if asking Codex to audit this section against the repository state:
+
+```text
+Please audit the new Part XIII section in docs/dataset_generation_and_repair_notes.md for consistency with the current PhIRE repository and generated outputs.
+
+Check the following:
+1. The E2 infrastructure-fix description matches the actual code changes:
+   - normalized L_uv in D/Dpd/E/E2 PyTorch refiner scripts;
+   - speed/topology losses still in physical units;
+   - VTI flattening fixed to C order in convert_phire_to_vti.py and the internal writer in build_candidateE2_expanded672_ttk_constraints.py.
+2. The fixed E2 constraint path exists and has expected contents:
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+   with 672 samples, 43008 total pairs, and 64 pairs/sample.
+3. The high-lambda E2-fixed output paths and scalar-evaluation claims match:
+   data_out/wind_finetune_candidateE2_fixed/
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_eval/
+4. The low-lambda E2-fixed script and outputs match:
+   scripts/run_candidateE2_fixed_lowlambda_ttkcrit_refiner.py
+   data_out/wind_finetune_candidateE2_fixed_lowlambda/
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_eval/
+5. The low-lambda TTK topology outputs match:
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology/phase_c_final/phase_c_results.csv
+   docs/topology_finetuning_candidateE2_fixed_lowlambda_topology_eval.md
+6. Verify that the reported summary numbers are correct:
+   - high-lambda speed_mae 0.75063 vs CNN 0.6941;
+   - low-lambda speed_mae 0.695157 vs CNN 0.6941;
+   - low-lambda PD means CNN=27.4063, GAN=20.8641, E2=27.1011;
+   - low-lambda MT means CNN=5.8678, GAN=8.3481, E2=5.7522;
+   - low-lambda PD < CNN on 130/168, MT < CNN on 113/168, PD < GAN on 2/168.
+7. Confirm that Part XIII does not imply these E2 results were part of the submitted TopoInVis paper's main claim; they should be framed as post-submission audit/future-work results.
+
+Please report any path mismatch, stale filename, wrong metric sign, or overclaiming.
+```
