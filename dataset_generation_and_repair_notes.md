@@ -5753,6 +5753,8 @@ Key comparison against CNN:
 | exceed abs p99 | 0.0043 | 0.0031 | -0.0011 | 144 | 24 |
 | component curve L1 | 115.528 | 109.440 | -6.0873 | 140 | 27 |
 
+Note: for `component curve L1`, the pairwise table reports 140 improved samples and 27 worsened samples out of 168 valid samples. The remaining sample is a tie, so this row intentionally sums to 167 when only the improved and worsened columns are shown.
+
 Interpretation:
 
 - Low-lambda E2-fixed is no longer a catastrophic fidelity regression.
@@ -5773,6 +5775,18 @@ bash scripts/run_candidate_topology_pipeline.sh \
   --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology_vti \
   --out-base ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology \
   --n-samples 168
+```
+
+The comparison/report step was also run explicitly. The pipeline's Stage 5 invokes the same comparison logic, but recording the standalone command makes the generated report reproducible:
+
+```bash
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateE2_fixed_lowlambda \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results  ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx     data_out/wind_finetune_candidateE2_fixed_lowlambda/idx.npy \
+  --out-dir           ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology \
+  --report-path       docs/topology_finetuning_candidateE2_fixed_lowlambda_topology_eval.md
 ```
 
 The topology pipeline completed with:
