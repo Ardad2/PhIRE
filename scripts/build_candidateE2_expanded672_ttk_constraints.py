@@ -43,14 +43,23 @@ Filtering (same as Candidate E pilot):
   persistence_frac = 0.01   (min persistence as fraction of sample max persistence)
   top_k            = 64     (top pairs by descending persistence)
 
-Usage:
+Usage (default: the original 672-sample dataset, unchanged):
   docker pull phire-ttk:latest   # if not already cached
   python3 scripts/build_candidateE2_expanded672_ttk_constraints.py
 
+Usage (generalized: any expanded scale, e.g. 1344):
+  python3 scripts/build_candidateE2_expanded672_ttk_constraints.py \\
+    --gt-path    data_out/wind_mrhr_cnn_expanded1344/dataGT.npy \\
+    --idx-path   data_out/wind_mrhr_cnn_expanded1344/idx.npy \\
+    --n-expected 1344 \\
+    --out-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints \\
+    --vti-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_vti \\
+    --vti-label  candidateE2fixedlowlambda1344_GT
+
 Requires:
   - Docker with image phire-ttk:latest
-  - data_out/wind_mrhr_cnn_expanded672/dataGT.npy  (672, 500, 500, 2)
-  - data_out/wind_mrhr_cnn_expanded672/idx.npy     (672,)
+  - <gt-path>  (N, 500, 500, 2), N == --n-expected
+  - <idx-path> (N,), N == --n-expected  (optional; falls back to 0..N-1 if absent)
   - numpy only (no VTK or TTK in native Python env)
 
 See also:
@@ -74,8 +83,13 @@ import numpy as np
 # ---------------------------------------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-GT_PATH  = REPO_ROOT / "data_out" / "wind_mrhr_cnn_expanded672" / "dataGT.npy"
-IDX_PATH = REPO_ROOT / "data_out" / "wind_mrhr_cnn_expanded672" / "idx.npy"
+# Historical defaults (unchanged): used when --gt-path/--idx-path/--n-expected
+# are not passed, so the original zero-arg 672-sample invocation keeps working
+# exactly as before. Pass --gt-path/--idx-path/--n-expected to build
+# constraints for a different expanded dataset (e.g. 1344, 2688).
+_DEFAULT_GT_PATH  = REPO_ROOT / "data_out" / "wind_mrhr_cnn_expanded672" / "dataGT.npy"
+_DEFAULT_IDX_PATH = REPO_ROOT / "data_out" / "wind_mrhr_cnn_expanded672" / "idx.npy"
+_DEFAULT_N_EXPECTED = 672
 
 # Historical defaults (unchanged): used when --out-dir/--vti-dir/--pd-dir are
 # not passed on the command line, so old invocations keep working exactly as
@@ -101,7 +115,11 @@ TOP_K            = 64        # max pairs per sample
 PERSISTENCE_FRAC = 0.01      # min persistence as fraction of per-sample max
 DOCKER_IMAGE     = "phire-ttk:latest"
 THREADS          = 4         # TTK threads per VTI; each TTK call is sequential
-N_EXPECTED       = 672
+
+# Docker TTK timeout, scaled per sample from the original 672-sample budget
+# (4 hours) so larger expanded datasets (1344, 2688, ...) aren't killed
+# partway through by a timeout sized for 672.
+_DOCKER_TIMEOUT_SEC_PER_SAMPLE = (4 * 3600) / 672
 
 _SAMPLE_IDX_RE   = re.compile(r"_s(\d+)_")
 
@@ -109,6 +127,14 @@ _SAMPLE_IDX_RE   = re.compile(r"_s(\d+)_")
 def build_arg_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--gt-path", type=Path, default=None,
+                    help=f"Path to expanded dataGT.npy, shape (N,500,500,2) "
+                         f"(default: {_DEFAULT_GT_PATH})")
+    p.add_argument("--idx-path", type=Path, default=None,
+                    help=f"Path to expanded idx.npy, shape (N,) "
+                         f"(default: {_DEFAULT_IDX_PATH})")
+    p.add_argument("--n-expected", type=int, default=None,
+                    help=f"Expected sample count N (default: {_DEFAULT_N_EXPECTED})")
     p.add_argument("--out-dir", type=Path, default=None,
                     help=f"Output directory for the constraints NPZ "
                          f"(default: {_DEFAULT_OUT_DIR})")
@@ -245,7 +271,7 @@ def _check_docker() -> None:
 # Phase 3: Run TTK via Docker (one bash loop for all 672 VTIs)
 # ---------------------------------------------------------------------------
 
-def _run_ttk_docker(vti_dir: Path, pd_dir: Path) -> None:
+def _run_ttk_docker(vti_dir: Path, pd_dir: Path, n_expected: int) -> None:
     """
     Run ttkPersistenceDiagramCmd on every VTI in vti_dir via a single Docker call.
 
@@ -254,7 +280,7 @@ def _run_ttk_docker(vti_dir: Path, pd_dir: Path) -> None:
     """
     pd_dir.mkdir(parents=True, exist_ok=True)
 
-    # One bash script that loops over all VTIs; avoids 672 Docker start-ups.
+    # One bash script that loops over all VTIs; avoids one Docker start-up per sample.
     bash_script = (
         "for f in /work_vti/*.vti; do\n"
         "    base=$(basename \"$f\" .vti)\n"
@@ -268,6 +294,11 @@ def _run_ttk_docker(vti_dir: Path, pd_dir: Path) -> None:
     print(f"[phase3] Running Docker ({DOCKER_IMAGE}) for {len(list(vti_dir.glob('*.vti')))} VTI files …")
     print(f"[phase3] Threads per VTI: {THREADS}  (sequential in one Docker container)")
 
+    # Timeout scaled from the original 672-sample budget (4h) so larger
+    # expanded datasets aren't killed partway through.
+    timeout_sec = max(4 * 3600, int(n_expected * _DOCKER_TIMEOUT_SEC_PER_SAMPLE))
+    print(f"[phase3] Docker timeout: {timeout_sec/3600:.1f}h for {n_expected} samples")
+
     t0 = time.perf_counter()
     subprocess.run(
         [
@@ -278,10 +309,10 @@ def _run_ttk_docker(vti_dir: Path, pd_dir: Path) -> None:
             "bash", "-c", bash_script,
         ],
         check=True,
-        timeout=4 * 3600,  # 4-hour limit for 672 samples
+        timeout=timeout_sec,
     )
     elapsed = time.perf_counter() - t0
-    print(f"[phase3] Docker TTK complete in {elapsed:.1f}s  ({elapsed/N_EXPECTED:.2f}s/sample)")
+    print(f"[phase3] Docker TTK complete in {elapsed:.1f}s  ({elapsed/n_expected:.2f}s/sample)")
 
 
 # ---------------------------------------------------------------------------
@@ -439,6 +470,10 @@ def _sanity_check(gt: np.ndarray, idx_all: np.ndarray, npz_path: Path) -> None:
 def main() -> None:
     args = build_arg_parser().parse_args()
 
+    gt_path    = args.gt_path    if args.gt_path    is not None else _DEFAULT_GT_PATH
+    idx_path   = args.idx_path   if args.idx_path   is not None else _DEFAULT_IDX_PATH
+    n_expected = args.n_expected if args.n_expected is not None else _DEFAULT_N_EXPECTED
+
     out_dir   = args.out_dir if args.out_dir is not None else _DEFAULT_OUT_DIR
     out_npz   = out_dir / "ttk_pd_critical_pairs_gtvalues.npz"
     work_dir  = out_dir / "work"
@@ -451,10 +486,11 @@ def main() -> None:
     vti_label = args.vti_label
 
     print("=" * 64)
-    print("Build CandidateE2-expanded-672 TTK constraints (faithful)")
+    print("Build CandidateE2 TTK constraints (faithful)")
     print("=" * 64)
-    print(f"  GT input    : {GT_PATH}")
-    print(f"  IDX input   : {IDX_PATH}")
+    print(f"  GT input    : {gt_path}")
+    print(f"  IDX input   : {idx_path}")
+    print(f"  N expected  : {n_expected}")
     print(f"  Output NPZ  : {out_npz}")
     print(f"  Work dir    : {work_dir}")
     print(f"  VTI dir     : {vti_dir}")
@@ -468,9 +504,9 @@ def main() -> None:
     print()
 
     # ── Pre-condition checks ──────────────────────────────────────────────
-    if not GT_PATH.exists():
+    if not gt_path.exists():
         sys.exit(
-            f"[error] Expanded GT arrays not found: {GT_PATH}\n"
+            f"[error] Expanded GT arrays not found: {gt_path}\n"
             "  Generate them first (requires TF1):\n"
             "    python3 - <<'PY'\n"
             "    import sys; sys.path.insert(0, '.')\n"
@@ -490,29 +526,29 @@ def main() -> None:
             "    PY"
         )
 
-    gt_shape = np.load(GT_PATH, mmap_mode="r").shape
-    if gt_shape[0] != N_EXPECTED:
+    gt_shape = np.load(gt_path, mmap_mode="r").shape
+    if gt_shape[0] != n_expected:
         sys.exit(
-            f"[error] GT array has {gt_shape[0]} samples; expected {N_EXPECTED}."
+            f"[error] GT array has {gt_shape[0]} samples; expected {n_expected}."
         )
     if gt_shape[1] < PATCH or gt_shape[2] < PATCH:
         sys.exit(
             f"[error] GT spatial size {gt_shape[1]}×{gt_shape[2]} < PATCH={PATCH}."
         )
 
-    if IDX_PATH.exists():
-        idx_all = np.load(IDX_PATH).astype(np.int64)
-        if len(idx_all) != N_EXPECTED:
+    if idx_path.exists():
+        idx_all = np.load(idx_path).astype(np.int64)
+        if len(idx_all) != n_expected:
             sys.exit(
-                f"[error] idx.npy has {len(idx_all)} entries; expected {N_EXPECTED}."
+                f"[error] idx.npy has {len(idx_all)} entries; expected {n_expected}."
             )
         print(
             f"  idx range: [{int(idx_all.min())}, {int(idx_all.max())}] "
             f"({len(idx_all)} entries)"
         )
     else:
-        print(f"  [warn] idx.npy not found; using 0..{N_EXPECTED - 1}")
-        idx_all = np.arange(N_EXPECTED, dtype=np.int64)
+        print(f"  [warn] idx.npy not found; using 0..{n_expected - 1}")
+        idx_all = np.arange(n_expected, dtype=np.int64)
 
     _check_docker()
     print()
@@ -525,43 +561,43 @@ def main() -> None:
 
     # ── Phase 1: Load GT (mmap) ───────────────────────────────────────────
     print("[phase1] Loading GT arrays (mmap) …")
-    gt = np.load(GT_PATH, mmap_mode="r")   # (672, 500, 500, 2)
+    gt = np.load(gt_path, mmap_mode="r")   # (672, 500, 500, 2)
     print(f"  GT shape: {gt.shape}  dtype: {gt.dtype}")
     print()
 
     # ── Phase 2: Write VTI files ──────────────────────────────────────────
     vti_dir.mkdir(parents=True, exist_ok=True)
     vti_paths = sorted(vti_dir.glob(f"{vti_label}_s*.vti"))
-    if len(vti_paths) == N_EXPECTED:
-        print(f"[phase2] {N_EXPECTED} VTI files already exist in {vti_dir} — skipping.")
+    if len(vti_paths) == n_expected:
+        print(f"[phase2] {n_expected} VTI files already exist in {vti_dir} — skipping.")
     else:
-        print(f"[phase2] Writing {N_EXPECTED} ASCII VTI files to {vti_dir} …")
+        print(f"[phase2] Writing {n_expected} ASCII VTI files to {vti_dir} …")
         t0 = time.perf_counter()
-        for i in range(N_EXPECTED):
+        for i in range(n_expected):
             wtk_idx = int(idx_all[i])
             speed_crop = _speed(np.asarray(gt[i, :PATCH, :PATCH, :]))
             vti_name = f"{vti_label}_s{wtk_idx}_speed_p{PATCH}_x0_y0.vti"
             _write_vti_ascii(vti_dir / vti_name, speed_crop)
             if (i + 1) % 100 == 0 or i == 0:
-                print(f"  [{i + 1:4d}/{N_EXPECTED}]  {vti_name}")
+                print(f"  [{i + 1:4d}/{n_expected}]  {vti_name}")
         elapsed = time.perf_counter() - t0
         vti_paths = sorted(vti_dir.glob(f"{vti_label}_s*.vti"))
         print(f"  Written {len(vti_paths)} VTI files in {elapsed:.1f}s")
-        if len(vti_paths) != N_EXPECTED:
+        if len(vti_paths) != n_expected:
             sys.exit(
-                f"[error] Expected {N_EXPECTED} VTI files; wrote {len(vti_paths)}."
+                f"[error] Expected {n_expected} VTI files; wrote {len(vti_paths)}."
             )
     print()
 
     # ── Phase 3: Run TTK via Docker ────────────────────────────────────────
     n_vtu_existing = len(list(pd_dir.glob("*_port_0.vtu")))
-    if n_vtu_existing >= N_EXPECTED:
+    if n_vtu_existing >= n_expected:
         print(
             f"[phase3] {n_vtu_existing} *_port_0.vtu files already exist in {pd_dir} — "
             "skipping Docker run."
         )
     else:
-        _run_ttk_docker(vti_dir, pd_dir)
+        _run_ttk_docker(vti_dir, pd_dir, n_expected)
     print()
 
     # ── Phase 4: Discover VTU files ───────────────────────────────────────
@@ -590,7 +626,7 @@ def main() -> None:
     print(f"[phase4] Parsed {len(vtu_by_idx)} sample indices from VTU filenames.")
 
     # Check for missing samples
-    missing_vtu = [int(idx_all[i]) for i in range(N_EXPECTED)
+    missing_vtu = [int(idx_all[i]) for i in range(n_expected)
                    if int(idx_all[i]) not in vtu_by_idx]
     if missing_vtu:
         sys.exit(
@@ -601,13 +637,13 @@ def main() -> None:
     print()
 
     # ── Phase 5: Parse VTU files and correct GT values ────────────────────
-    print(f"[phase5] Parsing {N_EXPECTED} VTU files and applying GT-corrected values …")
+    print(f"[phase5] Parsing {n_expected} VTU files and applying GT-corrected values …")
     t0 = time.perf_counter()
 
     all_results: list[dict] = []
     n_zero_pairs = 0
 
-    for i in range(N_EXPECTED):
+    for i in range(n_expected):
         wtk_idx = int(idx_all[i])
         vtu_path = vtu_by_idx[wtk_idx]
         gt_crop  = _speed(np.asarray(gt[i, :PATCH, :PATCH, :]))
@@ -632,10 +668,10 @@ def main() -> None:
 
         if (i + 1) % 100 == 0 or i == 0:
             n_pairs = len(all_results[-1]["birth_vid"])
-            print(f"  [{i + 1:4d}/{N_EXPECTED}]  wtk_idx={wtk_idx:6d}  pairs={n_pairs}")
+            print(f"  [{i + 1:4d}/{n_expected}]  wtk_idx={wtk_idx:6d}  pairs={n_pairs}")
 
     elapsed = time.perf_counter() - t0
-    print(f"  Parsed {N_EXPECTED} samples in {elapsed:.1f}s")
+    print(f"  Parsed {n_expected} samples in {elapsed:.1f}s")
     if n_zero_pairs > 0:
         print(
             f"  [warn] {n_zero_pairs} samples have 0 pairs "
@@ -695,7 +731,7 @@ def main() -> None:
     print(f"[phase7] Writing: {out_npz}")
     np.savez(
         str(out_npz),
-        n_samples    = np.int64(N_EXPECTED),
+        n_samples    = np.int64(n_expected),
         sample_idx   = sample_idx_arr,
         sample_start = sample_start_arr,
         sample_count = sample_count_arr,
@@ -715,8 +751,8 @@ def main() -> None:
     missing_keys = required - set(check.files)
     if missing_keys:
         sys.exit(f"[error] Written NPZ is missing keys: {missing_keys}")
-    assert int(check["n_samples"]) == N_EXPECTED
-    assert len(check["sample_idx"]) == N_EXPECTED
+    assert int(check["n_samples"]) == n_expected
+    assert len(check["sample_idx"]) == n_expected
     print(f"  n_samples   : {int(check['n_samples'])}")
     print(f"  total pairs : {len(check['birth_vid'])}")
     if len(birth_val_all) > 0:
@@ -740,9 +776,8 @@ def main() -> None:
     print(f"  Output NPZ : {out_npz}")
     print(f"  Work dir   : {work_dir}  (VTI + VTU files kept for inspection)")
     print()
-    print("Next step: train CandidateE2-expanded-672:")
-    print("  micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \\")
-    print("    python scripts/run_candidateE2_expanded672_ttkcrit_refiner.py")
+    print("Next step: point CONSTRAINTS_NPZ in your refiner training script at:")
+    print(f"  {out_npz}")
     print("=" * 64)
 
 
