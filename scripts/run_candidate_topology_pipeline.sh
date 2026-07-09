@@ -14,6 +14,14 @@
 #   4. Optional visualization  (native python3: phase_c_final_visualization.py)
 #   5. Topology comparison report  (native python3: build_candidate_topology_comparison.py)
 #
+# Stage 2 is safely resumable: a field already extracted (its PD/MT output
+# exists, whether or not it has been organised into pd|mt/{GT,SR}/ yet) is
+# skipped, never recomputed or overwritten. A single field's docker failure
+# (e.g. a TTK segfault) is logged and does not abort the run; re-invoking
+# this script with the same arguments retries only what is still missing.
+# Stage 2 hard-gates on complete PD/MT counts before Stage 3 runs, so
+# distance computation never runs against a partial extraction.
+#
 # Prerequisites (run from repo root on Spark):
 #   - <data-dir>/{dataSR,dataGT,idx}.npy
 #   - Docker image phire-ttk:latest
@@ -205,13 +213,20 @@ echo "[stage1] VTI counts: GT=$GT_VTI_COUNT  SR=$SR_VTI_COUNT  (expected $N_SAMP
 # Stage 2: TTK PD and MT extraction
 # convert_phire_to_vti.py writes --scalar speed as VTK array "wind_speed",
 # so TTK must use -a wind_speed regardless of the --scalar argument.
+#
+# Resumable by design: a completed field's PD/MT output is never recomputed,
+# whether it lives at the top level of pd/ or mt/ (not yet organised) or
+# already inside pd|mt/{GT,SR}/ (organised by a prior run). A single field's
+# docker failure (e.g. a TTK segfault) is logged and skipped rather than
+# aborting the whole script, so one bad field can't block every other field
+# on the same run; a subsequent invocation retries only what's still missing.
 # ---------------------------------------------------------------------------
 echo ""
 echo "--- Stage 2: TTK PD and MT extraction ---"
 
 PD_DIR="$OUT_BASE/pd"
 MT_DIR="$OUT_BASE/mt"
-mkdir -p "$PD_DIR" "$MT_DIR"
+mkdir -p "$PD_DIR" "$PD_DIR/GT" "$PD_DIR/SR" "$MT_DIR" "$MT_DIR/GT" "$MT_DIR/SR"
 
 shopt -s nullglob
 VTI_FILES=("$VTI_DIR"/${METHOD}_*.vti)
@@ -222,28 +237,93 @@ if [[ ${#VTI_FILES[@]} -eq 0 ]]; then
   exit 1
 fi
 
-echo "  Processing ${#VTI_FILES[@]} VTI files …"
+echo "  Processing ${#VTI_FILES[@]} VTI files … (threads=$THREADS)"
+
+# A field's PD output may already exist at the top level (not yet organised
+# by this run) or inside pd/GT or pd/SR (organised by a prior run).
+pd_output_exists() {
+  local base="$1"
+  [[ -f "$PD_DIR/${base}_pd_port_0.vtu" ]] && return 0
+  [[ -f "$PD_DIR/GT/${base}_pd_port_0.vtu" ]] && return 0
+  [[ -f "$PD_DIR/SR/${base}_pd_port_0.vtu" ]] && return 0
+  return 1
+}
+
+# MT output is only considered complete once all three ports exist together
+# in the same location.
+mt_output_exists() {
+  local base="$1"
+  local loc
+  for loc in "$MT_DIR" "$MT_DIR/GT" "$MT_DIR/SR"; do
+    if [[ -f "$loc/${base}_mt_port_0.vtu" ]] \
+       && [[ -f "$loc/${base}_mt_port_1.vtu" ]] \
+       && [[ -f "$loc/${base}_mt_port_2.vti" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+PD_SKIPPED=0; PD_RUN=0; PD_FAILED=0
+MT_SKIPPED=0; MT_RUN=0; MT_FAILED=0
 
 for f in "${VTI_FILES[@]}"; do
   base="$(basename "$f" .vti)"
-  echo "  === PD: $base ==="
-  docker run --rm -v "$WORKDIR":/work -w /work "$DOCKER_IMAGE" \
-    bash -lc "ttkPersistenceDiagramCmd -t $THREADS \
-      -i $VTI_DIR/${base}.vti \
-      -a wind_speed \
-      -o $PD_DIR/${base}_pd"
 
-  echo "  === MT: $base ==="
-  docker run --rm -v "$WORKDIR":/work -w /work "$DOCKER_IMAGE" \
-    bash -lc "ttkMergeTreeCmd -t $THREADS \
-      -i $VTI_DIR/${base}.vti \
-      -a wind_speed \
-      -o $MT_DIR/${base}_mt"
+  if pd_output_exists "$base"; then
+    echo "  [skip] PD $base"
+    PD_SKIPPED=$((PD_SKIPPED + 1))
+  else
+    echo "  === PD: $base ==="
+    set +e
+    docker run --rm -v "$WORKDIR":/work -w /work \
+      -e OMP_NUM_THREADS="$THREADS" -e TTK_NUM_THREADS="$THREADS" \
+      "$DOCKER_IMAGE" \
+      bash -lc "ttkPersistenceDiagramCmd -t $THREADS \
+        -i $VTI_DIR/${base}.vti \
+        -a wind_speed \
+        -o $PD_DIR/${base}_pd"
+    rc=$?
+    set -e
+    if [[ $rc -ne 0 ]]; then
+      echo "  [warn] PD failed for $base (docker exit code $rc). Skipping; will retry on next run."
+      PD_FAILED=$((PD_FAILED + 1))
+    else
+      PD_RUN=$((PD_RUN + 1))
+    fi
+  fi
+
+  if mt_output_exists "$base"; then
+    echo "  [skip] MT $base"
+    MT_SKIPPED=$((MT_SKIPPED + 1))
+  else
+    echo "  === MT: $base ==="
+    set +e
+    docker run --rm -v "$WORKDIR":/work -w /work \
+      -e OMP_NUM_THREADS="$THREADS" -e TTK_NUM_THREADS="$THREADS" \
+      "$DOCKER_IMAGE" \
+      bash -lc "ttkMergeTreeCmd -t $THREADS \
+        -i $VTI_DIR/${base}.vti \
+        -a wind_speed \
+        -o $MT_DIR/${base}_mt"
+    rc=$?
+    set -e
+    if [[ $rc -ne 0 ]]; then
+      echo "  [warn] MT failed for $base (docker exit code $rc). Skipping; will retry on next run."
+      MT_FAILED=$((MT_FAILED + 1))
+    else
+      MT_RUN=$((MT_RUN + 1))
+    fi
+  fi
 done
 
-# Organise into GT/ and SR/ subdirectories (mirrors baseline layout)
-mkdir -p "$PD_DIR/GT" "$PD_DIR/SR" "$MT_DIR/GT" "$MT_DIR/SR"
+echo ""
+echo "[stage2] PD: $PD_SKIPPED already done, $PD_RUN newly computed, $PD_FAILED failed"
+echo "[stage2] MT: $MT_SKIPPED already done, $MT_RUN newly computed, $MT_FAILED failed"
 
+# Organise into GT/ and SR/ subdirectories (mirrors baseline layout). Only
+# newly-computed top-level files need moving; anything skipped is already in
+# its correct GT/SR location from a prior run, and mv never touches it.
 shopt -s nullglob
 PD_GT=("$PD_DIR"/${METHOD}_GT_*)
 PD_SR=("$PD_DIR"/${METHOD}_SR_*)
@@ -260,6 +340,32 @@ echo "[stage2] PD files: $(find "$PD_DIR" -name '*.vtu' | wc -l)"
 echo "[stage2] MT port0: $(find "$MT_DIR" -name '*_port_0.vtu' | wc -l)"
 echo "[stage2] MT port1: $(find "$MT_DIR" -name '*_port_1.vtu' | wc -l)"
 echo "[stage2] MT port2: $(find "$MT_DIR" -name '*_port_2.vti'  | wc -l)"
+
+# Hard gate: never proceed to distance computation on incomplete PD/MT
+# output. If anything is still missing (skipped-and-failed or not yet run),
+# stop here with the exact re-run command instead of silently computing
+# distances on a partial dataset.
+EXPECTED_FIELDS=$((2 * N_SAMPLES))
+ACTUAL_PD=$(find "$PD_DIR" -name '*_pd_port_0.vtu' | wc -l)
+ACTUAL_MT_P0=$(find "$MT_DIR" -name '*_mt_port_0.vtu' | wc -l)
+ACTUAL_MT_P1=$(find "$MT_DIR" -name '*_mt_port_1.vtu' | wc -l)
+ACTUAL_MT_P2=$(find "$MT_DIR" -name '*_mt_port_2.vti'  | wc -l)
+
+if [[ "$ACTUAL_PD" -ne "$EXPECTED_FIELDS" || "$ACTUAL_MT_P0" -ne "$EXPECTED_FIELDS" \
+      || "$ACTUAL_MT_P1" -ne "$EXPECTED_FIELDS" || "$ACTUAL_MT_P2" -ne "$EXPECTED_FIELDS" ]]; then
+  echo ""
+  echo "[error] TTK extraction incomplete:"
+  echo "[error]   PD:        $ACTUAL_PD / $EXPECTED_FIELDS"
+  echo "[error]   MT port0:  $ACTUAL_MT_P0 / $EXPECTED_FIELDS"
+  echo "[error]   MT port1:  $ACTUAL_MT_P1 / $EXPECTED_FIELDS"
+  echo "[error]   MT port2:  $ACTUAL_MT_P2 / $EXPECTED_FIELDS"
+  echo "[error] Re-run the exact same command to retry only the missing/failed fields"
+  echo "[error] (already-completed fields will be skipped, not recomputed):"
+  echo "[error]   bash $0 --method $METHOD --data-dir $DATA_DIR --vti-dir $VTI_DIR \\"
+  echo "[error]     --out-base $OUT_BASE --n-samples $N_SAMPLES --threads $THREADS"
+  exit 1
+fi
+echo "[stage2] All TTK outputs complete: PD=$ACTUAL_PD/$EXPECTED_FIELDS  MT=$((ACTUAL_MT_P0 + ACTUAL_MT_P1 + ACTUAL_MT_P2))/$((EXPECTED_FIELDS * 3))"
 
 # ---------------------------------------------------------------------------
 # Stage 3: Distance computation (native python3 — same as baseline pipeline)
