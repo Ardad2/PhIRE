@@ -5918,3 +5918,606 @@ Check the following:
 
 Please report any path mismatch, stale filename, wrong metric sign, or overclaiming.
 ```
+
+## XIII.9 Low-lambda E2 scale-up: expanded 1344 and 2688 training sets
+
+After the repaired low-lambda E2-fixed run produced a useful 672-sample result, the same configuration was scaled to larger expanded training sets. The goal was to test whether the MT-oriented signal was stable with more training data, and whether larger constraint sets improved true topology enough to justify any added fidelity tradeoff.
+
+The two scale-up settings were:
+
+| Setting | Expanded training samples | TTK critical pairs/sample | Total TTK critical pairs | TTK weights |
+|---|---:|---:|---:|---:|
+| E2-low-1344 | 1344 | 64 | 86016 | `LAMBDA_TTKCV=0.004`, `LAMBDA_TTKPERS=0.002` |
+| E2-low-2688 | 2688 | 64 | 172032 | `LAMBDA_TTKCV=0.004`, `LAMBDA_TTKPERS=0.002` |
+
+Both runs used the same low-lambda strategy as `candidateE2_fixed_lowlambda`, but with expanded training data and expanded TTK fixed-index critical-pair constraints.
+
+### 1344 expanded CNN output generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/generate_expanded_cnn_sr.py \
+  --data-type wind_mrhr_cnn_expanded1344 \
+  --tfrecord example_data_topology_expanded_1344/wind_MR-HR.tfrecord \
+  --n-expected 1344 \
+  --out-dir data_out/wind_mrhr_cnn_expanded1344
+```
+
+Validation confirmed:
+
+```text
+idx.npy    (1344,)
+dataIN.npy (1344, 100, 100, 2)
+dataGT.npy (1344, 500, 500, 2)
+dataSR.npy (1344, 500, 500, 2)
+idx.npy: 1344 unique indices, range [0, 1343]
+```
+
+The TensorFlow/NumPy environment emitted compatibility warnings, but the run completed successfully. The full 1344 CNN forward pass took roughly 18-19 minutes at batch size 1.
+
+### 1344 constraint generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidateE2_expanded672_ttk_constraints.py \
+  --gt-path    data_out/wind_mrhr_cnn_expanded1344/dataGT.npy \
+  --idx-path   data_out/wind_mrhr_cnn_expanded1344/idx.npy \
+  --n-expected 1344 \
+  --out-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_vti \
+  --vti-label  candidateE2fixedlowlambda1344_GT \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded1344_constraints.log
+```
+
+Constraint NPZ validation:
+
+| Quantity | Value |
+|---|---:|
+| `n_samples` | 1344 |
+| `sample_idx` shape | `(1344,)` |
+| `sample_idx` range | `[0, 1343]` |
+| `sample_count` min/mean/max | `64 / 64.0 / 64` |
+| total pairs | 86016 |
+| expanded `idx.npy` equals NPZ `sample_idx` set | `True` |
+
+Final constraint artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+### 1344 training and benchmark output validation
+
+Training command:
+
+```bash
+cd ~/PhIRE
+
+micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \
+  python scripts/run_candidateE2_fixed_lowlambda_expanded1344_ttkcrit_refiner.py
+```
+
+The training script completed successfully and saved the 168-sample benchmark outputs:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/idx.npy     (168,)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/dataSR.npy  (168, 500, 500, 2)
+```
+
+Sanity check:
+
+| Quantity | Value |
+|---|---:|
+| SR vector range | `[-30.3043, 31.4301]` |
+| GT vector range | `[-30.4676, 30.8122]` |
+| SR speed range | `[0.0014, 41.6725]` |
+| GT speed range | `[0.0122, 33.9885]` |
+| mean absolute speed error | 0.698034 |
+| `idx.npy` | exactly 168 unique indices, range `[0, 167]` |
+
+Interpretation:
+
+- The 1344 run was non-catastrophic.
+- Mean speed MAE was slightly worse than CNN and slightly worse than the 672 low-lambda run, but still close enough to justify cheap evaluation and then true TTK evaluation.
+
+### 1344 cheap scalar/physics/domain evaluation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded1344 \
+  --candidate-dir  data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval
+```
+
+The cheap evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/all_sample_metrics_candidateE2_fixed_lowlambda_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/winner_counts_candidateE2_fixed_lowlambda_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/pairwise_cnn_vs_candidateE2_fixed_lowlambda_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/adjacent_cluster_table_candidateE2_fixed_lowlambda_expanded1344.csv
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_eval.md
+```
+
+The report noted that SSIM was unavailable because of a local `skimage` / NumPy binary mismatch. This did not affect the non-SSIM scalar, physics, component-proxy, or TTK topology evaluations.
+
+Key cheap-eval comparison against CNN:
+
+| Metric | Direction vs CNN | Improved / 168 |
+|---|---:|---:|
+| PSNR-u/v | `-0.0282` | not primary |
+| speed MAE | `+0.0040` | not primary |
+| speed RMSE | `+0.0064` | not primary |
+| WPD W1 | better | 153 |
+| WPD bias abs | better | 154 |
+| gradient MAE | better | 162 |
+| gradient W1 | better | 149 |
+| p90 exceedance error | better | 151 |
+| component curve L1 | better | 140 |
+
+Interpretation:
+
+- The direct-fidelity loss was small.
+- Structural/domain proxies improved strongly enough to justify a full TTK topology run.
+- Any PD/MT rows in the cheap report before the TTK run were not valid for the candidate, because candidate topology had not yet been computed.
+
+### 1344 true TTK topology evaluation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateE2_fixed_lowlambda_expanded1344 \
+  --data-dir data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344 \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology \
+  --n-samples 168 \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded1344_topology_pipeline.log
+```
+
+Comparison/report command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded1344 \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results  ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx     data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/idx.npy \
+  --out-dir           ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology \
+  --report-path       docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_topology_eval.md
+```
+
+Main true topology result:
+
+| Metric | CNN baseline | GAN baseline | E2-low-1344 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 26.9905 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7102 |
+| PD wins vs CNN | — | 166/168 | 128/168 |
+| MT wins vs CNN | — | 20/168 | 120/168 |
+| PD beats GAN | — | — | 2/168 |
+| MT beats GAN | — | — | 159/168 |
+| MT-GAN recovered by E2-low-1344 | — | — | 11/20 |
+
+Winner distribution after adding E2-low-1344:
+
+| Metric family | CNN wins | GAN wins | E2-low-1344 wins |
+|---|---:|---:|---:|
+| PD distance | 2 | 166 | 0 |
+| MT distance | 47 | 9 | 112 |
+
+Interpretation:
+
+- E2-low-1344 improved mean PD over CNN, but did not approach GAN's PD performance.
+- E2-low-1344 strengthened the MT-oriented signal, improving mean MT and taking many MT wins in the three-way comparison.
+- It recovered 11/20 original MT-GAN cases, matching the later 2688 result on this hard subset.
+- This was the strongest balanced result at this point because fidelity loss remained small while true MT improved.
+
+## XIII.10 Low-lambda E2 scale-up to 2688
+
+The 2688 run tested whether the scale-stable MT-oriented effect continued with an even larger expanded constraint set.
+
+### 2688 expanded CNN output generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/generate_expanded_cnn_sr.py \
+  --data-type wind_mrhr_cnn_expanded2688 \
+  --tfrecord example_data_topology_expanded_2688/wind_MR-HR.tfrecord \
+  --n-expected 2688 \
+  --out-dir data_out/wind_mrhr_cnn_expanded2688
+```
+
+Validation confirmed:
+
+```text
+idx.npy    (2688,)
+dataIN.npy (2688, 100, 100, 2)
+dataGT.npy (2688, 500, 500, 2)
+dataSR.npy (2688, 500, 500, 2)
+idx.npy: 2688 unique indices, range [0, 2687]
+```
+
+### 2688 constraint generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidateE2_expanded672_ttk_constraints.py \
+  --gt-path    data_out/wind_mrhr_cnn_expanded2688/dataGT.npy \
+  --idx-path   data_out/wind_mrhr_cnn_expanded2688/idx.npy \
+  --n-expected 2688 \
+  --out-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_vti \
+  --vti-label  candidateE2fixedlowlambda2688_GT \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded2688_constraints.log
+```
+
+Constraint NPZ validation:
+
+| Quantity | Value |
+|---|---:|
+| `n_samples` | 2688 |
+| `sample_idx` shape | `(2688,)` |
+| `sample_idx` range | `[0, 2687]` |
+| `sample_count` min/mean/max | `64 / 64.0 / 64` |
+| total pairs | 172032 |
+| expanded `idx.npy` equals NPZ `sample_idx` set | `True` |
+
+Final constraint artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+### 2688 training and benchmark output validation
+
+Training command:
+
+```bash
+cd ~/PhIRE
+
+micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \
+  python scripts/run_candidateE2_fixed_lowlambda_expanded2688_ttkcrit_refiner.py
+```
+
+The training script completed successfully and saved valid 168-sample benchmark outputs:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/idx.npy     (168,)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/dataSR.npy  (168, 500, 500, 2)
+```
+
+### 2688 cheap scalar/physics/domain evaluation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded2688 \
+  --candidate-dir  data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_eval
+```
+
+Key cheap-eval comparison against CNN:
+
+| Metric | Direction vs CNN | Improved / 168 |
+|---|---:|---:|
+| PSNR-u/v | `-0.0996` | not primary |
+| speed MAE | `+0.0208` | not primary |
+| speed RMSE | `+0.0264` | not primary |
+| WPD W1 | better | 121 |
+| gradient MAE | better | 164 |
+| gradient W1 | better | 154 |
+| component curve L1 | better | 152 |
+| PSD log L2 | better | 146 |
+
+Interpretation:
+
+- The 2688 run had a larger direct-fidelity penalty than 1344.
+- Structural/proxy metrics still improved strongly.
+- Because the cheap metrics remained healthy on the structure side, the full TTK topology run was justified.
+
+### 2688 true TTK topology evaluation and interrupted-run recovery
+
+Initial topology command:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateE2_fixed_lowlambda_expanded2688 \
+  --data-dir data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688 \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology \
+  --n-samples 168 \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded2688_topology_pipeline.log
+```
+
+The first attempts exited before producing `phase_c_final/phase_c_results.csv`. This was diagnosed as an interrupted partial TTK run rather than a bad sample or invalid candidate.
+
+Partial-run evidence from one failed attempt:
+
+| Artifact count | Observed | Complete expected |
+|---|---:|---:|
+| VTI files | 336 | 336 |
+| PD `.vtu` files | 170 | 336 |
+| MT output files | 507 | 1008 |
+| `phase_c_final/phase_c_results.csv` | missing | present |
+
+Partial-run evidence from a later failed attempt:
+
+| Artifact count | Observed | Complete expected |
+|---|---:|---:|
+| VTI files | 336 | 336 |
+| PD `.vtu` files | 316 | 336 |
+| MT output files | 945 | 1008 |
+| `phase_c_final/phase_c_results.csv` | missing | present |
+
+Missing-output diagnostic after the later partial run:
+
+```text
+GT missing PD: []
+GT missing MT: []
+
+SR missing PD: [8, 9, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]
+SR missing MT: [8, 9, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]
+```
+
+Interpretation of the interrupted runs:
+
+- The VTI conversion stage was complete.
+- GT topology extraction was complete.
+- The failures occurred during the SR half of TTK topology extraction.
+- Different attempts stopped at different SR samples (`SR_s100` in one run, `SR_s81` in another), so the evidence points to runtime/session/process interruption rather than a deterministic bad sample.
+- The model outputs and topology pipeline were not invalidated by these interruptions.
+
+The successful completion was obtained by rerunning/resuming the topology command in a plain interactive `tmux` pane rather than relying on fragile nested shell quoting. Final validation:
+
+```text
+PD VTU: 336
+MT files: 1008
+phase_c_final/phase_c_results.csv: present
+```
+
+Final completed artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology/phase_c_final/phase_c_results.csv
+```
+
+### 2688 comparison/report step
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded2688 \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results  ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx     data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/idx.npy \
+  --out-dir           ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology \
+  --report-path       docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_topology_eval.md
+```
+
+Main true topology result:
+
+| Metric | CNN baseline | GAN baseline | E2-low-2688 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 26.4934 |
+| MT distance mean | 5.8678 | 8.3481 | 5.6989 |
+| PD wins vs CNN | — | 166/168 | 142/168 |
+| MT wins vs CNN | — | 20/168 | 118/168 |
+| PD beats GAN | — | — | 2/168 |
+| MT beats GAN | — | — | 159/168 |
+| MT-GAN recovered by E2-low-2688 | — | — | 11/20 |
+
+Winner distribution after adding E2-low-2688:
+
+| Metric family | CNN wins | GAN wins | E2-low-2688 wins |
+|---|---:|---:|---:|
+| PD distance | 2 | 166 | 0 |
+| MT distance | 49 | 9 | 110 |
+
+Changed cases among the original 20 MT-GAN baseline wins:
+
+```text
+E2-low-2688 takes over from GAN on MT: 11/20
+Still GAN after E2-low-2688: 9/20
+Now CNN: 0/20
+```
+
+Interpretation:
+
+- E2-low-2688 improved mean PD more than E2-low-1344.
+- E2-low-2688 produced the lowest mean MT among the E2-low runs documented here, but only by a very small margin over 1344.
+- E2-low-2688 did not improve the MT-GAN hard-case recovery count relative to 1344; both recovered 11/20.
+- E2-low-2688 had a larger cheap-metric direct-fidelity penalty than 1344.
+
+## XIII.11 672 vs 1344 vs 2688 E2-low comparison
+
+Main true topology comparison:
+
+| Metric | E2-low-672 | E2-low-1344 | E2-low-2688 | Best value |
+|---|---:|---:|---:|---|
+| PD mean | 27.1011 | 26.9905 | 26.4934 | 2688 |
+| MT mean | 5.7522 | 5.7102 | 5.6989 | 2688 |
+| PD < CNN | 130/168 | 128/168 | 142/168 | 2688 |
+| MT < CNN | 113/168 | 120/168 | 118/168 | 1344 |
+| PD < GAN | 2/168 | 2/168 | 2/168 | tied |
+| MT beats GAN | 153/168 | 159/168 | 159/168 | 1344/2688 tied |
+| MT-GAN recovered | 6/20 | 11/20 | 11/20 | 1344/2688 tied |
+
+Balanced interpretation:
+
+- E2-low scale-up is stable: all three low-lambda E2-fixed variants improve mean PD and mean MT relative to CNN.
+- The PD effect strengthens most clearly at 2688, but the method remains far from GAN on PD.
+- The strongest scientific signal remains MT-oriented rather than PD-oriented.
+- 1344 is the best balanced setting because it gives strong MT behavior with smaller direct-fidelity degradation than 2688.
+- 2688 is the best topology-only setting if prioritizing mean PD and mean MT, but its advantage over 1344 on MT is tiny and comes with a larger cheap-metric fidelity penalty.
+
+Recommended wording:
+
+> Repaired low-weight E2 critical-pair supervision shows a scale-stable MT-oriented topology signal. Increasing the expanded training set from 672 to 1344 and 2688 improves mean topology distances relative to CNN, with the strongest PD improvement at 2688. However, the method still does not close the GAN PD gap, and the 2688 run incurs a larger pointwise/physics fidelity tradeoff. The 1344 setting is therefore the best balanced E2-low configuration, while 2688 is useful as evidence that the topology signal persists at larger scale.
+
+## XIII.12 Additional files and artifacts to preserve from scale-up
+
+Scripts:
+
+```text
+scripts/generate_expanded_cnn_sr.py
+scripts/build_candidateE2_expanded672_ttk_constraints.py
+scripts/run_candidateE2_fixed_lowlambda_expanded1344_ttkcrit_refiner.py
+scripts/run_candidateE2_fixed_lowlambda_expanded2688_ttkcrit_refiner.py
+scripts/evaluate_finetune_candidate.py
+scripts/run_candidate_topology_pipeline.sh
+scripts/build_candidate_topology_comparison.py
+```
+
+Expanded CNN outputs:
+
+```text
+data_out/wind_mrhr_cnn_expanded1344/
+data_out/wind_mrhr_cnn_expanded2688/
+```
+
+Expanded constraints:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+Fine-tuned benchmark outputs:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/
+```
+
+Cheap-evaluation reports:
+
+```text
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_eval.md
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_eval.md
+```
+
+True TTK topology reports:
+
+```text
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_topology_eval.md
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_topology_eval.md
+```
+
+True TTK topology output directories:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology/
+```
+
+Partial/interrupted 2688 topology runs should be preserved only as debugging/provenance evidence if disk permits. They should not be treated as final analysis outputs.
+
+## XIII.13 Updated Codex consistency-audit prompt for E2 scale-up
+
+Use the following prompt if asking Codex to audit the expanded E2-low 1344/2688 documentation against the repository state:
+
+```text
+Please audit Part XIII of docs/dataset_generation_and_repair_notes.md, especially sections XIII.9 through XIII.12, against the current PhIRE repository and generated outputs.
+
+Check the following:
+
+1. Confirm that the expanded CNN output directories exist and contain valid arrays:
+   - data_out/wind_mrhr_cnn_expanded1344/
+   - data_out/wind_mrhr_cnn_expanded2688/
+   Expected shapes:
+   - 1344: idx.npy (1344,), dataIN.npy (1344,100,100,2), dataGT.npy/dataSR.npy (1344,500,500,2)
+   - 2688: idx.npy (2688,), dataIN.npy (2688,100,100,2), dataGT.npy/dataSR.npy (2688,500,500,2)
+
+2. Confirm that the expanded constraint NPZ files exist and have expected counts:
+   - candidateE2_fixed_lowlambda_expanded1344_constraints: n_samples=1344, sample_count min/mean/max=64/64/64, total pairs=86016
+   - candidateE2_fixed_lowlambda_expanded2688_constraints: n_samples=2688, sample_count min/mean/max=64/64/64, total pairs=172032
+
+3. Confirm that the training scripts exist and point to the documented paths:
+   - scripts/run_candidateE2_fixed_lowlambda_expanded1344_ttkcrit_refiner.py
+   - scripts/run_candidateE2_fixed_lowlambda_expanded2688_ttkcrit_refiner.py
+   Verify that they use LAMBDA_TTKCV=0.004 and LAMBDA_TTKPERS=0.002, and that their N_TRAIN values are 1344 and 2688 respectively.
+
+4. Confirm that the fine-tuned benchmark output directories exist and contain 168-sample arrays:
+   - data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/
+   - data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/
+   Expected shapes:
+   - idx.npy (168,)
+   - dataIN.npy (168,100,100,2)
+   - dataGT.npy/dataSR.npy (168,500,500,2)
+
+5. Confirm that the cheap-evaluation reports and pairwise CSVs exist:
+   - docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_eval.md
+   - docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_eval.md
+   - ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/
+   - ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_eval/
+
+6. Confirm that the true topology outputs are complete:
+   - candidateE2_fixed_lowlambda_expanded1344_topology: 336 PD VTU files, 1008 MT output files, and phase_c_final/phase_c_results.csv
+   - candidateE2_fixed_lowlambda_expanded2688_topology: 336 PD VTU files, 1008 MT output files, and phase_c_final/phase_c_results.csv
+
+7. Verify the reported 1344 true topology summary:
+   - PD mean: CNN=27.4063, GAN=20.8641, E2-low-1344=26.9905
+   - MT mean: CNN=5.8678, GAN=8.3481, E2-low-1344=5.7102
+   - PD < CNN: 128/168
+   - MT < CNN: 120/168
+   - PD < GAN: 2/168
+   - MT beats GAN: 159/168
+   - MT-GAN recovered: 11/20
+
+8. Verify the reported 2688 true topology summary:
+   - PD mean: CNN=27.4063, GAN=20.8641, E2-low-2688=26.4934
+   - MT mean: CNN=5.8678, GAN=8.3481, E2-low-2688=5.6989
+   - PD < CNN: 142/168
+   - MT < CNN: 118/168
+   - PD < GAN: 2/168
+   - MT beats GAN: 159/168
+   - MT-GAN recovered: 11/20
+
+9. Check that the 2688 interrupted-run discussion is documented as a runtime/session issue, not as a data or model failure. Confirm that the final completed 2688 topology output is the one used in the report.
+
+10. Check for overclaiming:
+   - The notes should not imply E2-low closes the GAN PD gap.
+   - The notes should not imply 2688 is strictly better overall than 1344.
+   - The notes should frame 1344 as the best balanced setting and 2688 as stronger on mean topology but with a larger fidelity tradeoff.
+
+Please report any path mismatch, stale filename, wrong metric sign, incomplete artifact count, or overclaiming.
+```
