@@ -6927,3 +6927,149 @@ The strongest current claim is:
 
 > TTK-derived critical-pair supervision appears to provide a merge-tree-relevant training signal when added to native PhIRE topology-inspired fine-tuning. The B+E2 ablation shows that this MT-oriented improvement persists even when Candidate C's local-maxima proxy is disabled, suggesting that the repaired TTK fixed-index terms themselves are responsible for much of the MT gain. Further work should test neighborhood-aware critical-point supervision and direct merge-tree-aware proxies.
 
+---
+
+# Part XV — TF B+E2-low scale-up to 1344 and 2688 samples
+
+## XV.1 Motivation
+
+After the clean `candidateB_plus_E2_tf_lowlambda_expanded672` ablation showed that the repaired TTK fixed-index losses could improve merge-tree behavior even with Candidate C's `L_crit` disabled, the next question was whether this behavior would persist at larger training scales. The goal of this scale-up was to make an apples-to-apples comparison against the already completed Candidate C scale ladder.
+
+The scaled B+E2 runs preserve the same native PhIRE/TensorFlow fine-tuning setup as the 672 B+E2 run:
+
+- pretrained PhIRE CNN initialization,
+- normalized `[u,v]` reconstruction loss,
+- physical-unit scalar speed, gradient, level-set, and TTK losses,
+- repaired low-lambda TTK terms,
+- no Candidate C local-maxima contribution (`LAMBDA_CRIT = 0.0`),
+- same corrected 168-sample benchmark evaluation set,
+- same true TTK PD/MT evaluation pipeline.
+
+The only intended differences across the B+E2 scale ladder are the training TFRecord size and the corresponding repaired TTK constraint file.
+
+## XV.2 Objective and method names
+
+The scaled B+E2 objective is:
+
+$$
+L_{\mathrm{B+E2}} =
+L_{uv}+0.01L_{\mathrm{speed}}+0.05L_{\mathrm{grad}}
++0.25L_{\mathrm{levelset}}
++0.004L_{\mathrm{TTKCV}}
++0.002L_{\mathrm{TTKpers}}.
+$$
+
+`L_crit` is explicitly disabled:
+
+$$
+\lambda_{\mathrm{crit}} = 0.
+$$
+
+| Scale | Script | Method/output name | Training TFRecord | Constraint NPZ |
+|---:|---|---|---|---|
+| 672 | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py` | `candidateB_plus_E2_tf_lowlambda_expanded672` | `example_data_topology_expanded_672/wind_MR-HR.tfrecord` | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 1344 | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` | `candidateB_plus_E2_tf_lowlambda_expanded1344` | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 2688 | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` | `candidateB_plus_E2_tf_lowlambda_expanded2688` | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+
+## XV.3 Output artifacts
+
+| Scale | Model directory | SR output directory | Cheap eval report | True topology report |
+|---:|---|---|---|---|
+| 672 | `models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672` | `data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_eval.md` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md` |
+| 1344 | `models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded1344` | `data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded1344` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded1344_eval.md` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded1344_topology_eval.md` |
+| 2688 | `models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688` | `data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded2688_eval.md` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded2688_topology_eval.md` |
+
+## XV.4 Cheap scalar/domain evaluation across the B+E2 scale ladder
+
+The 1344 and 2688 cheap evaluations were healthy enough to justify the expensive TTK runs. Both had 168 common benchmark samples and exact GT alignment. Across scales, B+E2 improved the main direct-fidelity and scalar/domain metrics relative to the pretrained CNN baseline.
+
+| Metric | CNN baseline | GAN baseline | B+E2-low-672 | B+E2-low-1344 | B+E2-low-2688 | Direction |
+|---|---:|---:|---:|---:|---:|---|
+| PSNRuv (dB) | 31.1925 | 29.1380 | 32.1146 | 32.4480 | **32.6889** | higher is better |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | 0.6178 | 0.5884 | **0.5684** | lower is better |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | 1.0240 | 0.9852 | **0.9629** | lower is better |
+| WPD MAE | 231.6709 | 310.7328 | 202.2449 | 191.8304 | **183.4170** | lower is better |
+| WPD W1 | 45.2713 | 85.6191 | 19.5757 | 19.3128 | **16.0868** | lower is better |
+| WPD bias abs | 35.3439 | 78.7236 | 13.1372 | **11.5541** | 12.6851 | lower is better |
+| Gradient MAE | 0.3491 | 0.3806 | 0.3212 | 0.3180 | **0.3120** | lower is better |
+| Gradient W1 | 0.2329 | 0.0564 | 0.1492 | 0.1654 | 0.1543 | lower is better |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | 3.0060 | **2.9293** | 2.9747 | lower is better |
+| PSD log-L2 | 0.8335 | 0.5139 | **0.8096** | 0.8560 | 0.8509 | lower is better |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.0791 | 1.1891 | 1.2029 | lower is better |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | 0.0027 | 0.0029 | **0.0020** | lower is better |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | 0.0037 | 0.0027 | **0.0026** | lower is better |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | 0.0018 | 0.0023 | **0.0018** | lower is better |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | 0.0032 | 0.0031 | **0.0028** | lower is better |
+| Component-count curve L1 | 115.5278 | 124.6567 | 84.1935 | 91.1538 | **88.0060** | lower is better |
+
+Pairwise improvement counts relative to CNN:
+
+| Metric | B+E2-low-672 improved / 168 | B+E2-low-1344 improved / 168 | B+E2-low-2688 improved / 168 |
+|---|---:|---:|---:|
+| PSNRuv | 168 | 168 | 168 |
+| Speed MAE | 168 | 168 | 168 |
+| Speed RMSE | 168 | 168 | 168 |
+| WPD MAE | 168 | 168 | 168 |
+| WPD W1 | 156 | 139 | 157 |
+| WPD bias abs | 152 | 124 | 140 |
+| Gradient MAE | 168 | 168 | 168 |
+| Gradient W1 | 162 | 155 | 162 |
+| Exceedance abs Δ s>5 | 116 | 118 | 132 |
+| Exceedance abs Δ s>10 | 117 | 123 | 134 |
+| Exceedance abs Δ s>15 | 137 | 124 | 141 |
+| Exceedance abs Δ p90 | 155 | 136 | 148 |
+| Component-count curve L1 | 155 | 153 | 155 |
+
+The repeated caution is PSD slope: B+E2 improves many spatial/scalar metrics but worsens PSD slope relative to CNN at all three scales. This should be reported as a caveat rather than hidden.
+
+## XV.5 True TTK topology results across the B+E2 scale ladder
+
+All true topology evaluations used the corrected 168-sample benchmark, the fixed CNN/GAN baselines, 160×160 speed patches at `(x0=0, y0=0)`, TTK bottleneck distance for PD, and TTK merge-tree distance for MT. Lower is better for both PD and MT.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| B+E2-low-672 | 24.7596 | 5.7161 | 162/168 | 99/168 | 4/168 | 164/168 | 16/20 |
+| B+E2-low-1344 | 24.4965 | **5.6514** | 160/168 | 97/168 | 4/168 | 166/168 | **18/20** |
+| B+E2-low-2688 | **23.9876** | 5.6774 | 166/168 | 90/168 | 8/168 | 166/168 | **18/20** |
+
+Winner distributions after adding each B+E2 candidate:
+
+| Scale | PD winner: B+E2 | PD winner: CNN | PD winner: GAN | MT winner: B+E2 | MT winner: CNN | MT winner: GAN |
+|---:|---:|---:|---:|---:|---:|---:|
+| 672 | 2 | 2 | 164 | 96 | 68 | 4 |
+| 1344 | 3 | 2 | 163 | 95 | 71 | 2 |
+| 2688 | 6 | 2 | 160 | 90 | 76 | 2 |
+
+## XV.6 Apples-to-apples comparison with Candidate C
+
+The scaled B+E2 ladder gives an apples-to-apples comparison against the Candidate C scale ladder because both families use native PhIRE/TensorFlow fine-tuning from the pretrained CNN and the same fixed benchmark evaluation.
+
+| Scale | Candidate C PD | Candidate C MT | B+E2-low PD | B+E2-low MT | Interpretation |
+|---:|---:|---:|---:|---:|---|
+| 672 | **23.9580** | 6.0765 | 24.7596 | **5.7161** | C better PD; B+E2 better MT |
+| 1344 | **22.8623** | 6.1236 | 24.4965 | **5.6514** | C better PD; B+E2 much better MT |
+| 2688 | **22.4944** | 6.0803 | 23.9876 | **5.6774** | C better PD; B+E2 better MT and improved PD vs 672 |
+
+The key readout is descriptor-specific:
+
+- Candidate C remains the stronger PD-oriented objective at larger scales.
+- B+E2-low is the stronger MT-oriented objective at all tested scales.
+- B+E2-low's PD improves with scale: 24.7596 → 24.4965 → 23.9876.
+- B+E2-low's best mean MT is at 1344 samples: 5.6514.
+- B+E2-low recovers 18/20 original MT-GAN cases at both 1344 and 2688 samples.
+
+## XV.7 Updated scientific interpretation
+
+The completed B+E2 scale-up strengthens the repaired E2 conclusion. The original Candidate E result should not be treated as a definitive failure of TTK critical-pair supervision because it was confounded by target, mapping, normalization, and loss-scale issues. After repair, the clean native PhIRE B+E2 ablation shows that TTK-derived fixed-index critical-pair supervision provides a stable merge-tree-oriented signal.
+
+The most accurate interpretation is:
+
+> Candidate C remains the main submitted PD-oriented topology-inspired result. However, the repaired B+E2-low scale ladder shows that TTK critical-pair supervision, when implemented with corrected vertex mapping, GT scalar targets, normalized vector reconstruction, and low weights, consistently improves merge-tree agreement relative to CNN and Candidate C. This effect persists after removing Candidate C's local-maxima proxy, so the MT improvement is attributable to the repaired TTK fixed-index terms rather than to `L_crit`.
+
+## XV.8 Updated takeaway
+
+The B+E2 scale-up adds a new post-submission/future-work conclusion:
+
+> Repaired TTK fixed-index critical-pair supervision is a stable MT-oriented training signal. It does not replace Candidate C as the submitted PD-oriented result, but it gives a stronger route for future merge-tree-aware learning. The natural next step is a factorial ablation that tests `UV+E2`, `UV+crit`, `B+E2`, and `C+E2`, followed by neighborhood-aware or branch-aware critical-pair losses.
