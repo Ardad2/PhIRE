@@ -6521,3 +6521,409 @@ Check the following:
 
 Please report any path mismatch, stale filename, wrong metric sign, incomplete artifact count, or overclaiming.
 ```
+
+---
+
+# Part XIV — Native PhIRE TensorFlow Candidate E2-low fine-tuning audit
+
+## XIV.1 Motivation after the E2 residual audit
+
+After the repaired residual E2-low runs, the main remaining concern was comparability. Candidate C was implemented as native PhIRE/TensorFlow fine-tuning of the pretrained CNN generator, while repaired E2-low had initially been implemented as a PyTorch residual refiner on top of the CNN output. Therefore, even when repaired E2-low showed promising MT behavior, it was not an apples-to-apples comparison with Candidate C.
+
+The next experiment was therefore to implement repaired E2-low directly inside the original PhIRE TensorFlow fine-tuning path. The goal was not to port the full PhIRE model to PyTorch, but to keep the Candidate C training setting and add TTK-derived critical-pair supervision as an additional differentiable loss.
+
+Important naming caveat:
+
+- `candidateE2_tf_lowlambda_expanded672` is best interpreted as **TF C+E2-low**, not as pure Candidate E.
+- It keeps the Candidate C loss stack and adds repaired TTK critical-pair losses.
+- `candidateB_plus_E2_tf_lowlambda_expanded672` is the cleaner **TF B+E2-low** ablation with `L_crit` disabled.
+- The B+E2 ablation is now complete and should be treated as the cleanest repaired E2 ablation for isolating the effect of the repaired TTK fixed-index supervision.
+
+## XIV.2 Native TensorFlow implementation summary: TF C+E2-low
+
+The completed native-PhIRE E2-low experiment used:
+
+```text
+script: scripts/run_candidateE2_tf_lowlambda_expanded672_ttkcrit_refiner.py
+method/output name: candidateE2_tf_lowlambda_expanded672
+training set: expanded672
+constraint NPZ: ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+model dir: models_fixed/topology_finetuning/wind_finetune_candidateE2_tf_lowlambda_expanded672
+output dir: data_out/wind_finetune_candidateE2_tf_lowlambda_expanded672
+```
+
+Loss interpretation:
+
+```text
+L_total =
+  L_uv
+  + 0.01  L_speed
+  + 0.05  L_grad
+  + 0.25  L_levelset
+  + 0.001 L_crit
+  + 0.004 L_TTKCV
+  + 0.002 L_TTKPERS
+```
+
+Where:
+
+- `L_uv`, `L_speed`, `L_grad`, `L_levelset`, and `L_crit` match Candidate C's native TensorFlow/PhIRE fine-tuning stack.
+- `L_TTKCV` uses fixed TTK birth/death vertex IDs and penalizes the predicted scalar speed at those positions against GT critical values.
+- `L_TTKPERS` penalizes the predicted persistence gap at the same fixed TTK pair locations.
+- TTK critical-pair targets come from the repaired fixed-index constraint NPZ produced after the VTI coordinate-mapping fix.
+
+The TensorFlow implementation uses the stable `index` field already decoded from the PhIRE TFRecord pipeline to feed the correct per-sample TTK constraints for each shuffled batch. This avoids modifying the shared PhIRE parser or dataset format.
+
+## XIV.3 Topology pipeline interruption and resumability repair
+
+During true TTK evaluation of `candidateE2_tf_lowlambda_expanded672`, the topology pipeline repeatedly stopped before `phase_c_final/phase_c_results.csv` was created. Diagnostics showed:
+
+```text
+VTI files: 336
+PD files: partial
+MT files: partial
+```
+
+The failure was not a model-output issue. It was a runtime/pipeline-resume issue:
+
+1. Stage 2 of `scripts/run_candidate_topology_pipeline.sh` recomputed every PD/MT field on every restart.
+2. A single TTK segfault aborted the entire script because of `set -euo pipefail`.
+3. The script defaulted to 20 TTK threads unless `--threads` was explicitly passed.
+4. Environment variables such as `OMP_NUM_THREADS=1` did not help because the Docker command used the TTK CLI `-t` argument.
+
+The topology pipeline was patched by Codex in commit:
+
+```text
+e4e56b86
+```
+
+Key repair behavior:
+
+- Stage 2 now skips existing PD outputs.
+- Stage 2 now skips existing MT outputs only when all three MT ports are present.
+- Existing outputs are not overwritten.
+- Individual TTK failures are logged and do not abort the full Stage 2 loop.
+- A hard completeness gate prevents Stage 3 distance computation unless all expected PD/MT outputs exist.
+- `--threads` should be passed explicitly; for the repaired TF E2 runs, `--threads 1` was used.
+
+Successful resume command for TF C+E2-low:
+
+```bash
+cd ~/PhIRE
+
+METHOD=candidateE2_tf_lowlambda_expanded672
+DATA=data_out/wind_finetune_candidateE2_tf_lowlambda_expanded672
+TOPO=ttk_runs_fixed/topology_finetuning/${METHOD}_topology
+VTI=ttk_runs_fixed/topology_finetuning/${METHOD}_topology_vti
+LOG=logs/${METHOD}_topology_pipeline_resume_skip_existing_threads1.log
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method "$METHOD" \
+  --data-dir "$DATA" \
+  --vti-dir "$VTI" \
+  --out-base "$TOPO" \
+  --n-samples 168 \
+  --threads 1 \
+  --skip-viz \
+  2>&1 | tee "$LOG"
+```
+
+Final completed topology-output check for TF C+E2-low:
+
+```text
+VTI files: 336
+PD files: 336
+MT port0: 336
+MT port1: 336
+MT port2: 336
+phase_c_results.csv: present
+docs/topology_finetuning_candidateE2_tf_lowlambda_expanded672_topology_eval.md: present
+```
+
+The same patched resumable topology pipeline was later used successfully for the B+E2 ablation.
+
+## XIV.4 Native TF C+E2-low true topology results
+
+True topology report:
+
+```text
+docs/topology_finetuning_candidateE2_tf_lowlambda_expanded672_topology_eval.md
+```
+
+Summary table:
+
+| Metric | CNN baseline | GAN baseline | TF C+E2-low-672 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 24.9844 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7076 |
+| PD wins vs CNN | — | 166/168 | 162/168 |
+| MT wins vs CNN | — | 20/168 | 96/168 |
+| PD beats GAN | — | — | 4/168 |
+| MT beats GAN | — | — | 160/168 |
+
+Additional winner-distribution summary:
+
+| Metric | Candidate wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD three-way winners after adding TF C+E2-low | 2 | 2 | 164 |
+| MT three-way winners after adding TF C+E2-low | 92 | 70 | 6 |
+
+MT-GAN baseline-case behavior:
+
+- Original MT-GAN baseline wins before candidate: 20 samples.
+- After adding TF C+E2-low:
+  - 14/20 changed from GAN to the candidate.
+  - 6/20 stayed GAN.
+  - 0/20 changed to CNN.
+
+This first native TF E2 run showed that repaired TTK critical-pair supervision can provide a merge-tree-relevant signal in the native PhIRE fine-tuning setting. However, because `L_crit` was still active, it did not isolate whether the MT gain came from the repaired TTK terms or from an interaction with Candidate C's local-maxima proxy.
+
+## XIV.5 Clean TF B+E2-low ablation with `L_crit` disabled
+
+The clean ablation was created as:
+
+```text
+script: scripts/run_candidateB_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py
+method/output name: candidateB_plus_E2_tf_lowlambda_expanded672
+training set: expanded672
+constraint NPZ: ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+model dir: models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672
+output dir: data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672
+cheap eval report: docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_eval.md
+true topology report: docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md
+```
+
+Target loss:
+
+```text
+L_total =
+  L_uv
+  + 0.01 L_speed
+  + 0.05 L_grad
+  + 0.25 L_levelset
+  + 0.004 L_TTKCV
+  + 0.002 L_TTKPERS
+```
+
+with:
+
+```text
+L_crit = 0
+```
+
+Implementation notes:
+
+- The script was derived from the TF C+E2-low script.
+- The only intended loss-stack difference is `LAMBDA_CRIT = 0.0`.
+- The raw `L_crit` op is still constructed and printed for diagnostics, but the weighted contribution `w_L_crit` is always exactly `0.0`.
+- The same native PhIRE/TensorFlow generator fine-tuning path, 672-sample training data, pretrained CNN initialization, repaired constraints NPZ, optimizer, epochs, batch size, output shapes, and normalized `L_uv` convention are retained.
+- The script protects the completed TF C+E2-low output directories so the sibling ablation cannot overwrite them.
+
+Training and inference completed successfully. The final output validation reported:
+
+```text
+idx.npy:    (168,)
+dataIN.npy: (168, 100, 100, 2)
+dataGT.npy: (168, 500, 500, 2)
+dataSR.npy: (168, 500, 500, 2)
+idx.npy values: exactly 0..167
+```
+
+## XIV.6 TF B+E2-low cheap scalar/domain evaluation
+
+Cheap evaluation was run before the expensive TTK topology pipeline:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateB_plus_E2_tf_lowlambda_expanded672 \
+  --candidate-dir  data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateB_plus_E2_tf_lowlambda_expanded672_eval
+```
+
+The result was non-catastrophic and strongly positive relative to CNN on most scalar/domain metrics:
+
+| Metric | CNN baseline | TF B+E2-low-672 | Direction |
+|---|---:|---:|---|
+| PSNRuv (dB) | 31.1925 | 32.1146 | better |
+| Speed MAE | 0.6941 | 0.6178 | better |
+| Speed RMSE | 1.1078 | 1.0240 | better |
+| WPD MAE | 231.6709 | 202.2449 | better |
+| WPD W1 | 45.2713 | 19.5757 | better |
+| WPD bias abs | 35.3439 | 13.1372 | better |
+| Gradient MAE | 0.3491 | 0.3212 | better |
+| Gradient W1 | 0.2329 | 0.1492 | better |
+| Gradient kurtosis abs Δ | 3.7004 | 3.0060 | better |
+| PSD log-L2 | 0.8335 | 0.8096 | better |
+| PSD slope abs Δ | 0.9150 | 1.0791 | worse |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0027 | better |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0037 | better |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0018 | better |
+| Exceedance abs Δ p90 | 0.0103 | 0.0032 | better |
+| Component-count curve L1 | 115.5278 | 84.1935 | better |
+
+Per-sample improvement counts relative to CNN included:
+
+- PSNRuv: improved on 168/168 samples.
+- Speed MAE: improved on 168/168 samples.
+- WPD MAE: improved on 168/168 samples.
+- WPD W1: improved on 156/168 samples.
+- Gradient MAE: improved on 168/168 samples.
+- Gradient W1: improved on 162/168 samples.
+- Component-count curve L1: improved on 155/168 samples.
+
+This justified running the true TTK topology evaluation.
+
+## XIV.7 TF B+E2-low true TTK topology evaluation
+
+Topology pipeline command:
+
+```bash
+cd ~/PhIRE
+
+METHOD=candidateB_plus_E2_tf_lowlambda_expanded672
+DATA=data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672
+TOPO=ttk_runs_fixed/topology_finetuning/${METHOD}_topology
+VTI=ttk_runs_fixed/topology_finetuning/${METHOD}_topology_vti
+LOG=logs/${METHOD}_topology_pipeline_threads1.log
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method "$METHOD" \
+  --data-dir "$DATA" \
+  --vti-dir "$VTI" \
+  --out-base "$TOPO" \
+  --n-samples 168 \
+  --threads 1 \
+  --skip-viz \
+  2>&1 | tee "$LOG"
+```
+
+The topology pipeline completed successfully:
+
+```text
+VTI files: 336
+PD files: 336
+MT port0: 336
+MT port1: 336
+MT port2: 336
+phase_c_results.csv: present
+docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md: present
+```
+
+True topology report:
+
+```text
+docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md
+```
+
+Summary table:
+
+| Metric | CNN baseline | GAN baseline | TF B+E2-low-672 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 24.7596 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7161 |
+| PD wins vs CNN | — | 166/168 | 162/168 |
+| MT wins vs CNN | — | 20/168 | 99/168 |
+| PD beats GAN | — | — | 4/168 |
+| MT beats GAN | — | — | 164/168 |
+
+Additional winner-distribution summary:
+
+| Metric | Candidate wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD three-way winners after adding TF B+E2-low | 2 | 2 | 164 |
+| MT three-way winners after adding TF B+E2-low | 96 | 68 | 4 |
+
+MT-GAN baseline-case behavior:
+
+- Original MT-GAN baseline wins before candidate: 20 samples.
+- After adding TF B+E2-low:
+  - 16/20 changed from GAN to the candidate.
+  - 4/20 stayed GAN.
+  - 0/20 changed to CNN.
+
+Changed MT-GAN cases included samples:
+
+```text
+6, 16, 17, 18, 20, 25, 48, 62, 63, 65, 68, 77, 79, 80, 82, 92
+```
+
+The four MT-GAN cases that remained GAN were:
+
+```text
+8, 12, 19, 154
+```
+
+## XIV.8 Comparison across Candidate C, TF C+E2-low, and TF B+E2-low
+
+The key 672-sample comparison is:
+
+| Method | Implementation | Mean PD | Mean MT | PD < CNN | MT < CNN / MT wins | MT-GAN recovered |
+|---|---|---:|---:|---:|---:|---:|
+| Candidate C-expanded-672 | native PhIRE TF fine-tuning, local-max proxy | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Residual E2-low-672 | PyTorch residual refiner, repaired TTK pairs | 27.1011 | 5.7522 | 130/168 | three-way MT wins 101/168 | 6/20 |
+| TF C+E2-low-672 | native PhIRE TF fine-tuning, Candidate C + repaired TTK pairs | 24.9844 | 5.7076 | 162/168 | 96/168 vs CNN; 92 three-way wins | 14/20 |
+| TF B+E2-low-672 | native PhIRE TF fine-tuning, Candidate B + repaired TTK pairs; `L_crit=0` | 24.7596 | 5.7161 | 162/168 | 99/168 vs CNN; 96 three-way wins | 16/20 |
+
+Interpretation:
+
+- Candidate C remains stronger on PD bottleneck distance than either TF C+E2-low or TF B+E2-low.
+- Both native TF E2-low variants are substantially stronger on MT distance than Candidate C.
+- TF C+E2-low has the slightly best mean MT distance: 5.7076 vs 5.7161 for TF B+E2-low.
+- TF B+E2-low has the slightly better mean PD distance among the two TF E2 variants: 24.7596 vs 24.9844.
+- TF B+E2-low has stronger count-based MT behavior: 99/168 MT wins vs CNN and 16/20 original MT-GAN cases recovered, compared with 96/168 and 14/20 for TF C+E2-low.
+- The B+E2 ablation shows that removing `L_crit` does not remove the MT improvement.
+- Therefore, the repaired TTK fixed-index terms themselves carry a merge-tree-relevant training signal.
+
+This is the cleanest repaired E2 ablation so far because it removes Candidate C's local-maxima proxy and keeps the native PhIRE fine-tuning setting fixed.
+
+## XIV.9 Scientific interpretation after the B+E2 ablation
+
+The current best interpretation is:
+
+> Removing `L_crit` does not remove the MT improvement. The repaired TTK fixed-index losses alone, when added to the Candidate B loss stack in the native PhIRE/TensorFlow fine-tuning setting, are sufficient to produce the MT-oriented gain. `L_crit` is therefore not necessary for the observed merge-tree improvement.
+
+Recommended framing:
+
+- Candidate C remains the main submitted/paper result and the strongest controlled PD-oriented result.
+- TF C+E2-low was the first repaired native-PhIRE E2 experiment and showed strong MT improvement, but it still included `L_crit`.
+- TF B+E2-low is the clean ablation that isolates the repaired TTK fixed-index terms.
+- TF B+E2-low should be treated as the cleanest post-submission/future-work evidence that TTK critical-pair supervision provides an MT-oriented signal.
+- Neither TF E2-low run closes the GAN PD gap, so the claim should remain descriptor-specific: improved MT behavior and improved PD relative to CNN, but not GAN-level PD.
+
+Suggested advisor-update wording:
+
+> The B+E2 ablation is complete. It removes the local-maxima `L_crit` term while keeping the repaired TTK critical-pair losses. The result still improves mean PD over CNN from 27.41 to 24.76 and mean MT from 5.87 to 5.72. It improves MT over CNN on 99/168 samples and recovers 16/20 of the original MT-GAN cases. This suggests the MT gain is coming from the repaired TTK fixed-index supervision itself, not from the Candidate C local-maxima proxy.
+
+## XIV.10 Neighborhood-aware extension suggested in advisor meeting
+
+In the advisor meeting, a useful next conceptual direction was discussed: instead of supervising only the exact birth/death critical pixels, supervise a local neighborhood around each TTK critical point.
+
+Potential variants:
+
+1. Gaussian-weighted patch loss around each birth/death vertex.
+2. Local gradient or Hessian-shape consistency near each critical point.
+3. Enforcing that the selected point remains locally extremal relative to its neighborhood.
+4. Small-patch scalar-speed matching around TTK critical vertices.
+
+This may address a limitation of single-pixel critical-value supervision: exact critical points can be brittle under small spatial shifts, while the surrounding neighborhood may better encode the scalar-field structure that gives rise to the persistence pair or merge-tree branch.
+
+## XIV.11 Updated takeaway after native TF E2-low and B+E2-low
+
+The post-submission Candidate E audit now has a constructive conclusion:
+
+- The original residual E/E2 runs were confounded by infrastructure bugs, loss-balance issues, and a residual-refiner implementation that was not directly comparable to Candidate C.
+- After repairing the infrastructure and lowering the TTK weights, residual E2-low showed promising MT behavior.
+- Implementing repaired E2-low inside native PhIRE TensorFlow fine-tuning produced an apples-to-apples Candidate C-style experiment.
+- The native TF C+E2-low run improved both PD and MT relative to CNN, and was especially strong on MT.
+- The native TF B+E2-low ablation removed `L_crit` and still produced essentially the same MT improvement, with stronger MT win counts.
+- The cleanest current repaired-E2 claim is that TTK-derived fixed critical-pair supervision provides a merge-tree-relevant signal in native PhIRE fine-tuning.
+
+The strongest current claim is:
+
+> TTK-derived critical-pair supervision appears to provide a merge-tree-relevant training signal when added to native PhIRE topology-inspired fine-tuning. The B+E2 ablation shows that this MT-oriented improvement persists even when Candidate C's local-maxima proxy is disabled, suggesting that the repaired TTK fixed-index terms themselves are responsible for much of the MT gain. Further work should test neighborhood-aware critical-point supervision and direct merge-tree-aware proxies.
+
