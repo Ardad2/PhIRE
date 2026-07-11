@@ -7073,3 +7073,1142 @@ The most accurate interpretation is:
 The B+E2 scale-up adds a new post-submission/future-work conclusion:
 
 > Repaired TTK fixed-index critical-pair supervision is a stable MT-oriented training signal. It does not replace Candidate C as the submitted PD-oriented result, but it gives a stronger route for future merge-tree-aware learning. The natural next step is a factorial ablation that tests `UV+E2`, `UV+crit`, `B+E2`, and `C+E2`, followed by neighborhood-aware or branch-aware critical-pair losses.
+
+
+---
+
+# Part XVI — Priority 3 C+E2-low scale-up audit
+
+This part records the next repaired-E2 experiment after the clean B+E2-low scale ladder. The goal was to scale the native PhIRE/TensorFlow **C+E2-low** objective to 1344 and 2688 samples. This family differs from B+E2-low because it keeps Candidate C's local-maxima critical-value proxy enabled while adding repaired low-lambda TTK fixed-index supervision.
+
+## XVI.1 Experiment definition
+
+The C+E2-low objective is
+
+```text
+L_total = L_uv
+        + 0.01  L_speed
+        + 0.05  L_grad
+        + 0.25  L_levelset
+        + 0.001 L_crit
+        + 0.004 L_TTKCV
+        + 0.002 L_TTKpers
+```
+
+Important distinctions:
+
+- `L_crit` is enabled with weight `0.001`.
+- This is Candidate C + repaired E2, not the B+E2 ablation.
+- The implementation uses native PhIRE/TensorFlow generator fine-tuning from the pretrained CNN checkpoint, not the PyTorch residual-refiner path.
+- The 168-sample corrected benchmark remains the evaluation set.
+- TTK evaluation uses the same fixed CNN/GAN baselines, same 160×160 speed patches at `(x0=0, y0=0)`, TTK bottleneck distance for PD, and TTK merge-tree distance for MT.
+
+## XVI.2 Scripts generated and validated
+
+Two new scripts were generated from the completed 672-sample native TF C+E2-low script:
+
+| Script | Method | Training data | Constraints | `L_crit` status |
+|---|---|---|---|---|
+| `scripts/run_candidateE2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` | `candidateE2_tf_lowlambda_expanded1344` | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` | `candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` | enabled, `0.001` |
+| `scripts/run_candidateE2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` | `candidateE2_tf_lowlambda_expanded2688` | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` | `candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` | enabled, `0.001` |
+
+Validation performed before running included:
+
+1. `py_compile` for both scripts,
+2. constant extraction for method names, training paths, constraints paths, `N_TRAIN`, and lambda values,
+3. confirmation that `LAMBDA_CRIT=0.001` is enabled in both scripts,
+4. self-block checks to confirm each script does not protect its own output directory,
+5. completed-run protection checks for the 672 C+E2 run and all B+E2 runs,
+6. sibling cross-protection between the 1344 and 2688 C+E2 scripts,
+7. dry-run precondition checks.
+
+## XVI.3 C+E2-low-1344 cheap scalar/domain evaluation
+
+The C+E2-low-1344 run completed training and paired inference successfully on the fixed 168-sample benchmark. The cheap evaluation was healthy enough for TTK: 168 common samples were present and GT alignment was exact.
+
+| Metric | CNN | GAN | C+E2-low-1344 | Direction |
+|---|---:|---:|---:|---|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.3659** | higher is better |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5925** | lower is better |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9947** | lower is better |
+| WPD MAE | 231.6709 | 310.7328 | **193.1359** | lower is better |
+| WPD W1 | 45.2713 | 85.6191 | **14.7417** | lower is better |
+| WPD bias abs | 35.3439 | 78.7236 | **4.7898** | lower is better |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3173** | lower is better |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1530 | lower is better |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.8428** | lower is better |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.8302 | lower is better |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.1317 | lower is better |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0030** | lower is better |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0030** | lower is better |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0013** | lower is better |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0018** | lower is better |
+| Component-count curve L1 | 115.5278 | 124.6567 | **88.8919** | lower is better |
+
+Pairwise improvement counts relative to CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 165 | 3 |
+| WPD bias abs | 155 | 13 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 165 | 3 |
+| Gradient kurtosis abs Δ | 79 | 89 |
+| PSD log-L2 | 98 | 70 |
+| PSD slope abs Δ | 3 | 165 |
+| Exceedance abs Δ s>5 | 117 | 51 |
+| Exceedance abs Δ s>10 | 123 | 45 |
+| Exceedance abs Δ s>15 | 141 | 26 |
+| Exceedance abs Δ p90 | 160 | 8 |
+| Component-count curve L1 | 156 | 12 |
+
+The main caveat is PSD slope: it worsened on most samples, as in the B+E2 scale ladder. This did not block TTK because the direct-fidelity, scalar-speed, WPD, gradient, exceedance, and component-count proxy metrics were strong.
+
+## XVI.4 C+E2-low-1344 true TTK topology evaluation
+
+The topology pipeline completed successfully for C+E2-low-1344:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| C+E2-low-1344 | 24.3389 | 5.7479 | 164/168 | 90/168 | 6/168 | 161/168 | 16/20 |
+
+Winner distributions after adding C+E2-low-1344:
+
+| Metric family | C+E2 wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD | 4 | 2 | 162 |
+| MT | 87 | 77 | 4 |
+
+## XVI.5 Interpretation against C and B+E2 at 1344
+
+| Method | Objective summary | PD mean | MT mean | PD < CNN | MT < CNN | MT-GAN cases recovered | Interpretation |
+|---|---|---:|---:|---:|---:|---:|---|
+| C-1344 | B + `0.001 L_crit` | **22.8623** | 6.1236 | 168/168 | 49/168 | 9/20 | strongest PD at this scale |
+| B+E2-low-1344 | B + low-lambda TTK, no `L_crit` | 24.4965 | **5.6514** | 160/168 | 97/168 | **18/20** | strongest MT at this scale |
+| C+E2-low-1344 | B + `L_crit` + low-lambda TTK | 24.3389 | 5.7479 | 164/168 | 90/168 | 16/20 | intermediate: better PD than B+E2, weaker MT |
+
+The 1344 result suggests that adding Candidate C's `L_crit` back into the repaired E2 stack slightly improves PD relative to B+E2-low-1344, but weakens the MT signal and recovers fewer of the original MT-GAN cases. This supports the interpretation that the repaired TTK fixed-index terms are the main source of the merge-tree improvement, while `L_crit` is more PD-oriented or at least not purely MT-helpful in this repaired E2 setting.
+
+## XVI.6 C+E2-low-2688 cheap scalar/domain evaluation
+
+C+E2-low-2688 completed training, paired inference, and cheap evaluation successfully. The run used the native TensorFlow/PhIRE path, kept Candidate C's `L_crit=0.001` enabled, and added the repaired low-lambda E2 terms.
+
+The cheap evaluation completed on the fixed 168-sample benchmark:
+
+| Check | Result |
+|---|---|
+| Common samples | 168 |
+| GT alignment | OK (`max_abs_diff=0.00e+00`) |
+| Topology lookup | 336 baseline CNN/GAN entries loaded |
+| Total metric rows | 672 |
+| SSIM | not computed because of the known local `skimage`/NumPy binary mismatch |
+
+Summary metrics:
+
+| Metric | CNN | GAN | C+E2-low-2688 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.7329** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5649** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9566** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **182.9106** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **12.9098** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **6.7038** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3116** |
+| Gradient W1 | 0.2329 | 0.0564 | **0.1582** |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.9537** |
+| PSD log-L2 | **0.8335** | 0.5139 | 0.8589 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.2509 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0022** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0024** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0015** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0017** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **91.8690** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 166 | 2 |
+| WPD bias abs | 148 | 20 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 165 | 3 |
+| Gradient kurtosis abs Δ | 80 | 88 |
+| PSD log-L2 | 79 | 89 |
+| PSD slope abs Δ | 0 | 168 |
+| Exceedance abs Δ s>5 | 131 | 37 |
+| Exceedance abs Δ s>10 | 126 | 42 |
+| Exceedance abs Δ s>15 | 140 | 28 |
+| Exceedance abs Δ p90 | 155 | 13 |
+| Component-count curve L1 | 154 | 14 |
+
+The cheap evaluation again shows the recurring PSD-slope caveat, but the direct-fidelity, scalar-speed, WPD, gradient, exceedance, and component-count proxy metrics were strong enough to justify the true TTK run.
+
+## XVI.7 C+E2-low-2688 true TTK topology evaluation
+
+The topology pipeline completed successfully for C+E2-low-2688:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| C+E2-low-2688 | 24.2686 | 5.6628 | 165/168 | 94/168 | 7/168 | 167/168 | 19/20 |
+
+Winner distributions after adding C+E2-low-2688:
+
+| Metric family | C+E2 wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD | 5 | 2 | 161 |
+| MT | 93 | 74 | 1 |
+
+The 20 original MT-GAN baseline wins were nearly all recovered: the MT winner changed to C+E2-low-2688 in 19 of the 20 cases, stayed GAN in 1 case, and changed to CNN in 0 cases.
+
+## XVI.8 Completed Priority 3 comparison
+
+| Scale | Method | Objective summary | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---:|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 672 | C | B + `0.001 L_crit` | **23.9580** | 6.0765 | 168/168 | 54/168 | -- | -- | 7/20 |
+| 672 | B+E2-low | B + low-lambda TTK, no `L_crit` | 24.7596 | 5.7161 | 162/168 | 99/168 | 4/168 | 164/168 | 16/20 |
+| 672 | C+E2-low | B + `L_crit` + low-lambda TTK | 24.9844 | **5.7076** | 162/168 | 96/168 | 4/168 | 160/168 | 14/20 |
+| 1344 | C | B + `0.001 L_crit` | **22.8623** | 6.1236 | 168/168 | 49/168 | -- | -- | 9/20 |
+| 1344 | B+E2-low | B + low-lambda TTK, no `L_crit` | 24.4965 | **5.6514** | 160/168 | 97/168 | 4/168 | 166/168 | 18/20 |
+| 1344 | C+E2-low | B + `L_crit` + low-lambda TTK | 24.3389 | 5.7479 | 164/168 | 90/168 | 6/168 | 161/168 | 16/20 |
+| 2688 | C | B + `0.001 L_crit` | **22.4944** | 6.0803 | 168/168 | 52/168 | 20/168 | -- | 10/20 |
+| 2688 | B+E2-low | B + low-lambda TTK, no `L_crit` | 23.9876 | 5.6774 | 166/168 | 90/168 | 8/168 | 166/168 | 18/20 |
+| 2688 | C+E2-low | B + `L_crit` + low-lambda TTK | 24.2686 | **5.6628** | 165/168 | 94/168 | 7/168 | 167/168 | **19/20** |
+
+Priority 3 interpretation:
+
+1. Candidate C remains the strongest PD-oriented objective at every scale.
+2. Repaired E2 terms are consistently MT-oriented and substantially outperform Candidate C alone on MT.
+3. B+E2 proves that repaired TTK fixed-index supervision can produce MT gains even without `L_crit`.
+4. C+E2-2688 shows that reintroducing `L_crit` at larger scale does not destroy the MT signal; it gives the strongest 2688-scale MT mean (`5.6628`) and recovers `19/20` original MT-GAN cases.
+5. Across all repaired E2 runs so far, the best absolute mean MT is B+E2-low-1344 (`5.6514`), with C+E2-low-2688 close behind (`5.6628`).
+6. The repaired E2 variants do not close the PD gap to GAN, but they improve PD over CNN on most samples while strongly improving MT relative to Candidate C.
+
+## XVII. Priority 4 complete: UV+E2-low-672
+
+Priority 4 tested whether Candidate B's scalar-speed, gradient, and level-set scaffold is necessary for repaired E2 to produce useful topology behavior.
+
+### XVII.1 Scientific question
+
+The question was:
+
+> Can repaired TTK fixed-index critical-pair supervision produce a useful topology signal when the only other loss is normalized vector reconstruction?
+
+This ablation removes all Candidate B/C scalar proxy terms and keeps only `L_uv` plus the repaired low-lambda E2 terms.
+
+Objective:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++ 0.004L_{\mathrm{TTKCV}}
++ 0.002L_{\mathrm{TTKpers}}.
+$$
+
+Disabled terms:
+
+- `L_speed = 0`
+- `L_grad = 0`
+- `L_levelset = 0`
+- `L_crit = 0`
+
+### XVII.2 Primary files and reconstruction anchors
+
+This section records the file names needed to reconstruct the UV+E2-low-672 experiment.
+
+#### Script and code provenance
+
+| Artifact | Path / name | Notes |
+|---|---|---|
+| Training/inference script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py` | Native TensorFlow/PhIRE generator fine-tuning; no PyTorch residual refiner |
+| Source sibling script | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py` | Closest base; same data/constraints/optimizer, but Candidate B losses are active there |
+| Commit noted from Codex | `acc78748` | Commit that added the UV+E2-low-672 script |
+| Script log path | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672.log` | Internal tee log written by the script |
+| Manual run log path | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672_manual.log` | Manual terminal log from the training + paired inference command |
+
+#### Input files
+
+| Artifact | Path / name | Notes |
+|---|---|---|
+| Training TFRecord | `example_data_topology_expanded_672/wind_MR-HR.tfrecord` | Same 672-sample expanded seasonal training data as B+E2-low-672 |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` | Fixed 168-sample benchmark |
+| Pretrained CNN checkpoint | `models/wind_mr-hr/trained_cnn/cnn` | Read-only initialization |
+| Repaired E2 constraints | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz` | Same repaired low-lambda 672 E2 constraints used by B+E2-low-672 and C+E2-low-672 |
+| Baseline merged CSV | `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` | Supplies precomputed CNN/GAN PD/MT entries for cheap eval reports |
+
+#### Output files
+
+| Artifact | Path / name | Notes |
+|---|---|---|
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672/` | Saved fine-tuned checkpoint |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672/` | Contains `idx.npy`, `dataIN.npy`, `dataGT.npy`, `dataSR.npy` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/` | Cheap scalar/domain/proxy metrics |
+| Cheap eval all metrics | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/all_sample_metrics_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | Per-sample metrics for bicubic/CNN/GAN/candidate |
+| Cheap eval pairwise CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/pairwise_cnn_vs_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | CNN-vs-candidate deltas |
+| Cheap eval winner counts | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/winner_counts_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | Winner-count table for cheap metrics |
+| Cheap eval adjacent clusters | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/adjacent_cluster_table_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | Samples 10–13, 90–93, 162–163 |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded672_eval.md` | Human-readable cheap evaluation report |
+| VTI directory | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology_vti/` | GT/SR VTI files for TTK |
+| TTK topology directory | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/` | PD/MT outputs and comparison files |
+| TTK phase-C results | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/phase_c_results.csv` | Per-sample candidate PD/MT distances |
+| TTK PD pairwise CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/pd_pairwise_distances.csv` | PD pairwise distances |
+| TTK MT pairwise CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/mt_pairwise_distances.csv` | MT pairwise distances |
+| TTK summary CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/phase_c_summary.csv` | Summary table |
+| TTK summary TXT | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/phase_c_summary.txt` | Text summary |
+| Candidate PD/MT distances | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/candidateUV_plus_E2_tf_lowlambda_expanded672_pd_mt_distances.csv` | Candidate distances per sample |
+| 3-way topology comparison | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/candidateUV_plus_E2_tf_lowlambda_expanded672_topology_comparison.csv` | CNN/GAN/candidate comparison |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded672_topology_eval.md` | Human-readable true TTK topology report |
+| TTK pipeline log | `logs/candidateUV_plus_E2_tf_lowlambda_expanded672_topology_pipeline_threads1.log` | Full TTK pipeline log with `--threads 1 --skip-viz` |
+
+### XVII.3 Training and paired inference
+
+The script completed training and paired inference on the fixed 168-sample benchmark. Output validation passed:
+
+| Output file | Expected shape |
+|---|---:|
+| `idx.npy` | `(168,)` |
+| `dataIN.npy` | `(168, 100, 100, 2)` |
+| `dataGT.npy` | `(168, 500, 500, 2)` |
+| `dataSR.npy` | `(168, 500, 500, 2)` |
+
+The output index values were exactly `0..167`.
+
+### XVII.4 Cheap scalar/domain evaluation
+
+UV+E2-low-672 completed cheap evaluation successfully. The report is:
+
+- `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded672_eval.md`
+
+Summary metrics:
+
+| Metric | CNN | GAN | UV+E2-low-672 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **31.8657** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.6386** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **1.0574** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **210.1936** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **20.2967** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **12.1275** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3260** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1466 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.9402** |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.7724 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 0.9683 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0029** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0040** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0019** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0034** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **83.8552** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 155 | 13 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 129 | 39 |
+| WPD MAE | 163 | 5 |
+| WPD W1 | 154 | 14 |
+| WPD bias abs | 144 | 24 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 159 | 9 |
+| Gradient kurtosis abs Δ | 86 | 82 |
+| PSD log-L2 | 128 | 40 |
+| PSD slope abs Δ | 55 | 113 |
+| Exceedance abs Δ s>5 | 115 | 53 |
+| Exceedance abs Δ s>10 | 119 | 48 |
+| Exceedance abs Δ s>15 | 131 | 37 |
+| Exceedance abs Δ p90 | 145 | 23 |
+| Component-count curve L1 | 154 | 13 |
+
+The cheap evaluation was healthy enough to justify the true TTK topology pipeline.
+
+### XVII.5 True TTK topology evaluation
+
+The true TTK topology pipeline completed successfully:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+E2-low-672 | 25.2675 | 5.6645 | 161/168 | 103/168 | 2/168 | 162/168 | 16/20 |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 4 |
+| MT winner changes to UV+E2-low-672 | 16 |
+| MT winner changes to CNN | 0 |
+
+MT winner distribution after adding UV+E2-low-672:
+
+| Method | MT wins |
+|---|---:|
+| UV+E2-low-672 | 101 |
+| CNN | 63 |
+| GAN | 4 |
+
+### XVII.6 Interpretation
+
+Priority 4 is complete.
+
+Main conclusions:
+
+1. Candidate B is not necessary for repaired E2 to produce an MT signal.
+2. UV+E2-low-672 improves mean MT relative to CNN (`5.6645` vs `5.8678`) and gives the strongest 672-scale MT mean among the repaired native TensorFlow/PhIRE E2 variants.
+3. UV+E2-low-672 also improves the component-count proxy strongly (`83.8552` vs CNN `115.5278`).
+4. Candidate B/C scalar scaffold terms still appear helpful for PD: UV+E2-low-672 has weaker PD than B+E2-low-672 and C+E2-low-672.
+5. The repaired fixed-index TTK loss is therefore a genuine MT-oriented training signal, not merely a side effect of Candidate B's speed/gradient/level-set losses.
+
+## XVIII. Priority 5 complete: UV+crit-672
+
+Priority 5 tested Candidate C's high-speed local-maxima / critical-value proxy without Candidate B's scalar-speed, gradient, and level-set scaffold.
+
+### XVIII.1 Scientific question
+
+The question was:
+
+> Can Candidate C's local-maxima / critical-value proxy produce a topology-relevant training signal when the only other loss is normalized vector reconstruction?
+
+This ablation removes all Candidate B scalar proxy terms and all repaired E2 fixed-index TTK terms. It keeps only `L_uv + 0.001 L_crit`.
+
+### XVIII.2 Objective and disabled terms
+
+Native TensorFlow/PhIRE objective:
+
+$$
+L_{\mathrm{UV+crit}} =
+L_{uv}
++ 0.001L_{\mathrm{crit}}.
+$$
+
+Disabled terms:
+
+- `L_speed = 0`
+- `L_grad = 0`
+- `L_levelset = 0`
+- `L_TTKCV = 0`
+- `L_TTKpers = 0`
+
+### XVIII.3 Reconstruction anchors and file inventory
+
+| Artifact | Path / name |
+|---|---|
+| Script | `scripts/run_candidateUV_plus_crit_expanded672_refiner.py` |
+| Method name | `candidateUV_plus_crit_expanded672` |
+| Training TFRecord | `example_data_topology_expanded_672/wind_MR-HR.tfrecord` |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` |
+| Source checkpoint | `models/wind_mr-hr/trained_cnn/cnn` |
+| Log file | `logs/wind_finetune_candidateUV_plus_crit_expanded672.log` |
+| Manual run log | `logs/wind_finetune_candidateUV_plus_crit_expanded672_manual.log` |
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded672/` |
+| Final checkpoint | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded672/cnn/cnn` |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/` |
+| SR output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/dataSR.npy` |
+| GT output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/dataGT.npy` |
+| LR/MR input output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/dataIN.npy` |
+| Sample index output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/idx.npy` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/` |
+| Cheap eval all-sample metrics | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/all_sample_metrics_candidateUV_plus_crit_expanded672.csv` |
+| Cheap eval pairwise table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/pairwise_cnn_vs_candidateUV_plus_crit_expanded672.csv` |
+| Cheap eval winner counts | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/winner_counts_candidateUV_plus_crit_expanded672.csv` |
+| Adjacent-cluster table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/adjacent_cluster_table_candidateUV_plus_crit_expanded672.csv` |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded672_eval.md` |
+| Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology_vti/` |
+| Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/` |
+| PD/MT per-sample distances | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/candidateUV_plus_crit_expanded672_pd_mt_distances.csv` |
+| Three-way topology comparison | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/candidateUV_plus_crit_expanded672_topology_comparison.csv` |
+| Phase-C distance summary | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/phase_c_final/phase_c_results.csv` |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded672_topology_eval.md` |
+
+### XVIII.4 Training and paired inference validation
+
+Training completed and wrote the final checkpoint:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded672/cnn/cnn
+```
+
+Paired inference on the fixed 168-sample benchmark completed successfully. Output validation passed:
+
+| Output | Expected shape | Status |
+|---|---:|---|
+| `idx.npy` | `(168,)` | OK |
+| `dataIN.npy` | `(168, 100, 100, 2)` | OK |
+| `dataGT.npy` | `(168, 500, 500, 2)` | OK |
+| `dataSR.npy` | `(168, 500, 500, 2)` | OK |
+
+`idx.npy` was exactly `0..167`.
+
+### XVIII.5 Cheap scalar/domain evaluation
+
+Summary metrics:
+
+| Metric | CNN | GAN | UV+crit-672 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **33.1536** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5385** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9093** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **176.0295** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **27.2570** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **12.0790** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3296** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.2439 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.9691** |
+| PSD log-L2 | 0.8335 | **0.5139** | 1.0670 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.3543 |
+| Exceedance abs Δ s>5 | **0.0042** | 0.0082 | 0.0091 |
+| Exceedance abs Δ s>10 | **0.0066** | 0.0243 | 0.0081 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0024** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0027** |
+| Component-count curve L1 | **115.5278** | 124.6567 | 133.9722 |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 150 | 18 |
+| WPD bias abs | 151 | 17 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 56 | 112 |
+| Gradient kurtosis abs Δ | 87 | 81 |
+| PSD log-L2 | 0 | 168 |
+| PSD slope abs Δ | 0 | 168 |
+| Exceedance abs Δ s>5 | 5 | 163 |
+| Exceedance abs Δ s>10 | 81 | 86 |
+| Exceedance abs Δ s>15 | 133 | 35 |
+| Exceedance abs Δ p90 | 147 | 21 |
+| Component-count curve L1 | 9 | 158 |
+
+The cheap evaluation was mixed. UV+crit-672 strongly improved direct fidelity and scalar/WPD magnitude metrics, but worsened PSD metrics, low-threshold exceedance, and component-count behavior.
+
+### XVIII.6 True TTK topology evaluation
+
+The true TTK topology pipeline completed successfully:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+crit-672 | 29.4764 | 5.9217 | 8/168 | 65/168 | 0/168 | 149/168 | 7/20 |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 13 |
+| MT winner changes to UV+crit-672 | 7 |
+| MT winner changes to CNN | 0 |
+
+MT winner distribution after adding UV+crit-672:
+
+| Method | MT wins |
+|---|---:|
+| UV+crit-672 | 58 |
+| CNN | 97 |
+| GAN | 13 |
+
+PD winner distribution after adding UV+crit-672 remained CNN 2 and GAN 166; UV+crit-672 did not become the PD winner on any sample.
+
+### XVIII.7 Interpretation
+
+Priority 5 is complete.
+
+Main conclusions:
+
+1. `L_crit` alone does not reproduce Candidate C's PD improvement. UV+crit-672 is worse than CNN on mean PD (`29.4764` vs `27.4063`) and improves over CNN on only `8/168` samples.
+2. Candidate C's strong 672-scale PD behavior therefore appears to require Candidate B's scalar-speed, gradient, and level-set scaffold.
+3. UV+crit-672 slightly improves over UV-only on MT (`5.9217` vs `6.2891`) and recovers `7/20` original MT-GAN cases, but it does not beat CNN on mean MT.
+4. The cheap component-count result predicted this weakness: component-count L1 worsened from CNN `115.5278` to UV+crit `133.9722`, improving on only `9/168` samples.
+5. This sharply contrasts with Priority 4: UV+E2-low-672 showed that repaired fixed-index TTK supervision can drive an MT signal without Candidate B, while UV+crit-672 shows that the local-maxima proxy alone is not enough for robust PD or MT improvement.
+
+## XIX. Robustness scale-up plan: UV+E2-low and UV+crit at 1344 and 2688 samples
+
+After completing Priorities 4 and 5 at 672 samples, the next robustness check is to scale both ablations to the larger 1344- and 2688-sample training sets.
+
+### XIX.1 Scientific motivation
+
+The 672-sample results suggest two complementary findings:
+
+1. `UV+E2-low-672` shows repaired TTK fixed-index losses can drive an MT signal without Candidate B.
+2. `UV+crit-672` shows Candidate C's `L_crit` alone does not reproduce Candidate C's PD improvement.
+
+Scaling both families to 1344 and 2688 samples tests whether these findings are stable or whether either ablation is data-scale sensitive.
+
+### XIX.2 Planned scale-up matrix
+
+| Family | 672 result | 1344 status | 2688 status | Main question |
+|---|---|---|---|---|
+| UV+E2-low | complete; MT-strong | **complete; MT-strong** | **complete; MT-strong** | Repaired E2 alone remains MT-effective and improves with scale. |
+| UV+crit | complete; topology-weak despite strong fidelity | complete; PD-weak, modest MT improvement | **complete; PD-weak, stronger but limited MT improvement** | `L_crit` alone remains insufficient for PD, but MT improves with scale. |
+
+### XIX.3 Planned UV+E2-low scale-up reconstruction anchors
+
+| Scale | Artifact | Planned path / name |
+|---:|---|---|
+| 1344 | Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` |
+| 1344 | Method name | `candidateUV_plus_E2_tf_lowlambda_expanded1344` |
+| 1344 | Training TFRecord | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` |
+| 1344 | Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 1344 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| 1344 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| 1344 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/` |
+| 1344 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_vti/` |
+| 1344 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/` |
+| 1344 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_eval.md` |
+| 1344 | Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_eval.md` |
+| 2688 | Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` |
+| 2688 | Method name | `candidateUV_plus_E2_tf_lowlambda_expanded2688` |
+| 2688 | Training TFRecord | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` |
+| 2688 | Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 2688 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| 2688 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| 2688 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_eval/` |
+| 2688 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_vti/` |
+| 2688 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/` |
+| 2688 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_eval.md` |
+| 2688 | Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_eval.md` |
+
+Planned UV+E2-low objective at both scales:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++0.004L_{\mathrm{TTKCV}}
++0.002L_{\mathrm{TTKpers}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_crit=0`.
+
+### XIX.4 Planned UV+crit scale-up reconstruction anchors
+
+| Scale | Artifact | Planned path / name |
+|---:|---|---|
+| 1344 | Script | `scripts/run_candidateUV_plus_crit_expanded1344_refiner.py` |
+| 1344 | Method name | `candidateUV_plus_crit_expanded1344` |
+| 1344 | Training TFRecord | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` |
+| 1344 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_eval/` |
+| 1344 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology_vti/` |
+| 1344 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology/` |
+| 1344 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_eval.md` |
+| 1344 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_topology_eval.md` |
+| 2688 | Script | `scripts/run_candidateUV_plus_crit_expanded2688_refiner.py` |
+| 2688 | Method name | `candidateUV_plus_crit_expanded2688` |
+| 2688 | Training TFRecord | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` |
+| 2688 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_eval/` |
+| 2688 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology_vti/` |
+| 2688 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology/` |
+| 2688 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_eval.md` |
+| 2688 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_topology_eval.md` |
+
+Planned UV+crit objective at both scales:
+
+$$
+L_{\mathrm{UV+crit}} =
+L_{uv}
++0.001L_{\mathrm{crit}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_TTKCV=L_TTKpers=0`.
+
+### XIX.5 Expected interpretation after scaling
+
+| Outcome | Interpretation |
+|---|---|
+| UV+E2-low remains MT-strong at 1344/2688 | Repaired fixed-index TTK supervision is robustly MT-oriented without Candidate B |
+| UV+E2-low weakens at scale | Candidate B may stabilize E2 when training data become more diverse |
+| UV+crit remains topology-weak at 1344/2688 | Candidate C's PD gains require Candidate B's scalar scaffold |
+| UV+crit improves substantially at 1344/2688 | `L_crit` may be data-scale sensitive and should be reconsidered as a standalone local-extrema signal |
+
+---
+
+## XX. UV+E2-low-1344 scale-up complete
+
+This section records the completed 1344-sample scale-up of the UV+E2-low ablation. It updates the Part XIX robustness plan with the first completed larger-scale run.
+
+### XX.1 Scientific question
+
+The question was:
+
+> Does repaired E2 fixed-index TTK supervision remain MT-effective without Candidate B's scalar-speed, gradient, and level-set scaffold when the training set is increased from 672 to 1344 samples?
+
+The objective was unchanged from UV+E2-low-672:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++0.004L_{\mathrm{TTKCV}}
++0.002L_{\mathrm{TTKpers}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_crit=0`.
+
+### XX.2 Reconstruction anchors and file inventory
+
+| Artifact | Path / name |
+|---|---|
+| Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` |
+| Method name | `candidateUV_plus_E2_tf_lowlambda_expanded1344` |
+| Training TFRecord | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` |
+| Source checkpoint | `models/wind_mr-hr/trained_cnn/cnn` |
+| Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| Log file | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344.log` |
+| Manual run log | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344_manual.log` |
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| Final checkpoint | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/cnn/cnn` |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| SR output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/dataSR.npy` |
+| GT output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/dataGT.npy` |
+| LR/MR input output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/dataIN.npy` |
+| Sample index output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/idx.npy` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/` |
+| Cheap eval all-sample metrics | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/all_sample_metrics_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Cheap eval pairwise table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/pairwise_cnn_vs_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Cheap eval winner counts | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/winner_counts_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Adjacent-cluster table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/adjacent_cluster_table_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_eval.md` |
+| Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_vti/` |
+| Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/` |
+| Phase-C distance summary | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/phase_c_final/phase_c_results.csv` |
+| Three-way topology comparison | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_comparison.csv` |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_eval.md` |
+
+### XX.3 Training and paired inference validation
+
+Training completed and wrote the final checkpoint:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/cnn/cnn
+```
+
+Paired inference on the fixed 168-sample benchmark completed successfully. Output validation passed:
+
+| Output | Expected shape | Status |
+|---|---:|---|
+| `idx.npy` | `(168,)` | OK |
+| `dataIN.npy` | `(168, 100, 100, 2)` | OK |
+| `dataGT.npy` | `(168, 500, 500, 2)` | OK |
+| `dataSR.npy` | `(168, 500, 500, 2)` | OK |
+
+`idx.npy` was exactly `0..167`.
+
+### XX.4 Cheap scalar/domain evaluation
+
+Summary metrics:
+
+| Metric | CNN | GAN | UV+E2-low-1344 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.1573** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.6118** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **1.0235** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **200.2107** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **22.7899** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **18.5849** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3226** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1572 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.8830** |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.8099 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.0799 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0025** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0040** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0024** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0044** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **88.8442** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 154 | 14 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 140 | 28 |
+| WPD bias abs | 124 | 44 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 161 | 7 |
+| Gradient kurtosis abs Δ | 83 | 85 |
+| Exceedance abs Δ s>5 | 122 | 46 |
+| Exceedance abs Δ s>10 | 106 | 62 |
+| Exceedance abs Δ s>15 | 127 | 41 |
+| Exceedance abs Δ p90 | 134 | 34 |
+| Component-count curve L1 | 156 | 12 |
+
+The cheap evaluation was healthy enough to justify the true TTK topology pipeline.
+
+### XX.5 True TTK topology evaluation
+
+The true TTK topology pipeline completed successfully:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+E2-low-1344 | 25.1566 | **5.6300** | 158/168 | 105/168 | 2/168 | 165/168 | **18/20** |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 2 |
+| MT winner changes to UV+E2-low-1344 | 18 |
+| MT winner changes to CNN | 0 |
+
+Winner distributions after adding UV+E2-low-1344:
+
+| Metric | CNN wins | GAN wins | UV+E2-low-1344 wins |
+|---|---:|---:|---:|
+| PD | 2 | 165 | 1 |
+| MT | 62 | 2 | 104 |
+
+### XX.6 Interpretation
+
+Main conclusions:
+
+1. UV+E2-low-1344 strengthens the Priority 4 conclusion. Repaired E2 fixed-index supervision remains MT-effective without Candidate B at a larger training scale.
+2. UV+E2-low-1344 improves mean MT from CNN `5.8678` to `5.6300`, beats CNN on MT in `105/168` samples, beats GAN on MT in `165/168` samples, and recovers `18/20` original MT-GAN cases.
+3. UV+E2-low-1344 is the strongest mean-MT native TensorFlow repaired-E2 result so far, improving on B+E2-low-1344 (`5.6514`) and C+E2-low-1344 (`5.7479`) on mean MT.
+4. The result remains descriptor-specific: Candidate C-1344 is much stronger on mean PD (`22.8623` vs UV+E2-low-1344 `25.1566`), while UV+E2-low-1344 is much stronger on mean MT (`5.6300` vs Candidate C-1344 `6.1236`).
+5. Running UV+E2-low-2688 is scientifically worthwhile for consistency and for determining whether the UV+E2 MT signal saturates, weakens, or continues improving with scale.
+
+---
+
+
+## XXI. UV+E2-low-2688 scale-up complete
+
+This section records the completed 2688-sample UV+E2-low scale-up, including training, paired inference, cheap scalar/domain evaluation, and true TTK topology evaluation.
+
+### XXI.1 Goal
+
+This run extends the UV+E2-low ablation from 672 and 1344 training samples to 2688 training samples, using the same objective:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++ 0.004L_{\mathrm{TTKCV}}
++ 0.002L_{\mathrm{TTKpers}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_crit=0`.
+
+The question is whether repaired fixed-index TTK supervision remains MT-oriented without Candidate B's scalar scaffold at the largest expanded training scale.
+
+### XXI.2 Reconstruction anchors and file names
+
+| Artifact type | Path |
+|---|---|
+| Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` |
+| Method name | `candidateUV_plus_E2_tf_lowlambda_expanded2688` |
+| Training TFRecord | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` |
+| Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| Training/inference log | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688.log` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_eval/` |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_eval.md` |
+| Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_vti/` |
+| Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/` |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_eval.md` |
+
+### XXI.3 Training and paired inference status
+
+Training and paired inference completed successfully. The final checkpoint and output arrays were:
+
+- final checkpoint: `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/cnn/cnn`
+- SR outputs: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataSR.npy`
+- GT outputs: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataGT.npy`
+- LR inputs: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataIN.npy`
+- sample indices: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/idx.npy`
+
+Validation status:
+
+| Output | Expected / observed |
+|---|---|
+| `idx.npy` | `(168,)`, exactly `0..167` |
+| `dataIN.npy` | `(168, 100, 100, 2)` |
+| `dataGT.npy` | `(168, 500, 500, 2)` |
+| `dataSR.npy` | `(168, 500, 500, 2)` |
+
+### XXI.4 Cheap scalar/domain evaluation
+
+The cheap scalar/domain evaluation completed and was healthy.
+
+| Metric | CNN | GAN | UV+E2-low-2688 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.5752** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5789** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9773** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **187.6210** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **21.2812** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **17.1101** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3181** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1694 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **3.2223** |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.8378 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.1206 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0025** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0035** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0025** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0037** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **97.1538** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 152 | 16 |
+| WPD bias abs | 143 | 25 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 159 | 9 |
+| Gradient kurtosis abs Δ | 80 | 88 |
+| Exceedance abs Δ s>5 | 121 | 47 |
+| Exceedance abs Δ s>10 | 132 | 36 |
+| Exceedance abs Δ s>15 | 141 | 27 |
+| Exceedance abs Δ p90 | 144 | 24 |
+| Component-count curve L1 | 154 | 14 |
+
+### XXI.5 TTK topology result
+
+The TTK topology pipeline completed and wrote the expected topology artifacts:
+
+- VTI files: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_vti/`
+- TTK outputs: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/`
+- distances: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/phase_c_final/phase_c_results.csv`
+- comparison: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_comparison.csv`
+- report: `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_eval.md`
+
+The corrected report extraction confirmed the report header and method name correspond to `candidateUV_plus_E2_tf_lowlambda_expanded2688`.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+E2-low-2688 | 25.0721 | **5.5940** | 160/168 | 104/168 | 2/168 | **166/168** | **18/20** |
+
+Mean deltas relative to CNN:
+
+| Metric | CNN | UV+E2-low-2688 | Δ | Direction |
+|---|---:|---:|---:|---|
+| PD distance | 27.4063 | 25.0721 | -2.3342 | better |
+| MT distance | 5.8678 | 5.5940 | -0.2738 | better |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 2 |
+| MT winner changes to UV+E2-low-2688 | 18 |
+| MT winner changes to CNN | 0 |
+
+Winner distributions after adding UV+E2-low-2688:
+
+| Metric | CNN wins | GAN wins | UV+E2-low-2688 wins |
+|---|---:|---:|---:|
+| PD | 2 | 165 | 1 |
+| MT | 64 | 2 | 102 |
+
+### XXI.6 Final UV+E2-low scale ladder
+
+| Scale | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered | MT winners after adding candidate |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 672 | 25.2675 | 5.6645 | 161/168 | 103/168 | 2/168 | 162/168 | 16/20 | UV+E2 101 / CNN 63 / GAN 4 |
+| 1344 | 25.1566 | 5.6300 | 158/168 | 105/168 | 2/168 | 165/168 | 18/20 | UV+E2 104 / CNN 62 / GAN 2 |
+| 2688 | **25.0721** | **5.5940** | 160/168 | 104/168 | 2/168 | **166/168** | **18/20** | UV+E2 102 / CNN 64 / GAN 2 |
+
+### XXI.7 Interpretation
+
+1. UV+E2-low-2688 completes the UV+E2 scale ladder and confirms that repaired fixed-index TTK supervision remains MT-effective without Candidate B at the largest expanded training scale.
+2. Mean MT improves monotonically with training scale: `5.6645` at 672, `5.6300` at 1344, and `5.5940` at 2688.
+3. UV+E2-low-2688 is the strongest mean-MT native TensorFlow repaired-E2 result so far, improving over B+E2-low-2688 (`5.6774`) and C+E2-low-2688 (`5.6628`) on mean MT.
+4. The result remains descriptor-specific: Candidate C-2688 is much stronger on mean PD (`22.4944` vs UV+E2-low-2688 `25.0721`), while UV+E2-low-2688 is much stronger on mean MT (`5.5940` vs Candidate C-2688 `6.0803`).
+5. The UV+crit ladder is now complete. UV+crit remains PD-weak at all scales but gives an increasingly strong, still limited MT improvement as training scale increases.
+
+---
+
+# Part XXII — UV+crit scale ladder completion
+
+This part records the completed native TensorFlow/PhIRE UV+crit scale-up runs. These runs test Candidate C's high-speed local-maxima / critical-value proxy in isolation from Candidate B's scalar-speed, gradient, and level-set scaffold.
+
+## XXII.1 Objective and disabled losses
+
+The UV+crit objective at both 1344 and 2688 samples is:
+
+```text
+L_total = L_uv + 0.001 L_crit
+```
+
+Disabled terms:
+
+```text
+L_speed = 0
+L_grad = 0
+L_levelset = 0
+L_wpd = 0
+L_TTKCV = 0
+L_TTKpers = 0
+```
+
+This means the runs are not repaired-E2 runs and use no fixed-index TTK constraint NPZ. They use the standard native PhIRE `pretrain()` path with normalized vector `L_uv` and Candidate C's local-maxima proxy computed on denormalized scalar speed.
+
+## XXII.2 Reconstruction anchors
+
+| Scale | Artifact | Path |
+|---:|---|---|
+| 1344 | Script | `scripts/run_candidateUV_plus_crit_expanded1344_refiner.py` |
+| 1344 | Model directory | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Cheap eval dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_eval/` |
+| 1344 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology_vti/` |
+| 1344 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology/` |
+| 1344 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_eval.md` |
+| 1344 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_topology_eval.md` |
+| 2688 | Script | `scripts/run_candidateUV_plus_crit_expanded2688_refiner.py` |
+| 2688 | Model directory | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Cheap eval dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_eval/` |
+| 2688 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology_vti/` |
+| 2688 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology/` |
+| 2688 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_eval.md` |
+| 2688 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_topology_eval.md` |
+
+For both scales, paired inference output validation confirmed the expected fixed-benchmark output structure:
+
+```text
+idx.npy:    (168,), exactly 0..167
+dataIN.npy: (168, 100, 100, 2)
+dataGT.npy: (168, 500, 500, 2)
+dataSR.npy: (168, 500, 500, 2)
+```
+
+## XXII.3 Cheap-evaluation summary
+
+| Metric | CNN | UV+crit-1344 | UV+crit-2688 | Interpretation |
+|---|---:|---:|---:|---|
+| PSNRuv | 31.1925 | 33.3888 | **33.6552** | improves strongly with scale |
+| Speed MAE | 0.6941 | 0.5218 | **0.5038** | improves strongly |
+| Speed RMSE | 1.1078 | 0.8902 | **0.8667** | improves strongly |
+| WPD MAE | 231.6709 | 170.1947 | **163.0417** | improves strongly |
+| WPD W1 | 45.2713 | 25.8500 | **21.8276** | improves strongly |
+| WPD bias abs | 35.3439 | 17.8387 | **14.0303** | improves strongly |
+| Gradient MAE | 0.3491 | 0.3229 | **0.3184** | improves |
+| Gradient W1 | 0.2329 | 0.2335 | **0.2295** | slight improvement at 2688 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.6949 | 6.3798 | worsens |
+| PSD log-L2 | 0.8335 | 1.0568 | 1.0504 | worse than CNN |
+| PSD slope abs Δ | 0.9150 | 1.3842 | 1.3937 | worse than CNN |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0081 | 0.0077 | worse than CNN |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0082 | 0.0066 | roughly tied at 2688 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0020 | **0.0017** | improves |
+| Exceedance abs Δ p90 | 0.0103 | 0.0024 | **0.0022** | improves |
+| Component-count curve L1 | 115.5278 | 132.1756 | 133.6042 | worse than CNN |
+
+The cheap-evaluation pattern is consistent across UV+crit scales: direct fidelity and scalar magnitude metrics improve substantially, but topology-proxy metrics related to threshold-set organization remain poor. The component-count curve L1 remains worse than CNN at both 1344 and 2688.
+
+## XXII.4 True TTK topology summary
+
+Lower is better for both PD bottleneck distance and MT Wasserstein-type distance.
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovered | MT winners after adding candidate |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| UV+crit-672 | 29.4764 | 5.9217 | 8/168 | 65/168 | 0/168 | 149/168 | 7/20 | UV+crit 58 / CNN 97 / GAN 13 |
+| UV+crit-1344 | 29.1410 | 5.7733 | 10/168 | 81/168 | 0/168 | 156/168 | 11/20 | UV+crit 76 / CNN 83 / GAN 9 |
+| UV+crit-2688 | 29.1143 | 5.6899 | 12/168 | 94/168 | 0/168 | 160/168 | 13/20 | UV+crit 90 / CNN 71 / GAN 7 |
+
+Original MT-GAN case outcomes for UV+crit-2688:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 7 |
+| MT winner changes to UV+crit-2688 | 13 |
+| MT winner changes to CNN | 0 |
+
+Winner distributions after adding UV+crit-2688:
+
+| Metric | CNN wins | GAN wins | UV+crit-2688 wins |
+|---|---:|---:|---:|
+| PD | 2 | 166 | 0 |
+| MT | 71 | 7 | 90 |
+
+## XXII.5 Interpretation
+
+1. `L_crit` alone does **not** reproduce Candidate C's PD behavior. Across 672, 1344, and 2688 samples, UV+crit remains worse than CNN on mean PD and never beats GAN on PD.
+2. `L_crit` alone has a scale-dependent MT signal. Mean MT improves monotonically from `5.9217` to `5.7733` to `5.6899`, and MT<CNN improves from `65/168` to `81/168` to `94/168`.
+3. The MT signal is still weaker than repaired fixed-index TTK supervision. UV+E2-low-2688 reaches mean MT `5.5940` and recovers `18/20` MT-GAN cases, while UV+crit-2688 reaches mean MT `5.6899` and recovers `13/20`.
+4. The completed UV+crit ladder supports the ablation conclusion that Candidate C's PD gains depend on combining the Candidate B scalar-speed / gradient / level-set scaffold with `L_crit`. The local-maxima proxy alone mainly improves fidelity and gives only limited merge-tree benefit at larger scale.
+
+---
