@@ -9022,3 +9022,918 @@ UV + grad + levelset
 Only after these topology and cheap/domain metrics are accumulated should the results be interpreted jointly with fidelity, WPD, gradient, PSD, exceedance, and component-count behavior.
 
 ---
+
+---
+
+# Part XXV — Completed superlevel robustness extension with UV-2688 and B-2688
+
+## XXV.1 Purpose of this update
+
+This section supersedes the pending/debugging status recorded in Part XXIV.5. The superlevel robustness extension with the matched UV control and full Candidate B scaffold has now been completed successfully.
+
+The goal was to extend the existing superlevel robustness evaluation to include:
+
+```text
+candidateUV_expanded2688
+candidateB_expanded2688
+```
+
+alongside the previously completed methods:
+
+```text
+cnn
+gan
+candidateC_expanded2688
+candidateB_plus_E2_tf_lowlambda_expanded2688
+candidateE2_tf_lowlambda_expanded2688
+candidateUV_plus_E2_tf_lowlambda_expanded2688
+candidateUV_plus_crit_expanded2688
+```
+
+The final completed evaluation used the same superlevel convention as before:
+
+```text
+superlevel topology of speed s = sublevel topology of -s
+```
+
+That is, the VTI scalar array is still named `wind_speed` for compatibility with the existing TTK command lines, but it stores:
+
+```text
+-sqrt(u^2 + v^2)
+```
+
+rather than positive speed.
+
+## XXV.2 Relevant files
+
+### Script
+
+```text
+scripts/run_superlevel_topology_robustness.py
+```
+
+This script now contains:
+
+1. the corrected real method name `candidateE2_tf_lowlambda_expanded2688` for the native TF C+E2-low-2688 run,
+2. `candidateUV_expanded2688` and `candidateB_expanded2688` in `DEFAULT_METHODS`,
+3. known sublevel means for UV-2688 and B-2688,
+4. a Docker path fix using repo-relative paths for all Docker-internal VTI and TTK commands.
+
+### Completed log
+
+```text
+logs/superlevel_with_B_UV_rerun_pathfix.log
+```
+
+### Final report
+
+```text
+docs/superlevel_topology_robustness_eval_with_B_UV.md
+```
+
+### Final aggregate CSV outputs
+
+```text
+ttk_runs_fixed/superlevel_topology/superlevel_pd_mt_per_sample_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_winner_comparison_with_B_UV.csv
+```
+
+### Per-method superlevel outputs for the newly added methods
+
+```text
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/vti/
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/topology/pd/
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/topology/mt/
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/topology/phase_c_final/phase_c_results.csv
+```
+
+```text
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/vti/
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/topology/pd/
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/topology/mt/
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/topology/phase_c_final/phase_c_results.csv
+```
+
+## XXV.3 Reproducibility commands
+
+### Step 1 — exact-order input check
+
+Before rerunning the superlevel extension, verify that every method has `idx.npy` exactly ordered as `0..167`.
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+methods = {
+    "cnn": "data_out_fixed/wind_mrhr_cnn",
+    "gan": "data_out_fixed/wind_mrhr_gan",
+    "candidateC_expanded2688": "data_out/wind_finetune_candidateC_expanded2688",
+    "candidateB_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688",
+    "candidateE2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_crit_expanded2688": "data_out/wind_finetune_candidateUV_plus_crit_expanded2688",
+    "candidateUV_expanded2688": "data_out/wind_finetune_candidateUV_expanded2688",
+    "candidateB_expanded2688": "data_out/wind_finetune_candidateB_expanded2688",
+}
+
+ok = True
+for name, d in methods.items():
+    p = Path(d) / "idx.npy"
+    if not p.exists():
+        print(f"[MISSING] {name}: {p}")
+        ok = False
+        continue
+    idx = np.load(p)
+    exact = np.array_equal(idx, np.arange(168))
+    print(f"{name:55s} exact_order={exact}")
+    ok = ok and exact
+
+raise SystemExit(0 if ok else 1)
+PY
+```
+
+All methods returned `exact_order=True`.
+
+### Step 2 — clean up debug VTI directory, if present
+
+During the path debugging stage, one-sample debug VTIs may have been written under `_debug_vti`. Remove them using Docker, because Docker-created files may be root-owned.
+
+```bash
+cd ~/PhIRE
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'rm -rf ttk_runs_fixed/superlevel_topology/_debug_vti'
+```
+
+### Step 3 — run the completed Phase A superlevel extension
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_superlevel_topology_robustness.py --run \
+  --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateE2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \
+  --output-suffix _with_B_UV \
+  --threads 1 \
+  2>&1 | tee logs/superlevel_with_B_UV_rerun_pathfix.log
+```
+
+This command writes a new suffixed report and new suffixed aggregate CSVs. It does not overwrite the earlier unsuffixed superlevel report/CSVs.
+
+### Step 4 — inspect the PASS/FAIL checklist
+
+```bash
+cd ~/PhIRE
+
+grep -nE "candidateUV_expanded2688|candidateB_expanded2688|PASS|FAIL|FINISHED|COMPLETE" \
+  logs/superlevel_with_B_UV_rerun_pathfix.log | tail -120
+```
+
+The completed run reported:
+
+```text
+[PASS] candidateUV_expanded2688: VTI generation
+[PASS] candidateUV_expanded2688: complete TTK outputs (VTI=336 PD=336 MT_p0=336 MT_p1=336 MT_p2=336, expect 336 each)
+[PASS] candidateUV_expanded2688: distance computation
+[PASS] candidateUV_expanded2688: phase_c_results.csv row count for method='candidateUV_expanded2688' == 168 (got 168)
+
+[PASS] candidateB_expanded2688: VTI generation
+[PASS] candidateB_expanded2688: complete TTK outputs (VTI=336 PD=336 MT_p0=336 MT_p1=336 MT_p2=336, expect 336 each)
+[PASS] candidateB_expanded2688: distance computation
+[PASS] candidateB_expanded2688: phase_c_results.csv row count for method='candidateB_expanded2688' == 168 (got 168)
+
+[PASS] Winner CSV row count == 168
+Superlevel topology robustness evaluation COMPLETE (all checks passed).
+```
+
+### Step 5 — inspect the final report
+
+```bash
+cd ~/PhIRE
+
+sed -n '1,260p' docs/superlevel_topology_robustness_eval_with_B_UV.md
+```
+
+### Step 6 — optionally print the completed summary table from CSV
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import pandas as pd
+
+p = "ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method_with_B_UV.csv"
+df = pd.read_csv(p)
+
+cols = [
+    "method",
+    "pd_mean_superlevel",
+    "mt_mean_superlevel",
+    "pd_lt_cnn",
+    "mt_lt_cnn",
+    "pd_beats_gan",
+    "mt_beats_gan",
+    "mt_gan_recovered",
+    "mt_gan_total",
+    "pd_mean_sublevel_known",
+    "mt_mean_sublevel_known",
+]
+print(df[cols].to_string(index=False))
+PY
+```
+
+## XXV.4 Completed superlevel mean PD/MT table
+
+Lower is better for both PD and MT.
+
+| Method | PD mean (superlevel) | MT mean (superlevel) | PD mean (sublevel, known) | MT mean (sublevel, known) |
+|---|---:|---:|---:|---:|
+| cnn | 27.3762 | 5.3231 | 27.4063 | 5.8678 |
+| gan | 20.7168 | 7.8397 | 20.8641 | 8.3481 |
+| candidateC_expanded2688 | 22.4417 | 5.3578 | 22.4944 | 6.0803 |
+| candidateB_plus_E2_tf_lowlambda_expanded2688 | 24.1042 | 4.9998 | 23.9876 | 5.6774 |
+| candidateE2_tf_lowlambda_expanded2688 | 24.3811 | 4.9796 | 24.2686 | 5.6628 |
+| candidateUV_plus_E2_tf_lowlambda_expanded2688 | 25.1923 | 4.9522 | 25.0721 | 5.5940 |
+| candidateUV_plus_crit_expanded2688 | 29.0752 | 5.0875 | 29.1143 | 5.6899 |
+| candidateUV_expanded2688 | 29.6621 | 5.4230 | 29.6121 | 6.0119 |
+| candidateB_expanded2688 | 22.6909 | 5.8614 | 22.7070 | 6.1612 |
+
+## XXV.5 Completed superlevel win-count table
+
+| Method | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovered (/23) |
+|---|---:|---:|---:|---:|---:|
+| gan | 166/168 | 23/168 | -- | -- | -- |
+| candidateC_expanded2688 | 168/168 | 72/168 | 19/168 | 151/168 | 14 |
+| candidateB_plus_E2_tf_lowlambda_expanded2688 | 165/168 | 110/168 | 6/168 | 165/168 | 23 |
+| candidateE2_tf_lowlambda_expanded2688 | 164/168 | 112/168 | 5/168 | 166/168 | 23 |
+| candidateUV_plus_E2_tf_lowlambda_expanded2688 | 160/168 | 120/168 | 0/168 | 168/168 | 23 |
+| candidateUV_plus_crit_expanded2688 | 13/168 | 104/168 | 0/168 | 157/168 | 13 |
+| candidateUV_expanded2688 | 8/168 | 68/168 | 0/168 | 144/168 | 7 |
+| candidateB_expanded2688 | 164/168 | 42/168 | 15/168 | 137/168 | 8 |
+
+## XXV.6 Winner distributions
+
+### PD winner distribution
+
+| Method | Wins |
+|---|---:|
+| gan | 146 |
+| candidateC_expanded2688 | 14 |
+| candidateB_expanded2688 | 8 |
+
+### MT winner distribution
+
+| Method | Wins |
+|---|---:|
+| candidateUV_plus_E2_tf_lowlambda_expanded2688 | 43 |
+| candidateE2_tf_lowlambda_expanded2688 | 34 |
+| candidateB_plus_E2_tf_lowlambda_expanded2688 | 30 |
+| candidateUV_plus_crit_expanded2688 | 25 |
+| cnn | 25 |
+| candidateUV_expanded2688 | 8 |
+| candidateC_expanded2688 | 3 |
+
+## XXV.7 Interpretation of the completed superlevel extension
+
+The completed superlevel extension strengthens the same descriptor-specific story seen under the default/sublevel convention.
+
+### UV to B
+
+```text
+UV-2688 superlevel: PD 29.6621, MT 5.4230
+B-2688  superlevel: PD 22.6909, MT 5.8614
+```
+
+So the Candidate B scaffold gives a large PD improvement relative to UV, but worsens MT relative to UV.
+
+### B to C
+
+```text
+B-2688 superlevel: PD 22.6909, MT 5.8614, MT-GAN recovery 8/23
+C-2688 superlevel: PD 22.4417, MT 5.3578, MT-GAN recovery 14/23
+```
+
+This suggests that `L_crit` is still not the main PD driver, but it does add a useful high-speed/extrema signal and mitigates some of the MT degradation caused by the B scaffold.
+
+### E2 family
+
+The repaired E2-family variants remain the clearest MT-oriented methods under the superlevel convention:
+
+```text
+UV+E2-low-2688: MT 4.9522, MT-GAN recovery 23/23
+C+E2-low-2688 / candidateE2_tf_lowlambda_expanded2688: MT 4.9796, MT-GAN recovery 23/23
+B+E2-low-2688: MT 4.9998, MT-GAN recovery 23/23
+```
+
+This reinforces the interpretation that the B/C scaffold is PD-oriented, whereas the repaired fixed-index TTK terms are MT-oriented.
+
+## XXV.8 Final status before Phase B
+
+Phase A is now complete.
+
+The next step is Phase B: the Candidate B internal factorial ablation, beginning with the `levelset` singleton:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --variant levelset \
+  2>&1 | tee logs/candidateB_factorial_levelset_expanded2688_batch.log
+```
+
+This will test whether the soft high-speed level-set term alone is the main source of Candidate B's large PD improvement and/or MT degradation.
+
+---
+
+# Part XXVI — Phase B completed: Candidate B factorial ablation at 2688-sample scale
+
+## XXVI.1 Purpose of this update
+
+This section records the completed **Phase B Candidate B factorial ablation**. It supersedes the previous “Final status before Phase B” note in Part XXV.8.
+
+The purpose of Phase B was to decompose Candidate B:
+
+```text
+B = L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset
+```
+
+into singleton and pairwise objectives in order to identify which term or interaction was responsible for Candidate B's large persistence-diagram (PD) improvement and which terms contributed to the merge-tree (MT) degradation.
+
+The completed result is:
+
+> Candidate B's large PD improvement is primarily driven by `L_grad`. `L_speed` and `L_levelset` singleton losses do not substantially improve TTK PD. `L_levelset` becomes useful only when paired with `L_grad`, while `L_speed` can worsen MT when paired with `L_grad`.
+
+## XXVI.2 Evaluation convention
+
+All Phase B variants were trained from the pretrained PhIRE CNN checkpoint and evaluated on the fixed 168-sample benchmark. The model predicts normalized vector components `[u,v]`; scalar losses and topology evaluation denormalize `[u,v]` and use scalar speed:
+
+```text
+s(x,y) = sqrt(u(x,y)^2 + v(x,y)^2)
+```
+
+True topology metrics:
+
+```text
+PD distance = TTK bottleneck distance between persistence diagrams
+MT distance = TTK merge-tree Wasserstein-type distance
+```
+
+Lower is better for both PD and MT.
+
+The cheap evaluation reports include pointwise, physical, spectral, exceedance, and connected-component proxy metrics. These are useful diagnostics, but they are not substitutes for true TTK PD/MT. Phase B shows this clearly: speed-only and levelset-only improve many cheap metrics but remain near the UV control in true PD.
+
+SSIM was still unavailable in the cheap reports because `skimage` could not be imported in the active NumPy environment:
+
+```text
+ValueError('numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject')
+```
+
+This affects only SSIM reporting, not the SR arrays or TTK topology evaluation.
+
+## XXVI.3 Scripts used
+
+Training / cheap evaluation:
+
+```text
+scripts/run_candidateB_factorial_expanded2688_finetune.py
+scripts/run_candidateB_factorial_expanded2688_batch.sh
+```
+
+TTK topology pipeline:
+
+```text
+scripts/run_candidate_topology_pipeline.sh
+```
+
+All TTK runs were done with:
+
+```text
+--threads 1
+--skip-viz
+```
+
+The `--skip-viz` flag means Phase B produced VTI/VTU/CSV/Markdown outputs but did not generate new image-panel figure sets. Existing paper figure sets remain under:
+
+```text
+ttk_runs_fixed/figure_sets/
+```
+
+## XXVI.4 Variant definitions
+
+| Variant | Objective |
+|---|---|
+| `speed` | `L_uv + 0.01 L_speed` |
+| `grad` | `L_uv + 0.05 L_grad` |
+| `levelset` | `L_uv + 0.25 L_levelset` |
+| `speed_grad` | `L_uv + 0.01 L_speed + 0.05 L_grad` |
+| `speed_levelset` | `L_uv + 0.01 L_speed + 0.25 L_levelset` |
+| `grad_levelset` | `L_uv + 0.05 L_grad + 0.25 L_levelset` |
+| full `B-2688` | `L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset` |
+
+References:
+
+| Reference | Meaning |
+|---|---|
+| `UV-2688` | vector-only fine-tuning control, `L_uv` |
+| `B-2688` | full Candidate B scaffold |
+| `C-2688` | Candidate B plus `0.001 L_crit` |
+| CNN | pretrained PhIRE CNN baseline |
+| GAN | pretrained PhIRE GAN baseline |
+
+## XXVI.5 Artifact naming convention
+
+For each variant `<variant>`, the method name is:
+
+```text
+candidateB_factorial_<variant>_expanded2688
+```
+
+### Model output arrays
+
+```text
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/idx.npy
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/dataIN.npy
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/dataGT.npy
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/dataSR.npy
+```
+
+Expected shapes:
+
+```text
+idx.npy    -> (168,)
+dataIN.npy -> (168, 100, 100, 2)
+dataGT.npy -> (168, 500, 500, 2)
+dataSR.npy -> (168, 500, 500, 2)
+```
+
+Checked `grad` output arrays:
+
+```text
+idx.npy    shape=(168,), min=0, max=167, exact 0..167=True
+dataIN.npy shape=(168,100,100,2), min=-21.5213, max=26.9345
+dataGT.npy shape=(168,500,500,2), min=-30.4676, max=30.8122
+dataSR.npy shape=(168,500,500,2), min=-26.8842, max=29.0971
+```
+
+### Cheap-evaluation outputs
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/all_sample_metrics_candidateB_factorial_<variant>_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/winner_counts_candidateB_factorial_<variant>_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_<variant>_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/adjacent_cluster_table_candidateB_factorial_<variant>_expanded2688.csv
+docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_eval.md
+```
+
+### TTK topology outputs
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology_vti/
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/pd/
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/mt/
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/pd_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/mt_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/phase_c_summary.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/phase_c_summary.txt
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/candidateB_factorial_<variant>_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/candidateB_factorial_<variant>_expanded2688_topology_comparison.csv
+docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_topology_eval.md
+```
+
+### Logs
+
+```text
+logs/candidateB_factorial_<variant>_expanded2688_batch.log
+logs/topology_candidateB_factorial_<variant>_expanded2688.log
+```
+
+## XXVI.6 Reproduction commands
+
+Train and cheap-evaluate one variant:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --variant <variant> \
+  2>&1 | tee logs/candidateB_factorial_<variant>_expanded2688_batch.log
+```
+
+Run TTK topology:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method     candidateB_factorial_<variant>_expanded2688 \
+  --data-dir   data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688 \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology_vti \
+  --out-base   ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology \
+  --n-samples  168 \
+  --threads    1 \
+  --skip-viz \
+  2>&1 | tee logs/topology_candidateB_factorial_<variant>_expanded2688.log
+```
+
+Extract topology summary:
+
+```bash
+cd ~/PhIRE
+
+grep -nA12 "Summary:" logs/topology_candidateB_factorial_<variant>_expanded2688.log | tail -30
+```
+
+Inspect reports:
+
+```bash
+cd ~/PhIRE
+
+sed -n '1,220p' docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_eval.md
+sed -n '1,220p' docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_topology_eval.md
+```
+
+Verify arrays before TTK:
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+variant = "grad"  # change as needed
+method_dir = Path(f"data_out/wind_finetune_candidateB_factorial_{variant}_expanded2688")
+expected = {
+    "idx.npy": (168,),
+    "dataIN.npy": (168, 100, 100, 2),
+    "dataGT.npy": (168, 500, 500, 2),
+    "dataSR.npy": (168, 500, 500, 2),
+}
+
+ok = True
+for fname, shape in expected.items():
+    p = method_dir / fname
+    if not p.exists():
+        print("[MISSING]", p)
+        ok = False
+        continue
+    arr = np.load(p, mmap_mode="r")
+    print(fname, "shape=", arr.shape, "min=", float(np.min(arr)), "max=", float(np.max(arr)))
+    if tuple(arr.shape) != shape:
+        print("  [BAD SHAPE] expected", shape)
+        ok = False
+    if not np.isfinite(np.asarray(arr)).all():
+        print("  [BAD VALUES] NaN/Inf found")
+        ok = False
+idx = np.load(method_dir / "idx.npy")
+print("idx exact 0..167:", np.array_equal(idx, np.arange(168)))
+ok = ok and np.array_equal(idx, np.arange(168))
+raise SystemExit(0 if ok else 1)
+PY
+```
+
+## XXVI.7 Completed Phase B topology results
+
+Lower is better for both PD and MT.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD < GAN | MT-GAN recovered | Notes |
+|---|---:|---:|---:|---:|---:|---:|---|
+| CNN baseline | 27.4063 | 5.8678 | — | — | — | — | pretrained CNN |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | — | — | pretrained GAN |
+| UV-2688 | 29.6121 | 6.0119 | not transcribed | 64/168 known | not transcribed | 5/20 known | vector-only control |
+| speed-only | 29.5783 | 5.9996 | 9/168 | 61/168 | 0/168 | 5/20 | `L_uv + 0.01 L_speed` |
+| levelset-only | 29.5953 | 6.0076 | see report | see report | see report | see report | `L_uv + 0.25 L_levelset`; report path below |
+| speed+levelset | 29.4363 | 5.9441 | 11/168 | 66/168 | 0/168 | 8/20 | no `L_grad`; still near UV in PD |
+| grad-only | 22.9326 | 6.0560 | 157/168 | 66/168 | 22/168 | 10/20 | dominant singleton |
+| speed+grad | 22.9706 | 6.2905 | 164/168 | 42/168 | 15/168 | 4/20 | adding speed to grad worsens MT |
+| grad+levelset | 22.6194 | 6.1996 | 164/168 | 41/168 | 17/168 | 7/20 | best B-factorial mean PD |
+| full B-2688 | 22.7070 | 6.1612 | 166/168 | 40/168 | 18/168 | 8/20 | full B scaffold |
+| C-2688 | 22.4944 | 6.0803 | 168/168 | 52/168 | 20/168 | 10/20 | full B + `L_crit` |
+
+Important note on `levelset-only`: the mean PD/MT values were extracted from the completed `phase_c_results.csv`; the authoritative per-sample topology-comparison counts should be read from:
+
+```text
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_topology_eval.md
+logs/topology_candidateB_factorial_levelset_expanded2688.log
+```
+
+An early quick summary compared candidate values against CNN/GAN mean thresholds and should not be used as the authoritative per-sample comparison count.
+
+### PD reduction relative to UV-2688
+
+| Method | PD mean | PD reduction vs UV | Fraction of full-B PD reduction |
+|---|---:|---:|---:|
+| UV-2688 | 29.6121 | 0.0000 | 0.0% |
+| speed-only | 29.5783 | 0.0338 | 0.5% |
+| levelset-only | 29.5953 | 0.0168 | 0.2% |
+| speed+levelset | 29.4363 | 0.1758 | 2.5% |
+| grad-only | 22.9326 | 6.6795 | 96.7% |
+| speed+grad | 22.9706 | 6.6415 | 96.2% |
+| grad+levelset | 22.6194 | 6.9927 | 101.3% |
+| full B-2688 | 22.7070 | 6.9051 | 100.0% |
+| C-2688 | 22.4944 | 7.1177 | 103.1% |
+
+This table is the strongest quantitative evidence from Phase B. It shows that `L_grad` alone reproduces approximately 96.7% of full Candidate B's mean PD improvement relative to UV.
+
+## XXVI.8 Cheap-evaluation summaries captured during Phase B
+
+### Levelset-only cheap evaluation
+
+Report:
+
+```text
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_eval.md
+```
+
+| Metric | CNN | Levelset-only |
+|---|---:|---:|
+| PSNRuv | 31.1925 | 33.7886 |
+| Speed MAE | 0.6941 | 0.4937 |
+| Speed RMSE | 1.1078 | 0.8542 |
+| WPD MAE | 231.6709 | 158.0550 |
+| WPD W1 | 45.2713 | 33.1943 |
+| WPD bias abs | 35.3439 | 23.2017 |
+| Gradient MAE | 0.3491 | 0.3240 |
+| Gradient W1 | 0.2329 | 0.2492 |
+| Gradient kurtosis abs Δ | 3.7004 | 5.2613 |
+| PSD log-L2 | 0.8335 | 1.1331 |
+| PSD slope abs Δ | 0.9150 | 1.4633 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0065 |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0045 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0043 |
+| Exceedance abs Δ p90 | 0.0103 | 0.0062 |
+| Component-count curve L1 | 115.5278 | 143.0357 |
+
+### Speed-only cheap evaluation
+
+Report:
+
+```text
+docs/topology_finetuning_candidateB_factorial_speed_expanded2688_eval.md
+```
+
+| Metric | CNN | Speed-only |
+|---|---:|---:|
+| PSNRuv | 31.1925 | 33.7894 |
+| Speed MAE | 0.6941 | 0.4943 |
+| Speed RMSE | 1.1078 | 0.8532 |
+| WPD MAE | 231.6709 | 158.3337 |
+| WPD W1 | 45.2713 | 35.8761 |
+| WPD bias abs | 35.3439 | 26.4431 |
+| Gradient MAE | 0.3491 | 0.3242 |
+| Gradient W1 | 0.2329 | 0.2491 |
+| Gradient kurtosis abs Δ | 3.7004 | 5.1312 |
+| PSD log-L2 | 0.8335 | 1.1311 |
+| PSD slope abs Δ | 0.9150 | 1.4548 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0066 |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0049 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0048 |
+| Exceedance abs Δ p90 | 0.0103 | 0.0070 |
+| Component-count curve L1 | 115.5278 | 142.1994 |
+
+### Grad-only cheap evaluation
+
+Report:
+
+```text
+docs/topology_finetuning_candidateB_factorial_grad_expanded2688_eval.md
+```
+
+| Metric | CNN | Grad-only |
+|---|---:|---:|
+| PSNRuv | 31.1925 | 33.3698 |
+| Speed MAE | 0.6941 | 0.5286 |
+| Speed RMSE | 1.1078 | 0.8963 |
+| WPD MAE | 231.6709 | 169.5510 |
+| WPD W1 | 45.2713 | 22.8114 |
+| WPD bias abs | 35.3439 | 17.5039 |
+| Gradient MAE | 0.3491 | 0.3088 |
+| Gradient W1 | 0.2329 | 0.1751 |
+| Gradient kurtosis abs Δ | 3.7004 | 2.5098 |
+| PSD log-L2 | 0.8335 | 0.8930 |
+| PSD slope abs Δ | 0.9150 | 1.3907 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0036 |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0036 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0031 |
+| Exceedance abs Δ p90 | 0.0103 | 0.0041 |
+| Component-count curve L1 | 115.5278 | 97.1349 |
+
+Grad-only improved component-count curve L1 on 146/168 samples and improved gradient W1 on 154/168 samples.
+
+### Pairwise cheap-evaluation reports
+
+The pairwise cheap-evaluation reports were generated and should be inspected directly when needed:
+
+```text
+docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_eval.md
+```
+
+Corresponding per-sample metric CSVs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_eval/all_sample_metrics_candidateB_factorial_speed_grad_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_eval/all_sample_metrics_candidateB_factorial_grad_levelset_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_eval/all_sample_metrics_candidateB_factorial_speed_levelset_expanded2688.csv
+```
+
+## XXVI.9 Per-variant topology notes and files
+
+### `speed`
+
+```text
+PD mean = 29.5783
+MT mean = 5.9996
+PD < CNN = 9/168
+MT < CNN = 61/168
+PD < GAN = 0/168
+MT-GAN recovery = 5/20
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_speed_expanded2688/
+docs/topology_finetuning_candidateB_factorial_speed_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_topology/candidateB_factorial_speed_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_topology/candidateB_factorial_speed_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_speed_expanded2688_batch.log
+logs/topology_candidateB_factorial_speed_expanded2688.log
+```
+
+### `levelset`
+
+```text
+PD mean = 29.5953
+MT mean = 6.0076
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_levelset_expanded2688/
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_topology/candidateB_factorial_levelset_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_topology/candidateB_factorial_levelset_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_levelset_expanded2688_batch.log
+logs/topology_candidateB_factorial_levelset_expanded2688.log
+```
+
+### `grad`
+
+```text
+PD mean = 22.9326
+MT mean = 6.0560
+PD < CNN = 157/168
+MT < CNN = 66/168
+PD < GAN = 22/168
+MT beats GAN = 154/168
+MT-GAN recovery = 10/20
+```
+
+Important changed MT-GAN cases recovered by grad-only:
+
+```text
+18, 25, 62, 63, 65, 68, 77, 79, 80, 82
+```
+
+Winner distribution after adding grad-only:
+
+```text
+PD winners: candidate=20, CNN=2, GAN=146
+MT winners: candidate=62, CNN=96, GAN=10
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_grad_expanded2688/
+docs/topology_finetuning_candidateB_factorial_grad_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_grad_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_topology/candidateB_factorial_grad_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_topology/candidateB_factorial_grad_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_grad_expanded2688_batch.log
+logs/topology_candidateB_factorial_grad_expanded2688.log
+```
+
+### `speed_grad`
+
+```text
+PD mean = 22.9706
+MT mean = 6.2905
+PD < CNN = 164/168
+MT < CNN = 42/168
+PD < GAN = 15/168
+MT beats GAN = 139/168
+MT-GAN recovery = 4/20
+```
+
+Recovered MT-GAN cases:
+
+```text
+6, 25, 77, 79
+```
+
+Winner distribution after adding speed+grad:
+
+```text
+PD winners: candidate=13, CNN=2, GAN=153
+MT winners: candidate=32, CNN=120, GAN=16
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_speed_grad_expanded2688/
+docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_topology/candidateB_factorial_speed_grad_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_topology/candidateB_factorial_speed_grad_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_speed_grad_expanded2688_batch.log
+logs/topology_candidateB_factorial_speed_grad_expanded2688.log
+```
+
+### `grad_levelset`
+
+```text
+PD mean = 22.6194
+MT mean = 6.1996
+PD < CNN = 164/168
+MT < CNN = 41/168
+PD < GAN = 17/168
+MT-GAN recovery = 7/20
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_grad_levelset_expanded2688/
+docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_topology/candidateB_factorial_grad_levelset_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_topology/candidateB_factorial_grad_levelset_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_grad_levelset_expanded2688_batch.log
+logs/topology_candidateB_factorial_grad_levelset_expanded2688.log
+```
+
+### `speed_levelset`
+
+```text
+PD mean = 29.4363
+MT mean = 5.9441
+PD < CNN = 11/168
+MT < CNN = 66/168
+PD < GAN = 0/168
+MT-GAN recovery = 8/20
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_speed_levelset_expanded2688/
+docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_topology/candidateB_factorial_speed_levelset_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_topology/candidateB_factorial_speed_levelset_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_speed_levelset_expanded2688_batch.log
+logs/topology_candidateB_factorial_speed_levelset_expanded2688.log
+```
+
+## XXVI.10 Final Phase B interpretation
+
+1. **`L_grad` is the dominant PD driver.** It reduces mean PD from `29.6121` for UV-2688 to `22.9326`, reproducing about `96.7%` of full B's PD reduction.
+2. **`L_speed` and `L_levelset` do not explain the PD gain in isolation.** Speed-only, levelset-only, and speed+levelset all remain near UV in PD.
+3. **`L_levelset` is useful through interaction with `L_grad`.** Grad+levelset reaches `PD=22.6194`, slightly better than full B's `PD=22.7070`.
+4. **`L_speed` can hurt MT when combined with `L_grad`.** Grad-only has `MT=6.0560`; speed+grad worsens to `MT=6.2905`.
+5. **PD and MT respond differently.** Grad+levelset is best by mean PD among B-factorial variants, while grad-only has the cleanest MT behavior among the gradient-based B variants.
+
+Paper-ready wording:
+
+> A factorial ablation of Candidate B showed that its persistence-diagram improvement is primarily caused by gradient-magnitude supervision. Scalar-speed and soft high-speed level-set losses improved several fidelity and physical metrics in isolation, but their true TTK PD distances remained close to the vector-only control. In contrast, the gradient-only objective reduced mean PD from 29.6121 for UV-2688 to 22.9326, reproducing approximately 96.7% of full Candidate B's PD reduction. Adding the soft level-set term to the gradient loss further reduced mean PD to 22.6194, slightly outperforming full Candidate B in mean PD. However, these gains did not translate into mean merge-tree improvement, indicating that local gradient and threshold-region alignment improve persistence-diagram agreement without fully preserving merge-tree hierarchy.
+
+## XXVI.11 Status after Phase B
+
+Phase B is complete.
+
+Strongest compact B-style objectives:
+
+```text
+Best mean PD among B-factorial variants: grad+levelset
+Cleanest gradient-based MT behavior:    grad-only
+Best overall PD among this family:       C-2688
+Best MT-oriented direction overall:      repaired E2 family
+```
+
+Suggested future combinations:
+
+```text
+UV + grad + E2
+UV + grad + levelset + E2
+grad-only + L_crit
+grad+levelset + L_crit
+```

@@ -8,9 +8,7 @@
 
 **Samples evaluated per method:** 168
 
-**Methods completed:** cnn, gan, candidateC_expanded2688, candidateB_plus_E2_tf_lowlambda_expanded2688, candidateE2_tf_lowlambda_expanded2688, candidateUV_plus_E2_tf_lowlambda_expanded2688, candidateUV_plus_crit_expanded2688
-
-**Methods skipped/incomplete:** candidateUV_expanded2688, candidateB_expanded2688 (see console log / PASS-FAIL checklist for reasons)
+**Methods completed:** cnn, gan, candidateC_expanded2688, candidateB_plus_E2_tf_lowlambda_expanded2688, candidateE2_tf_lowlambda_expanded2688, candidateUV_plus_E2_tf_lowlambda_expanded2688, candidateUV_plus_crit_expanded2688, candidateUV_expanded2688, candidateB_expanded2688
 
 **Superlevel MT-GAN baseline wins (GAN beats CNN on superlevel MT):** 23 samples — [6, 8, 16, 17, 18, 19, 20, 22, 25, 62, 63, 65, 66, 70, 77, 79, 80, 82, 83, 88, 89, 90, 122]
 
@@ -25,6 +23,8 @@
 | candidateE2_tf_lowlambda_expanded2688 | 24.3811 | 4.9796 | 24.2686 | 5.6628 |
 | candidateUV_plus_E2_tf_lowlambda_expanded2688 | 25.1923 | 4.9522 | 25.0721 | 5.5940 |
 | candidateUV_plus_crit_expanded2688 | 29.0752 | 5.0875 | 29.1143 | 5.6899 |
+| candidateUV_expanded2688 | 29.6621 | 5.4230 | 29.6121 | 6.0119 |
+| candidateB_expanded2688 | 22.6909 | 5.8614 | 22.7070 | 6.1612 |
 
 ## PD / MT wins vs CNN, beats-GAN counts (superlevel)
 
@@ -37,6 +37,8 @@
 | candidateE2_tf_lowlambda_expanded2688 | 164/168 | 112/168 | 5/168 | 166/168 | 23 |
 | candidateUV_plus_E2_tf_lowlambda_expanded2688 | 160/168 | 120/168 | 0/168 | 168/168 | 23 |
 | candidateUV_plus_crit_expanded2688 | 13/168 | 104/168 | 0/168 | 157/168 | 13 |
+| candidateUV_expanded2688 | 8/168 | 68/168 | 0/168 | 144/168 | 7 |
+| candidateB_expanded2688 | 164/168 | 42/168 | 15/168 | 137/168 | 8 |
 
 ## Winner distribution (superlevel)
 
@@ -44,8 +46,9 @@
 
 | Method | Wins |
 |---|---:|
-| gan | 149 |
-| candidateC_expanded2688 | 19 |
+| gan | 146 |
+| candidateC_expanded2688 | 14 |
+| candidateB_expanded2688 | 8 |
 
 ### MT distance winners
 
@@ -53,9 +56,10 @@
 |---|---:|
 | candidateUV_plus_E2_tf_lowlambda_expanded2688 | 43 |
 | candidateE2_tf_lowlambda_expanded2688 | 34 |
-| candidateUV_plus_crit_expanded2688 | 31 |
 | candidateB_plus_E2_tf_lowlambda_expanded2688 | 30 |
-| cnn | 27 |
+| candidateUV_plus_crit_expanded2688 | 25 |
+| cnn | 25 |
+| candidateUV_expanded2688 | 8 |
 | candidateC_expanded2688 | 3 |
 
 ## MT-GAN recovery detail (superlevel)
@@ -69,6 +73,8 @@ Samples where GAN's superlevel MT distance beat CNN's superlevel MT distance: [6
 | candidateE2_tf_lowlambda_expanded2688 | 23 | 0 | 0 |
 | candidateUV_plus_E2_tf_lowlambda_expanded2688 | 23 | 0 | 0 |
 | candidateUV_plus_crit_expanded2688 | 13 | 10 | 0 |
+| candidateUV_expanded2688 | 7 | 16 | 0 |
+| candidateB_expanded2688 | 8 | 15 | 0 |
 
 ## Superlevel vs sublevel side-by-side (known values)
 
@@ -81,6 +87,8 @@ Samples where GAN's superlevel MT distance beat CNN's superlevel MT distance: [6
 | candidateE2_tf_lowlambda_expanded2688 | 24.3811 | 24.2686 | 4.9796 | 5.6628 |
 | candidateUV_plus_E2_tf_lowlambda_expanded2688 | 25.1923 | 25.0721 | 4.9522 | 5.5940 |
 | candidateUV_plus_crit_expanded2688 | 29.0752 | 29.1143 | 5.0875 | 5.6899 |
+| candidateUV_expanded2688 | 29.6621 | 29.6121 | 5.4230 | 6.0119 |
+| candidateB_expanded2688 | 22.6909 | 22.7070 | 5.8614 | 6.1612 |
 
 ## Output files
 
