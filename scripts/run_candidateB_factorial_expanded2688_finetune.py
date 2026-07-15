@@ -495,15 +495,15 @@ def main() -> None:
     idx_p = Path(DATA_OUT) / 'idx.npy'
     if idx_p.exists():
         idx_vals = np.load(idx_p)
-        if not np.array_equal(np.sort(idx_vals), np.arange(N_EVAL)):
+        if not np.array_equal(idx_vals, np.arange(N_EVAL)):
             print(
-                f'[FAIL] idx.npy: values are not exactly 0..{N_EVAL - 1} '
+                f'[FAIL] idx.npy: values are not exactly ordered 0..{N_EVAL - 1} '
                 f'(got range [{int(idx_vals.min())}, {int(idx_vals.max())}], '
                 f'{len(idx_vals)} entries)'
             )
             all_ok = False
         else:
-            print(f'[OK]   idx.npy values: exactly 0..{N_EVAL - 1}')
+            print(f'[OK]   idx.npy values: exactly ordered 0..{N_EVAL - 1}')
 
     if not all_ok:
         sys.exit('[error] Post-inference validation failed. See above.')

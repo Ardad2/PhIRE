@@ -68,24 +68,23 @@ Methods evaluated
   gan                                              data_out_fixed/wind_mrhr_gan
   candidateC_expanded2688                          data_out/wind_finetune_candidateC_expanded2688
   candidateB_plus_E2_tf_lowlambda_expanded2688      data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688
-  candidateC_plus_E2_tf_lowlambda_expanded2688      data_out/wind_finetune_candidateC_plus_E2_tf_lowlambda_expanded2688
+  candidateE2_tf_lowlambda_expanded2688             data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688
   candidateUV_plus_E2_tf_lowlambda_expanded2688     data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688
   candidateUV_plus_crit_expanded2688                data_out/wind_finetune_candidateUV_plus_crit_expanded2688
   candidateUV_expanded2688                          data_out/wind_finetune_candidateUV_expanded2688       (added: matched UV control)
   candidateB_expanded2688                           data_out/wind_finetune_candidateB_expanded2688         (added: full Candidate B scaffold)
 
-NOTE on candidateC_plus_E2_tf_lowlambda_expanded2688: this literal directory
-name is what was specified for this priority. Elsewhere in this repo the
-completed "Candidate C stack + repaired E2" native-TF run is named
-candidateE2_tf_lowlambda_expanded2688 (see
+NOTE on candidateE2_tf_lowlambda_expanded2688: this is the completed
+"Candidate C stack + repaired E2" native-TF run (see
 scripts/run_candidateE2_tf_lowlambda_expanded2688_ttkcrit_refiner.py), with
-real output at data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688.
-Both names refer to the same experiment ("C + E2"), but this script does
-NOT silently alias them -- it looks up exactly the path in DEFAULT_METHODS
-and, per the "warn and skip" requirement below, will print a clear warning
-and skip this entry if that literal directory does not exist. If you intend
-to evaluate the real C+E2-2688 run, either edit DEFAULT_METHODS below or use
---methods to exclude this entry and evaluate it under a corrected mapping.
+real output at data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688
+and completed superlevel output already at
+ttk_runs_fixed/superlevel_topology/candidateE2_tf_lowlambda_expanded2688/.
+An earlier version of this script used the alias
+candidateC_plus_E2_tf_lowlambda_expanded2688, which does not correspond to
+any real directory on disk and would warn-and-skip; DEFAULT_METHODS now
+uses the real internal method name directly, so this entry resolves to the
+already-completed data on Spark instead of being skipped.
 
 If any method's directory does not exist, or its required files are
 missing/misshapen, this script prints a clear warning and SKIPS that
@@ -145,7 +144,7 @@ Usage (from repo root, on Spark)
   aggregated, not recomputed; only genuinely new methods do real
   Docker/TTK work:
     python3 scripts/run_superlevel_topology_robustness.py --run \\
-      --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateC_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \\
+      --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateE2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \\
       --output-suffix _with_B_UV \\
       --threads 1
 """
@@ -196,7 +195,7 @@ DEFAULT_METHODS: Dict[str, str] = {
     "gan":                                           "data_out_fixed/wind_mrhr_gan",
     "candidateC_expanded2688":                       "data_out/wind_finetune_candidateC_expanded2688",
     "candidateB_plus_E2_tf_lowlambda_expanded2688":  "data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688",
-    "candidateC_plus_E2_tf_lowlambda_expanded2688":  "data_out/wind_finetune_candidateC_plus_E2_tf_lowlambda_expanded2688",
+    "candidateE2_tf_lowlambda_expanded2688":         "data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688",
     "candidateUV_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688",
     "candidateUV_plus_crit_expanded2688":            "data_out/wind_finetune_candidateUV_plus_crit_expanded2688",
     # Added for the "matched UV control + full Candidate B scaffold" superlevel
@@ -220,15 +219,11 @@ KNOWN_SUBLEVEL: Dict[str, Optional[Dict[str, float]]] = {
     "gan":                                           {"pd_mean": 20.8641, "mt_mean": 8.3481},
     "candidateC_expanded2688":                       {"pd_mean": 22.4944, "mt_mean": 6.0803},
     "candidateB_plus_E2_tf_lowlambda_expanded2688":  {"pd_mean": 23.9876, "mt_mean": 5.6774},
-    "candidateC_plus_E2_tf_lowlambda_expanded2688":  {"pd_mean": 24.2686, "mt_mean": 5.6628},
+    "candidateE2_tf_lowlambda_expanded2688":         {"pd_mean": 24.2686, "mt_mean": 5.6628},
     "candidateUV_plus_E2_tf_lowlambda_expanded2688": {"pd_mean": 25.0721, "mt_mean": 5.5940},
     "candidateUV_plus_crit_expanded2688":            {"pd_mean": 29.1143, "mt_mean": 5.6899},
     "candidateB_expanded2688":                       {"pd_mean": 22.7070, "mt_mean": 6.1612},
-    # UV-2688's sublevel PD/MT means are not recorded anywhere in this repo's
-    # docs/ at the time this entry was added -- None means "N/A" in the
-    # report rather than a guess. Fill this in once the sublevel
-    # candidateUV_expanded2688 true-topology run's numbers are known.
-    "candidateUV_expanded2688":                      None,
+    "candidateUV_expanded2688":                      {"pd_mean": 29.6121, "mt_mean": 6.0119},
 }
 
 # ---------------------------------------------------------------------------
