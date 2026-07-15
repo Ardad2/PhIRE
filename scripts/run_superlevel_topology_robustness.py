@@ -62,8 +62,8 @@ script asserts that disjointness at startup and refuses to run if it is
 ever violated. It only ever READS from data_out*/models*/ candidate output
 directories, never writes to them.
 
-Methods evaluated (first superlevel robustness set)
------------------------------------------------------
+Methods evaluated
+-------------------
   cnn                                              data_out_fixed/wind_mrhr_cnn
   gan                                              data_out_fixed/wind_mrhr_gan
   candidateC_expanded2688                          data_out/wind_finetune_candidateC_expanded2688
@@ -71,6 +71,8 @@ Methods evaluated (first superlevel robustness set)
   candidateC_plus_E2_tf_lowlambda_expanded2688      data_out/wind_finetune_candidateC_plus_E2_tf_lowlambda_expanded2688
   candidateUV_plus_E2_tf_lowlambda_expanded2688     data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688
   candidateUV_plus_crit_expanded2688                data_out/wind_finetune_candidateUV_plus_crit_expanded2688
+  candidateUV_expanded2688                          data_out/wind_finetune_candidateUV_expanded2688       (added: matched UV control)
+  candidateB_expanded2688                           data_out/wind_finetune_candidateB_expanded2688         (added: full Candidate B scaffold)
 
 NOTE on candidateC_plus_E2_tf_lowlambda_expanded2688: this literal directory
 name is what was specified for this priority. Elsewhere in this repo the
@@ -136,6 +138,16 @@ Usage (from repo root, on Spark)
   Subset of methods:
     python3 scripts/run_superlevel_topology_robustness.py --run \\
       --methods cnn,gan,candidateUV_plus_E2_tf_lowlambda_expanded2688
+
+  Extend a prior run with new methods, writing a new suffixed report/CSVs
+  and never touching the prior (unsuffixed) report/CSVs. Already-completed
+  methods (VTI/PD/MT/phase_c_results.csv already on disk) are read and
+  aggregated, not recomputed; only genuinely new methods do real
+  Docker/TTK work:
+    python3 scripts/run_superlevel_topology_robustness.py --run \\
+      --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateC_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \\
+      --output-suffix _with_B_UV \\
+      --threads 1
 """
 
 from __future__ import annotations
@@ -187,6 +199,12 @@ DEFAULT_METHODS: Dict[str, str] = {
     "candidateC_plus_E2_tf_lowlambda_expanded2688":  "data_out/wind_finetune_candidateC_plus_E2_tf_lowlambda_expanded2688",
     "candidateUV_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688",
     "candidateUV_plus_crit_expanded2688":            "data_out/wind_finetune_candidateUV_plus_crit_expanded2688",
+    # Added for the "matched UV control + full Candidate B scaffold" superlevel
+    # robustness extension: candidateB_expanded2688 fills the previously
+    # missing 2688-scale rung of the Candidate B ladder (L_crit=0, no E2/TTK
+    # terms); candidateUV_expanded2688 is its UV-only control.
+    "candidateUV_expanded2688":                      "data_out/wind_finetune_candidateUV_expanded2688",
+    "candidateB_expanded2688":                       "data_out/wind_finetune_candidateB_expanded2688",
 }
 
 # Reference (baseline) method for GT-alignment checks and the winner tables.
@@ -205,6 +223,12 @@ KNOWN_SUBLEVEL: Dict[str, Optional[Dict[str, float]]] = {
     "candidateC_plus_E2_tf_lowlambda_expanded2688":  {"pd_mean": 24.2686, "mt_mean": 5.6628},
     "candidateUV_plus_E2_tf_lowlambda_expanded2688": {"pd_mean": 25.0721, "mt_mean": 5.5940},
     "candidateUV_plus_crit_expanded2688":            {"pd_mean": 29.1143, "mt_mean": 5.6899},
+    "candidateB_expanded2688":                       {"pd_mean": 22.7070, "mt_mean": 6.1612},
+    # UV-2688's sublevel PD/MT means are not recorded anywhere in this repo's
+    # docs/ at the time this entry was added -- None means "N/A" in the
+    # report rather than a guess. Fill this in once the sublevel
+    # candidateUV_expanded2688 true-topology run's numbers are known.
+    "candidateUV_expanded2688":                      None,
 }
 
 # ---------------------------------------------------------------------------
@@ -688,9 +712,20 @@ def _fmt(v: Optional[float], d: int = 4) -> str:
 def build_outputs(
     method_results: Dict[str, Dict[int, Tuple[float, float]]],
     methods_run: List[str],
+    report_path: Path = REPORT_PATH,
+    csv_per_sample: Path = CSV_PER_SAMPLE,
+    csv_summary: Path = CSV_SUMMARY,
+    csv_winner: Path = CSV_WINNER,
 ) -> Tuple[bool, List[str]]:
     """Build the three CSVs and the markdown report from completed
-    per-method phase_c_results.csv data. Returns (all_ok, checklist_lines)."""
+    per-method phase_c_results.csv data. Returns (all_ok, checklist_lines).
+
+    report_path/csv_per_sample/csv_summary/csv_winner default to the
+    canonical (unsuffixed) locations but can be overridden -- e.g. with
+    --output-suffix -- to write a new aggregate report/CSVs alongside the
+    existing ones without ever touching them. Per-method VTI/topology
+    directories (OUT_ROOT / <method> / ...) are always the canonical,
+    unsuffixed, shared/resumable locations regardless of this override."""
     checklist: List[str] = []
     all_ok = True
 
@@ -723,12 +758,12 @@ def build_outputs(
         _check(f"{name}: per-sample CSV row count == {N_EVAL}", n_rows_this_method == N_EVAL)
 
     OUT_ROOT.mkdir(parents=True, exist_ok=True)
-    with CSV_PER_SAMPLE.open("w", newline="") as fh:
+    with csv_per_sample.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=["method", "pos_idx", "sample_idx",
                                             "pd_distance_superlevel", "mt_distance_superlevel"])
         w.writeheader()
         w.writerows(per_sample_rows)
-    print(f"Written: {CSV_PER_SAMPLE}")
+    print(f"Written: {csv_per_sample}")
 
     # --- per-method summary stats -------------------------------------------
     pd_by_method: Dict[str, List[float]] = {}
@@ -814,11 +849,11 @@ def build_outputs(
             "mt_mean_sublevel_known": known["mt_mean"] if known else "",
         })
 
-    with CSV_SUMMARY.open("w", newline="") as fh:
+    with csv_summary.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(summary_rows[0].keys()))
         w.writeheader()
         w.writerows(summary_rows)
-    print(f"Written: {CSV_SUMMARY}")
+    print(f"Written: {csv_summary}")
 
     # --- per-sample winner CSV ----------------------------------------------
     winner_rows: List[Dict[str, object]] = []
@@ -838,11 +873,11 @@ def build_outputs(
         })
     _check(f"Winner CSV row count == {N_EVAL}", len(winner_rows) == N_EVAL)
 
-    with CSV_WINNER.open("w", newline="") as fh:
+    with csv_winner.open("w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(winner_rows[0].keys()))
         w.writeheader()
         w.writerows(winner_rows)
-    print(f"Written: {CSV_WINNER}")
+    print(f"Written: {csv_winner}")
 
     # --- markdown report ------------------------------------------------------
     md = io.StringIO()
@@ -923,10 +958,10 @@ def build_outputs(
     md.write("\n")
 
     md.write("## Output files\n\n")
-    md.write(f"- `{CSV_PER_SAMPLE.relative_to(REPO_ROOT)}` — per-sample PD/MT distances, one row per (method, sample)\n")
-    md.write(f"- `{CSV_SUMMARY.relative_to(REPO_ROOT)}` — per-method summary statistics\n")
-    md.write(f"- `{CSV_WINNER.relative_to(REPO_ROOT)}` — per-sample PD/MT winner across all completed methods\n")
-    md.write(f"- `{REPORT_PATH.relative_to(REPO_ROOT)}` — this report\n\n")
+    md.write(f"- `{csv_per_sample.relative_to(REPO_ROOT)}` — per-sample PD/MT distances, one row per (method, sample)\n")
+    md.write(f"- `{csv_summary.relative_to(REPO_ROOT)}` — per-method summary statistics\n")
+    md.write(f"- `{csv_winner.relative_to(REPO_ROOT)}` — per-sample PD/MT winner across all completed methods\n")
+    md.write(f"- `{report_path.relative_to(REPO_ROOT)}` — this report\n\n")
 
     md.write("## Notes\n\n")
     md.write("- PD distance = bottleneck distance between persistence diagrams "
@@ -939,9 +974,9 @@ def build_outputs(
               "outputs were never read for writing, modified, or overwritten by this script.\n")
     md.write("- No model was retrained to produce this evaluation.\n")
 
-    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(md.getvalue(), encoding="utf-8")
-    print(f"Written: {REPORT_PATH}")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(md.getvalue(), encoding="utf-8")
+    print(f"Written: {report_path}")
 
     return all_ok, checklist
 
@@ -950,7 +985,12 @@ def build_outputs(
 # Safety / discrepancy checks
 # ---------------------------------------------------------------------------
 
-def run_safety_checks() -> List[str]:
+def run_safety_checks(
+    report_path: Path = REPORT_PATH,
+    csv_per_sample: Path = CSV_PER_SAMPLE,
+    csv_summary: Path = CSV_SUMMARY,
+    csv_winner: Path = CSV_WINNER,
+) -> List[str]:
     lines: List[str] = []
 
     def _check(label: str, ok: bool) -> None:
@@ -964,9 +1004,24 @@ def run_safety_checks() -> List[str]:
                not _is_inside(OUT_ROOT, d))
     _check("OUT_ROOT resolves under ttk_runs_fixed/superlevel_topology",
            _is_inside(OUT_ROOT, REPO_ROOT / "ttk_runs_fixed" / "superlevel_topology"))
-    _check("REPORT_PATH resolves under docs/", _is_inside(REPORT_PATH, REPO_ROOT / "docs"))
-    for csv_path in (CSV_PER_SAMPLE, CSV_SUMMARY, CSV_WINNER):
+    _check("report_path resolves under docs/", _is_inside(report_path, REPO_ROOT / "docs"))
+    for csv_path in (csv_per_sample, csv_summary, csv_winner):
         _check(f"{csv_path.name} resolves under OUT_ROOT", _is_inside(csv_path, OUT_ROOT))
+
+    # When a suffix is in play, the suffixed aggregate outputs must never
+    # resolve to the SAME path as the canonical (unsuffixed) ones -- that
+    # would silently overwrite the existing report/CSVs instead of writing
+    # new files alongside them.
+    for label, path, canonical in (
+        ("report_path", report_path, REPORT_PATH),
+        ("csv_per_sample", csv_per_sample, CSV_PER_SAMPLE),
+        ("csv_summary", csv_summary, CSV_SUMMARY),
+        ("csv_winner", csv_winner, CSV_WINNER),
+    ):
+        if path != canonical:
+            _check(f"{label} ({path.name}) does not collide with the canonical "
+                   f"unsuffixed output ({canonical.name})",
+                   _resolve(path) != _resolve(canonical))
 
     return lines
 
@@ -989,6 +1044,16 @@ def _parse_args() -> argparse.Namespace:
                           "(default: all of DEFAULT_METHODS).")
     ap.add_argument("--threads", type=int, default=THREADS_DEFAULT,
                      help=f"TTK thread count per Docker call (default: {THREADS_DEFAULT}).")
+    ap.add_argument("--output-suffix", default=None,
+                     help="Suffix inserted before the file extension of the report and "
+                          "the three aggregate CSVs (e.g. --output-suffix _with_B_UV writes "
+                          "docs/superlevel_topology_robustness_eval_with_B_UV.md and "
+                          "superlevel_summary_by_method_with_B_UV.csv etc.), leaving the "
+                          "canonical unsuffixed report/CSVs from a prior run completely "
+                          "untouched. Per-method VTI/topology/phase_c_results.csv outputs "
+                          "are always written to the canonical (unsuffixed, shared, "
+                          "resumable) per-method paths regardless of this option -- only "
+                          "the final combined report/CSVs are affected.")
 
     # Hidden worker mode (invoked recursively, typically inside Docker).
     ap.add_argument("--_vti-worker", action="store_true", help=argparse.SUPPRESS)
@@ -1012,6 +1077,17 @@ def main() -> int:
 
     dry_run = bool(args.dry_run)
 
+    suffix = args.output_suffix or ""
+    if suffix:
+        report_path    = REPORT_PATH.with_name(REPORT_PATH.stem + suffix + REPORT_PATH.suffix)
+        csv_per_sample = CSV_PER_SAMPLE.with_name(CSV_PER_SAMPLE.stem + suffix + CSV_PER_SAMPLE.suffix)
+        csv_summary    = CSV_SUMMARY.with_name(CSV_SUMMARY.stem + suffix + CSV_SUMMARY.suffix)
+        csv_winner     = CSV_WINNER.with_name(CSV_WINNER.stem + suffix + CSV_WINNER.suffix)
+    else:
+        report_path, csv_per_sample, csv_summary, csv_winner = (
+            REPORT_PATH, CSV_PER_SAMPLE, CSV_SUMMARY, CSV_WINNER,
+        )
+
     if args.methods:
         requested = [s.strip() for s in args.methods.split(",") if s.strip()]
         unknown = [r for r in requested if r not in DEFAULT_METHODS]
@@ -1028,13 +1104,15 @@ def main() -> int:
     print("=" * 72)
     print(f"  Methods requested : {list(methods)}")
     print(f"  Output root       : {OUT_ROOT}")
-    print(f"  Report path       : {REPORT_PATH}")
+    print(f"  Report path       : {report_path}")
+    if suffix:
+        print(f"  Output suffix     : {suffix!r} (canonical unsuffixed report/CSVs left untouched)")
     print(f"  Threads           : {args.threads}")
     print("=" * 72)
     print()
 
     print("--- Safety checks ---")
-    safety_lines = run_safety_checks()
+    safety_lines = run_safety_checks(report_path, csv_per_sample, csv_summary, csv_winner)
     for line in safety_lines:
         print(f"  {line}")
     if any(l.startswith("[FAIL]") for l in safety_lines):
@@ -1123,7 +1201,11 @@ def main() -> int:
         print()
 
     print("--- Stage 4: combined CSVs + report ---")
-    outputs_ok, outputs_checklist = build_outputs(method_results, ok_methods)
+    outputs_ok, outputs_checklist = build_outputs(
+        method_results, ok_methods,
+        report_path=report_path, csv_per_sample=csv_per_sample,
+        csv_summary=csv_summary, csv_winner=csv_winner,
+    )
     stage_checklist += outputs_checklist
     print()
 
