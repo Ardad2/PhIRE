@@ -8391,3 +8391,634 @@ The superlevel audit strengthens the main descriptor-specific story:
 4. The sublevel-vs-superlevel convention does not undermine the submitted Candidate C result. It mainly clarifies the interpretation: Candidate C is robust for PD, while E2-family methods are better aligned with merge-tree structure.
 
 ---
+---
+
+# Part XXIV — Candidate B-2688 anchor run, Candidate B factorial setup, and superlevel-extension debugging
+
+## XXIV.1 Purpose of this update
+
+This section records the follow-up experiments and infrastructure added after the repaired E2 and superlevel robustness analyses. The immediate scientific goal was to isolate the role of the Candidate B scaffold
+
+\[
+L_B = L_{uv} + 0.01L_{\mathrm{speed}} + 0.05L_{\mathrm{grad}} + 0.25L_{\mathrm{levelset}}
+\]
+
+in Candidate C's persistence-diagram improvement and merge-tree degradation. The practical goal was to make the next ablations reproducible by documenting the exact scripts, commands, output directories, and current status.
+
+The key new pieces are:
+
+1. a completed **Candidate B-2688** native PhIRE fine-tuning run;
+2. a completed Candidate B-2688 cheap/domain evaluation;
+3. a completed Candidate B-2688 default/sublevel TTK topology evaluation;
+4. a superlevel robustness extension that now includes UV-2688 and B-2688 in the method list, but whose first full run exposed a Docker path bug for the two newly added methods;
+5. a parameterized Candidate B factorial-ablation setup for `speed`, `grad`, `levelset`, and pairwise combinations.
+
+---
+
+## XXIV.2 Candidate B-2688 anchor run
+
+### Script
+
+The new Candidate B-2688 training/inference script is:
+
+```text
+scripts/run_candidateB_expanded2688_finetune.py
+```
+
+The script implements the missing 2688-scale Candidate B rung:
+
+\[
+L_B = L_{uv} + 0.01L_{\mathrm{speed}} + 0.05L_{\mathrm{grad}} + 0.25L_{\mathrm{levelset}}
+\]
+
+with:
+
+```text
+lambda_speed    = 0.01
+lambda_grad     = 0.05
+lambda_wpd      = 0.0
+lambda_levelset = 0.25
+lambda_crit     = 0.0
+lambda_TTKCV    = n/a
+lambda_TTKpers  = n/a
+```
+
+No repaired-E2 fixed-index losses are used. The training data is the same expanded 2688-sample TFRecord used by Candidate C-2688:
+
+```text
+example_data_topology_expanded_2688/wind_MR-HR.tfrecord
+```
+
+The fixed 168-sample evaluation benchmark remains:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+### Output directories
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateB_expanded2688/
+data_out/wind_finetune_candidateB_expanded2688/
+logs/wind_finetune_candidateB_expanded2688.log
+logs/wind_finetune_candidateB_expanded2688_terminal.log
+```
+
+### Training + paired inference command
+
+Run from the repo root on Spark:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_candidateB_expanded2688_finetune.py \
+  2>&1 | tee logs/wind_finetune_candidateB_expanded2688_terminal.log
+```
+
+The script performs both fine-tuning and paired inference on the fixed 168-sample benchmark.
+
+### Post-run array validation command
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+d = Path("data_out/wind_finetune_candidateB_expanded2688")
+for f in ["idx.npy", "dataIN.npy", "dataGT.npy", "dataSR.npy"]:
+    p = d / f
+    print(f, "exists:", p.exists())
+    if p.exists():
+        a = np.load(p, mmap_mode="r")
+        print("  shape:", a.shape, "min:", float(np.nanmin(a)), "max:", float(np.nanmax(a)))
+
+idx = np.load(d / "idx.npy")
+print("idx exact ordered 0..167:", np.array_equal(idx, np.arange(168)))
+PY
+```
+
+Observed validation output:
+
+```text
+idx.npy exists: True
+  shape: (168,) min: 0.0 max: 167.0
+dataIN.npy exists: True
+  shape: (168, 100, 100, 2) min: -21.52134190559387 max: 26.934541473388673
+dataGT.npy exists: True
+  shape: (168, 500, 500, 2) min: -30.46762466430664 max: 30.812210083007812
+dataSR.npy exists: True
+  shape: (168, 500, 500, 2) min: -26.495317424345014 max: 28.44360796570778
+idx exact ordered 0..167: True
+```
+
+---
+
+## XXIV.3 Candidate B-2688 cheap/domain evaluation
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateB_expanded2688 \
+  --candidate-dir  data_out/wind_finetune_candidateB_expanded2688 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval \
+  2>&1 | tee logs/evaluate_candidateB_expanded2688.log
+```
+
+### Output files
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/all_sample_metrics_candidateB_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/winner_counts_candidateB_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/pairwise_cnn_vs_candidateB_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/adjacent_cluster_table_candidateB_expanded2688.csv
+docs/topology_finetuning_candidateB_expanded2688_eval.md
+```
+
+### Cheap/domain metric summary
+
+| Metric | Bicubic | CNN | GAN | Candidate B-2688 |
+|---|---:|---:|---:|---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | 33.5198 |
+| Speed MAE (m/s) | 0.5963 | 0.6941 | 0.9026 | 0.5141 |
+| Speed RMSE (m/s) | 1.0156 | 1.1078 | 1.3775 | 0.8763 |
+| WPD MAE (m³/s³) | 193.5403 | 231.6709 | 310.7328 | 164.5935 |
+| WPD Wasserstein-1 | 55.5103 | 45.2713 | 85.6191 | 26.6869 |
+| WPD bias abs (m³/s³) | 41.2244 | 35.3439 | 78.7236 | 19.6891 |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | 0.3124 |
+| Gradient W1 | 0.3282 | 0.2329 | 0.0564 | 0.1996 |
+| Gradient kurtosis abs Δ | 6.6163 | 3.7004 | 4.2010 | 2.9374 |
+| PSD log-L2 | 1.3625 | 0.8335 | 0.5139 | 0.9754 |
+| PSD slope abs Δ | 1.6684 | 0.9150 | 0.9482 | 1.3177 |
+| Exceedance abs Δ s>5 | 0.0095 | 0.0042 | 0.0082 | 0.0049 |
+| Exceedance abs Δ s>10 | 0.0085 | 0.0066 | 0.0243 | 0.0036 |
+| Exceedance abs Δ s>15 | 0.0074 | 0.0062 | 0.0096 | 0.0035 |
+| Exceedance abs Δ p90 | 0.0109 | 0.0103 | 0.0123 | 0.0051 |
+| Component-count curve L1 | 173.1855 | 115.5278 | 124.6567 | 112.3254 |
+
+Interpretation: Candidate B-2688 improves many fidelity and physical/domain metrics relative to CNN, including PSNR, scalar speed errors, WPD metrics, gradient metrics, high-threshold exceedance, and component-count curve L1. It worsens PSD metrics relative to CNN.
+
+---
+
+## XXIV.4 Candidate B-2688 default/sublevel TTK topology evaluation
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method     candidateB_expanded2688 \
+  --data-dir   data_out/wind_finetune_candidateB_expanded2688 \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology_vti \
+  --out-base   ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology \
+  --n-samples  168 \
+  --threads    1 \
+  --skip-viz \
+  2>&1 | tee logs/topology_candidateB_expanded2688.log
+```
+
+### Output files
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology_vti/
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/candidateB_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/candidateB_expanded2688_topology_comparison.csv
+docs/topology_finetuning_candidateB_expanded2688_topology_eval.md
+```
+
+### True TTK topology result
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovery |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Candidate B-2688 | 22.7070 | 6.1612 | 166/168 | 40/168 | 18/168 | 144/168 | 8/20 |
+
+### Key comparison to UV and Candidate C
+
+| Method | Objective | PD mean | MT mean |
+|---|---|---:|---:|
+| UV-2688 | \(L_{uv}\) | 29.6121 | 6.0119 |
+| B-2688 | \(L_{uv}+L_{\mathrm{speed}}+L_{\mathrm{grad}}+L_{\mathrm{levelset}}\) | 22.7070 | 6.1612 |
+| UV+crit-2688 | \(L_{uv}+L_{\mathrm{crit}}\) | 29.1143 | 5.6899 |
+| C-2688 | \(B+L_{\mathrm{crit}}\) | 22.4944 | 6.0803 |
+
+Observed differences:
+
+```text
+UV -> B:
+  PD improves by 6.9051
+  MT worsens by 0.1493
+
+B -> C:
+  PD improves by 0.2126
+  MT improves by 0.0809, but C still remains worse than UV on MT
+
+UV -> C:
+  PD improves by 7.1177
+  MT worsens by 0.0684
+```
+
+Interpretation: the Candidate B scaffold accounts for most of Candidate C's PD improvement. The local-maxima term `L_crit` adds a small additional PD improvement and slightly mitigates the MT degradation relative to B, but it is not the main PD driver. The MT degradation appears primarily associated with the Candidate B scaffold.
+
+---
+
+## XXIV.5 Superlevel robustness extension with UV-2688 and B-2688
+
+### Updated script
+
+The superlevel robustness script is:
+
+```text
+scripts/run_superlevel_topology_robustness.py
+```
+
+The script evaluates superlevel topology of speed \(s\) as sublevel topology of \(-s\), using the same TTK commands as the default/sublevel topology pipeline. The VTI point-data array is still named `wind_speed`, but the stored scalar is `-sqrt(u^2+v^2)`.
+
+### Intended Phase A command
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_superlevel_topology_robustness.py --run \
+  --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateE2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \
+  --output-suffix _with_B_UV \
+  --threads 1 \
+  2>&1 | tee logs/superlevel_with_B_UV.log
+```
+
+### Intended new aggregate outputs
+
+```text
+docs/superlevel_topology_robustness_eval_with_B_UV.md
+ttk_runs_fixed/superlevel_topology/superlevel_pd_mt_per_sample_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_winner_comparison_with_B_UV.csv
+```
+
+### Exact-order pre-run check
+
+Before the Phase A run, all requested methods were checked to make sure their `idx.npy` files were exactly ordered `0..167`.
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+methods = {
+    "cnn": "data_out_fixed/wind_mrhr_cnn",
+    "gan": "data_out_fixed/wind_mrhr_gan",
+    "candidateC_expanded2688": "data_out/wind_finetune_candidateC_expanded2688",
+    "candidateB_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688",
+    "candidateE2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_crit_expanded2688": "data_out/wind_finetune_candidateUV_plus_crit_expanded2688",
+    "candidateUV_expanded2688": "data_out/wind_finetune_candidateUV_expanded2688",
+    "candidateB_expanded2688": "data_out/wind_finetune_candidateB_expanded2688",
+}
+
+ok = True
+for name, d in methods.items():
+    p = Path(d) / "idx.npy"
+    if not p.exists():
+        print(f"[MISSING] {name}: {p}")
+        ok = False
+        continue
+    idx = np.load(p)
+    exact = np.array_equal(idx, np.arange(168))
+    print(f"{name:55s} exact_order={exact}")
+    ok = ok and exact
+
+raise SystemExit(0 if ok else 1)
+PY
+```
+
+All methods returned `exact_order=True`.
+
+### First Phase A run status
+
+The first Phase A run did **not** complete for the two newly added methods. It completed/aggregated the already-existing methods but skipped/incompleted:
+
+```text
+candidateUV_expanded2688
+candidateB_expanded2688
+```
+
+The report written by this incomplete run is therefore useful only for the already-completed methods and should **not** be treated as the final `_with_B_UV` report.
+
+Observed report status:
+
+```text
+Methods completed:
+cnn, gan, candidateC_expanded2688,
+candidateB_plus_E2_tf_lowlambda_expanded2688,
+candidateE2_tf_lowlambda_expanded2688,
+candidateUV_plus_E2_tf_lowlambda_expanded2688,
+candidateUV_plus_crit_expanded2688
+
+Methods skipped/incomplete:
+candidateUV_expanded2688, candidateB_expanded2688
+```
+
+Observed PASS/FAIL checklist excerpt:
+
+```text
+[FAIL] candidateUV_expanded2688: VTI generation
+[FAIL] candidateUV_expanded2688: complete TTK outputs (VTI=0 PD=0 MT_p0=0 MT_p1=0 MT_p2=0, expect 336 each)
+[FAIL] candidateB_expanded2688: VTI generation
+[FAIL] candidateB_expanded2688: complete TTK outputs (VTI=0 PD=0 MT_p0=0 MT_p1=0 MT_p2=0, expect 336 each)
+```
+
+### Failure diagnosis
+
+The error log showed `FileNotFoundError` inside Docker for host-absolute paths such as:
+
+```text
+/home/adadhwal/PhIRE/data_out/wind_finetune_candidateUV_expanded2688/dataGT.npy
+/home/adadhwal/PhIRE/data_out/wind_finetune_candidateB_expanded2688/dataGT.npy
+```
+
+But the Docker invocation mounts the repo as:
+
+```text
+-v /home/adadhwal/PhIRE:/work -w /work
+```
+
+Therefore, inside Docker, the correct paths are repo-relative or `/work`-relative, for example:
+
+```text
+data_out/wind_finetune_candidateB_expanded2688/dataGT.npy
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/vti
+```
+
+### Diagnostic commands used
+
+Log grep:
+
+```bash
+cd ~/PhIRE
+
+grep -nE "candidateUV_expanded2688|candidateB_expanded2688|_vti-worker|Traceback|ModuleNotFoundError|FileNotFoundError|PermissionError|No such|error|warn|docker|failed" \
+  logs/superlevel_with_B_UV.log | head -300
+```
+
+Directory inspection:
+
+```bash
+cd ~/PhIRE
+
+find ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688 -maxdepth 4 -type f | head -20
+find ttk_runs_fixed/superlevel_topology/candidateB_expanded2688  -maxdepth 4 -type f | head -20
+
+ls -lah ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688 || true
+ls -lah ttk_runs_fixed/superlevel_topology/candidateB_expanded2688 || true
+```
+
+Manual worker test for B-2688:
+
+```bash
+cd ~/PhIRE
+
+mkdir -p ttk_runs_fixed/superlevel_topology/_debug_vti
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'python scripts/run_superlevel_topology_robustness.py --_vti-worker \
+  --input data_out/wind_finetune_candidateB_expanded2688/dataGT.npy \
+  --outdir ttk_runs_fixed/superlevel_topology/_debug_vti \
+  --label candidateB_expanded2688_GT \
+  --samples 0'
+```
+
+Observed output:
+
+```text
+[_vti-worker] wrote 1 VTI file(s) to ttk_runs_fixed/superlevel_topology/_debug_vti (label=candidateB_expanded2688_GT)
+```
+
+Manual worker test for UV-2688:
+
+```bash
+cd ~/PhIRE
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'python scripts/run_superlevel_topology_robustness.py --_vti-worker \
+  --input data_out/wind_finetune_candidateUV_expanded2688/dataGT.npy \
+  --outdir ttk_runs_fixed/superlevel_topology/_debug_vti \
+  --label candidateUV_expanded2688_GT \
+  --samples 0'
+```
+
+Observed output:
+
+```text
+[_vti-worker] wrote 1 VTI file(s) to ttk_runs_fixed/superlevel_topology/_debug_vti (label=candidateUV_expanded2688_GT)
+```
+
+Debug cleanup:
+
+```bash
+cd ~/PhIRE
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'rm -rf ttk_runs_fixed/superlevel_topology/_debug_vti'
+```
+
+### Current status and needed patch
+
+The VTI worker is functional. The failure is not due to the input arrays, Docker image, or VTK writing. The failure is that the full superlevel script passes host-absolute paths into Docker. The fix is to patch `scripts/run_superlevel_topology_robustness.py` so that paths passed inside Docker commands are repo-relative or `/work`-relative.
+
+Suggested helper:
+
+```python
+def _repo_rel(path: Path) -> str:
+    return str(Path(path).resolve().relative_to(REPO_ROOT.resolve()))
+```
+
+Use this helper for Docker-internal `--input`, `--outdir`, and any TTK command paths passed into `docker run`.
+
+After the patch, rerun:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_superlevel_topology_robustness.py --run \
+  --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateE2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \
+  --output-suffix _with_B_UV \
+  --threads 1 \
+  2>&1 | tee logs/superlevel_with_B_UV_rerun.log
+```
+
+---
+
+## XXIV.6 Candidate B internal factorial ablation setup
+
+### Scripts
+
+Two new scripts were created for the Candidate B internal ablation:
+
+```text
+scripts/run_candidateB_factorial_expanded2688_finetune.py
+scripts/run_candidateB_factorial_expanded2688_batch.sh
+```
+
+The parameterized training script isolates which of Candidate B's three scalar-field terms drive PD improvement and which contribute to MT degradation.
+
+### Variants
+
+All variants keep \(L_{uv}\) and disable `L_crit`, `L_TTKCV`, and `L_TTKpers`.
+
+| Variant | Objective |
+|---|---|
+| `speed` | \(L_{uv}+0.01L_{\mathrm{speed}}\) |
+| `grad` | \(L_{uv}+0.05L_{\mathrm{grad}}\) |
+| `levelset` | \(L_{uv}+0.25L_{\mathrm{levelset}}\) |
+| `speed_grad` | \(L_{uv}+0.01L_{\mathrm{speed}}+0.05L_{\mathrm{grad}}\) |
+| `speed_levelset` | \(L_{uv}+0.01L_{\mathrm{speed}}+0.25L_{\mathrm{levelset}}\) |
+| `grad_levelset` | \(L_{uv}+0.05L_{\mathrm{grad}}+0.25L_{\mathrm{levelset}}\) |
+
+The full B endpoint already exists as:
+
+```text
+candidateB_expanded2688
+```
+
+and the UV endpoint already exists as:
+
+```text
+candidateUV_expanded2688
+```
+
+### Output naming
+
+Per variant:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_<variant>_expanded2688/
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/
+logs/wind_finetune_candidateB_factorial_<variant>_expanded2688.log
+```
+
+### Run one variant
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_candidateB_factorial_expanded2688_finetune.py --variant levelset
+```
+
+### Run all singletons
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --all-singletons \
+  2>&1 | tee logs/candidateB_factorial_singletons_expanded2688.log
+```
+
+Preferred singleton order:
+
+```text
+levelset
+speed
+grad
+```
+
+### Run one singleton through the batch driver
+
+Recommended first end-to-end test:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --variant levelset \
+  2>&1 | tee logs/candidateB_factorial_levelset_expanded2688_batch.log
+```
+
+### Run pairwise variants
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --all-pairs \
+  2>&1 | tee logs/candidateB_factorial_pairs_expanded2688.log
+```
+
+### Run all variants
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --all \
+  2>&1 | tee logs/candidateB_factorial_all_expanded2688.log
+```
+
+### TTK command for a completed factorial variant
+
+Replace `<variant>` with `levelset`, `speed`, `grad`, `speed_grad`, `speed_levelset`, or `grad_levelset`.
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method     candidateB_factorial_<variant>_expanded2688 \
+  --data-dir   data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688 \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology_vti \
+  --out-base   ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology \
+  --n-samples  168 \
+  --threads    1 \
+  --skip-viz \
+  2>&1 | tee logs/topology_candidateB_factorial_<variant>_expanded2688.log
+```
+
+### Current status
+
+The factorial scripts have been created and patched so that the post-inference `idx.npy` check requires exact order:
+
+```python
+np.array_equal(idx_vals, np.arange(N_EVAL))
+```
+
+instead of merely checking the sorted set. The factorial ablations have not yet been run as of this note. The recommended next run is the `levelset` singleton, because the soft high-speed level-set term is the most plausible individual driver of Candidate B's PD improvement and high-speed component/exceedance behavior.
+
+---
+
+## XXIV.7 Current interpretation after Candidate B-2688
+
+The Candidate B-2688 anchor sharpens the interpretation of Candidate C:
+
+1. Candidate B's scalar-field scaffold explains most of Candidate C's PD improvement.
+2. The high-speed local-maxima proxy `L_crit` adds only a small additional PD improvement at 2688.
+3. `L_crit` slightly mitigates Candidate B's MT degradation, but Candidate C still does not become MT-oriented.
+4. The main MT degradation appears associated with the Candidate B scaffold.
+5. The repaired E2 family remains the clearest MT-oriented direction.
+6. The next scientific question is which Candidate B term — speed, gradient, or soft high-speed level-set — drives the PD gain and which term causes or worsens the MT trade-off.
+
+The next required data are therefore the singleton Candidate B ablations:
+
+```text
+UV + speed
+UV + grad
+UV + levelset
+```
+
+followed, if useful, by the pairwise variants:
+
+```text
+UV + speed + grad
+UV + speed + levelset
+UV + grad + levelset
+```
+
+Only after these topology and cheap/domain metrics are accumulated should the results be interpreted jointly with fidelity, WPD, gradient, PSD, exceedance, and component-count behavior.
+
+---
