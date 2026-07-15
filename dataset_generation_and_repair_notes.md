@@ -8212,3 +8212,182 @@ Winner distributions after adding UV+crit-2688:
 4. The completed UV+crit ladder supports the ablation conclusion that Candidate C's PD gains depend on combining the Candidate B scalar-speed / gradient / level-set scaffold with `L_crit`. The local-maxima proxy alone mainly improves fidelity and gives only limited merge-tree benefit at larger scale.
 
 ---
+
+# Part XXIII — Superlevel filtration robustness evaluation
+
+## XXIII.1 Scientific question
+
+The main repaired topology evaluations used TTK's default sublevel convention on scalar wind speed. Because several of the topology-inspired training terms were motivated in high-speed / superlevel language, a separate robustness audit was run to test whether the conclusions change when evaluating the superlevel topology of speed.
+
+The audit question was:
+
+> Are the Candidate C, repaired E2, UV+E2, and UV+crit conclusions stable if high-speed superlevel topology is evaluated directly?
+
+## XXIII.2 Method and artifact isolation
+
+Superlevel topology of speed `s` was evaluated as sublevel topology of `-s`.
+
+Implementation details:
+
+- the scalar array written to VTI was named `wind_speed`, but stored `-sqrt(u^2+v^2)`;
+- the same unmodified TTK command-line tools were used:
+  - `ttkPersistenceDiagramCmd`
+  - `ttkMergeTreeCmd`
+  - `ttkBottleneckDistance`
+  - `ttkMergeTreeDistanceMatrix`
+- no model was retrained;
+- no existing sublevel/default topology outputs were overwritten;
+- no candidate `data_out*/` or `models*/` artifacts were modified;
+- all outputs were isolated under:
+
+```text
+ttk_runs_fixed/superlevel_topology/
+```
+
+Final superlevel report:
+
+```text
+docs/superlevel_topology_robustness_eval.md
+```
+
+Combined output files:
+
+```text
+ttk_runs_fixed/superlevel_topology/superlevel_pd_mt_per_sample.csv
+ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method.csv
+ttk_runs_fixed/superlevel_topology/superlevel_winner_comparison.csv
+```
+
+## XXIII.3 Completed methods and validation status
+
+The superlevel audit completed for the following seven methods:
+
+| Method | Role |
+|---|---|
+| `cnn` | pretrained CNN baseline |
+| `gan` | pretrained GAN baseline |
+| `candidateC_expanded2688` | submitted Candidate C scale-up |
+| `candidateB_plus_E2_tf_lowlambda_expanded2688` | B+E2-low, no `L_crit` |
+| `candidateE2_tf_lowlambda_expanded2688` | C+E2-low |
+| `candidateUV_plus_E2_tf_lowlambda_expanded2688` | UV+E2-low |
+| `candidateUV_plus_crit_expanded2688` | UV+crit |
+
+Final checklist status:
+
+- every method had 168 per-sample distance rows;
+- every method had complete VTI/PD/MT outputs;
+- each method had `336` VTI files, `336` PD files, and `336` outputs for each MT port;
+- the winner CSV had 168 rows;
+- the run completed with all checks passed.
+
+## XXIII.4 Mean PD / MT by method under superlevel evaluation
+
+Lower is better for both PD bottleneck distance and MT Wasserstein-type distance.
+
+| Method | PD mean superlevel ↓ | MT mean superlevel ↓ | PD mean sublevel ↓ | MT mean sublevel ↓ | ΔPD (super - sub) | ΔMT (super - sub) |
+|---|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.3762 | 5.3231 | 27.4063 | 5.8678 | -0.0301 | -0.5447 |
+| GAN baseline | 20.7168 | 7.8397 | 20.8641 | 8.3481 | -0.1473 | -0.5084 |
+| Candidate C-2688 | 22.4417 | 5.3578 | 22.4944 | 6.0803 | -0.0527 | -0.7225 |
+| B+E2-low-2688 | 24.1042 | 4.9998 | 23.9876 | 5.6774 | +0.1166 | -0.6776 |
+| C+E2-low-2688 | 24.3811 | 4.9796 | 24.2686 | 5.6628 | +0.1125 | -0.6832 |
+| UV+E2-low-2688 | 25.1923 | 4.9522 | 25.0721 | 5.5940 | +0.1202 | -0.6418 |
+| UV+crit-2688 | 29.0752 | 5.0875 | 29.1143 | 5.6899 | -0.0391 | -0.6024 |
+
+## XXIII.5 Superlevel wins relative to CNN and GAN
+
+| Method | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|
+| CNN baseline | -- | -- | -- | -- | -- |
+| GAN baseline | 166/168 | 23/168 | -- | -- | -- |
+| Candidate C-2688 | 168/168 | 72/168 | 19/168 | 151/168 | 14/23 |
+| B+E2-low-2688 | 165/168 | 110/168 | 6/168 | 165/168 | 23/23 |
+| C+E2-low-2688 | 164/168 | 112/168 | 5/168 | 166/168 | 23/23 |
+| UV+E2-low-2688 | 160/168 | 120/168 | 0/168 | 168/168 | 23/23 |
+| UV+crit-2688 | 13/168 | 104/168 | 0/168 | 157/168 | 13/23 |
+
+The superlevel MT-GAN baseline set contained 23 samples where GAN beat CNN on superlevel MT:
+
+```text
+[6, 8, 16, 17, 18, 19, 20, 22, 25, 62, 63, 65, 66, 70, 77, 79, 80, 82, 83, 88, 89, 90, 122]
+```
+
+## XXIII.6 Superlevel winner distributions
+
+### PD winner distribution
+
+| Method | PD wins |
+|---|---:|
+| GAN baseline | 149 |
+| Candidate C-2688 | 19 |
+
+### MT winner distribution
+
+| Method | MT wins |
+|---|---:|
+| UV+E2-low-2688 | 43 |
+| C+E2-low-2688 | 34 |
+| UV+crit-2688 | 31 |
+| B+E2-low-2688 | 30 |
+| CNN baseline | 27 |
+| Candidate C-2688 | 3 |
+
+## XXIII.7 Interpretation
+
+### Candidate C
+
+The change from sublevel to superlevel evaluation does **not** materially change the Candidate C ablation story.
+
+Candidate C-2688 remains the strongest fine-tuned CNN-family method for PD:
+
+- sublevel PD mean: `22.4944`;
+- superlevel PD mean: `22.4417`;
+- change: `-0.0527`, effectively negligible relative to the method gaps;
+- superlevel `PD < CNN`: `168/168`;
+- superlevel `PD beats GAN`: `19/168`;
+- superlevel PD winner distribution: Candidate C wins `19` samples, GAN wins `149`.
+
+Thus, the high-speed/superlevel interpretation of Candidate C is consistent with the original sublevel evaluation. Candidate C's PD gain is not an artifact of using the default sublevel filtration.
+
+For MT, Candidate C improves in absolute superlevel MT distance relative to its sublevel MT distance (`6.0803 -> 5.3578`), but it is still not the strongest MT method. Under superlevel MT, Candidate C is close to the CNN mean (`5.3578` vs CNN `5.3231`), beats CNN on `72/168` samples, and recovers `14/23` superlevel MT-GAN cases. This supports the same descriptor-specific interpretation as before: Candidate C is primarily PD-oriented, with only partial MT benefit.
+
+### Repaired E2 / fixed-index TTK supervision
+
+The repaired E2-family results become, if anything, **stronger** under the superlevel MT evaluation.
+
+All three native TF E2-family variants improve mean MT over CNN:
+
+- B+E2-low-2688: `4.9998` vs CNN `5.3231`;
+- C+E2-low-2688: `4.9796` vs CNN `5.3231`;
+- UV+E2-low-2688: `4.9522` vs CNN `5.3231`.
+
+They also recover all `23/23` cases where GAN beats CNN on superlevel MT. This is stronger than the sublevel MT-GAN recovery counts because the superlevel GAN-favored set is different (`23` samples rather than the earlier sublevel `20` samples), but the conclusion is stable: repaired TTK fixed-index supervision is strongly merge-tree-oriented.
+
+The PD behavior of the E2-family methods changes only slightly. Their superlevel PD means are about `+0.11` to `+0.12` worse than their sublevel PD means, but the qualitative conclusion is unchanged: E2 improves PD over CNN but does not replace Candidate C as the best PD-oriented fine-tuning objective.
+
+### UV+crit
+
+UV+crit-2688 remains PD-weak under superlevel evaluation:
+
+- superlevel PD mean: `29.0752`, worse than CNN's `27.3762`;
+- superlevel `PD < CNN`: `13/168`;
+- superlevel `PD beats GAN`: `0/168`.
+
+However, UV+crit keeps a real MT signal:
+
+- superlevel MT mean: `5.0875`, better than CNN's `5.3231`;
+- superlevel `MT < CNN`: `104/168`;
+- superlevel MT-GAN recovery: `13/23`.
+
+This is consistent with the sublevel conclusion that `L_crit` alone carries some tree/critical-value signal but does not reproduce Candidate C's PD improvement.
+
+### Final robustness conclusion
+
+The superlevel audit strengthens the main descriptor-specific story:
+
+1. **Candidate C remains the strongest PD-oriented fine-tuned CNN-family objective**, and this is stable under both sublevel and superlevel filtrations.
+2. **Repaired E2 fixed-index TTK supervision is the strongest MT-oriented signal**, especially under superlevel/high-speed evaluation.
+3. **UV+crit alone is not enough for PD**, but it has a modest MT signal.
+4. The sublevel-vs-superlevel convention does not undermine the submitted Candidate C result. It mainly clarifies the interpretation: Candidate C is robust for PD, while E2-family methods are better aligned with merge-tree structure.
+
+---
