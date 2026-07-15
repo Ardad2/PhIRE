@@ -469,6 +469,22 @@ def vti_worker_main(args: argparse.Namespace) -> int:
 # Stage 1: VTI generation (host-side orchestration; delegates to Docker)
 # ---------------------------------------------------------------------------
 
+def _repo_rel(path) -> str:
+    """Return path relative to REPO_ROOT, as a plain string, for use inside
+    a Docker command string (cmd_inner passed to _docker_run).
+
+    _docker_run mounts REPO_ROOT at /work with -w /work, so only paths
+    relative to REPO_ROOT (equivalently, relative to /work inside the
+    container) resolve correctly inside the container. A host-absolute
+    path (e.g. /home/adadhwal/PhIRE/data_out/...) does NOT exist inside the
+    container and silently fails there. Every path interpolated into a
+    cmd_inner string passed to _docker_run must go through this helper.
+    Host-side Path objects used for existence checks, globbing, and
+    aggregation outside of _docker_run are unaffected and stay absolute.
+    """
+    return str(Path(path).resolve().relative_to(REPO_ROOT.resolve()))
+
+
 def _docker_run(cmd_inner: str, extra_env: Optional[Dict[str, str]] = None) -> int:
     docker_cmd = ["docker", "run", "--rm", "-v", f"{REPO_ROOT}:/work", "-w", "/work"]
     for k, v in (extra_env or {}).items():
@@ -491,10 +507,15 @@ def generate_vti_for_method(name: str, m: MethodInputs, dry_run: bool) -> bool:
             print(f"  [skip] {label}: {len(existing)}/{N_EVAL} VTI files already present.")
             continue
 
-        rel_input = (m.data_dir / npy_file)
+        # --input/--outdir must be repo-relative: _docker_run mounts
+        # REPO_ROOT at /work, so a host-absolute path (e.g.
+        # /home/adadhwal/PhIRE/data_out/...) does not exist inside the
+        # container.
+        docker_input = _repo_rel(m.data_dir / npy_file)
+        docker_outdir = _repo_rel(vti_dir)
         cmd_inner = (
             f"python scripts/run_superlevel_topology_robustness.py --_vti-worker "
-            f"--input {rel_input} --outdir {vti_dir} --label {label} --samples {sample_args}"
+            f"--input {docker_input} --outdir {docker_outdir} --label {label} --samples {sample_args}"
         )
         if dry_run:
             print(f"  [dry-run] would generate {N_EVAL} VTI files for {label} via Docker:")
@@ -556,12 +577,20 @@ def run_ttk_extraction(name: str, threads: int, dry_run: bool) -> Tuple[bool, Di
 
     env = {"OMP_NUM_THREADS": str(threads), "TTK_NUM_THREADS": str(threads)}
 
+    # -i/-o must be repo-relative for the same reason as generate_vti_for_method
+    # (see _repo_rel docstring): _docker_run mounts REPO_ROOT at /work, and a
+    # host-absolute VTI/PD/MT path does not exist inside the container.
+    docker_pd_dir = _repo_rel(pd_dir)
+    docker_mt_dir = _repo_rel(mt_dir)
+
     for f in vti_files:
         base = f.stem
+        docker_vti_file = _repo_rel(f)
         if not _pd_output_exists(pd_dir, base):
             print(f"  === PD: {base} ===")
             rc = _docker_run(
-                f"ttkPersistenceDiagramCmd -t {threads} -i {f} -a {ARRAY_NAME} -o {pd_dir}/{base}_pd",
+                f"ttkPersistenceDiagramCmd -t {threads} -i {docker_vti_file} -a {ARRAY_NAME} "
+                f"-o {docker_pd_dir}/{base}_pd",
                 extra_env=env,
             )
             if rc != 0:
@@ -572,7 +601,8 @@ def run_ttk_extraction(name: str, threads: int, dry_run: bool) -> Tuple[bool, Di
         if not _mt_output_exists(mt_dir, base):
             print(f"  === MT: {base} ===")
             rc = _docker_run(
-                f"ttkMergeTreeCmd -t {threads} -i {f} -a {ARRAY_NAME} -o {mt_dir}/{base}_mt",
+                f"ttkMergeTreeCmd -t {threads} -i {docker_vti_file} -a {ARRAY_NAME} "
+                f"-o {docker_mt_dir}/{base}_mt",
                 extra_env=env,
             )
             if rc != 0:
