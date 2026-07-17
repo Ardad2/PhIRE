@@ -22,11 +22,19 @@
 #      non-catastrophic.
 #
 # A variant's failure (training script exits non-zero -- e.g. its output
-# already exists and --overwrite/--resume was not passed, or post-inference
-# validation failed) is reported and does NOT abort the batch; remaining
-# variants still run, since each is an independent training job. A final
-# PASS/FAIL summary is printed at the end and the script exits non-zero if
-# any variant failed.
+# already exists, or post-inference validation failed) is reported and does
+# NOT abort the batch; remaining variants still run, since each is an
+# independent training job. A final PASS/FAIL summary is printed at the end
+# and the script exits non-zero if any variant failed.
+#
+# There is deliberately no --overwrite/--resume option here or in the
+# training script: PhIREGANs.pretrain() always retrains from the pretrained
+# CNN checkpoint from scratch in this codebase, so an overwrite flag would
+# silently retrain under the same method name while potentially leaving
+# stale cheap-evaluation or TTK outputs from an older model version behind.
+# If a prior run for a variant needs to be redone, inspect its artifacts
+# first, then deliberately archive or remove them yourself (nothing here
+# ever deletes anything automatically) before rerunning.
 #
 # Usage (from repo root, on Spark):
 #   bash scripts/run_candidateF_expanded2688_batch.sh --variant grad_e2_low
@@ -40,11 +48,6 @@
 #                    cleanest direct PD+MT combination first, then the
 #                    level-set interaction test, then the local-maxima-only
 #                    control).
-#   --overwrite      Forwarded to the training script: allow proceeding even
-#                    if a variant's output already exists.
-#   --resume         Forwarded to the training script: like --overwrite, but
-#                    verifies existing paths belong to this exact variant
-#                    first.
 #   --print-config   Forwarded to the training script: print the static
 #                    configuration table for all three variants and exit
 #                    (ignores --variant/--all; runs once, not once per
@@ -82,7 +85,6 @@ usage() {
 
 VARIANT=""
 MODE=""   # "single" | "all" | "print-config"
-OVERWRITE=0
 DRY_RUN=0
 SKIP_EVAL=0
 
@@ -91,8 +93,6 @@ while [[ $# -gt 0 ]]; do
     --variant)       VARIANT="$2"; MODE="single"; shift 2 ;;
     --all)           MODE="all"; shift ;;
     --print-config)  MODE="print-config"; shift ;;
-    --overwrite)     OVERWRITE=1; shift ;;
-    --resume)        OVERWRITE=1; shift ;;
     --dry-run)       DRY_RUN=1; shift ;;
     --skip-eval)     SKIP_EVAL=1; shift ;;
     -h|--help)       usage; exit 0 ;;
@@ -140,7 +140,6 @@ echo "Candidate F expanded-2688 batch"
 echo "========================================"
 echo "  Mode              : $MODE"
 echo "  Variants to run    : ${VARIANTS_TO_RUN[*]}"
-echo "  Overwrite/resume   : $OVERWRITE"
 echo "  Dry run             : $DRY_RUN"
 echo "  Auto cheap-eval     : $([[ "$SKIP_EVAL" -eq 1 || "$DRY_RUN" -eq 1 ]] && echo no || echo yes)"
 echo "========================================"
@@ -154,7 +153,6 @@ for variant in "${VARIANTS_TO_RUN[@]}"; do
   echo "########################################"
 
   TRAIN_ARGS=(--variant "$variant")
-  [[ "$OVERWRITE" -eq 1 ]] && TRAIN_ARGS+=(--overwrite)
   [[ "$DRY_RUN" -eq 1 ]] && TRAIN_ARGS+=(--dry-run)
 
   set +e
@@ -164,6 +162,9 @@ for variant in "${VARIANTS_TO_RUN[@]}"; do
 
   if [[ "$train_rc" -ne 0 ]]; then
     echo "[error] Variant $variant: training script exited with code $train_rc. Skipping evaluation/TTK for this variant."
+    echo "[error] If this was a collision (artifacts already exist for this method), inspect them and"
+    echo "[error] deliberately archive or remove ALL of them yourself before rerunning -- nothing is"
+    echo "[error] deleted automatically, and there is no --overwrite/--resume flag to bypass this."
     RESULTS+=("$variant:FAIL(train_rc=$train_rc)")
     echo
     continue

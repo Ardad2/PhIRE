@@ -70,13 +70,19 @@ candidateE2_tf_lowlambda_expanded2688 (C+E2), candidateB_plus_E2_tf_lowlambda_ex
 (B+E2), and candidateUV_plus_E2_tf_lowlambda_expanded2688 (UV+E2) -- verified
 by grepping CONSTRAINTS_NPZ in all three scripts before writing this one.
 This script never regenerates or modifies that file; preflight only reads
-and validates it (see _load_constraints_and_report below): n_samples/unique
-sample count == 2688, sample_idx shape/range, pairs-per-sample (must be
-EXACTLY 64 for every sample -- a mismatch from the known-good 64 is a hard
-error here, not just a warning, per this task's explicit requirement),
-birth/death vertex ID bounds (must lie in [0, PATCH*PATCH-1], PATCH=160,
-matching the top-left-anchored 160x160 VTK crop), and finiteness of every
-target value and persistence gap.
+and validates it (see _load_constraints_and_report below), loaded with
+allow_pickle=False (every field is a plain numeric array; no script in this
+repo's E2 family relies on pickled objects inside this NPZ). Hard errors
+(not warnings) on any of: stored n_samples != 2688; sample_idx/sample_start/
+sample_count shape != (2688,); sample_idx is not exactly the set
+{0, ..., 2687} (each integer exactly once); sample_count != 64 for any
+sample; any sample_start < 0; any sample_start+sample_count exceeding the
+birth/death pair-array length; birth_vid/death_vid/birth_val/death_val/
+persistence lengths disagreeing; any birth/death vertex ID outside
+[0, PATCH*PATCH-1] (PATCH=160, matching the top-left-anchored 160x160 VTK
+crop); any non-finite target/persistence value; or any negative persistence
+value. The training TFRecord's sample-index set must equal the NPZ's
+sample-index set EXACTLY (not merely be a subset of it).
 
 Normalization / physical-unit conventions (identical to every other native
 TF candidate script in this repo)
@@ -118,18 +124,31 @@ Usage (from repo root, on Spark)
 
 Collision protection
 -----------------------
-By default this script ABORTS if ANY of its target artifact paths already
-exist and look completed -- model dir, data-out dir, cheap-eval dir, TTK
-VTI dir, TTK topology-out dir, the eval/topology markdown reports, or the
-log file -- printing every colliding path, not just the first one. Pass
---overwrite to proceed anyway (unconditionally). Pass --resume to proceed
-only after verifying every colliding path's name contains this variant's
-own method_name (a defensive check that this is genuinely a re-run of THIS
-variant, not an accidental collision with a different method's output);
-PhIREGANs.pretrain() always retrains from the pretrained CNN checkpoint
-from scratch in this codebase, so --resume does not actually resume
-partial training -- it has the same training effect as --overwrite, just
-with that extra safety verification first.
+By default (and ALWAYS -- there is no override flag) this script ABORTS if
+ANY of its target artifact paths already exist and look completed -- model
+dir, data-out dir, cheap-eval dir, TTK VTI dir, TTK topology-out dir, the
+eval/topology markdown reports, or the canonical training log -- printing
+every colliding path, not just the first one. There is deliberately no
+--overwrite or --resume flag: PhIREGANs.pretrain() always retrains from the
+pretrained CNN checkpoint from scratch in this codebase (there is no
+partial-training resume capability), so an "overwrite" flag would silently
+retrain under the same method name while potentially leaving stale
+cheap-evaluation or TTK outputs from an older model version behind. If a
+prior run for this exact method needs to be redone, inspect its artifacts
+first, then deliberately archive or delete them yourself (this script never
+deletes anything automatically) before rerunning.
+
+Dry runs and --print-config are artifact-free: no canonical training log,
+model checkpoint, inference output, or any other file is ever created by
+--print-config or --dry-run. The canonical training log is opened for the
+first time only after every collision/preflight/NPZ-validation check has
+already passed for an actual (non-dry-run) invocation -- a failed preflight
+or a --dry-run therefore can never "poison" a subsequent real run by
+pre-creating a log file that then looks like a collision. If you want
+preflight/dry-run output captured to a file, tee the command yourself, e.g.
+`python3 scripts/run_candidateF_expanded2688_finetune.py --variant
+grad_e2_low --dry-run 2>&1 | tee /tmp/preflight.log` -- that file is not
+treated as an experiment artifact by this script.
 
 This script never runs the expensive TTK topology pipeline automatically --
 it prints the exact command at the end (see
@@ -146,11 +165,15 @@ import os
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Ensure repo root is on sys.path
+# Ensure repo root is on sys.path AND is the working directory, so every
+# relative path used below (TRAIN_DATA_PATH, EVAL_DATA_PATH, model_dir,
+# data_out_dir, etc.) resolves correctly regardless of the directory this
+# script was invoked from.
 # ---------------------------------------------------------------------------
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT  = SCRIPT_DIR.parent
 sys.path.insert(0, str(REPO_ROOT))
+os.chdir(REPO_ROOT)
 
 # ---------------------------------------------------------------------------
 # Shared constants (identical to candidateB_expanded2688 / candidateC_expanded2688
@@ -430,17 +453,8 @@ def _parse_args() -> argparse.Namespace:
                           'No training, no Docker/TTK, no file writes.')
     ap.add_argument('--dry-run', action='store_true',
                      help='Run preflight/collision/NPZ-validation checks for --variant and print '
-                          'the plan; do not train.')
-    ap.add_argument('--overwrite', action='store_true',
-                     help='Allow proceeding even if this variant\'s output paths already exist. '
-                          'Default is to abort and print every colliding path.')
-    ap.add_argument('--resume', action='store_true',
-                     help='Like --overwrite, but first verifies every colliding path\'s name '
-                          'contains this variant\'s own method_name -- refuses to proceed if an '
-                          'existing path looks like it belongs to a different method. '
-                          'PhIREGANs.pretrain() always retrains from the pretrained checkpoint '
-                          'from scratch in this codebase, so this does not resume partial '
-                          'training; it has the same training effect as --overwrite.')
+                          'the plan; do not train. Creates no files at all (no canonical training '
+                          'log, no model/data output).')
     return ap.parse_args()
 
 
@@ -461,20 +475,15 @@ def main() -> int:
     cfg = VARIANTS[variant]
     paths = method_paths(cfg['method_name'])
     constraints_npz = constraints_npz_for(variant)
-    allow_existing = bool(args.overwrite or args.resume)
-
-    # Snapshot whether the log file already had content BEFORE this
-    # invocation's own Tee opens/appends to it below -- otherwise the
-    # collision check would always see a non-empty log file (the one this
-    # very run just started writing) and falsely report a collision on
-    # every single invocation, including the very first one after this
-    # process starts printing its own header.
-    log_already_existed = (
-        Path(paths['log_path']).exists() and Path(paths['log_path']).stat().st_size > 0
-    )
 
     # -------------------------------------------------------------------
-    # Tee: mirror stdout to a log file (after paths are known)
+    # _Tee is defined here but NOT instantiated yet. It is only ever
+    # instantiated after every collision/preflight/NPZ-validation check has
+    # passed for a REAL (non-dry-run) invocation -- see the "if args.dry_run:
+    # return" gate below. This guarantees --dry-run and --print-config never
+    # create the canonical training log (or any other file), and that a
+    # failed preflight can never leave behind a log file that a later run
+    # would mistake for a collision.
     # -------------------------------------------------------------------
     class _Tee:
         """Write to both the original stdout and a file simultaneously."""
@@ -494,11 +503,8 @@ def main() -> int:
         def fileno(self):
             return self._stream.fileno()
 
-    sys.stdout = _Tee(sys.stdout, paths['log_path'])
-    sys.stderr = sys.stdout
-
     # -------------------------------------------------------------------
-    # Imports (after tee is active)
+    # Imports (plain stdout; no Tee has been created yet)
     # -------------------------------------------------------------------
     import numpy as np
     import tensorflow.compat.v1 as tf
@@ -538,6 +544,18 @@ def main() -> int:
         print('[safety] Output paths do not overlap any protected directory. OK.')
 
     def _check_collisions() -> None:
+        """Abort if any method-specific model, inference, evaluation, VTI,
+        topology, report, or completed training-log artifact exists for
+        this method. There is no override: this check cannot be bypassed
+        by any flag. If a prior run needs to be redone, inspect and
+        deliberately archive or remove all artifacts for this method
+        yourself before rerunning -- this script never deletes anything.
+
+        Note: the canonical training log (paths['log_path']) is only ever
+        created below AFTER this check (and only for a real, non-dry-run
+        invocation), so if it exists here, it can only be from a genuine
+        prior real run -- never from this invocation's own dry-run or
+        preflight output, which are never written to it."""
         existing = []
         for key in ('model_dir', 'data_out_dir', 'cheap_eval_dir',
                     'topology_vti_dir', 'topology_out_dir'):
@@ -548,7 +566,7 @@ def main() -> int:
             p = Path(paths[key])
             if p.exists():
                 existing.append(str(p))
-        if log_already_existed:
+        if Path(paths['log_path']).exists() and Path(paths['log_path']).stat().st_size > 0:
             existing.append(str(paths['log_path']))
 
         if not existing:
@@ -556,31 +574,17 @@ def main() -> int:
                   f'{paths["method_name"]!r}. OK to proceed.')
             return
 
-        if not allow_existing:
-            sys.exit(
-                '[error] Completed-looking output(s) already exist for method '
-                f'{paths["method_name"]!r}:\n'
-                + '\n'.join(f'  - {e}' for e in existing)
-                + '\n  Refusing to overwrite. Pass --overwrite, or --resume (which additionally '
-                  'verifies the existing paths belong to this exact method configuration), '
-                  'to proceed deliberately.'
-            )
-
-        if args.resume and not args.overwrite:
-            for e in existing:
-                if paths['method_name'] not in e:
-                    sys.exit(
-                        f"[error] --resume refuses to proceed: existing path {e!r} does not "
-                        f"contain this variant's method name {paths['method_name']!r}. This "
-                        "looks like it belongs to a different method; aborting rather than "
-                        "treating it as resumable."
-                    )
-            print(f"[resume] Verified all {len(existing)} existing path(s) belong to method "
-                  f"{paths['method_name']!r}. Proceeding.")
-        else:
-            print(f'[overwrite] Proceeding despite {len(existing)} existing output(s):')
-            for e in existing:
-                print(f'  - {e}')
+        sys.exit(
+            '[error] Completed-looking output(s) already exist for method '
+            f'{paths["method_name"]!r}:\n'
+            + '\n'.join(f'  - {e}' for e in existing)
+            + '\n  Refusing to proceed automatically. There is no --overwrite/--resume flag: '
+              'PhIREGANs.pretrain() always retrains from scratch in this codebase, so an '
+              'automatic overwrite could silently retrain under this method name while leaving '
+              'stale cheap-evaluation or TTK outputs from an older model behind. Inspect the '
+              'path(s) above, then deliberately archive or remove ALL of them yourself before '
+              'rerunning this exact variant. Nothing is deleted automatically.'
+        )
 
     def _count_tfrecord_records(data_path: str) -> int:
         n = 0
@@ -603,11 +607,25 @@ def main() -> int:
         return np.array(indices, dtype=np.int64)
 
     def _load_constraints_and_report(npz_path: Path):
-        """Load + validate the constraints NPZ, printing the metadata this
-        task requires: n_samples, sample_idx shape/range, pairs per sample,
-        birth/death vertex bounds, finite target/persistence values. A
-        mismatch from the known-good 64 pairs/sample is a hard error."""
-        npz = np.load(str(npz_path), allow_pickle=True)
+        """Load + strictly validate the constraints NPZ. allow_pickle=False:
+        every field used here (sample_idx/sample_start/sample_count/
+        birth_vid/death_vid/birth_val/death_val/persistence) is a plain
+        numeric array in every reference E2 script in this repo; none
+        requires pickled Python objects.
+
+        Hard errors (never warnings) on:
+          - stored n_samples != N_TRAIN
+          - sample_idx/sample_start/sample_count shape != (N_TRAIN,)
+          - sample_idx is not exactly {0, ..., N_TRAIN-1}, each exactly once
+          - sample_count != EXPECTED_PAIRS_PER_SAMPLE for any sample
+          - any sample_start < 0
+          - any sample_start + sample_count exceeding the pair-array length
+          - birth_vid/death_vid/birth_val/death_val/persistence length mismatch
+          - any birth/death vertex ID outside [0, PATCH*PATCH-1]
+          - any non-finite target or persistence value
+          - any negative persistence value
+        """
+        npz = np.load(str(npz_path), allow_pickle=False)
 
         required = {
             'n_samples', 'sample_idx', 'sample_start', 'sample_count',
@@ -616,6 +634,11 @@ def main() -> int:
         missing = required - set(npz.files)
         if missing:
             sys.exit(f'[error] Constraints NPZ missing required keys: {missing}')
+
+        stored_n_samples = npz['n_samples']
+        # May be stored as a 0-d array or Python scalar depending on how it
+        # was saved; np.asarray(...).item() handles both uniformly.
+        stored_n_samples = int(np.asarray(stored_n_samples).item())
 
         sample_idx   = npz['sample_idx'].astype(np.int64)
         sample_start = npz['sample_start'].astype(np.int64)
@@ -627,18 +650,34 @@ def main() -> int:
         persistence  = npz['persistence'].astype(np.float32)
 
         print('  --- Constraints NPZ metadata validation ---')
-        n_samples = len(sample_idx)
-        n_unique = len(set(sample_idx.tolist()))
-        print(f'  n_samples (rows)       : {n_samples}')
-        print(f'  unique sample count    : {n_unique}')
-        if n_unique != N_TRAIN:
-            sys.exit(f'[error] Constraints NPZ has {n_unique} unique samples; expected {N_TRAIN}.')
-        print(f'  sample_idx shape/range : {sample_idx.shape}, '
-              f'[{int(sample_idx.min())}, {int(sample_idx.max())}]')
+        print(f'  stored n_samples field  : {stored_n_samples} (expected {N_TRAIN})')
+        if stored_n_samples != N_TRAIN:
+            sys.exit(f'[error] Constraints NPZ stored n_samples={stored_n_samples}; expected {N_TRAIN}.')
+
+        for arr_name, arr in (('sample_idx', sample_idx), ('sample_start', sample_start),
+                               ('sample_count', sample_count)):
+            print(f'  {arr_name}.shape'.ljust(26) + f': {arr.shape} (expected ({N_TRAIN},))')
+            if arr.shape != (N_TRAIN,):
+                sys.exit(f'[error] Constraints NPZ {arr_name}.shape={arr.shape}; expected ({N_TRAIN},).')
+
+        sample_idx_set = set(sample_idx.tolist())
+        expected_set = set(range(N_TRAIN))
+        print(f'  sample_idx range        : [{int(sample_idx.min())}, {int(sample_idx.max())}]')
+        if sample_idx_set != expected_set:
+            extra = sorted(sample_idx_set - expected_set)[:10]
+            missing_idx = sorted(expected_set - sample_idx_set)[:10]
+            sys.exit(
+                f'[error] Constraints NPZ sample_idx is not exactly {{0, ..., {N_TRAIN - 1}}} '
+                f'(each exactly once). Unexpected values (first 10): {extra}. '
+                f'Missing values (first 10): {missing_idx}.'
+            )
+        if len(sample_idx.tolist()) != len(sample_idx_set):
+            sys.exit('[error] Constraints NPZ sample_idx contains duplicate values.')
+        print(f'  sample_idx == exactly {{0..{N_TRAIN - 1}}}, each once: confirmed')
 
         sc_min, sc_mean, sc_max = int(sample_count.min()), float(sample_count.mean()), int(sample_count.max())
         print(f'  pairs per sample       : min={sc_min} mean={sc_mean:.2f} max={sc_max} '
-              f'(expected exactly {EXPECTED_PAIRS_PER_SAMPLE})')
+              f'(expected exactly {EXPECTED_PAIRS_PER_SAMPLE} for every sample)')
         if sc_min != EXPECTED_PAIRS_PER_SAMPLE or sc_max != EXPECTED_PAIRS_PER_SAMPLE:
             sys.exit(
                 f'[error] Constraints NPZ does not have exactly {EXPECTED_PAIRS_PER_SAMPLE} '
@@ -651,6 +690,32 @@ def main() -> int:
                 f'[error] sample_count max ({sc_max}) exceeds MAX_PAIRS ({MAX_PAIRS}); '
                 'padding/masking would silently truncate real pairs. Aborting.'
             )
+
+        if bool((sample_start < 0).any()):
+            sys.exit('[error] Constraints NPZ contains negative sample_start values.')
+        print('  sample_start all nonnegative: confirmed')
+
+        pair_lengths = {name: len(arr) for name, arr in (
+            ('birth_vid', birth_vid), ('death_vid', death_vid),
+            ('birth_val', birth_val), ('death_val', death_val),
+            ('persistence', persistence),
+        )}
+        print(f'  pair-array lengths      : {pair_lengths}')
+        if len(set(pair_lengths.values())) != 1:
+            sys.exit(f'[error] birth_vid/death_vid/birth_val/death_val/persistence have '
+                      f'unequal lengths: {pair_lengths}.')
+        pair_array_len = next(iter(pair_lengths.values()))
+
+        row_end = sample_start + sample_count
+        if bool((row_end > pair_array_len).any()):
+            bad = int(np.argmax(row_end > pair_array_len))
+            sys.exit(
+                f'[error] sample_start+sample_count exceeds the pair-array length '
+                f'({pair_array_len}) for at least one sample (first offending row index '
+                f'{bad}: sample_start={int(sample_start[bad])}, '
+                f'sample_count={int(sample_count[bad])}).'
+            )
+        print(f'  sample_start+sample_count never exceeds pair-array length ({pair_array_len}): confirmed')
 
         bv_min, bv_max = int(birth_vid.min()), int(birth_vid.max())
         dv_min, dv_max = int(death_vid.min()), int(death_vid.max())
@@ -672,6 +737,12 @@ def main() -> int:
         print(f'  finite persistence target values    : {finite_persistence}')
         if not (finite_birth_val and finite_death_val and finite_persistence):
             sys.exit('[error] Constraints NPZ contains non-finite target/persistence values.')
+
+        persistence_nonneg = bool((persistence >= 0).all())
+        print(f'  persistence nonnegative              : {persistence_nonneg}')
+        if not persistence_nonneg:
+            sys.exit('[error] Constraints NPZ contains negative persistence values.')
+
         print('  --- Constraints NPZ metadata validation: PASSED ---')
 
         constraints = {}
@@ -876,17 +947,29 @@ def main() -> int:
 
         print('  Reading training TFRecord sample indices …')
         train_indices = _read_tfrecord_indices(TRAIN_DATA_PATH)
-        if len(set(train_indices.tolist())) != N_TRAIN:
+        train_idx_set = set(train_indices.tolist())
+        if len(train_indices.tolist()) != len(train_idx_set):
             sys.exit('[error] Training TFRecord contains duplicate index values.')
-        missing = sorted(set(train_indices.tolist()) - set(constraint_idx.tolist()))
-        if missing:
+        constraint_idx_set = set(constraint_idx.tolist())
+        # The training TFRecord's index set must equal the NPZ's index set
+        # EXACTLY -- not merely be a subset of it. A superset on the NPZ
+        # side (extra indices never trained on) is just as much a mismatch
+        # as a missing index, so both directions are checked and reported.
+        missing_from_npz = sorted(train_idx_set - constraint_idx_set)
+        extra_in_npz = sorted(constraint_idx_set - train_idx_set)
+        if missing_from_npz or extra_in_npz:
             sys.exit(
-                f'[error] {len(missing)} training sample indices not found in constraints NPZ '
-                f'(first 10): {missing[:10]}\n'
-                '  Re-run the constraint builder for this dataset.'
+                '[error] Training TFRecord index set does not exactly equal the constraints '
+                'NPZ index set.\n'
+                f'  In TFRecord but not in NPZ (first 10 of {len(missing_from_npz)}): '
+                f'{missing_from_npz[:10]}\n'
+                f'  In NPZ but not in TFRecord (first 10 of {len(extra_in_npz)}): '
+                f'{extra_in_npz[:10]}\n'
+                '  Re-run the constraint builder for this exact dataset.'
             )
-        print(f'  All {N_TRAIN} training indices confirmed present in constraints (each maps '
-              'to the correct row of the 2688-sample constraint file).')
+        print(f'  Training TFRecord index set == constraints NPZ index set EXACTLY '
+              f'({N_TRAIN} indices, each maps to the correct row of the 2688-sample '
+              'constraint file).')
         print('  Confirmed: lambda_crit = 0.0 for this variant (E2 present, L_crit absent).')
     else:
         print('  Confirmed: requires_e2=False -- no constraints NPZ will be loaded, no E2 '
@@ -902,7 +985,20 @@ def main() -> int:
         print(f'[dry-run] then run paired inference on the {N_EVAL}-sample benchmark, writing to:')
         print(f'[dry-run]   {paths["model_dir"]}')
         print(f'[dry-run]   {paths["data_out_dir"]}')
+        print('[dry-run] No canonical training log or any other file was created by this dry run.')
         return 0
+
+    # =====================================================================
+    # Every check has passed and this is a real (non-dry-run) invocation --
+    # only now do we create the canonical training log. Everything printed
+    # above (header, safety, collision, preflight, NPZ validation) went to
+    # plain stdout only; tee the whole command yourself if you want that
+    # captured too. Everything printed from here on is mirrored into the
+    # canonical log.
+    # =====================================================================
+    sys.stdout = _Tee(sys.stdout, paths['log_path'])
+    sys.stderr = sys.stdout
+    print(f'[log] Canonical training log opened: {paths["log_path"]}')
 
     # =====================================================================
     # Training
@@ -1241,45 +1337,64 @@ def _validate_post_inference(paths, *, np) -> None:
     print(f'[OK]   idx.npy values: exactly ordered 0..{N_EVAL - 1} (no duplicate/missing samples).')
 
     # ---------------------------------------------------------------
-    # GT/IN alignment with the fixed CNN/GAN benchmark
+    # GT/IN alignment with the fixed CNN/GAN benchmark -- MANDATORY.
+    # On Spark the fixed CNN benchmark arrays must exist; their absence is a
+    # fatal validation error, not a warning (this repo's authoritative
+    # benchmark is data_out_fixed/wind_mrhr_cnn/, produced once and never
+    # regenerated by any candidate script).
     # ---------------------------------------------------------------
     cnn_gt_p  = Path(CNN_BASELINE_DIR) / 'dataGT.npy'
     cnn_in_p  = Path(CNN_BASELINE_DIR) / 'dataIN.npy'
     cnn_idx_p = Path(CNN_BASELINE_DIR) / 'idx.npy'
-    if cnn_gt_p.exists() and cnn_in_p.exists() and cnn_idx_p.exists():
-        cnn_idx = np.load(cnn_idx_p).astype(int).ravel()
-        cnn_gt  = np.load(cnn_gt_p, mmap_mode='r')
-        cnn_in  = np.load(cnn_in_p, mmap_mode='r')
-        cnn_pos = {int(v): i for i, v in enumerate(cnn_idx)}
-        cand_pos = {int(v): i for i, v in enumerate(idx_vals)}
-        common = sorted(set(cnn_pos) & set(cand_pos))
-        if len(common) != N_EVAL:
-            sys.exit(
-                f'[error] Candidate idx.npy and CNN baseline idx.npy do not share all '
-                f'{N_EVAL} samples (only {len(common)} in common). Stopping before cheap '
-                'evaluation.'
-            )
-        cnn_order  = np.array([cnn_pos[s] for s in common])
-        cand_order = np.array([cand_pos[s] for s in common])
-        gt_diff = float(np.abs(
-            np.asarray(cnn_gt)[cnn_order].astype(np.float64)
-            - arrays['dataGT.npy'][cand_order].astype(np.float64)
-        ).max())
-        in_diff = float(np.abs(
-            np.asarray(cnn_in)[cnn_order].astype(np.float64)
-            - arrays['dataIN.npy'][cand_order].astype(np.float64)
-        ).max())
-        print(f'[{"OK" if gt_diff <= 1e-3 else "FAIL"}] dataGT.npy aligned with fixed CNN/GAN '
-              f'benchmark GT (max_abs_diff={gt_diff:.4e}).')
-        print(f'[{"OK" if in_diff <= 1e-3 else "FAIL"}] dataIN.npy aligned with fixed benchmark '
-              f'input (max_abs_diff={in_diff:.4e}).')
-        if gt_diff > 1e-3 or in_diff > 1e-3:
-            sys.exit('[error] GT/IN alignment against the fixed CNN/GAN benchmark failed. '
-                      'Stopping before cheap evaluation.')
-    else:
-        print(f'[warn] Fixed CNN baseline not found at {CNN_BASELINE_DIR} in this environment -- '
-              'GT/IN alignment check skipped. This MUST be verified on Spark, where the '
-              'baseline is expected to exist.')
+    missing_baseline = [str(p) for p in (cnn_idx_p, cnn_in_p, cnn_gt_p) if not p.exists()]
+    if missing_baseline:
+        sys.exit(
+            '[error] Fixed CNN benchmark array(s) required for GT/IN alignment are missing:\n'
+            + '\n'.join(f'  - {p}' for p in missing_baseline)
+            + '\n  This is a fatal validation error, not a warning -- stopping before cheap '
+              'evaluation. GT/IN alignment against the fixed benchmark cannot be skipped.'
+        )
+
+    cnn_idx = np.load(cnn_idx_p).astype(int).ravel()
+    if not np.array_equal(cnn_idx, np.arange(N_EVAL)):
+        sys.exit(
+            f'[error] Fixed CNN baseline idx.npy ({cnn_idx_p}) is not exactly ordered '
+            f'0..{N_EVAL - 1} (got range [{int(cnn_idx.min())}, {int(cnn_idx.max())}], '
+            f'{len(cnn_idx)} entries). Stopping before cheap evaluation.'
+        )
+    print(f'[OK]   fixed CNN baseline idx.npy: exactly ordered 0..{N_EVAL - 1}.')
+
+    cnn_gt = np.load(cnn_gt_p)
+    cnn_in = np.load(cnn_in_p)
+    # idx.npy is exactly ordered 0..N_EVAL-1 for both the candidate and the
+    # CNN baseline (just confirmed above), so position i in both arrays
+    # already refers to the same sample_idx == i; no idx-based reordering
+    # is needed, but we still assert the shapes agree defensively.
+    if cnn_gt.shape != arrays['dataGT.npy'].shape or cnn_in.shape != arrays['dataIN.npy'].shape:
+        sys.exit(
+            f'[error] Fixed CNN baseline array shape(s) do not match this candidate\'s output '
+            f'(cnn dataGT.npy={cnn_gt.shape} vs candidate={arrays["dataGT.npy"].shape}; '
+            f'cnn dataIN.npy={cnn_in.shape} vs candidate={arrays["dataIN.npy"].shape}). '
+            'Stopping before cheap evaluation.'
+        )
+
+    gt_exact = bool(np.array_equal(cnn_gt, arrays['dataGT.npy']))
+    in_exact = bool(np.array_equal(cnn_in, arrays['dataIN.npy']))
+    gt_diff = float(np.abs(cnn_gt.astype(np.float64) - arrays['dataGT.npy'].astype(np.float64)).max())
+    in_diff = float(np.abs(cnn_in.astype(np.float64) - arrays['dataIN.npy'].astype(np.float64)).max())
+    print(f'[{"OK" if gt_exact else "FAIL"}] dataGT.npy exactly aligned with fixed CNN/GAN '
+          f'benchmark GT (np.array_equal={gt_exact}, max_abs_diff={gt_diff:.4e} for diagnostics).')
+    print(f'[{"OK" if in_exact else "FAIL"}] dataIN.npy exactly aligned with fixed benchmark '
+          f'input (np.array_equal={in_exact}, max_abs_diff={in_diff:.4e} for diagnostics).')
+    # No repo script establishes 1e-3 (or any other tolerance) as an
+    # authoritative "aligned" criterion -- scripts/evaluate_finetune_candidate.py
+    # only ever uses 1e-3 as a non-fatal warning threshold. Both dataGT.npy
+    # and dataIN.npy are deterministic decodes of the same fixed evaluation
+    # TFRecord, so exact equality is the correct bar here; any difference is
+    # fatal.
+    if not (gt_exact and in_exact):
+        sys.exit('[error] GT/IN alignment against the fixed CNN/GAN benchmark is not exact '
+                  '(see max_abs_diff above). Stopping before cheap evaluation.')
 
     # ---------------------------------------------------------------
     # Vector/scalar-speed range + mean abs error reporting
@@ -1305,11 +1420,29 @@ def _validate_post_inference(paths, *, np) -> None:
     mae = float(np.abs(speed_sr - speed_gt).mean())
     print(f'[report] Mean absolute scalar-speed error (SR vs GT): {mae:.4f} m/s')
 
-    plausible_max = 100.0  # generous bound; established CNN/GAN speeds are well under this
-    if speed_gt.max() > plausible_max or speed_sr.max() > plausible_max or speed_sr.min() < 0:
+    # Non-catastrophic plausibility report only -- never fatal. An experimental
+    # fine-tuned model slightly exceeding the fixed GT maximum is expected and
+    # must not abort the run; this is a prompt for manual judgement before the
+    # expensive TTK stage, not a pass/fail gate.
+    gt_max = float(speed_gt.max())
+    sr_max = float(speed_sr.max())
+    sr_gt_max_ratio = (sr_max / gt_max) if gt_max > 0 else float('inf')
+
+    plausible_max = 100.0        # generous absolute bound; established CNN/GAN speeds are well under this
+    relative_ratio_bound = 1.25  # SR max materially above GT max: >25% over is worth a manual look
+
+    absolute_flag = gt_max > plausible_max or sr_max > plausible_max or speed_sr.min() < 0
+    relative_flag = sr_gt_max_ratio > relative_ratio_bound
+    if absolute_flag or relative_flag:
         print('=' * 72)
-        print('[WARNING] Scalar-speed range looks implausible for physical wind speed. '
-              'Do NOT proceed to the expensive TTK stage until this is investigated.')
+        print('[WARNING] Scalar-speed range looks implausible for physical wind speed, or the '
+              'SR maximum is materially above the fixed GT maximum. This is NOT automatically '
+              'fatal -- an experimental model slightly exceeding the GT maximum is expected -- '
+              'but do not proceed to the expensive TTK stage until this has been manually reviewed.')
+        print(f'[WARNING]   GT maximum speed      : {gt_max:.4f} m/s')
+        print(f'[WARNING]   SR maximum speed      : {sr_max:.4f} m/s')
+        print(f'[WARNING]   SR/GT maximum ratio   : {sr_gt_max_ratio:.4f}')
+        print(f'[WARNING]   Speed MAE (SR vs GT)  : {mae:.4f} m/s')
         print('=' * 72)
 
     print('[validate] Post-inference validation complete: shapes, exact idx order, '
