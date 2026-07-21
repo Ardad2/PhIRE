@@ -63,13 +63,29 @@ DOCS_DIR = REPO_ROOT / 'docs'
 LOG_PATH = REPO_ROOT / 'logs' / 'unified_candidate_analysis_phase2a.log'
 
 # Phase-1 files this script must never modify -- checksummed before and
-# after the run; any change is a hard failure.
+# after the run; any change is a hard failure. This is an explicit,
+# exhaustive list (not a glob) so a missing or unexpectedly-extra file is
+# caught immediately rather than silently skipped.
+PHASE1_PROTECTED_CSV_NAMES = [
+    'column_mapping.csv',
+    'method_inventory.csv',
+    'unified_primary_method_summary.csv',
+    'unified_primary_missingness.csv',
+    'unified_primary_pairwise_vs_cnn.csv',
+    'unified_primary_per_sample_long.csv',
+    'unified_primary_topology_validation.csv',
+    'unified_primary_wide.csv',
+]
+PHASE1_PROTECTED_CSVS = [PHASE1_DIR / name for name in PHASE1_PROTECTED_CSV_NAMES]
+
 PHASE1_PROTECTED_DOCS = [
     REPO_ROOT / 'docs' / 'unified_candidate_evaluation_phase1.md',
     REPO_ROOT / 'docs' / 'unified_candidate_evaluation_inventory.md',
     REPO_ROOT / 'docs' / 'primary_candidate_artifact_reference.md',
     REPO_ROOT / 'logs' / 'build_unified_candidate_evaluation.log',
 ]
+
+PHASE1_PROTECTED_FILES = PHASE1_PROTECTED_CSVS + PHASE1_PROTECTED_DOCS  # exactly 12, explicit
 
 N_EVAL = 168
 N_PRIMARY_METHODS = 19
@@ -106,14 +122,41 @@ def sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def phase1_protected_files() -> list:
-    files = sorted(PHASE1_DIR.glob('*.csv'), key=str)
-    files += [p for p in PHASE1_PROTECTED_DOCS if p.exists()]
-    return files
+def require_phase1_protected_files() -> list:
+    """Requires the exact expected Phase-1 protected file set (patch
+    requirement 1). Hard-fails with the complete missing-file list if any
+    of the 12 required files are absent -- never silently omits a missing
+    file with an `if p.exists()` filter. Also hard-fails if an unexpected
+    extra CSV appears in the frozen Phase-1 directory, since that
+    directory's schema is intended to be immutable."""
+    missing = [str(p) for p in PHASE1_PROTECTED_FILES if not p.exists()]
+    if missing:
+        raise SystemExit(
+            '[hard-fail] Missing required Phase-1 protected file(s) (expected exactly '
+            f'{len(PHASE1_PROTECTED_FILES)}):\n' + '\n'.join(f'  - {m}' for m in missing)
+        )
+    actual_csvs = sorted(PHASE1_DIR.glob('*.csv'), key=str)
+    expected_csv_set = set(PHASE1_PROTECTED_CSVS)
+    unexpected = [str(p) for p in actual_csvs if p not in expected_csv_set]
+    if unexpected:
+        raise SystemExit(
+            f'[hard-fail] Unexpected extra CSV(s) found in the frozen Phase-1 directory {PHASE1_DIR} '
+            f'(its schema is intended to be immutable, so an untracked new file is treated as an error '
+            f'rather than silently ignored): {unexpected}'
+        )
+    return PHASE1_PROTECTED_FILES
 
 
 def checksum_all(files: list) -> dict:
-    return {str(p): sha256_file(p) for p in files if p.exists()}
+    """Returns {repo-relative POSIX path: sha256 or None}. Keys are always
+    repository-relative (patch requirement 2) so phase1_immutability_check.csv
+    is byte-identical across machines with different absolute checkout paths
+    (e.g. /home/user/PhIRE on this sandbox vs /home/adadhwal/PhIRE on Spark)."""
+    result = {}
+    for p in files:
+        rel = p.resolve().relative_to(REPO_ROOT).as_posix()
+        result[rel] = sha256_file(p) if p.exists() else None
+    return result
 
 
 def read_csv_dicts(path: Path) -> list:
@@ -334,12 +377,34 @@ def run_validation(long_table, refs, metric_direction):
         finite = sum(1 for si in per_sample[mid] if math.isfinite(per_sample[mid][si].get('ssim_speed', float('nan'))))
         add(f'ssim_168_or_0[{mid}]', finite, '0 or 168', 0, finite in (0, N_EVAL))
 
-    # PD/MT finite and nonnegative for all topology-bearing methods
+    # PD/MT coverage, directly required (patch requirement 3) rather than
+    # implicitly assumed by filtering to finite values first: every method
+    # represented in unified_primary_topology_validation.csv must have
+    # EXACTLY 168 finite PD and 168 finite MT values (checked as an
+    # explicit count, not inferred), each nonnegative; bicubic (which is
+    # never in that file) must have EXACTLY 0 finite PD and 0 finite MT.
+    topology_bearing_methods = {r['method_id'] for r in refs['topo_val']}
     for mid in sorted(per_sample):
         for col in ('pd_distance', 'mt_distance'):
-            vals = [per_sample[mid][si][col] for si in per_sample[mid] if math.isfinite(per_sample[mid][si].get(col, float('nan')))]
-            neg = [v for v in vals if v < 0]
-            add(f'{col}_nonnegative[{mid}]', len(neg), 0, 0, len(neg) == 0, notes=str(neg[:3]))
+            col_vals = [per_sample[mid][si].get(col, float('nan')) for si in range(N_EVAL)]
+            finite_vals = [v for v in col_vals if math.isfinite(v)]
+            finite_count = len(finite_vals)
+            neg_vals = [v for v in finite_vals if v < 0]
+
+            if mid == 'bicubic':
+                add(f'{col}_finite_count[{mid}]', finite_count, 0, 0, finite_count == 0)
+                # No finite values are expected for bicubic, so a
+                # nonnegative check would be vacuous; record that explicitly
+                # rather than silently omitting the row.
+                add(f'{col}_nonnegative[{mid}]', len(neg_vals), 0, 0, len(neg_vals) == 0,
+                    notes='vacuous: bicubic is expected to have 0 finite values for this metric')
+            elif mid in topology_bearing_methods:
+                add(f'{col}_finite_count[{mid}]', finite_count, N_EVAL, 0, finite_count == N_EVAL)
+                add(f'{col}_nonnegative[{mid}]', len(neg_vals), 0, 0, len(neg_vals) == 0,
+                    notes=str(neg_vals[:3]))
+            else:
+                add(f'{col}_topology_classification[{mid}]', 'unclassified', 'bicubic or topology-bearing', 0,
+                    False, notes='method is neither bicubic nor present in unified_primary_topology_validation.csv')
 
     # Metric coverage cross-check against unified_primary_missingness.csv
     missingness_lookup = {(r['method_id'], r['metric']): r for r in refs['missingness']}
@@ -445,9 +510,10 @@ def main() -> int:
     log('Read-only w.r.t. Phase-1 artifacts. No training/inference/eval/TTK performed.')
     log('=' * 88)
 
-    protected_files = phase1_protected_files()
+    protected_files = require_phase1_protected_files()
     checksums_before = checksum_all(protected_files)
-    log(f'[immutability] Checksummed {len(checksums_before)} Phase-1 file(s) before the run.')
+    log(f'[immutability] Checksummed {len(checksums_before)} Phase-1 file(s) before the run '
+        f'(exact required set: {len(PHASE1_PROTECTED_FILES)}).')
 
     log_step = '[load] '
     long_table = load_long_table()
@@ -866,7 +932,7 @@ def main() -> int:
     # -------------------------------------------------------------------
     # Phase-1 immutability check (after)
     # -------------------------------------------------------------------
-    checksums_after = checksum_all(phase1_protected_files())
+    checksums_after = checksum_all(PHASE1_PROTECTED_FILES)
     immut_rows = []
     changed = []
     for path_str, before in sorted(checksums_before.items()):
@@ -876,7 +942,7 @@ def main() -> int:
             status = 'MISSING_AFTER_RUN'
         if status != 'unchanged':
             changed.append(path_str)
-        immut_rows.append(dict(file_path=path_str, sha256_before=before, sha256_after=(after or ''),
+        immut_rows.append(dict(file_path=path_str, sha256_before=(before or ''), sha256_after=(after or ''),
                                  status=status))
     for path_str in sorted(set(checksums_after) - set(checksums_before)):
         immut_rows.append(dict(file_path=path_str, sha256_before='', sha256_after=checksums_after[path_str],
@@ -986,6 +1052,24 @@ def write_phase2a_doc(methods, non_cnn_methods, metric_cols, coverage_rows, desc
                  'therefore support benchmark-level comparisons (does this trained model do better than CNN on '
                  'this fixed evaluation set?) but not claims about training-run robustness (would a differently-'
                  'seeded retraining of the same objective reproduce this result?).')
+    lines.append('')
+    lines.append('A second, independent caveat concerns the samples themselves: the 168 benchmark fields are '
+                 'consecutive hourly wind samples, and are therefore likely temporally correlated rather than '
+                 'independent and identically distributed. The ordinary sample-level bootstrap used throughout '
+                 'this report, the exact sign-test p-values, and any Wilcoxon p-values all rely on an '
+                 'independence-across-samples approximation; under real temporal autocorrelation they may '
+                 'understate the true sampling uncertainty (i.e. be anti-conservative -- confidence intervals '
+                 'narrower, and p-values smaller, than an analysis that properly accounted for the '
+                 'autocorrelation would produce). This does not affect the descriptive quantities themselves: '
+                 'means, medians, paired deltas, and win rates in this report remain valid, exact descriptive '
+                 'summaries of this fixed 168-sample benchmark regardless of any temporal correlation. What it '
+                 'affects is the *inferential* quantities layered on top of those summaries -- the bootstrap CIs '
+                 'and the sign-test/Wilcoxon p-values should not be read as fully calibrated population-level '
+                 'inference, and should be treated as approximate, sample-independence-assuming quantities rather '
+                 'than exact ones. A temporal block-bootstrap sensitivity analysis (resampling contiguous runs of '
+                 'samples rather than single samples independently, to see whether the CIs/p-values widen '
+                 'materially) may be worth considering in a later phase, but is explicitly not performed here -- '
+                 'this patch documents the caveat only and adds no new calculation to Phase 2A.')
     lines.append('')
     lines.append('## 7. Topology tradeoff summary')
     lines.append('')
