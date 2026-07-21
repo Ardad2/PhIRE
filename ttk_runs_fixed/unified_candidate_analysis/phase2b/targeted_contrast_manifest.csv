@@ -1,0 +1,16 @@
+contrast_id,contrast_family,base_method,comparison_method,added_or_changed_term,single_term_contrast,interpretation
+add_crit_to_uv,add_critical_proxy,uv,uv_crit,crit,True,Effect of adding the critical-maxima proxy (L_crit) to the vector-only UV control.
+add_crit_to_b,add_critical_proxy,candidate_b,candidate_c,crit,True,Effect of adding the critical-maxima proxy to the full Candidate B scaffold (the original Candidate B -> Candidate C step).
+add_crit_to_grad,add_critical_proxy,grad_only,f3_grad_crit,crit,True,Effect of adding the critical-maxima proxy to the gradient-only objective.
+add_crit_to_b_e2,add_critical_proxy,b_e2,c_e2,crit,True,Effect of adding the critical-maxima proxy on top of the B+repaired-E2 objective.
+add_e2_to_uv,add_repaired_e2,uv,uv_e2,e2,True,Effect of adding repaired low-lambda E2 to the vector-only UV control.
+add_e2_to_b,add_repaired_e2,candidate_b,b_e2,e2,True,Effect of adding repaired E2 to the full Candidate B scaffold.
+add_e2_to_c,add_repaired_e2,candidate_c,c_e2,e2,True,Effect of adding repaired E2 to Candidate C (B scaffold + critical proxy).
+add_e2_to_grad,add_repaired_e2,grad_only,f1_grad_e2,e2,True,Effect of adding repaired E2 to the gradient-only objective.
+add_e2_to_grad_levelset,add_repaired_e2,grad_levelset,f2_grad_levelset_e2,e2,True,Effect of adding repaired E2 to the gradient+level-set objective.
+e2_vs_crit_uv,e2_vs_crit_matched_scaffold,uv_crit,uv_e2,crit_replaced_by_e2,False,Substitution contrast on the UV scaffold: replaces the critical-maxima proxy with repaired E2 (both uses_crit and uses_e2 flip simultaneously; not a single-term effect).
+e2_vs_crit_b,e2_vs_crit_matched_scaffold,candidate_c,b_e2,crit_replaced_by_e2,False,Substitution contrast on the full B scaffold: replaces the critical-maxima proxy with repaired E2 (both uses_crit and uses_e2 flip simultaneously).
+e2_vs_crit_grad,e2_vs_crit_matched_scaffold,f3_grad_crit,f1_grad_e2,crit_replaced_by_e2,False,Substitution contrast on the gradient-only scaffold: replaces the critical-maxima proxy with repaired E2 (both uses_crit and uses_e2 flip simultaneously).
+remove_speed_from_b_e2,scaffold_pruning,b_e2,f2_grad_levelset_e2,speed,False,"Composite scaffold-pruning contrast (not a single-term causal effect, per the requested labeling for this family): removes the speed-loss term from B+E2 while keeping grad+levelset+E2. (Flag-level note: this particular pair differs only in uses_speed, but is still reported under the composite scaffold_pruning family.)"
+remove_speed_levelset_from_b_e2,scaffold_pruning,b_e2,f1_grad_e2,speed+levelset,False,"Composite scaffold-pruning contrast: removes both the speed- and level-set-loss terms from B+E2, keeping only grad+E2. Differs from base in two flags (uses_speed and uses_levelset) -- not a single-term effect."
+remove_speed_levelset_from_c,scaffold_pruning,candidate_c,f3_grad_crit,speed+levelset,False,"Composite scaffold-pruning contrast: removes both the speed- and level-set-loss terms from Candidate C, keeping only grad+crit. Differs from base in two flags (uses_speed and uses_levelset) -- not a single-term effect."
