@@ -1,12 +1,16 @@
 # Unified candidate evaluation -- Phase 1 report
 
+## 0. Run mode
+
+**AUDIT MODE (`--audit-allow-missing`).** This is a permissive inventory pass: the unified table below intentionally includes empty cells for any method/metric with no source artifact in this checkout. Do not treat it as authoritative -- see section 9.
+
 ## 1. Scope and primary/secondary method distinction
 
 Primary set: 19 methods evaluated on the fixed 168-sample benchmark (3 baselines: bicubic, cnn, gan; 9 B-term-factorial variants incl. full Candidate B and C; 1 critical-proxy-only ablation; 3 repaired low-lambda E2 ablations; 3 Candidate F recombinations). Secondary set: 168-sample pilot runs, 672/1344-sample scale-study duplicates of primary objectives, PyTorch residual-refiner E2 variants (architecture confound), and deprecated pre-Phase-C legacy archives -- see `docs/unified_candidate_evaluation_inventory.md` for the full secondary listing.
 
 ## 2. Complete artifact inventory
 
-See `ttk_runs_fixed/unified_candidate_evaluation/method_inventory.csv` (one row per discovered or expected experiment, primary and secondary) and `docs/unified_candidate_evaluation_inventory.md` (narrative version).
+See `ttk_runs_fixed/unified_candidate_evaluation/method_inventory.csv`, `docs/unified_candidate_evaluation_inventory.md`, and `docs/primary_candidate_artifact_reference.md`.
 
 ## 3. Exact table dimensions
 
@@ -19,15 +23,24 @@ See `column_mapping.csv`. Families: `vector_uv` (psnruv), `scalar_speed` (ssim_s
 
 ## 5. Validation results
 
-- Topology-mean reproduction: **2 PASS**, **0 FAIL**, **16 NO_DATA** (no source artifact found at all) out of 18 primary methods with an expected value.
-- Cheap-metric completeness (168 rows, sample_idx exactly 0..167, no duplicates): verified for cnn and gan from `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv`; not applicable to the other 16 non-baseline primary methods since no cheap-eval CSV exists for any of them.
-- Join (cheap metrics <-> true topology, one-to-one on sample_idx): for cnn/gan the two are already merged upstream in the same source row; no separate join was required or performed.
+- Topology-mean reproduction: **2 PASS**, **0 FAIL**, **16 NO_DATA** out of 18 primary methods with an expected value.
+- Cheap-metric completeness (168 rows, sample_idx exactly 0..167, no duplicates): checked for every primary method with any discovered source (baseline-harvested, legacy-combined, or a resolved candidate all_sample_metrics CSV).
+- Join (cheap metrics <-> true topology, one-to-one on sample_idx): every per-sample record is a single merged dict keyed by sample_idx, so a missing cheap or topology value for a given sample_idx shows up directly as a non-finite cell rather than a silent row-count mismatch.
 
 ## 6. Baseline duplicate-consistency audit
 
-The task instructions anticipate that repeated cnn/gan/bicubic rows may appear across multiple per-candidate cheap-evaluation CSVs and must be checked for equality before choosing one canonical source. In this checkout **no per-candidate cheap-evaluation CSV exists at all** (zero `all_sample_metrics_*.csv` files were found for any of the 16 non-baseline primary methods), so that specific cross-file duplication could not occur and this check is vacuously satisfied. The only baseline consistency check actually performable was cross-validating `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` PD/MT values against the independent `ttk_runs_fixed/combined/phase_c_results.csv` source:
-  - **cnn**: max |Δpd| = 0.000e+00, max |Δmt| = 0.000e+00 across 168 cross-checked samples -- effectively exact (floating-point-level agreement).
-  - **gan**: max |Δpd| = 0.000e+00, max |Δmt| = 0.000e+00 across 168 cross-checked samples -- effectively exact (floating-point-level agreement).
+Discovered 0 candidate `all_sample_metrics_*.csv` file(s) under `ttk_runs_fixed/topology_finetuning/*_eval/`. Every discovered file was checked for bicubic/cnn/gan rows; every baseline method present in more than one file had its rows compared pairwise, metric by metric, against a 1e-06 tolerance (would hard-fail the whole run on disagreement):
+  - **bicubic**: 0 source(s) with data; canonical source = `(none found)`.
+  - **cnn**: 0 source(s) with data; canonical source = `(none found)`.
+  - **gan**: 0 source(s) with data; canonical source = `(none found)`.
+
+Canonical cnn/gan rows were additionally cross-checked against the older `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` pipeline for overlapping columns (tolerance 0.001):
+  - **cnn**: skipped (harvested candidate-eval rows not found for this method in this checkout).
+  - **gan**: skipped (harvested candidate-eval rows not found for this method in this checkout).
+
+The independent `ttk_runs_fixed/combined/phase_c_results.csv` PD/MT cross-check remains as before:
+  - **cnn**: max |Δpd| = 0.000e+00, max |Δmt| = 0.000e+00 across 168 cross-checked samples.
+  - **gan**: max |Δpd| = 0.000e+00, max |Δmt| = 0.000e+00 across 168 cross-checked samples.
 
 ## 7. PD/MT mean reproduction table
 
@@ -54,17 +67,17 @@ The task instructions anticipate that repeated cnn/gan/bicubic rows may appear a
 
 ## 8. Missingness, especially SSIM
 
-- SSIM (`ssim_speed`): finite for ['cnn', 'gan'] (real data found, all 168 values finite -- the known NumPy/scikit-image ABI issue does NOT manifest in this particular source file). Entirely missing (no source at all, not the ABI issue) for the other 17 primary methods.
-- See `unified_primary_missingness.csv` for the full total/finite/missing breakdown per (method_id, metric); `missing_reason` distinguishes `no_source_artifact_found_in_repository` from `not_computed_by_legacy_physics_merged_pipeline` (speed_mae/speed_rmse/comp_* for cnn/gan/bicubic, which the older physics-merged pipeline never computed).
+- SSIM (`ssim_speed`): finite for ['cnn', 'gan']. Entirely missing (no source at all, not the known NumPy/scikit-image ABI issue) for the other 17 primary methods in this checkout.
+- See `unified_primary_missingness.csv` for the full total/finite/missing breakdown per (method_id, metric).
 - No missing value was filled with zero or inferred; all gaps are empty cells in the CSVs.
 
 ## 9. Candidates that could not be included and why
 
-17 of 19 primary methods (bicubic, uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, candidate_b, candidate_c, uv_crit, uv_e2, b_e2, c_e2, f1_grad_e2, f2_grad_levelset_e2, f3_grad_crit) have **zero** real per-sample cheap-evaluation or true-topology artifacts anywhere in this git checkout. Root cause: this repository's `.gitignore` excludes `*.npy`, `*.npz`, `data_out/`, and `ttk_runs_fixed/topology_finetuning/*` (tracked exceptions are only `candidateE_constraints` and the cnn/gan `combined`/`phase_c_final` summary artifacts); large experiment outputs for the loss-ablation candidates are produced only on the separate training machine referenced throughout this project's history and were never committed. The reference documentation records PD/MT means for these methods, but per the task instructions those values were used only as a *validation target*, never copied into the unified table as data.
+17 of 19 primary methods (bicubic, uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, candidate_b, candidate_c, uv_crit, uv_e2, b_e2, c_e2, f1_grad_e2, f2_grad_levelset_e2, f3_grad_crit) have **zero** real per-sample cheap-evaluation or true-topology artifacts anywhere in this git checkout. Root cause: this repository's `.gitignore` excludes `*.npy`, `*.npz`, `data_out/`, and `ttk_runs_fixed/topology_finetuning/*` (tracked exceptions are only `candidateE_constraints` and the cnn/gan `combined`/`phase_c_final` summary artifacts); large experiment outputs for the loss-ablation candidates are produced only on the separate training machine and were never committed.
 
 ## 10. No training or TTK was rerun
 
-This script and this audit performed zero training runs, zero TTK invocations, and zero cheap-evaluation runs. It only read pre-existing CSV files already committed to the repository. No existing artifact was modified or deleted.
+This script and this audit performed zero training runs, zero TTK invocations, and zero cheap-evaluation runs. It only read pre-existing CSV files already present in the repository. No existing artifact was modified or deleted.
 
 ## 11. Generated file paths
 
@@ -77,9 +90,10 @@ This script and this audit performed zero training runs, zero TTK invocations, a
 - `ttk_runs_fixed/unified_candidate_evaluation/unified_primary_missingness.csv`
 - `ttk_runs_fixed/unified_candidate_evaluation/unified_primary_wide.csv`
 - `docs/unified_candidate_evaluation_inventory.md`
+- `docs/primary_candidate_artifact_reference.md`
 - `docs/unified_candidate_evaluation_phase1.md` (this file)
 - `logs/build_unified_candidate_evaluation.log`
 
 ## 12. Recommended next step
 
-Before any factorial-effect analysis, paired contrasts, correlations, or Pareto-front work can be performed on the full primary set, the 17 missing methods' cheap-evaluation and true-topology artifacts need to be synced from the training machine into this checkout (or this script re-run there). Until then, any such analysis is only valid for the 2 methods with real data (cnn, gan). Per the task instructions, no correlation, factorial-model, Pareto-front, or visualization-selection work was performed in this Phase-1 pass.
+Before any factorial-effect analysis, paired contrasts, correlations, or Pareto-front work can be performed on the full primary set, the 17 missing methods' cheap-evaluation and true-topology artifacts need to be synced from the training machine into this checkout (or this script re-run there with `--strict-primary`). Until then, any such analysis is only valid for the 2 methods with real data (cnn, gan).

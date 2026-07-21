@@ -10,44 +10,59 @@ never writes anywhere except:
 
     ttk_runs_fixed/unified_candidate_evaluation/
     docs/unified_candidate_evaluation_*.md
+    docs/primary_candidate_artifact_reference.md
+
+Two run modes
+-------------
+--strict-primary (default): the authoritative Spark-machine mode. Every
+primary method (bicubic included) must have complete, cross-validated data
+or the script prints exactly which methods/criteria failed and exits
+nonzero WITHOUT writing the six `unified_primary_*` tables -- strict mode
+never produces a table that looks complete but secretly contains empty
+placeholder rows. The inventory, column-mapping, and reference docs are
+still written in this case since they are diagnostic, not a completeness
+claim.
+
+--audit-allow-missing: the permissive mode used for auditing an incomplete
+checkout (e.g. this lightweight sandbox clone). Builds the full method x
+sample grid with empty cells for anything genuinely missing, and always
+exits 0 unless a genuine data-integrity problem (duplicate keys, corrupt
+values, ambiguous file resolution) is hit.
 
 Design principle -- "hard-fail on corruption, report on absence"
 ------------------------------------------------------------------
-This script hard-fails (raises SystemExit / lets an exception propagate)
-only on internal inconsistencies that would silently corrupt its own
-output invariants: duplicate (method_id, sample_idx) keys inside a single
-source file, a non-finite or negative topology distance in a file that WAS
-found, or more than one ambiguous candidate source file for the same
-method that this script cannot resolve automatically.
+This script hard-fails (raises SystemExit) on internal inconsistencies that
+would silently corrupt its own output invariants: duplicate
+(method_id, sample_idx) keys inside a single source file, a non-finite or
+negative topology distance in a file that WAS found, repeated
+bicubic/cnn/gan baseline rows that disagree beyond a small numeric
+tolerance across candidate cheap-evaluation CSVs, or more than one
+ambiguous fallback-discovered source file for the same method.
 
-Total ABSENCE of an artifact (the file/directory simply does not exist in
-this git checkout) is not treated as a crash-worthy bug. It is exactly the
-condition this Phase-1 audit exists to surface: it is recorded per-method
-in method_inventory.csv / the unified tables with an explicit
-validation_status, and the run still completes and writes every requested
-deliverable. The final report states in plain language which primary
-methods have zero real data and why success cannot be claimed for those
-methods -- silently crashing instead would prevent producing the very
-audit the user asked for.
+Total ABSENCE of an artifact (the file/directory simply does not exist)
+is not a crash-worthy bug by itself -- in --audit-allow-missing mode it is
+recorded and reported; in --strict-primary mode (the default) it is a
+reason the run exits nonzero, but the run still finishes and reports
+exactly what is missing rather than crashing uninformatively.
 
-Do not rerun training or TTK. Do not delete or modify any existing
-artifact. Do not manufacture missing numeric values (no zero-fill, no
-interpolation, no copying values from the reference markdown docs -- the
-docs are a roadmap only, never a numeric source).
+Do not rerun training, cheap evaluation, or TTK. Do not delete or modify
+any existing artifact. Do not manufacture missing numeric values (no
+zero-fill, no interpolation, no copying values from the reference markdown
+docs -- the docs are a roadmap only, never a numeric source).
 """
 
 from __future__ import annotations
 
+import argparse
 import csv
 import math
+import os
 import re
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
-import os
 os.chdir(REPO_ROOT)
 
 OUT_DIR = REPO_ROOT / 'ttk_runs_fixed' / 'unified_candidate_evaluation'
@@ -56,6 +71,20 @@ LOG_PATH = REPO_ROOT / 'logs' / 'build_unified_candidate_evaluation.log'
 
 N_EVAL = 168
 PD_MT_TOLERANCE = 1e-4
+# Repeated bicubic/cnn/gan rows across different candidate all_sample_metrics
+# CSVs are recomputed from the SAME fixed dataGT/dataSR/dataIN arrays each
+# time evaluate_finetune_candidate.py runs, so they should be identical up to
+# floating-point roundoff -- a tight tolerance is appropriate here.
+BASELINE_CROSS_SOURCE_TOLERANCE = 1e-6
+# Comparing the harvested (new-schema) cnn/gan rows against the older,
+# independently-implemented psnr_topology_physics_merged.csv pipeline is a
+# cross-pipeline check, not a same-computation repeat -- consistent with the
+# +/-1e-3 threshold already used elsewhere in this repo as a non-fatal
+# warning bound (scripts/evaluate_finetune_candidate.py), promoted here to a
+# hard-fail bound per this task's explicit request.
+OLDER_SOURCE_CROSS_CHECK_TOLERANCE = 1e-3
+
+BASELINE_METHODS = ('bicubic', 'cnn', 'gan')
 
 _LOG_LINES: list[str] = []
 
@@ -76,15 +105,18 @@ def rp(rel: str) -> Path:
     return REPO_ROOT / rel
 
 
+def _relpath(p) -> str:
+    if not p:
+        return ''
+    try:
+        return str(Path(p).resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return str(p)
+
+
 # =============================================================================
 # Metric-column schema (standardized names, direction, representation).
-# Derived from the ACTUAL column-writing code in scripts/evaluate_finetune_candidate.py
-# (the schema new candidates would be written with) and cross-checked against the
-# ACTUAL column headers found in ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
-# (the only per-sample source file that currently has real primary-method data:
-# cnn and gan). See column_mapping.csv for the full source-column-level mapping.
 # =============================================================================
-# (standardized_column, direction, representation, units)
 METRIC_SCHEMA = [
     ('psnruv',                  'higher_is_better',  'vector_uv',                'dB'),
     ('ssim_speed',              'higher_is_better',  'scalar_speed',             'unitless'),
@@ -111,6 +143,8 @@ METRIC_SCHEMA = [
 ]
 METRIC_COLUMNS = [m[0] for m in METRIC_SCHEMA]
 METRIC_DIRECTION = {m[0]: m[1] for m in METRIC_SCHEMA}
+TOPOLOGY_METRIC_COLUMNS = ['pd_distance', 'mt_distance']
+CHEAP_METRIC_COLUMNS = [c for c in METRIC_COLUMNS if c not in TOPOLOGY_METRIC_COLUMNS]
 
 IDENTITY_COLUMNS = [
     'sample_idx', 'method_id', 'display_name', 'candidate_family',
@@ -120,9 +154,9 @@ IDENTITY_COLUMNS = [
 
 # Columns present in ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
 # (the legacy cnn/gan-only "physics_merged" pipeline) mapped to the standardized
-# schema above. This pipeline predates scripts/evaluate_finetune_candidate.py and
-# does NOT compute speed_mae/speed_rmse/comp_* -- those are left as genuinely
-# missing (not fabricated) for cnn/gan in this audit.
+# schema. Predates scripts/evaluate_finetune_candidate.py; does NOT compute
+# speed_mae/speed_rmse/comp_* -- those are left genuinely missing here unless
+# the newer harvested baseline rows (see harvest_baseline_rows()) supply them.
 BASELINE_COMBINED_DIRECT_MAP = {
     'psnr': 'psnruv',
     'ssim': 'ssim_speed',
@@ -140,14 +174,15 @@ BASELINE_COMBINED_DIRECT_MAP = {
     'pd_distance': 'pd_distance',
     'mt_distance': 'mt_distance',
 }
-# 'wpd_bias' -> 'wpd_bias_abs' needs abs() applied; handled specially in code.
 BASELINE_COMBINED_NOT_AVAILABLE = [
     'speed_mae', 'speed_rmse', 'comp_curve_l1',
     'comp_abs_t5', 'comp_abs_t10', 'comp_abs_t15',
 ]
 
-# Columns scripts/evaluate_finetune_candidate.py would write for any NEW
-# candidate's all_sample_metrics_<name>.csv, mapped to the standardized schema.
+# Columns scripts/evaluate_finetune_candidate.py writes for bicubic/cnn/gan/
+# the candidate in every all_sample_metrics_<name>.csv, mapped to the
+# standardized schema. This is both the schema used to harvest repeated
+# baseline rows (requirement 1) and the schema for a genuine new candidate.
 CANDIDATE_EVAL_DIRECT_MAP = {
     'psnruv': 'psnruv',
     'ssim': 'ssim_speed',
@@ -176,10 +211,6 @@ CANDIDATE_EVAL_DIRECT_MAP = {
 
 # =============================================================================
 # Manifest: every method this audit knows to look for.
-# Expected PD/MT means are the values the user supplied in the task instructions
-# (originating from the reference documentation's recorded true-TTK results);
-# they are used ONLY as a validation target for values independently recomputed
-# from repository CSVs, never written into the unified table as data.
 # =============================================================================
 EXPECTED_PD_MT = {
     'cnn': (27.4063, 5.8678),
@@ -210,7 +241,7 @@ FIXED_BENCHMARK_NOTE = ('fixed 168-sample benchmark (data_out_fixed/wind_mrhr_<m
 
 def _native_tf_entry(method_id, display_name, original_method_name, family,
                       uses_speed, uses_grad, uses_levelset, uses_crit, uses_e2,
-                      objective_summary, repaired_status='not_applicable'):
+                      objective_summary, repaired_status='not_applicable', historical_alias=''):
     return dict(
         method_id=method_id, display_name=display_name,
         original_method_name=original_method_name, candidate_family=family,
@@ -220,6 +251,7 @@ def _native_tf_entry(method_id, display_name, original_method_name, family,
         objective_summary=objective_summary,
         uses_speed=uses_speed, uses_grad=uses_grad, uses_levelset=uses_levelset,
         uses_crit=uses_crit, uses_e2=uses_e2, repaired_status=repaired_status,
+        historical_alias=historical_alias,
         data_out_dir=f'data_out/wind_finetune_{original_method_name}',
         model_dir=f'models_fixed/topology_finetuning/wind_finetune_{original_method_name}',
         cheap_eval_dir=f'ttk_runs_fixed/topology_finetuning/{original_method_name}_eval',
@@ -238,7 +270,7 @@ PRIMARY_MANIFEST = [
          training_tfrecord='n/a', evaluation_tfrecord=FIXED_BENCHMARK_NOTE,
          objective_summary='Bicubic upsampling of the MR input to HR resolution; no learned model.',
          uses_speed=False, uses_grad=False, uses_levelset=False, uses_crit=False, uses_e2=False,
-         repaired_status='baseline',
+         repaired_status='baseline', historical_alias='',
          data_out_dir='data_out_fixed/wind_mrhr_bicubic',
          model_dir='n/a', cheap_eval_dir='', topology_dir='',
          cheap_report='', topology_report='', exclusion_reason=''),
@@ -249,7 +281,7 @@ PRIMARY_MANIFEST = [
          training_tfrecord='n/a', evaluation_tfrecord=FIXED_BENCHMARK_NOTE,
          objective_summary='Released fidelity-oriented pretrained PhIRE CNN; no fine-tuning.',
          uses_speed=False, uses_grad=False, uses_levelset=False, uses_crit=False, uses_e2=False,
-         repaired_status='baseline',
+         repaired_status='baseline', historical_alias='',
          data_out_dir='data_out_fixed/wind_mrhr_cnn',
          model_dir='models/wind_mr-hr/trained_cnn', cheap_eval_dir='', topology_dir='ttk_runs_fixed/cnn/phase_c_final',
          cheap_report='', topology_report='', exclusion_reason=''),
@@ -260,7 +292,7 @@ PRIMARY_MANIFEST = [
          training_tfrecord='n/a', evaluation_tfrecord=FIXED_BENCHMARK_NOTE,
          objective_summary='Released adversarially-trained pretrained PhIRE GAN; no fine-tuning.',
          uses_speed=False, uses_grad=False, uses_levelset=False, uses_crit=False, uses_e2=False,
-         repaired_status='baseline',
+         repaired_status='baseline', historical_alias='',
          data_out_dir='data_out_fixed/wind_mrhr_gan',
          model_dir='models/wind_mr-hr/trained_gan', cheap_eval_dir='', topology_dir='ttk_runs_fixed/gan/phase_c_final',
          cheap_report='', topology_report='', exclusion_reason=''),
@@ -294,21 +326,25 @@ PRIMARY_MANIFEST = [
                       'L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset + 0.001 L_crit.'),
     _native_tf_entry('uv_crit', 'UV + critical-maxima proxy', 'candidateUV_plus_crit_expanded2688',
                       'UV_crit', False, False, False, True, False,
-                      'L_uv + 0.001 L_crit (Candidate C minus the Candidate B scaffold).'),
+                      'L_uv + 0.001 L_crit (Candidate C minus the Candidate B scaffold).',
+                      historical_alias='C-(B scaffold): "Candidate C minus the Candidate B scaffold"'),
     _native_tf_entry('uv_e2', 'UV + repaired E2', 'candidateUV_plus_E2_tf_lowlambda_expanded2688',
                       'E2_uv', False, False, False, False, True,
                       'L_uv + 0.004 L_TTKCV + 0.002 L_TTKpers (repaired low-lambda E2, no B/C scaffold).',
-                      repaired_status='repaired_e2'),
+                      repaired_status='repaired_e2',
+                      historical_alias='E-(C+B); also referenced as "UV+E2-low"'),
     _native_tf_entry('b_e2', 'Candidate B + repaired E2', 'candidateB_plus_E2_tf_lowlambda_expanded2688',
                       'E2_b', True, True, True, False, True,
                       'L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset + 0.004 L_TTKCV + 0.002 L_TTKpers '
                       '(L_crit disabled, lambda_crit=0).',
-                      repaired_status='repaired_e2'),
+                      repaired_status='repaired_e2',
+                      historical_alias='E-C; also referenced as "TF B+E2-low"'),
     _native_tf_entry('c_e2', 'Candidate C + repaired E2', 'candidateE2_tf_lowlambda_expanded2688',
                       'E2_c', True, True, True, True, True,
                       'L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset + 0.001 L_crit '
                       '+ 0.004 L_TTKCV + 0.002 L_TTKpers.',
-                      repaired_status='repaired_e2'),
+                      repaired_status='repaired_e2',
+                      historical_alias='E; also referenced as "TF C+E2-low"'),
     _native_tf_entry('f1_grad_e2', 'Candidate F: grad + repaired E2-low', 'candidateF_grad_E2_low_expanded2688',
                       'F_recombination', False, True, False, False, True,
                       'L_uv + 0.05 L_grad + 0.004 L_TTKCV + 0.002 L_TTKpers.',
@@ -343,7 +379,7 @@ def _secondary_entry(method_id, display_name, original_method_name, family, tier
         evaluation_tfrecord=TFREC_EVAL_FIXED,
         objective_summary='See docs/*_notes.md for this candidate family; not resolved in detail for the secondary tier.',
         uses_speed='', uses_grad='', uses_levelset='', uses_crit='', uses_e2='',
-        repaired_status=repaired_status,
+        repaired_status=repaired_status, historical_alias='',
         data_out_dir=data_out_dir, model_dir=model_dir,
         cheap_eval_dir=f'ttk_runs_fixed/topology_finetuning/{original_method_name}_eval',
         topology_dir=f'ttk_runs_fixed/topology_finetuning/{original_method_name}_topology',
@@ -453,7 +489,8 @@ SECONDARY_MANIFEST = [
          objective_summary='Early GAN/CNN vs bicubic persistence-diagram distance feasibility study; predates '
                             'the Candidate A-F naming and the fixed 168-sample benchmark methodology.',
          uses_speed='', uses_grad='', uses_levelset='', uses_crit='', uses_e2='',
-         repaired_status='n/a', data_out_dir='n/a', model_dir='n/a',
+         repaired_status='n/a', historical_alias='',
+         data_out_dir='n/a', model_dir='n/a',
          cheap_eval_dir='', topology_dir='',
          cheap_report='', topology_report='',
          exclusion_reason='Superseded by the Phase-C fixed-benchmark methodology; different schema '
@@ -465,7 +502,8 @@ SECONDARY_MANIFEST = [
          objective_summary='Pre-Phase-C archived TTK run; only GAN rows present, different schema '
                             '(n_pd0/n_pd1/mt_nodes/mt_arcs rather than pd_distance/mt_distance).',
          uses_speed='', uses_grad='', uses_levelset='', uses_crit='', uses_e2='',
-         repaired_status='n/a', data_out_dir='n/a', model_dir='n/a',
+         repaired_status='n/a', historical_alias='',
+         data_out_dir='n/a', model_dir='n/a',
          cheap_eval_dir='', topology_dir='',
          cheap_report='', topology_report='',
          exclusion_reason='archive/old_ttk_outputs/phase_c_results.csv uses a different, non-distance schema '
@@ -476,7 +514,7 @@ FULL_MANIFEST = PRIMARY_MANIFEST + SECONDARY_MANIFEST
 
 
 # =============================================================================
-# Baseline (cnn/gan) loader from the surviving combined CSVs
+# CSV helpers
 # =============================================================================
 
 def _read_csv_rows(path: Path):
@@ -484,28 +522,150 @@ def _read_csv_rows(path: Path):
         return list(csv.DictReader(fh))
 
 
-def load_baseline_data():
-    """Load cnn/gan per-sample cheap+topology metrics from the two surviving
-    sources, cross-validate them against each other, and return
-    {method: {sample_idx: {standardized_col: value}}} plus a validation report.
+# =============================================================================
+# Requirement 1: harvest repeated bicubic/cnn/gan rows from every candidate
+# all_sample_metrics_<name>.csv found anywhere in the tree.
+# =============================================================================
+
+def discover_candidate_eval_csvs() -> list:
+    root = rp('ttk_runs_fixed/topology_finetuning')
+    if not root.is_dir():
+        return []
+    found = []
+    for eval_dir in sorted(root.glob('*_eval')):
+        if not eval_dir.is_dir():
+            continue
+        for csv_path in sorted(eval_dir.glob('all_sample_metrics_*.csv')):
+            found.append(csv_path)
+    return sorted(found, key=str)
+
+
+def harvest_baseline_rows(csv_paths: list):
+    """Extract bicubic/cnn/gan rows from every discovered candidate
+    all_sample_metrics CSV, validate each source, cross-compare all sources
+    pairwise per metric, hard-fail on disagreement, and pick one
+    deterministic canonical source per baseline method.
+
+    Returns (baseline_data, report) where baseline_data is
+    {baseline_method: {sample_idx: {standardized_col: value}}}.
     """
+    per_source: dict = {}
+    for path in csv_paths:
+        rows = _read_csv_rows(path)
+        by_method: dict = {}
+        for row in rows:
+            by_method.setdefault(row.get('method', ''), []).append(row)
+        per_source[path] = {}
+        for bm in BASELINE_METHODS:
+            method_rows = by_method.get(bm, [])
+            if not method_rows:
+                continue
+            seen: dict = {}
+            dup = []
+            for row in method_rows:
+                si = int(row['sample_idx'])
+                if si in seen:
+                    dup.append(si)
+                    continue
+                seen[si] = row
+            if dup:
+                raise SystemExit(
+                    f'[hard-fail] Duplicate sample_idx for baseline={bm!r} in {path}: {sorted(set(dup))}.'
+                )
+            idx_set = set(seen.keys())
+            if len(method_rows) != N_EVAL or idx_set != set(range(N_EVAL)):
+                raise SystemExit(
+                    f'[hard-fail] Baseline {bm!r} rows in {path} are not exactly {N_EVAL} rows with '
+                    f'sample_idx exactly 0..{N_EVAL - 1} (found {len(method_rows)} rows, '
+                    f'{len(idx_set)} unique indices).'
+                )
+            rec_by_si = {}
+            for si, row in seen.items():
+                rec = {}
+                for src_col, std_col in CANDIDATE_EVAL_DIRECT_MAP.items():
+                    val = row.get(src_col, '')
+                    rec[std_col] = float(val) if val not in ('', None) else float('nan')
+                rec_by_si[si] = rec
+            per_source[path][bm] = rec_by_si
+
+    cross_report: dict = {}
+    for bm in BASELINE_METHODS:
+        sources_with_bm = sorted([p for p in csv_paths if bm in per_source.get(p, {})], key=str)
+        cross_report[bm] = dict(n_sources=len(sources_with_bm),
+                                 sources=[str(p) for p in sources_with_bm],
+                                 max_diff_per_metric={}, worst_pair_per_metric={})
+        if len(sources_with_bm) < 2:
+            continue
+        for col in METRIC_COLUMNS:
+            overall_max = 0.0
+            worst_pair = None
+            for i in range(len(sources_with_bm)):
+                for j in range(i + 1, len(sources_with_bm)):
+                    pi, pj = sources_with_bm[i], sources_with_bm[j]
+                    pair_max = 0.0
+                    for si in range(N_EVAL):
+                        a = per_source[pi][bm][si].get(col, float('nan'))
+                        b = per_source[pj][bm][si].get(col, float('nan'))
+                        if math.isnan(a) or math.isnan(b):
+                            continue
+                        pair_max = max(pair_max, abs(a - b))
+                    if pair_max > overall_max:
+                        overall_max = pair_max
+                        worst_pair = (str(pi), str(pj))
+            cross_report[bm]['max_diff_per_metric'][col] = overall_max
+            cross_report[bm]['worst_pair_per_metric'][col] = worst_pair
+            if overall_max > BASELINE_CROSS_SOURCE_TOLERANCE:
+                raise SystemExit(
+                    f'[hard-fail] Repeated baseline {bm!r} rows for metric {col!r} disagree by '
+                    f'{overall_max:.6g} (> tolerance {BASELINE_CROSS_SOURCE_TOLERANCE:g}) between '
+                    f'{worst_pair[0]} and {worst_pair[1]}. Repeated baseline rows must be identical '
+                    'across every candidate evaluation run.'
+                )
+
+    # Deterministic canonical source per baseline method: lexicographically
+    # first source (by path string) that actually contains this baseline.
+    canonical = {}
+    baseline_data = {}
+    for bm in BASELINE_METHODS:
+        sources_with_bm = sorted([p for p in csv_paths if bm in per_source.get(p, {})], key=str)
+        if not sources_with_bm:
+            baseline_data[bm] = {}
+            canonical[bm] = None
+            continue
+        chosen = sources_with_bm[0]
+        canonical[bm] = chosen
+        baseline_data[bm] = per_source[chosen][bm]
+
+    report = dict(
+        discovered_csvs=[str(p) for p in csv_paths],
+        cross_report=cross_report,
+        canonical={bm: (str(canonical[bm]) if canonical[bm] else '') for bm in BASELINE_METHODS},
+    )
+    return baseline_data, report
+
+
+# =============================================================================
+# Legacy combined-CSV loader (cnn/gan only) -- remains the topology (PD/MT)
+# source of record; also a cheap-metric fallback when no harvested rows exist.
+# =============================================================================
+
+def load_legacy_baseline_data():
     combined_path = rp('ttk_runs_fixed/combined/psnr_topology_physics_merged.csv')
     phase_c_path = rp('ttk_runs_fixed/combined/phase_c_results.csv')
-    report = {'combined_path': str(combined_path), 'phase_c_path': str(phase_c_path),
-              'per_method': {}}
+    report = {'combined_path': str(combined_path), 'phase_c_path': str(phase_c_path), 'per_method': {}}
 
     data = {}
     if not combined_path.exists():
-        log(f'[baseline] MISSING: {combined_path}')
+        log(f'[legacy-baseline] MISSING: {combined_path}')
         return data, report
 
     rows = _read_csv_rows(combined_path)
-    by_method = {}
+    by_method: dict = {}
     for row in rows:
         by_method.setdefault(row['method'], []).append(row)
 
     phase_c_rows = _read_csv_rows(phase_c_path) if phase_c_path.exists() else []
-    phase_c_by_method = {}
+    phase_c_by_method: dict = {}
     for row in phase_c_rows:
         m = re.search(r'_s(\d+)_', row['key'])
         if not m:
@@ -515,7 +675,7 @@ def load_baseline_data():
 
     for method in ('cnn', 'gan'):
         method_rows = by_method.get(method, [])
-        seen_idx = {}
+        seen_idx: dict = {}
         per_sample = {}
         dup_keys = []
         for row in method_rows:
@@ -537,8 +697,7 @@ def load_baseline_data():
         if dup_keys:
             raise SystemExit(
                 f'[hard-fail] Duplicate sample_idx values for method={method!r} in {combined_path}: '
-                f'{sorted(set(dup_keys))}. This would corrupt the one-row-per-(method,sample_idx) '
-                f'invariant of the unified table -- refusing to silently pick one.'
+                f'{sorted(set(dup_keys))}.'
             )
 
         idx_set = set(per_sample.keys())
@@ -547,7 +706,6 @@ def load_baseline_data():
             f'MISMATCH missing={sorted(expected_set - idx_set)[:10]} '
             f'extra={sorted(idx_set - expected_set)[:10]}')
 
-        # Cross-validate PD/MT against the independent phase_c_results.csv source.
         max_pd_diff = 0.0
         max_mt_diff = 0.0
         n_cross_checked = 0
@@ -571,9 +729,100 @@ def load_baseline_data():
 
 
 # =============================================================================
-# Generic candidate loader (for methods that DO have all_sample_metrics CSVs;
-# none currently exist in this checkout, but this is written generically so it
-# works unmodified the first time a candidate's cheap-eval artifacts appear).
+# Requirement 2: cross-check harvested (new-schema) cnn/gan rows against the
+# older combined pipeline for overlapping columns.
+# =============================================================================
+
+def cross_check_baseline_vs_legacy(harvested_baseline_data: dict, legacy_baseline_data: dict) -> dict:
+    overlap_cols = sorted(set(BASELINE_COMBINED_DIRECT_MAP.values()) | {'wpd_bias_abs'})
+    report = {}
+    for method in ('cnn', 'gan'):
+        harvested = harvested_baseline_data.get(method, {})
+        legacy = legacy_baseline_data.get(method, {})
+        if not harvested or not legacy:
+            report[method] = dict(skipped=True,
+                                   reason='harvested candidate-eval rows not found for this method in this checkout'
+                                   if not harvested else 'legacy combined source not found',
+                                   max_diff={})
+            continue
+        max_diff = {}
+        for col in overlap_cols:
+            d = 0.0
+            for si in range(N_EVAL):
+                hv = harvested.get(si, {}).get(col, float('nan'))
+                lv = legacy.get(si, {}).get(col, float('nan'))
+                if math.isnan(hv) or math.isnan(lv):
+                    continue
+                d = max(d, abs(hv - lv))
+            max_diff[col] = d
+            if d > OLDER_SOURCE_CROSS_CHECK_TOLERANCE:
+                raise SystemExit(
+                    f'[hard-fail] {method} metric {col!r} disagrees between the harvested candidate-eval '
+                    f'baseline rows and the legacy combined source ({d:.6g} > tolerance '
+                    f'{OLDER_SOURCE_CROSS_CHECK_TOLERANCE:g}).'
+                )
+        report[method] = dict(skipped=False, max_diff=max_diff)
+    return report
+
+
+def build_baseline_per_sample(harvested_baseline_data: dict, legacy_baseline_data: dict) -> dict:
+    """Merge harvested + legacy baseline sources: PD/MT stay sourced from the
+    legacy/phase_c cross-validated pipeline (per requirement 2, it remains
+    the topology source of record); every other (cheap) metric prefers the
+    harvested candidate-eval rows and falls back to the legacy subset."""
+    merged = {}
+    for method in BASELINE_METHODS:
+        harvested = harvested_baseline_data.get(method, {})
+        legacy = legacy_baseline_data.get(method, {})
+        per_sample = {}
+        for si in set(harvested) | set(legacy):
+            legacy_rec = legacy.get(si, {})
+            harvested_rec = harvested.get(si, {})
+            rec = {}
+            for col in METRIC_COLUMNS:
+                if col in TOPOLOGY_METRIC_COLUMNS:
+                    v = legacy_rec.get(col, harvested_rec.get(col, float('nan')))
+                else:
+                    v = harvested_rec.get(col, legacy_rec.get(col, float('nan')))
+                rec[col] = v
+            per_sample[si] = rec
+        merged[method] = per_sample
+    return merged
+
+
+# =============================================================================
+# Requirement 4: path-discovery fallback.
+# =============================================================================
+
+FALLBACK_SEARCH_ROOTS = ['ttk_runs_fixed/topology_finetuning', 'data_out', 'docs']
+
+
+def resolve_with_fallback(exact_path, expected_basename: str):
+    """Try the exact manifest path first; if absent, search the fallback
+    roots for a file with the exact expected basename. Accept the fallback
+    only if exactly one match is found; hard-fail on ambiguity."""
+    if exact_path is not None and exact_path.exists():
+        return exact_path, 'exact_path'
+    candidates = []
+    for root in FALLBACK_SEARCH_ROOTS:
+        root_path = rp(root)
+        if not root_path.is_dir():
+            continue
+        candidates.extend(p for p in root_path.rglob(expected_basename) if p.is_file())
+    candidates = sorted(set(candidates), key=str)
+    if not candidates:
+        return None, 'not_found'
+    if len(candidates) > 1:
+        raise SystemExit(
+            f'[hard-fail] Ambiguous fallback discovery for {expected_basename!r}: found '
+            f'{len(candidates)} candidates under {FALLBACK_SEARCH_ROOTS}: {[str(c) for c in candidates]}. '
+            'Refusing to guess which one is authoritative.'
+        )
+    return candidates[0], 'fallback_discovery'
+
+
+# =============================================================================
+# Generic candidate loader (path-discovery fallback + full schema load).
 # =============================================================================
 
 def resolve_candidate_artifacts(entry: dict) -> dict:
@@ -589,29 +838,37 @@ def resolve_candidate_artifacts(entry: dict) -> dict:
     res['data_sr_exists'] = bool(data_out_dir and (data_out_dir / 'dataSR.npy').exists())
 
     cheap_eval_dir = rp(entry['cheap_eval_dir']) if entry.get('cheap_eval_dir') else None
-    cheap_csv = cheap_eval_dir / f'all_sample_metrics_{name}.csv' if cheap_eval_dir else None
-    pairwise_csv = cheap_eval_dir / f'pairwise_cnn_vs_{name}.csv' if cheap_eval_dir else None
+    exact_cheap = cheap_eval_dir / f'all_sample_metrics_{name}.csv' if cheap_eval_dir else None
+    exact_pairwise = cheap_eval_dir / f'pairwise_cnn_vs_{name}.csv' if cheap_eval_dir else None
+    cheap_csv, cheap_resolution = resolve_with_fallback(exact_cheap, f'all_sample_metrics_{name}.csv')
+    pairwise_csv, pairwise_resolution = resolve_with_fallback(exact_pairwise, f'pairwise_cnn_vs_{name}.csv')
     res['cheap_eval_csv'] = str(cheap_csv) if cheap_csv else ''
     res['cheap_pairwise_csv'] = str(pairwise_csv) if pairwise_csv else ''
-    res['cheap_eval_csv_exists'] = bool(cheap_csv and cheap_csv.exists())
-    res['cheap_pairwise_csv_exists'] = bool(pairwise_csv and pairwise_csv.exists())
+    res['cheap_eval_csv_exists'] = bool(cheap_csv)
+    res['cheap_pairwise_csv_exists'] = bool(pairwise_csv)
+    res['cheap_eval_resolution'] = cheap_resolution
+    res['cheap_pairwise_resolution'] = pairwise_resolution
 
     topology_dir = rp(entry['topology_dir']) if entry.get('topology_dir') else None
-    pd_mt_csv = topology_dir / f'{name}_pd_mt_distances.csv' if topology_dir else None
-    topo_cmp_csv = topology_dir / f'{name}_topology_comparison.csv' if topology_dir else None
+    exact_pd_mt = topology_dir / f'{name}_pd_mt_distances.csv' if topology_dir else None
+    exact_topo_cmp = topology_dir / f'{name}_topology_comparison.csv' if topology_dir else None
+    pd_mt_csv, topo_resolution = resolve_with_fallback(exact_pd_mt, f'{name}_pd_mt_distances.csv')
+    topo_cmp_csv, topo_cmp_resolution = resolve_with_fallback(exact_topo_cmp, f'{name}_topology_comparison.csv')
     res['topology_results_csv'] = str(pd_mt_csv) if pd_mt_csv else ''
     res['topology_comparison_csv'] = str(topo_cmp_csv) if topo_cmp_csv else ''
-    res['topology_results_csv_exists'] = bool(pd_mt_csv and pd_mt_csv.exists())
-    res['topology_comparison_csv_exists'] = bool(topo_cmp_csv and topo_cmp_csv.exists())
+    res['topology_results_csv_exists'] = bool(pd_mt_csv)
+    res['topology_comparison_csv_exists'] = bool(topo_cmp_csv)
+    res['topology_results_resolution'] = topo_resolution
+    res['topology_comparison_resolution'] = topo_cmp_resolution
 
     res['cheap_report_exists'] = bool(entry.get('cheap_report') and rp(entry['cheap_report']).exists())
     res['topology_report_exists'] = bool(entry.get('topology_report') and rp(entry['topology_report']).exists())
 
-    per_sample = {}
+    per_sample: dict = {}
     row_count_cheap = 0
     row_count_topology = 0
 
-    if res['cheap_eval_csv_exists']:
+    if cheap_csv:
         rows = _read_csv_rows(cheap_csv)
         cand_rows = [r for r in rows if r.get('method') == name]
         row_count_cheap = len(cand_rows)
@@ -620,8 +877,7 @@ def resolve_candidate_artifacts(entry: dict) -> dict:
             si = int(row['sample_idx'])
             if si in seen:
                 raise SystemExit(
-                    f'[hard-fail] Duplicate sample_idx={si} for method={name!r} in {cheap_csv}. '
-                    'Refusing to silently collapse duplicate rows.'
+                    f'[hard-fail] Duplicate sample_idx={si} for method={name!r} in {cheap_csv}.'
                 )
             seen.add(si)
             rec = per_sample.setdefault(si, {})
@@ -629,16 +885,14 @@ def resolve_candidate_artifacts(entry: dict) -> dict:
                 val = row.get(src_col, '')
                 rec[std_col] = float(val) if val not in ('', None) else float('nan')
 
-    if res['topology_results_csv_exists']:
+    if pd_mt_csv:
         rows = _read_csv_rows(pd_mt_csv)
         row_count_topology = len(rows)
         seen = set()
         for row in rows:
             si = int(row.get('sample_idx', row.get('sample', -1)))
             if si in seen:
-                raise SystemExit(
-                    f'[hard-fail] Duplicate sample_idx={si} for method={name!r} in {pd_mt_csv}.'
-                )
+                raise SystemExit(f'[hard-fail] Duplicate sample_idx={si} for method={name!r} in {pd_mt_csv}.')
             seen.add(si)
             rec = per_sample.setdefault(si, {})
             pdv = row.get('pd_distance')
@@ -663,23 +917,113 @@ def resolve_candidate_artifacts(entry: dict) -> dict:
 
 
 # =============================================================================
+# Requirement 3: strict-mode per-method completeness check.
+# =============================================================================
+
+def check_strict_primary(mid, per_sample, is_bicubic, expected_pd, expected_mt):
+    reasons = []
+    idx_set = set(per_sample.keys())
+    if idx_set != set(range(N_EVAL)):
+        reasons.append(f'cheap/topology rows not exactly {N_EVAL} with sample_idx 0..{N_EVAL - 1} '
+                        f'(found {len(idx_set)} rows)')
+        return False, reasons
+
+    cheap_bad = [c for c in CHEAP_METRIC_COLUMNS
+                 if not all(math.isfinite(per_sample[si].get(c, float('nan'))) for si in range(N_EVAL))]
+    if cheap_bad:
+        reasons.append(f'cheap metric column(s) not finite for all {N_EVAL} samples: {cheap_bad}')
+
+    if is_bicubic:
+        return (len(reasons) == 0), reasons
+
+    pd_vals = [per_sample[si].get('pd_distance', float('nan')) for si in range(N_EVAL)]
+    mt_vals = [per_sample[si].get('mt_distance', float('nan')) for si in range(N_EVAL)]
+    if not all(math.isfinite(v) and v >= 0 for v in pd_vals):
+        reasons.append('pd_distance not finite/nonnegative for all 168 samples')
+    if not all(math.isfinite(v) and v >= 0 for v in mt_vals):
+        reasons.append('mt_distance not finite/nonnegative for all 168 samples')
+
+    if not reasons:
+        obs_pd = sum(pd_vals) / len(pd_vals)
+        obs_mt = sum(mt_vals) / len(mt_vals)
+        if expected_pd is not None and abs(obs_pd - expected_pd) > PD_MT_TOLERANCE:
+            reasons.append(f'pd mean {obs_pd:.6f} differs from expected {expected_pd} by more than '
+                            f'{PD_MT_TOLERANCE:g}')
+        if expected_mt is not None and abs(obs_mt - expected_mt) > PD_MT_TOLERANCE:
+            reasons.append(f'mt mean {obs_mt:.6f} differs from expected {expected_mt} by more than '
+                            f'{PD_MT_TOLERANCE:g}')
+
+    return (len(reasons) == 0), reasons
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--strict-primary', action='store_true',
+                       help='(default) Authoritative mode: require every primary method to have complete, '
+                            'cross-validated data; exit nonzero and skip writing the unified tables otherwise.')
+    mode.add_argument('--audit-allow-missing', action='store_true',
+                       help='Permissive audit mode: build the full grid with empty cells for missing methods '
+                            'and always exit 0 unless a genuine data-integrity error occurs.')
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
+    strict = not args.audit_allow_missing
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     log('=' * 88)
     log('Unified candidate evaluation -- Phase 1 audit')
     log(f'Repo root: {REPO_ROOT}')
+    log(f"Mode: {'STRICT (--strict-primary, default)' if strict else 'AUDIT (--audit-allow-missing)'}")
     log('Read-only w.r.t. all experiment artifacts. No training/TTK/eval rerun performed.')
     log('=' * 88)
 
-    baseline_data, baseline_report = load_baseline_data()
-    for method, rep in baseline_report.get('per_method', {}).items():
-        log(f"[baseline:{method}] rows={rep['n_rows']} unique_sample_idx={rep['n_unique_sample_idx']} "
+    # -------------------------------------------------------------------
+    # Requirement 1: harvest repeated baseline rows from every discovered
+    # candidate all_sample_metrics CSV.
+    # -------------------------------------------------------------------
+    eval_csvs = discover_candidate_eval_csvs()
+    log(f'[harvest] Discovered {len(eval_csvs)} candidate all_sample_metrics CSV(s) under '
+        f'ttk_runs_fixed/topology_finetuning/*_eval/.')
+    for p in eval_csvs:
+        log(f'[harvest]   - {p}')
+    harvested_baseline_data, harvest_report = harvest_baseline_rows(eval_csvs)
+    for bm in BASELINE_METHODS:
+        cr = harvest_report['cross_report'][bm]
+        canon = harvest_report['canonical'][bm] or '(none found)'
+        log(f"[harvest:{bm}] sources_with_data={cr['n_sources']} canonical_source={canon}")
+
+    # -------------------------------------------------------------------
+    # Legacy combined source: remains the PD/MT topology source of record
+    # for cnn/gan, and a cheap-metric fallback when no harvested rows exist.
+    # -------------------------------------------------------------------
+    legacy_baseline_data, legacy_report = load_legacy_baseline_data()
+    for method, rep in legacy_report.get('per_method', {}).items():
+        log(f"[legacy:{method}] rows={rep['n_rows']} unique_sample_idx={rep['n_unique_sample_idx']} "
             f"sample_index_status={rep['sample_index_status']} "
             f"cross_checked_vs_phase_c={rep['n_cross_checked_against_phase_c']} "
             f"max_pd_diff={rep['max_pd_diff_vs_phase_c']:.3e} max_mt_diff={rep['max_mt_diff_vs_phase_c']:.3e}")
+
+    # -------------------------------------------------------------------
+    # Requirement 2: cross-check harvested vs legacy for overlapping columns.
+    # -------------------------------------------------------------------
+    cross_check_report = cross_check_baseline_vs_legacy(harvested_baseline_data, legacy_baseline_data)
+    for method, rep in cross_check_report.items():
+        if rep.get('skipped'):
+            log(f"[cross-check:{method}] skipped ({rep['reason']})")
+        else:
+            worst_metric = max(rep['max_diff'], key=rep['max_diff'].get) if rep['max_diff'] else None
+            worst_val = rep['max_diff'].get(worst_metric, 0.0) if worst_metric else 0.0
+            log(f"[cross-check:{method}] max diff vs legacy combined source across "
+                f"{len(rep['max_diff'])} overlapping metrics: {worst_metric}={worst_val:.3e}")
+
+    baseline_data = build_baseline_per_sample(harvested_baseline_data, legacy_baseline_data)
 
     # -------------------------------------------------------------------
     # Resolve every manifest entry's artifacts on disk.
@@ -687,37 +1031,45 @@ def main() -> int:
     resolved = {}
     for entry in FULL_MANIFEST:
         mid = entry['method_id']
-        if mid in ('bicubic', 'cnn', 'gan'):
+        if mid in BASELINE_METHODS:
             per_sample = baseline_data.get(mid, {})
+            harvested_source = harvest_report['canonical'].get(mid) or ''
+            cheap_resolution = ('harvested_baseline_row' if harvested_source
+                                 else ('legacy_combined' if per_sample else 'not_found'))
+            cheap_source = harvested_source or (legacy_report['combined_path'] if per_sample else '')
+            has_topology = (mid != 'bicubic') and bool(per_sample)
             resolved[mid] = dict(
                 data_out_dir_exists=rp(entry['data_out_dir']).is_dir() if entry['data_out_dir'] not in ('n/a', '') else False,
                 idx_path=str(rp(entry['data_out_dir']) / 'idx.npy') if entry['data_out_dir'] not in ('n/a', '') else '',
                 data_gt_path=str(rp(entry['data_out_dir']) / 'dataGT.npy') if entry['data_out_dir'] not in ('n/a', '') else '',
                 data_sr_path=str(rp(entry['data_out_dir']) / 'dataSR.npy') if entry['data_out_dir'] not in ('n/a', '') else '',
                 idx_exists=False, data_gt_exists=False, data_sr_exists=False,
-                cheap_eval_csv=str(rp('ttk_runs_fixed/combined/psnr_topology_physics_merged.csv')) if per_sample else '',
-                cheap_eval_csv_exists=bool(per_sample),
-                cheap_pairwise_csv='', cheap_pairwise_csv_exists=False,
-                topology_results_csv=str(rp('ttk_runs_fixed/combined/phase_c_results.csv')) if per_sample else '',
-                topology_results_csv_exists=bool(per_sample),
+                cheap_eval_csv=cheap_source, cheap_eval_csv_exists=bool(per_sample),
+                cheap_eval_resolution=cheap_resolution,
+                cheap_pairwise_csv='', cheap_pairwise_csv_exists=False, cheap_pairwise_resolution='not_found',
+                topology_results_csv=legacy_report['phase_c_path'] if has_topology else '',
+                topology_results_csv_exists=has_topology,
+                topology_results_resolution='legacy_combined' if has_topology else 'not_found',
                 topology_comparison_csv='', topology_comparison_csv_exists=False,
+                topology_comparison_resolution='not_found',
                 cheap_report_exists=False, topology_report_exists=False,
                 per_sample=per_sample,
-                row_count_cheap=len(per_sample), row_count_topology=len(per_sample),
+                row_count_cheap=len(per_sample), row_count_topology=(len(per_sample) if has_topology else 0),
             )
         else:
             resolved[mid] = resolve_candidate_artifacts(entry)
 
     # -------------------------------------------------------------------
-    # method_inventory.csv
+    # method_inventory.csv (always written -- diagnostic, not a completeness claim)
     # -------------------------------------------------------------------
     inventory_cols = [
         'method_id', 'display_name', 'original_method_name', 'candidate_family',
         'comparison_tier', 'include_primary', 'training_scale', 'architecture',
         'training_tfrecord', 'evaluation_tfrecord', 'objective_summary',
         'uses_speed', 'uses_grad', 'uses_levelset', 'uses_crit', 'uses_e2',
-        'repaired_status', 'data_out_dir', 'idx_path', 'data_gt_path', 'data_sr_path',
-        'cheap_eval_csv', 'cheap_pairwise_csv', 'topology_results_csv', 'topology_comparison_csv',
+        'repaired_status', 'historical_alias', 'data_out_dir', 'idx_path', 'data_gt_path', 'data_sr_path',
+        'cheap_eval_csv', 'cheap_eval_resolution', 'cheap_pairwise_csv',
+        'topology_results_csv', 'topology_results_resolution', 'topology_comparison_csv',
         'cheap_report', 'topology_report', 'row_count_cheap', 'row_count_topology',
         'sample_index_status', 'gt_alignment_status', 'topology_mean_pd', 'topology_mean_mt',
         'expected_pd', 'expected_mt', 'validation_status', 'notes',
@@ -745,20 +1097,17 @@ def main() -> int:
             if mid == 'bicubic':
                 validation_status = 'not_applicable'
                 notes_extra = ('No expected PD/MT value was supplied for bicubic (it may not have true-topology '
-                                'files at all). No cheap-eval or topology CSV was found for it either in this '
-                                'checkout -- only its generator script (scripts/generate_bicubic_baseline.py, '
-                                'output convention data_out_fixed/wind_mrhr_bicubic/) exists. Kept in the cheap-'
-                                'metric table with all metrics missing, per the task instructions.')
+                                'files at all). Cheap metrics are sourced from harvested candidate-eval baseline '
+                                'rows when available (scripts/generate_bicubic_baseline.py, output convention '
+                                'data_out_fixed/wind_mrhr_bicubic/); missing entirely otherwise.')
             else:
                 validation_status = 'no_expected_value'
                 notes_extra = ''
         elif not pd_vals:
             validation_status = 'NO_DATA'
-            notes_extra = ('No PD/MT source artifact found in this git checkout (data_out/, '
-                            'ttk_runs_fixed/topology_finetuning/<method>/, and models_fixed/topology_finetuning/ '
-                            'all lack this method). Large per-candidate experiment outputs are gitignored '
-                            '(*.npy, *.npz, ttk_runs_fixed/topology_finetuning/* except candidateE_constraints) '
-                            'and appear to exist only on the separate training machine, not in this repository. '
+            notes_extra = ('No PD/MT source artifact found in this git checkout. Large per-candidate experiment '
+                            'outputs are gitignored (*.npy, *.npz, ttk_runs_fixed/topology_finetuning/* except '
+                            'candidateE_constraints) and appear to exist only on the separate training machine. '
                             f'Expected mean (from user-supplied reference values, NOT verified here): '
                             f'PD={exp_pd}, MT={exp_mt}.')
         else:
@@ -768,8 +1117,8 @@ def main() -> int:
             notes_extra = f'pd_abs_diff={abs(topo_mean_pd - exp_pd):.6f} mt_abs_diff={abs(topo_mean_mt - exp_mt):.6f}'
 
         gt_alignment_status = 'not_checked (no dataGT.npy/dataIN.npy present in this checkout)'
-        if mid in ('bicubic', 'cnn', 'gan'):
-            gt_alignment_status = 'n/a (per-sample metrics sourced from pre-merged combined CSV, no raw arrays present)'
+        if mid in BASELINE_METHODS:
+            gt_alignment_status = 'n/a (per-sample metrics sourced from CSV, no raw arrays present)'
 
         notes = entry.get('exclusion_reason', '') or ''
         if notes_extra:
@@ -784,10 +1133,14 @@ def main() -> int:
             objective_summary=entry['objective_summary'],
             uses_speed=entry['uses_speed'], uses_grad=entry['uses_grad'], uses_levelset=entry['uses_levelset'],
             uses_crit=entry['uses_crit'], uses_e2=entry['uses_e2'], repaired_status=entry['repaired_status'],
+            historical_alias=entry.get('historical_alias', ''),
             data_out_dir=entry['data_out_dir'],
             idx_path=r.get('idx_path', ''), data_gt_path=r.get('data_gt_path', ''), data_sr_path=r.get('data_sr_path', ''),
-            cheap_eval_csv=r.get('cheap_eval_csv', ''), cheap_pairwise_csv=r.get('cheap_pairwise_csv', ''),
-            topology_results_csv=r.get('topology_results_csv', ''), topology_comparison_csv=r.get('topology_comparison_csv', ''),
+            cheap_eval_csv=r.get('cheap_eval_csv', ''), cheap_eval_resolution=r.get('cheap_eval_resolution', ''),
+            cheap_pairwise_csv=r.get('cheap_pairwise_csv', ''),
+            topology_results_csv=r.get('topology_results_csv', ''),
+            topology_results_resolution=r.get('topology_results_resolution', ''),
+            topology_comparison_csv=r.get('topology_comparison_csv', ''),
             cheap_report=entry.get('cheap_report', ''), topology_report=entry.get('topology_report', ''),
             row_count_cheap=r.get('row_count_cheap', 0), row_count_topology=r.get('row_count_topology', 0),
             sample_index_status=sample_index_status, gt_alignment_status=gt_alignment_status,
@@ -805,7 +1158,59 @@ def main() -> int:
     log(f'[write] {inv_path} ({len(inventory_rows)} rows)')
 
     # -------------------------------------------------------------------
-    # unified_primary_per_sample_long.csv -- full grid, NaN where no source.
+    # column_mapping.csv (always written)
+    # -------------------------------------------------------------------
+    write_column_mapping()
+
+    # -------------------------------------------------------------------
+    # docs/unified_candidate_evaluation_inventory.md (always written)
+    # docs/primary_candidate_artifact_reference.md (always written, requirement 5)
+    # -------------------------------------------------------------------
+    write_inventory_doc(inventory_rows, legacy_report, harvest_report, cross_check_report)
+    write_primary_reference_doc(inventory_rows)
+
+    # -------------------------------------------------------------------
+    # Requirement 3: strict-mode completeness gate.
+    # -------------------------------------------------------------------
+    primary_strict_results = {}
+    for entry in PRIMARY_MANIFEST:
+        mid = entry['method_id']
+        per_sample = resolved[mid].get('per_sample', {})
+        exp_pd, exp_mt = EXPECTED_PD_MT.get(mid, (None, None))
+        passed, reasons = check_strict_primary(mid, per_sample, is_bicubic=(mid == 'bicubic'),
+                                                expected_pd=exp_pd, expected_mt=exp_mt)
+        primary_strict_results[mid] = (passed, reasons)
+        log(f"[strict-check:{mid}] {'PASS' if passed else 'FAIL: ' + '; '.join(reasons)}")
+
+    all_strict_pass = all(p for p, _ in primary_strict_results.values())
+
+    if strict and not all_strict_pass:
+        log('')
+        log('=' * 88)
+        log('[STRICT MODE FAILURE] Not every primary method meets the strict completeness/validation criteria.')
+        for mid, (passed, reasons) in primary_strict_results.items():
+            if not passed:
+                log(f'  - {mid}: {"; ".join(reasons)}')
+        log('Refusing to write unified_primary_per_sample_long.csv / unified_primary_method_summary.csv / '
+            'unified_primary_topology_validation.csv / unified_primary_pairwise_vs_cnn.csv / '
+            'unified_primary_missingness.csv / unified_primary_wide.csv: doing so in strict mode would produce '
+            'an apparently complete authoritative table containing empty placeholder rows.')
+        stale = [f.name for f in OUT_DIR.glob('unified_primary_*.csv') if f.exists()]
+        if stale:
+            log(f'[warning] Stale file(s) from a previous (permissive) run still exist and were NOT regenerated '
+                f'or deleted by this strict run -- do not treat them as current: {stale}')
+        log('Re-run with --audit-allow-missing for a permissive inventory-only pass, or fix the missing '
+            'artifacts and re-run --strict-primary.')
+        log('=' * 88)
+        write_phase1_report_strict_failure(inventory_rows, primary_strict_results, harvest_report,
+                                            legacy_report, cross_check_report)
+        flush_log()
+        return 1
+
+    # -------------------------------------------------------------------
+    # unified_primary_per_sample_long.csv -- full grid. In audit mode this
+    # may contain empty cells for missing methods; in strict mode (reached
+    # only if every check above passed) every cell is real.
     # -------------------------------------------------------------------
     long_rows = []
     for entry in PRIMARY_MANIFEST:
@@ -826,7 +1231,6 @@ def main() -> int:
                 row[col] = '' if (isinstance(v, float) and math.isnan(v)) else v
             long_rows.append(row)
 
-    # Hard-fail: verify no duplicate (method_id, sample_idx) keys in the output itself.
     key_seen = set()
     for row in long_rows:
         k = (row['method_id'], row['sample_idx'])
@@ -845,56 +1249,6 @@ def main() -> int:
         for row in long_rows:
             w.writerow(row)
     log(f'[write] {long_path} ({len(long_rows)} rows = {len(PRIMARY_MANIFEST)} methods x {N_EVAL} samples)')
-
-    # -------------------------------------------------------------------
-    # column_mapping.csv
-    # -------------------------------------------------------------------
-    mapping_rows = []
-    for src_col, std_col in sorted(BASELINE_COMBINED_DIRECT_MAP.items()):
-        direction = METRIC_DIRECTION[std_col]
-        mapping_rows.append(dict(
-            source_path='ttk_runs_fixed/combined/psnr_topology_physics_merged.csv',
-            source_column=src_col, standardized_column=std_col,
-            units=[m[3] for m in METRIC_SCHEMA if m[0] == std_col][0],
-            direction=direction,
-            representation=[m[2] for m in METRIC_SCHEMA if m[0] == std_col][0],
-            notes='Present for cnn/gan only; this is the only per-sample source file with real primary-method data.',
-        ))
-    mapping_rows.append(dict(
-        source_path='ttk_runs_fixed/combined/psnr_topology_physics_merged.csv',
-        source_column='wpd_bias', standardized_column='wpd_bias_abs',
-        units='m^3/s^3', direction='lower_is_better', representation='wind_power_distribution',
-        notes='Standardized column is abs(wpd_bias); source stores the signed value.',
-    ))
-    for missing_col in BASELINE_COMBINED_NOT_AVAILABLE:
-        mapping_rows.append(dict(
-            source_path='ttk_runs_fixed/combined/psnr_topology_physics_merged.csv',
-            source_column='(not present)', standardized_column=missing_col,
-            units=[m[3] for m in METRIC_SCHEMA if m[0] == missing_col][0],
-            direction=METRIC_DIRECTION[missing_col],
-            representation=[m[2] for m in METRIC_SCHEMA if m[0] == missing_col][0],
-            notes='This legacy pipeline predates speed_mae/speed_rmse/component-count metrics; '
-                  'left as genuinely missing for cnn/gan, not fabricated.',
-        ))
-    for src_col, std_col in sorted(CANDIDATE_EVAL_DIRECT_MAP.items()):
-        mapping_rows.append(dict(
-            source_path='scripts/evaluate_finetune_candidate.py (schema definition only; '
-                         'no all_sample_metrics_<method>.csv instance file exists in this checkout)',
-            source_column=src_col, standardized_column=std_col,
-            units=[m[3] for m in METRIC_SCHEMA if m[0] == std_col][0],
-            direction=METRIC_DIRECTION[std_col],
-            representation=[m[2] for m in METRIC_SCHEMA if m[0] == std_col][0],
-            notes='Schema this evaluator would write for any candidate; no instance data found for any of the '
-                  '16 non-baseline primary methods in this repository checkout.',
-        ))
-    mapping_path = OUT_DIR / 'column_mapping.csv'
-    with mapping_path.open('w', newline='') as fh:
-        w = csv.DictWriter(fh, fieldnames=['source_path', 'source_column', 'standardized_column',
-                                            'units', 'direction', 'representation', 'notes'])
-        w.writeheader()
-        for row in mapping_rows:
-            w.writerow(row)
-    log(f'[write] {mapping_path} ({len(mapping_rows)} rows)')
 
     # -------------------------------------------------------------------
     # unified_primary_method_summary.csv
@@ -938,7 +1292,7 @@ def main() -> int:
         mt_vals = per_method_series.get((mid, 'mt_distance'), [])
         exp_pd, exp_mt = EXPECTED_PD_MT.get(mid, (None, None))
         if exp_pd is None:
-            continue  # bicubic: no expected true-topology value to validate against.
+            continue
         obs_pd = sum(pd_vals) / len(pd_vals) if pd_vals else ''
         obs_mt = sum(mt_vals) / len(mt_vals) if mt_vals else ''
         pd_diff = abs(obs_pd - exp_pd) if pd_vals else ''
@@ -990,10 +1344,7 @@ def main() -> int:
                 continue
             direction = METRIC_DIRECTION[col]
             raw_deltas = [cand_vals[si] - cnn_vals[si] for si in common]
-            if direction == 'higher_is_better':
-                improve_deltas = raw_deltas
-            else:
-                improve_deltas = [-d for d in raw_deltas]
+            improve_deltas = raw_deltas if direction == 'higher_is_better' else [-d for d in raw_deltas]
             n_improved = sum(1 for d in improve_deltas if d > 0)
             n_worsened = sum(1 for d in improve_deltas if d < 0)
             n_tied = sum(1 for d in improve_deltas if d == 0)
@@ -1035,8 +1386,8 @@ def main() -> int:
                 reason = 'no_source_artifact_found_in_repository'
             elif finite == total:
                 reason = ''
-            elif col in BASELINE_COMBINED_NOT_AVAILABLE and mid in ('bicubic', 'cnn', 'gan'):
-                reason = 'not_computed_by_legacy_physics_merged_pipeline'
+            elif col in BASELINE_COMBINED_NOT_AVAILABLE and mid in BASELINE_METHODS:
+                reason = 'not_computed_by_legacy_physics_merged_pipeline_and_no_harvested_row_available'
             else:
                 reason = 'partial_source_coverage'
             missingness_rows.append(dict(method_id=mid, metric=col, total_rows=total,
@@ -1069,40 +1420,85 @@ def main() -> int:
             w.writerow(row)
     log(f'[write] {wide_path} ({N_EVAL} rows x {len(wide_fieldnames)} columns)')
 
-    # -------------------------------------------------------------------
-    # docs/unified_candidate_evaluation_inventory.md
-    # -------------------------------------------------------------------
-    write_inventory_doc(inventory_rows, baseline_report)
-
-    # -------------------------------------------------------------------
-    # docs/unified_candidate_evaluation_phase1.md
-    # -------------------------------------------------------------------
-    write_phase1_report(inventory_rows, topo_val_rows, baseline_report, missingness_rows)
+    write_phase1_report(inventory_rows, topo_val_rows, legacy_report, missingness_rows,
+                         strict, all_strict_pass, harvest_report, cross_check_report)
 
     n_primary_with_data = sum(1 for e in PRIMARY_MANIFEST if resolved[e['method_id']].get('per_sample'))
     log('')
     log('=' * 88)
     log(f'RESULT: {n_primary_with_data}/{len(PRIMARY_MANIFEST)} primary methods have real per-sample data '
-        f'in this repository checkout.')
-    log('Do not claim full-table success: most primary methods are MISSING (see method_inventory.csv, '
-        'validation_status column, and docs/unified_candidate_evaluation_phase1.md).')
+        f'in this repository checkout. Strict criteria all-pass: {all_strict_pass}.')
+    if not all_strict_pass:
+        log('Do not claim full-table success: some primary methods are MISSING or incomplete (see '
+            'method_inventory.csv, validation_status column, and docs/unified_candidate_evaluation_phase1.md).')
     log('=' * 88)
 
     flush_log()
     return 0
 
 
-def write_inventory_doc(inventory_rows, baseline_report):
+def write_column_mapping():
+    mapping_rows = []
+    for src_col, std_col in sorted(BASELINE_COMBINED_DIRECT_MAP.items()):
+        mapping_rows.append(dict(
+            source_path='ttk_runs_fixed/combined/psnr_topology_physics_merged.csv',
+            source_column=src_col, standardized_column=std_col,
+            units=[m[3] for m in METRIC_SCHEMA if m[0] == std_col][0],
+            direction=METRIC_DIRECTION[std_col],
+            representation=[m[2] for m in METRIC_SCHEMA if m[0] == std_col][0],
+            notes='Legacy cnn/gan-only pipeline; used as the topology (PD/MT) source of record and as a cheap-'
+                  'metric fallback when no harvested candidate-eval baseline row is available.',
+        ))
+    mapping_rows.append(dict(
+        source_path='ttk_runs_fixed/combined/psnr_topology_physics_merged.csv',
+        source_column='wpd_bias', standardized_column='wpd_bias_abs',
+        units='m^3/s^3', direction='lower_is_better', representation='wind_power_distribution',
+        notes='Standardized column is abs(wpd_bias); source stores the signed value.',
+    ))
+    for missing_col in BASELINE_COMBINED_NOT_AVAILABLE:
+        mapping_rows.append(dict(
+            source_path='ttk_runs_fixed/combined/psnr_topology_physics_merged.csv',
+            source_column='(not present)', standardized_column=missing_col,
+            units=[m[3] for m in METRIC_SCHEMA if m[0] == missing_col][0],
+            direction=METRIC_DIRECTION[missing_col],
+            representation=[m[2] for m in METRIC_SCHEMA if m[0] == missing_col][0],
+            notes='This legacy pipeline predates speed_mae/speed_rmse/component-count metrics; sourced instead '
+                  'from harvested ttk_runs_fixed/topology_finetuning/*_eval/all_sample_metrics_*.csv baseline '
+                  'rows when at least one such file exists (see harvest_baseline_rows()).',
+        ))
+    for src_col, std_col in sorted(CANDIDATE_EVAL_DIRECT_MAP.items()):
+        mapping_rows.append(dict(
+            source_path='ttk_runs_fixed/topology_finetuning/<method>_eval/all_sample_metrics_<method>.csv '
+                         '(scripts/evaluate_finetune_candidate.py schema; also the source harvested for '
+                         'repeated bicubic/cnn/gan baseline rows)',
+            source_column=src_col, standardized_column=std_col,
+            units=[m[3] for m in METRIC_SCHEMA if m[0] == std_col][0],
+            direction=METRIC_DIRECTION[std_col],
+            representation=[m[2] for m in METRIC_SCHEMA if m[0] == std_col][0],
+            notes='Full candidate/baseline schema written by evaluate_finetune_candidate.py.',
+        ))
+    mapping_path = OUT_DIR / 'column_mapping.csv'
+    with mapping_path.open('w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=['source_path', 'source_column', 'standardized_column',
+                                            'units', 'direction', 'representation', 'notes'])
+        w.writeheader()
+        for row in mapping_rows:
+            w.writerow(row)
+    log(f'[write] {mapping_path} ({len(mapping_rows)} rows)')
+
+
+def write_inventory_doc(inventory_rows, legacy_report, harvest_report, cross_check_report):
     lines = []
     lines.append('# Unified candidate evaluation -- artifact inventory')
     lines.append('')
-    lines.append(f'Generated by `scripts/build_unified_candidate_evaluation.py`. Read-only audit; '
-                 f'no training, TTK, or cheap-evaluation rerun was performed.')
+    lines.append('Generated by `scripts/build_unified_candidate_evaluation.py`. Read-only audit; '
+                 'no training, TTK, or cheap-evaluation rerun was performed.')
     lines.append('')
     lines.append('## Primary method set')
     lines.append('')
-    lines.append('| method_id | display_name | comparison_tier | validation_status | row_count_cheap | notes |')
-    lines.append('|---|---|---|---|---:|---|')
+    lines.append('| method_id | display_name | comparison_tier | validation_status | row_count_cheap | '
+                 'cheap_eval_resolution | notes |')
+    lines.append('|---|---|---|---|---:|---|---|')
     for row in inventory_rows:
         if not row['include_primary']:
             continue
@@ -1110,11 +1506,13 @@ def write_inventory_doc(inventory_rows, baseline_report):
         if len(notes) > 160:
             notes = notes[:157] + '...'
         lines.append(f"| {row['method_id']} | {row['display_name']} | {row['comparison_tier']} | "
-                     f"{row['validation_status']} | {row['row_count_cheap']} | {notes} |")
+                     f"{row['validation_status']} | {row['row_count_cheap']} | {row['cheap_eval_resolution']} | "
+                     f"{notes} |")
     lines.append('')
     lines.append('## Secondary / non-primary inventory')
     lines.append('')
-    lines.append('| method_id | display_name | comparison_tier | training_scale | architecture | repaired_status | exclusion_reason |')
+    lines.append('| method_id | display_name | comparison_tier | training_scale | architecture | '
+                 'repaired_status | exclusion_reason |')
     lines.append('|---|---|---|---|---|---|---|')
     for row in inventory_rows:
         if row['include_primary']:
@@ -1125,15 +1523,36 @@ def write_inventory_doc(inventory_rows, baseline_report):
         lines.append(f"| {row['method_id']} | {row['display_name']} | {row['comparison_tier']} | "
                      f"{row['training_scale']} | {row['architecture']} | {row['repaired_status']} | {notes} |")
     lines.append('')
-    lines.append('## Baseline (cnn/gan) source cross-validation')
+    lines.append('## Baseline harvesting (requirement 1)')
     lines.append('')
-    lines.append(f"- Primary source: `{baseline_report.get('combined_path')}`")
-    lines.append(f"- Cross-validation source: `{baseline_report.get('phase_c_path')}`")
-    for method, rep in baseline_report.get('per_method', {}).items():
+    lines.append(f"- Discovered candidate all_sample_metrics CSVs: {len(harvest_report['discovered_csvs'])}")
+    for p in harvest_report['discovered_csvs']:
+        lines.append(f'  - `{p}`')
+    for bm in BASELINE_METHODS:
+        cr = harvest_report['cross_report'][bm]
+        canon = harvest_report['canonical'][bm] or '(none found)'
+        lines.append(f"- **{bm}**: {cr['n_sources']} source(s) with data, canonical source = `{canon}`")
+    lines.append('')
+    lines.append('## Baseline (cnn/gan) legacy-source cross-validation')
+    lines.append('')
+    lines.append(f"- Legacy combined source: `{legacy_report.get('combined_path')}`")
+    lines.append(f"- Legacy cross-validation source: `{legacy_report.get('phase_c_path')}`")
+    for method, rep in legacy_report.get('per_method', {}).items():
         lines.append(f"- **{method}**: {rep['n_rows']} rows, {rep['n_unique_sample_idx']} unique sample_idx "
                      f"({rep['sample_index_status']}), cross-checked against {rep['n_cross_checked_against_phase_c']} "
                      f"phase_c_results.csv rows, max |Δpd|={rep['max_pd_diff_vs_phase_c']:.3e}, "
                      f"max |Δmt|={rep['max_mt_diff_vs_phase_c']:.3e}.")
+    lines.append('')
+    lines.append('## Harvested-vs-legacy cross-check (requirement 2)')
+    lines.append('')
+    for method, rep in cross_check_report.items():
+        if rep.get('skipped'):
+            lines.append(f"- **{method}**: skipped ({rep['reason']})")
+        else:
+            worst_metric = max(rep['max_diff'], key=rep['max_diff'].get) if rep['max_diff'] else None
+            worst_val = rep['max_diff'].get(worst_metric, 0.0) if worst_metric else 0.0
+            lines.append(f"- **{method}**: max diff across {len(rep['max_diff'])} overlapping metrics: "
+                         f"`{worst_metric}` = {worst_val:.3e} (tolerance {OLDER_SOURCE_CROSS_CHECK_TOLERANCE:g})")
     lines.append('')
     lines.append('## Architecture legend')
     lines.append('')
@@ -1143,15 +1562,103 @@ def write_inventory_doc(inventory_rows, baseline_report):
     lines.append('- `pretrained_cnn` / `pretrained_gan`: released PhIRE checkpoints, no fine-tuning.')
     lines.append('- `bicubic_interpolation`: no learned model.')
     lines.append('')
-    lines.append('## Training-scale legend')
+    lines.append('## Path-resolution legend (requirement 4)')
     lines.append('')
-    lines.append('168 / 672 / 1344 / 2688 = number of training samples used for fine-tuning; all variants are '
-                 'evaluated on the same fixed 168-sample benchmark regardless of training scale.')
+    lines.append('- `exact_path`: found at the manifest-derived expected path.')
+    lines.append('- `fallback_discovery`: exact path absent; found via a unique filename match under '
+                 f'{FALLBACK_SEARCH_ROOTS}.')
+    lines.append('- `not_found`: absent at the exact path and no unique fallback match exists.')
+    lines.append('- `harvested_baseline_row` / `legacy_combined`: bicubic/cnn/gan-specific sources (see above).')
     (DOCS_DIR / 'unified_candidate_evaluation_inventory.md').write_text('\n'.join(lines) + '\n')
     log(f"[write] {DOCS_DIR / 'unified_candidate_evaluation_inventory.md'}")
 
 
-def write_phase1_report(inventory_rows, topo_val_rows, baseline_report, missingness_rows):
+def write_primary_reference_doc(inventory_rows):
+    """Requirement 5: human-readable candidate reference, repository-relative paths."""
+    by_id = {r['method_id']: r for r in inventory_rows}
+    lines = []
+    lines.append('# Primary candidate artifact reference')
+    lines.append('')
+    lines.append('Human-readable reference for every primary method in the Phase-1 unified evaluation. '
+                 'All paths are repository-relative. Generated by `scripts/build_unified_candidate_evaluation.py`; '
+                 'read-only, no training/TTK/eval rerun.')
+    lines.append('')
+    for entry in PRIMARY_MANIFEST:
+        mid = entry['method_id']
+        inv = by_id[mid]
+        lines.append(f"## `{mid}` -- {entry['display_name']}")
+        lines.append('')
+        lines.append(f"- **original_method_name**: `{entry['original_method_name']}`")
+        lines.append(f"- **weighted loss objective**: {entry['objective_summary']}")
+        lines.append(f"- **candidate_family**: {entry['candidate_family']}")
+        lines.append(f"- **historical_alias**: {entry.get('historical_alias') or 'n/a'}")
+        lines.append(f"- **training_scale**: {entry['training_scale']}")
+        lines.append(f"- **architecture**: {entry['architecture']}")
+        lines.append(f"- **data_out directory**: `{_relpath(rp(entry['data_out_dir'])) if entry['data_out_dir'] not in ('n/a', '') else 'n/a'}`")
+        lines.append(f"- **model directory**: `{entry.get('model_dir', '') or 'n/a'}`")
+        lines.append(f"- **cheap-metric CSV**: `{_relpath(inv['cheap_eval_csv']) or '(not resolved)'}` "
+                     f"[{inv['cheap_eval_resolution'] or 'not_found'}]")
+        lines.append(f"- **pairwise-vs-CNN CSV**: `{_relpath(inv['cheap_pairwise_csv']) or '(not resolved)'}`")
+        lines.append(f"- **PD/MT per-sample CSV**: `{_relpath(inv['topology_results_csv']) or '(not resolved)'}` "
+                     f"[{inv['topology_results_resolution'] or 'not_found'}]")
+        lines.append(f"- **topology comparison CSV**: `{_relpath(inv['topology_comparison_csv']) or '(not resolved)'}`")
+        lines.append(f"- **cheap report**: `{entry.get('cheap_report') or '(not resolved)'}`")
+        lines.append(f"- **topology report**: `{entry.get('topology_report') or '(not resolved)'}`")
+        exp_pd, exp_mt = EXPECTED_PD_MT.get(mid, ('n/a', 'n/a'))
+        lines.append(f"- **expected validation PD mean**: {exp_pd}")
+        lines.append(f"- **expected validation MT mean**: {exp_mt}")
+        lines.append('')
+    (DOCS_DIR / 'primary_candidate_artifact_reference.md').write_text('\n'.join(lines) + '\n')
+    log(f"[write] {DOCS_DIR / 'primary_candidate_artifact_reference.md'}")
+
+
+def write_phase1_report_strict_failure(inventory_rows, primary_strict_results, harvest_report,
+                                        legacy_report, cross_check_report):
+    primary_rows = [r for r in inventory_rows if r['include_primary']]
+    failing = [(mid, reasons) for mid, (passed, reasons) in primary_strict_results.items() if not passed]
+    lines = []
+    lines.append('# Unified candidate evaluation -- Phase 1 report')
+    lines.append('')
+    lines.append('## STRICT MODE: FAILED')
+    lines.append('')
+    lines.append(f'{len(failing)} of {len(primary_rows)} primary methods did not meet the `--strict-primary` '
+                 'completeness/validation criteria. The authoritative unified tables '
+                 '(`unified_primary_per_sample_long.csv` and its derived summary/validation/pairwise/'
+                 'missingness/wide tables) were **not written** in this run, to avoid producing a table that '
+                 'looks complete but silently contains empty placeholder rows. `method_inventory.csv`, '
+                 '`column_mapping.csv`, `docs/unified_candidate_evaluation_inventory.md`, and '
+                 '`docs/primary_candidate_artifact_reference.md` were written -- they are diagnostic and do not '
+                 'claim table completeness.')
+    lines.append('')
+    lines.append('## Failing methods and reasons')
+    lines.append('')
+    for mid, reasons in failing:
+        lines.append(f'- **{mid}**: {"; ".join(reasons)}')
+    lines.append('')
+    lines.append('## Baseline harvesting summary')
+    lines.append('')
+    lines.append(f"Discovered {len(harvest_report['discovered_csvs'])} candidate all_sample_metrics CSV(s).")
+    for bm in BASELINE_METHODS:
+        cr = harvest_report['cross_report'][bm]
+        lines.append(f"- {bm}: {cr['n_sources']} source(s), canonical = `{harvest_report['canonical'][bm] or '(none)'}`")
+    lines.append('')
+    lines.append('## No training or TTK was rerun')
+    lines.append('')
+    lines.append('This script performed zero training runs, zero TTK invocations, and zero cheap-evaluation '
+                 'runs. It only read pre-existing CSV files already present in the repository. No existing '
+                 'artifact was modified or deleted.')
+    lines.append('')
+    lines.append('## Next step')
+    lines.append('')
+    lines.append('Sync the missing artifacts listed above from the training machine, or investigate why the '
+                 'PD/MT means or row counts disagree, then re-run `python3 scripts/build_unified_candidate_'
+                 'evaluation.py --strict-primary`.')
+    (DOCS_DIR / 'unified_candidate_evaluation_phase1.md').write_text('\n'.join(lines) + '\n')
+    log(f"[write] {DOCS_DIR / 'unified_candidate_evaluation_phase1.md'} (strict-failure variant)")
+
+
+def write_phase1_report(inventory_rows, topo_val_rows, legacy_report, missingness_rows,
+                         strict, all_strict_pass, harvest_report, cross_check_report):
     primary_rows = [r for r in inventory_rows if r['include_primary']]
     n_pass = sum(1 for r in topo_val_rows if r['pd_pass'] is True and r['mt_pass'] is True)
     n_no_data = sum(1 for r in topo_val_rows if r['pd_pass'] == 'NO_DATA')
@@ -1161,6 +1668,18 @@ def write_phase1_report(inventory_rows, topo_val_rows, baseline_report, missingn
 
     lines = []
     lines.append('# Unified candidate evaluation -- Phase 1 report')
+    lines.append('')
+    lines.append('## 0. Run mode')
+    lines.append('')
+    if strict:
+        lines.append('**STRICT MODE (`--strict-primary`): PASSED.** Every primary method met the completeness/'
+                     'validation criteria (168 cheap rows with sample_idx exactly 0..167, finite nonnegative '
+                     'PD/MT for the 18 learned/baseline-with-topology methods, PD/MT mean reproduction within '
+                     f'{PD_MT_TOLERANCE:g}). The tables below are fully authoritative -- no placeholder rows.')
+    else:
+        lines.append('**AUDIT MODE (`--audit-allow-missing`).** This is a permissive inventory pass: the '
+                     'unified table below intentionally includes empty cells for any method/metric with no '
+                     'source artifact in this checkout. Do not treat it as authoritative -- see section 9.')
     lines.append('')
     lines.append('## 1. Scope and primary/secondary method distinction')
     lines.append('')
@@ -1173,17 +1692,16 @@ def write_phase1_report(inventory_rows, topo_val_rows, baseline_report, missingn
     lines.append('')
     lines.append('## 2. Complete artifact inventory')
     lines.append('')
-    lines.append('See `ttk_runs_fixed/unified_candidate_evaluation/method_inventory.csv` (one row per discovered '
-                 'or expected experiment, primary and secondary) and `docs/unified_candidate_evaluation_inventory.md` '
-                 '(narrative version).')
+    lines.append('See `ttk_runs_fixed/unified_candidate_evaluation/method_inventory.csv`, '
+                 '`docs/unified_candidate_evaluation_inventory.md`, and `docs/primary_candidate_artifact_reference.md`.')
     lines.append('')
     lines.append('## 3. Exact table dimensions')
     lines.append('')
     lines.append(f'- `unified_primary_per_sample_long.csv`: {len(primary_rows)} methods x 168 samples = '
                  f'{len(primary_rows) * N_EVAL} rows, one row per (method_id, sample_idx), no duplicates.')
     lines.append(f'- Of these {len(primary_rows)} primary methods, **{len(methods_with_data)} have real per-sample '
-                 f'data** in this repository checkout ({", ".join(methods_with_data)}), and '
-                 f'**{len(methods_without_data)} have zero real data** ({", ".join(methods_without_data)}).')
+                 f'data** in this repository checkout ({", ".join(methods_with_data) or "none"}), and '
+                 f'**{len(methods_without_data)} have zero real data** ({", ".join(methods_without_data) or "none"}).')
     lines.append('')
     lines.append('## 4. Metric families and representations')
     lines.append('')
@@ -1196,28 +1714,43 @@ def write_phase1_report(inventory_rows, topo_val_rows, baseline_report, missingn
     lines.append('## 5. Validation results')
     lines.append('')
     lines.append(f'- Topology-mean reproduction: **{n_pass} PASS**, **{n_fail} FAIL**, **{n_no_data} NO_DATA** '
-                 f'(no source artifact found at all) out of {len(topo_val_rows)} primary methods with an expected value.')
-    lines.append('- Cheap-metric completeness (168 rows, sample_idx exactly 0..167, no duplicates): verified for '
-                 'cnn and gan from `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv`; not applicable to '
-                 'the other 16 non-baseline primary methods since no cheap-eval CSV exists for any of them.')
-    lines.append('- Join (cheap metrics <-> true topology, one-to-one on sample_idx): for cnn/gan the two are '
-                 'already merged upstream in the same source row; no separate join was required or performed.')
+                 f'out of {len(topo_val_rows)} primary methods with an expected value.')
+    lines.append('- Cheap-metric completeness (168 rows, sample_idx exactly 0..167, no duplicates): checked for '
+                 'every primary method with any discovered source (baseline-harvested, legacy-combined, or a '
+                 'resolved candidate all_sample_metrics CSV).')
+    lines.append('- Join (cheap metrics <-> true topology, one-to-one on sample_idx): every per-sample record is '
+                 'a single merged dict keyed by sample_idx, so a missing cheap or topology value for a given '
+                 'sample_idx shows up directly as a non-finite cell rather than a silent row-count mismatch.')
     lines.append('')
     lines.append('## 6. Baseline duplicate-consistency audit')
     lines.append('')
-    lines.append('The task instructions anticipate that repeated cnn/gan/bicubic rows may appear across multiple '
-                 'per-candidate cheap-evaluation CSVs and must be checked for equality before choosing one canonical '
-                 'source. In this checkout **no per-candidate cheap-evaluation CSV exists at all** (zero '
-                 '`all_sample_metrics_*.csv` files were found for any of the 16 non-baseline primary methods), so '
-                 'that specific cross-file duplication could not occur and this check is vacuously satisfied. '
-                 'The only baseline consistency check actually performable was cross-validating '
-                 '`ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` PD/MT values against the independent '
-                 '`ttk_runs_fixed/combined/phase_c_results.csv` source:')
-    for method, rep in baseline_report.get('per_method', {}).items():
+    lines.append(f"Discovered {len(harvest_report['discovered_csvs'])} candidate `all_sample_metrics_*.csv` file(s) "
+                 'under `ttk_runs_fixed/topology_finetuning/*_eval/`. Every discovered file was checked for '
+                 'bicubic/cnn/gan rows; every baseline method present in more than one file had its rows compared '
+                 f'pairwise, metric by metric, against a {BASELINE_CROSS_SOURCE_TOLERANCE:g} tolerance (would '
+                 'hard-fail the whole run on disagreement):')
+    for bm in BASELINE_METHODS:
+        cr = harvest_report['cross_report'][bm]
+        lines.append(f"  - **{bm}**: {cr['n_sources']} source(s) with data; canonical source = "
+                     f"`{harvest_report['canonical'][bm] or '(none found)'}`.")
+    lines.append('')
+    lines.append('Canonical cnn/gan rows were additionally cross-checked against the older '
+                 '`ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` pipeline for overlapping columns '
+                 f'(tolerance {OLDER_SOURCE_CROSS_CHECK_TOLERANCE:g}):')
+    for method, rep in cross_check_report.items():
+        if rep.get('skipped'):
+            lines.append(f"  - **{method}**: skipped ({rep['reason']}).")
+        else:
+            worst_metric = max(rep['max_diff'], key=rep['max_diff'].get) if rep['max_diff'] else None
+            worst_val = rep['max_diff'].get(worst_metric, 0.0) if worst_metric else 0.0
+            lines.append(f"  - **{method}**: worst overlapping-column disagreement `{worst_metric}` = "
+                         f"{worst_val:.3e}.")
+    lines.append('')
+    lines.append('The independent `ttk_runs_fixed/combined/phase_c_results.csv` PD/MT cross-check remains as before:')
+    for method, rep in legacy_report.get('per_method', {}).items():
         lines.append(f"  - **{method}**: max |Δpd| = {rep['max_pd_diff_vs_phase_c']:.3e}, "
                      f"max |Δmt| = {rep['max_mt_diff_vs_phase_c']:.3e} across "
-                     f"{rep['n_cross_checked_against_phase_c']} cross-checked samples -- effectively exact "
-                     '(floating-point-level agreement).')
+                     f"{rep['n_cross_checked_against_phase_c']} cross-checked samples.")
     lines.append('')
     lines.append('## 7. PD/MT mean reproduction table')
     lines.append('')
@@ -1232,34 +1765,32 @@ def write_phase1_report(inventory_rows, topo_val_rows, baseline_report, missingn
     lines.append('## 8. Missingness, especially SSIM')
     lines.append('')
     ssim_rows = [r for r in missingness_rows if r['metric'] == 'ssim_speed']
-    ssim_nan_methods = [r['method_id'] for r in ssim_rows if r['finite_rows'] == 0 and r['total_rows'] > 0]
     ssim_ok_methods = [r['method_id'] for r in ssim_rows if r['finite_rows'] == r['total_rows']]
-    lines.append(f'- SSIM (`ssim_speed`): finite for {ssim_ok_methods} (real data found, all 168 values finite -- '
-                 'the known NumPy/scikit-image ABI issue does NOT manifest in this particular source file). '
-                 f'Entirely missing (no source at all, not the ABI issue) for the other '
-                 f'{len(ssim_rows) - len(ssim_ok_methods)} primary methods.')
+    lines.append(f'- SSIM (`ssim_speed`): finite for {ssim_ok_methods}. Entirely missing (no source at all, not '
+                 f'the known NumPy/scikit-image ABI issue) for the other {len(ssim_rows) - len(ssim_ok_methods)} '
+                 'primary methods in this checkout.')
     lines.append('- See `unified_primary_missingness.csv` for the full total/finite/missing breakdown per '
-                 '(method_id, metric); `missing_reason` distinguishes `no_source_artifact_found_in_repository` from '
-                 '`not_computed_by_legacy_physics_merged_pipeline` (speed_mae/speed_rmse/comp_* for cnn/gan/bicubic, '
-                 'which the older physics-merged pipeline never computed).')
+                 '(method_id, metric).')
     lines.append('- No missing value was filled with zero or inferred; all gaps are empty cells in the CSVs.')
     lines.append('')
     lines.append('## 9. Candidates that could not be included and why')
     lines.append('')
-    lines.append(f'{len(methods_without_data)} of {len(primary_rows)} primary methods '
-                 f'({", ".join(methods_without_data)}) have **zero** real per-sample cheap-evaluation or true-'
-                 'topology artifacts anywhere in this git checkout. Root cause: this repository\'s `.gitignore` '
-                 'excludes `*.npy`, `*.npz`, `data_out/`, and `ttk_runs_fixed/topology_finetuning/*` (tracked '
-                 'exceptions are only `candidateE_constraints` and the cnn/gan `combined`/`phase_c_final` summary '
-                 'artifacts); large experiment outputs for the loss-ablation candidates are produced only on the '
-                 'separate training machine referenced throughout this project\'s history and were never committed. '
-                 'The reference documentation records PD/MT means for these methods, but per the task instructions '
-                 'those values were used only as a *validation target*, never copied into the unified table as data.')
+    if methods_without_data:
+        lines.append(f'{len(methods_without_data)} of {len(primary_rows)} primary methods '
+                     f'({", ".join(methods_without_data)}) have **zero** real per-sample cheap-evaluation or '
+                     'true-topology artifacts anywhere in this git checkout. Root cause: this repository\'s '
+                     '`.gitignore` excludes `*.npy`, `*.npz`, `data_out/`, and '
+                     '`ttk_runs_fixed/topology_finetuning/*` (tracked exceptions are only `candidateE_constraints` '
+                     'and the cnn/gan `combined`/`phase_c_final` summary artifacts); large experiment outputs for '
+                     'the loss-ablation candidates are produced only on the separate training machine and were '
+                     'never committed.')
+    else:
+        lines.append('All primary methods have real data in this checkout.')
     lines.append('')
     lines.append('## 10. No training or TTK was rerun')
     lines.append('')
     lines.append('This script and this audit performed zero training runs, zero TTK invocations, and zero cheap-'
-                 'evaluation runs. It only read pre-existing CSV files already committed to the repository. No '
+                 'evaluation runs. It only read pre-existing CSV files already present in the repository. No '
                  'existing artifact was modified or deleted.')
     lines.append('')
     lines.append('## 11. Generated file paths')
@@ -1270,18 +1801,23 @@ def write_phase1_report(inventory_rows, topo_val_rows, baseline_report, missingn
                   'unified_primary_wide.csv']:
         lines.append(f'- `ttk_runs_fixed/unified_candidate_evaluation/{fname}`')
     lines.append('- `docs/unified_candidate_evaluation_inventory.md`')
+    lines.append('- `docs/primary_candidate_artifact_reference.md`')
     lines.append('- `docs/unified_candidate_evaluation_phase1.md` (this file)')
     lines.append('- `logs/build_unified_candidate_evaluation.log`')
     lines.append('')
     lines.append('## 12. Recommended next step')
     lines.append('')
-    lines.append(f'Before any factorial-effect analysis, paired contrasts, correlations, or Pareto-front work can '
-                 f'be performed on the full primary set, the {len(methods_without_data)} missing methods\' '
-                 'cheap-evaluation and true-topology artifacts need to be synced from the training machine into '
-                 'this checkout (or this script re-run there). Until then, any such analysis is only valid for '
-                 f'the {len(methods_with_data)} methods with real data ({", ".join(methods_with_data)}). Per the '
-                 'task instructions, no correlation, factorial-model, Pareto-front, or visualization-selection work '
-                 'was performed in this Phase-1 pass.')
+    if methods_without_data:
+        lines.append(f'Before any factorial-effect analysis, paired contrasts, correlations, or Pareto-front work '
+                     f'can be performed on the full primary set, the {len(methods_without_data)} missing methods\' '
+                     'cheap-evaluation and true-topology artifacts need to be synced from the training machine '
+                     'into this checkout (or this script re-run there with `--strict-primary`). Until then, any '
+                     f'such analysis is only valid for the {len(methods_with_data)} methods with real data '
+                     f'({", ".join(methods_with_data)}).')
+    else:
+        lines.append('The primary set is complete and strict-validated in this run. Per the task instructions, '
+                     'no correlation, factorial-model, Pareto-front, or visualization-selection work was performed '
+                     'in this Phase-1 pass -- that is the recommended next step.')
     (DOCS_DIR / 'unified_candidate_evaluation_phase1.md').write_text('\n'.join(lines) + '\n')
     log(f"[write] {DOCS_DIR / 'unified_candidate_evaluation_phase1.md'}")
 
