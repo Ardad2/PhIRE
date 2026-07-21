@@ -1,0 +1,55 @@
+{
+  "python": "3.11.15",
+  "torch": "2.12.0+cu130",
+  "cuda_available": false,
+  "gudhi": "3.12.0",
+  "torch_topological": "0.1.9",
+  "numpy": "2.4.4",
+  "gudhi_patch_applied": true,
+  "gudhi_patch_description": "torch_topological 0.1.9 passes torch.Tensor to gudhi.CubicalComplex; gudhi>=3.10 requires numpy array. Patched venv source: top_dimensional_cells=x.detach().cpu().numpy().flatten()",
+  "tests": [
+    {
+      "name": "synthetic_32x32_superlevel",
+      "passed": true,
+      "loss": 0.36082199215888977,
+      "n_nonzero_grad": 28,
+      "total_grad_entries": 1024,
+      "max_abs_grad": 0.3884776830673218,
+      "elapsed_s": 0.0078,
+      "error": null
+    },
+    {
+      "name": "synthetic_32x32_sublevel",
+      "passed": true,
+      "loss": 0.42317715287208557,
+      "n_nonzero_grad": 37,
+      "total_grad_entries": 1024,
+      "max_abs_grad": 0.42838627099990845,
+      "elapsed_s": 0.0055,
+      "error": null
+    },
+    {
+      "name": "wind_speed_160x160",
+      "passed": true,
+      "loss": 0.8379356265068054,
+      "n_nonzero_grad": 1676,
+      "total_grad_entries": 10000,
+      "max_abs_grad": 0.28047966957092285,
+      "elapsed_s": 0.1019,
+      "error": null
+    },
+    {
+      "name": "wind_speed_64x64",
+      "passed": true,
+      "loss": 0.5119656324386597,
+      "n_nonzero_grad": 696,
+      "total_grad_entries": 4096,
+      "max_abs_grad": 0.6964367628097534,
+      "elapsed_s": 0.0228,
+      "error": null
+    }
+  ],
+  "n_passed": 4,
+  "n_total": 4,
+  "verdict": "PROCEED \u2014 gradients flow on both synthetic and real wind-speed data."
+}
