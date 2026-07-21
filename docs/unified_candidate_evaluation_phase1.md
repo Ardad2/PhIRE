@@ -30,9 +30,9 @@ See `column_mapping.csv`. Families: `vector_uv` (psnruv), `scalar_speed` (ssim_s
 ## 6. Baseline duplicate-consistency audit
 
 Discovered 0 candidate `all_sample_metrics_*.csv` file(s) under `ttk_runs_fixed/topology_finetuning/*_eval/`. Every discovered file was checked for bicubic/cnn/gan rows; every baseline method present in more than one file had its rows compared pairwise, metric by metric, against a 1e-06 tolerance (would hard-fail the whole run on disagreement):
-  - **bicubic**: 0 source(s) with data; canonical source = `(none found)`.
-  - **cnn**: 0 source(s) with data; canonical source = `(none found)`.
-  - **gan**: 0 source(s) with data; canonical source = `(none found)`.
+  - **bicubic**: 0 source(s) with data; canonical source (required metrics) = `(none found)`; ssim_availability=`n/a`, canonical ssim source = `(none -- all-NaN)`.
+  - **cnn**: 0 source(s) with data; canonical source (required metrics) = `(none found)`; ssim_availability=`n/a`, canonical ssim source = `(none -- all-NaN)`.
+  - **gan**: 0 source(s) with data; canonical source (required metrics) = `(none found)`; ssim_availability=`n/a`, canonical ssim source = `(none -- all-NaN)`.
 
 Canonical cnn/gan rows were additionally cross-checked against the older `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` pipeline for overlapping columns (tolerance 0.001):
   - **cnn**: skipped (harvested candidate-eval rows not found for this method in this checkout).

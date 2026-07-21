@@ -118,6 +118,18 @@ def rp(rel: str) -> Path:
     return REPO_ROOT / rel
 
 
+def _worst_numeric_diff(max_diff: dict):
+    """max_diff values may legitimately be None (e.g. SSIM availability
+    mismatch/both-unavailable, where no numeric comparison happened) --
+    never let max() choke on comparing None to a float, and never report a
+    None entry as if it were the worst (or a zero) numeric difference."""
+    numeric = {k: v for k, v in max_diff.items() if v is not None}
+    if not numeric:
+        return None, 0.0
+    worst_metric = max(numeric, key=numeric.get)
+    return worst_metric, numeric[worst_metric]
+
+
 def _relpath(p) -> str:
     if not p:
         return ''
@@ -560,16 +572,40 @@ def discover_candidate_eval_csvs() -> list:
     return sorted(found, key=str)
 
 
+def _finite_count(rec_by_si: dict, col: str) -> int:
+    return sum(1 for si in range(N_EVAL) if math.isfinite(rec_by_si.get(si, {}).get(col, float('nan'))))
+
+
 def harvest_baseline_rows(csv_paths: list):
     """Extract bicubic/cnn/gan rows from every discovered candidate
-    all_sample_metrics CSV, validate each source, cross-compare all sources
-    pairwise per metric, hard-fail on disagreement, and pick one
-    deterministic canonical source per baseline method.
+    all_sample_metrics CSV, validate each source, cross-compare sources, and
+    select canonical baseline data PER METRIC rather than one whole file per
+    baseline method (patch requirement: 'small baseline-coverage correction').
+
+    Required cheap metrics (REQUIRED_CHEAP_METRIC_COLUMNS): every source must
+    have exactly 168/168 finite values or the whole run hard-fails -- a
+    source with 0-167 finite values for a required metric is a data-
+    integrity problem, not something to silently work around by picking a
+    different source. Once every source passes this gate, required-metric
+    values are compared pairwise across sources (tolerance
+    BASELINE_CROSS_SOURCE_TOLERANCE) and the lexicographically-first source
+    is used as the canonical value (they are validated equal anyway).
+
+    SSIM (ssim_speed) is handled differently: each source must independently
+    be 168/168 or 0/168 finite (partial coverage within one source still
+    hard-fails), but 168/168-in-one-source-and-0/168-in-another across
+    different sources is NOT a disagreement -- it is recorded as
+    'mixed_global_availability', and the canonical SSIM value is taken from
+    the lexicographically-first fully-finite source when one exists (so a
+    real SSIM value is never discarded just because another, unrelated
+    source happens to sort first), or preserved as all-NaN when no source
+    has it. Any two fully-finite SSIM sources must still numerically agree.
 
     Returns (baseline_data, report) where baseline_data is
     {baseline_method: {sample_idx: {standardized_col: value}}}.
     """
     per_source: dict = {}
+    ssim_status_by_source: dict = {}  # (path, bm) -> ('full'|'empty', finite_count)
     for path in csv_paths:
         rows = _read_csv_rows(path)
         by_method: dict = {}
@@ -606,17 +642,57 @@ def harvest_baseline_rows(csv_paths: list):
                     val = row.get(src_col, '')
                     rec[std_col] = float(val) if val not in ('', None) else float('nan')
                 rec_by_si[si] = rec
+
+            # Requirement 1: every required cheap metric must be exactly 168/168
+            # finite in THIS source, regardless of what other sources look like.
+            for col in REQUIRED_CHEAP_METRIC_COLUMNS:
+                finite = _finite_count(rec_by_si, col)
+                if finite != N_EVAL:
+                    raise SystemExit(
+                        f'[hard-fail] Baseline {bm!r} required cheap metric {col!r} in {path} has '
+                        f'{finite}/{N_EVAL} finite values (must be exactly {N_EVAL}). A required metric '
+                        'being partially or fully missing indicates a corrupted or incomplete evaluation '
+                        'source, even if another source is complete.'
+                    )
+
+            # Requirement 2: SSIM must independently be 168/168 or 0/168 in THIS source.
+            ssim_finite = _finite_count(rec_by_si, 'ssim_speed')
+            if ssim_finite not in (0, N_EVAL):
+                raise SystemExit(
+                    f'[hard-fail] Baseline {bm!r} ssim_speed in {path} has {ssim_finite}/{N_EVAL} finite '
+                    f'values -- must be either 0/{N_EVAL} (globally unavailable) or {N_EVAL}/{N_EVAL} '
+                    '(fully available); partial coverage indicates inconsistent evaluation coverage.'
+                )
+
             per_source[path][bm] = rec_by_si
+            ssim_status_by_source[(path, bm)] = ('full' if ssim_finite == N_EVAL else 'empty', ssim_finite)
 
     cross_report: dict = {}
     for bm in BASELINE_METHODS:
         sources_with_bm = sorted([p for p in csv_paths if bm in per_source.get(p, {})], key=str)
         cross_report[bm] = dict(n_sources=len(sources_with_bm),
                                  sources=[str(p) for p in sources_with_bm],
-                                 max_diff_per_metric={}, worst_pair_per_metric={})
+                                 max_diff_per_metric={}, worst_pair_per_metric={},
+                                 ssim_coverage={str(p): ssim_status_by_source[(p, bm)] for p in sources_with_bm},
+                                 ssim_availability='n/a', ssim_canonical_source='')
+        if not sources_with_bm:
+            continue
+        full_sources = [p for p in sources_with_bm if ssim_status_by_source[(p, bm)][0] == 'full']
+        empty_sources = [p for p in sources_with_bm if ssim_status_by_source[(p, bm)][0] == 'empty']
+        if full_sources and empty_sources:
+            cross_report[bm]['ssim_availability'] = 'mixed_global_availability'
+        elif full_sources:
+            cross_report[bm]['ssim_availability'] = 'full'
+        elif empty_sources:
+            cross_report[bm]['ssim_availability'] = 'unavailable'
+        cross_report[bm]['ssim_canonical_source'] = str(full_sources[0]) if full_sources else ''
+
         if len(sources_with_bm) < 2:
             continue
-        for col in METRIC_COLUMNS:
+
+        # Required cheap metrics: by this point every source is validated
+        # exactly 168/168 finite, so pairwise comparison needs no NaN-skip.
+        for col in REQUIRED_CHEAP_METRIC_COLUMNS:
             overall_max = 0.0
             worst_pair = None
             for i in range(len(sources_with_bm)):
@@ -624,10 +700,8 @@ def harvest_baseline_rows(csv_paths: list):
                     pi, pj = sources_with_bm[i], sources_with_bm[j]
                     pair_max = 0.0
                     for si in range(N_EVAL):
-                        a = per_source[pi][bm][si].get(col, float('nan'))
-                        b = per_source[pj][bm][si].get(col, float('nan'))
-                        if math.isnan(a) or math.isnan(b):
-                            continue
+                        a = per_source[pi][bm][si][col]
+                        b = per_source[pj][bm][si][col]
                         pair_max = max(pair_max, abs(a - b))
                     if pair_max > overall_max:
                         overall_max = pair_max
@@ -636,30 +710,70 @@ def harvest_baseline_rows(csv_paths: list):
             cross_report[bm]['worst_pair_per_metric'][col] = worst_pair
             if overall_max > BASELINE_CROSS_SOURCE_TOLERANCE:
                 raise SystemExit(
-                    f'[hard-fail] Repeated baseline {bm!r} rows for metric {col!r} disagree by '
+                    f'[hard-fail] Repeated baseline {bm!r} rows for required metric {col!r} disagree by '
                     f'{overall_max:.6g} (> tolerance {BASELINE_CROSS_SOURCE_TOLERANCE:g}) between '
                     f'{worst_pair[0]} and {worst_pair[1]}. Repeated baseline rows must be identical '
                     'across every candidate evaluation run.'
                 )
 
-    # Deterministic canonical source per baseline method: lexicographically
-    # first source (by path string) that actually contains this baseline.
-    canonical = {}
+        # SSIM: only fully-finite sources can be numerically compared; a
+        # full-vs-empty pairing is availability, not disagreement.
+        if len(full_sources) >= 2:
+            overall_max = 0.0
+            worst_pair = None
+            for i in range(len(full_sources)):
+                for j in range(i + 1, len(full_sources)):
+                    pi, pj = full_sources[i], full_sources[j]
+                    pair_max = 0.0
+                    for si in range(N_EVAL):
+                        a = per_source[pi][bm][si]['ssim_speed']
+                        b = per_source[pj][bm][si]['ssim_speed']
+                        pair_max = max(pair_max, abs(a - b))
+                    if pair_max > overall_max:
+                        overall_max = pair_max
+                        worst_pair = (str(pi), str(pj))
+            cross_report[bm]['max_diff_per_metric']['ssim_speed'] = overall_max
+            cross_report[bm]['worst_pair_per_metric']['ssim_speed'] = worst_pair
+            if overall_max > BASELINE_CROSS_SOURCE_TOLERANCE:
+                raise SystemExit(
+                    f'[hard-fail] Repeated baseline {bm!r} ssim_speed disagrees by {overall_max:.6g} '
+                    f'(> tolerance {BASELINE_CROSS_SOURCE_TOLERANCE:g}) between fully-finite sources '
+                    f'{worst_pair[0]} and {worst_pair[1]}.'
+                )
+
+    # Per-metric canonical selection (never one whole file for every metric):
+    # required metrics from the lexicographically-first source (all sources
+    # are validated equal for these); SSIM from the lexicographically-first
+    # FULLY-FINITE source when one exists, else preserved as all-NaN.
+    canonical_required = {}
+    canonical_ssim = {}
     baseline_data = {}
     for bm in BASELINE_METHODS:
         sources_with_bm = sorted([p for p in csv_paths if bm in per_source.get(p, {})], key=str)
         if not sources_with_bm:
             baseline_data[bm] = {}
-            canonical[bm] = None
+            canonical_required[bm] = None
+            canonical_ssim[bm] = None
             continue
-        chosen = sources_with_bm[0]
-        canonical[bm] = chosen
-        baseline_data[bm] = per_source[chosen][bm]
+
+        chosen_required = sources_with_bm[0]
+        canonical_required[bm] = chosen_required
+        full_sources = [p for p in sources_with_bm if ssim_status_by_source[(p, bm)][0] == 'full']
+        chosen_ssim = full_sources[0] if full_sources else None
+        canonical_ssim[bm] = chosen_ssim
+
+        per_sample = {}
+        for si in range(N_EVAL):
+            rec = dict(per_source[chosen_required][bm][si])
+            rec['ssim_speed'] = per_source[chosen_ssim][bm][si]['ssim_speed'] if chosen_ssim is not None else float('nan')
+            per_sample[si] = rec
+        baseline_data[bm] = per_sample
 
     report = dict(
         discovered_csvs=[str(p) for p in csv_paths],
         cross_report=cross_report,
-        canonical={bm: (str(canonical[bm]) if canonical[bm] else '') for bm in BASELINE_METHODS},
+        canonical={bm: (str(canonical_required[bm]) if canonical_required[bm] else '') for bm in BASELINE_METHODS},
+        canonical_ssim={bm: (str(canonical_ssim[bm]) if canonical_ssim.get(bm) else '') for bm in BASELINE_METHODS},
     )
     return baseline_data, report
 
@@ -754,7 +868,21 @@ def load_legacy_baseline_data():
 # =============================================================================
 
 def cross_check_baseline_vs_legacy(harvested_baseline_data: dict, legacy_baseline_data: dict) -> dict:
+    """Cross-check canonical harvested cnn/gan rows against the older
+    psnr_topology_physics_merged.csv pipeline for overlapping columns.
+
+    Required overlap columns: both sides must have exactly 168/168 finite
+    values before comparing -- if either side has 0-167, that is a hard
+    failure, not something to silently skip.
+
+    SSIM: compared numerically only when BOTH sides have 168/168 finite. A
+    168/168-vs-0/168 split is reported as an availability mismatch, not a
+    zero-difference "pass" -- max_diff['ssim_speed'] is left as None (never
+    fabricated) in that case and in the both-unavailable case, since no
+    numeric comparison actually happened.
+    """
     overlap_cols = sorted(set(BASELINE_COMBINED_DIRECT_MAP.values()) | {'wpd_bias_abs'})
+    required_overlap_cols = [c for c in overlap_cols if c != 'ssim_speed']
     report = {}
     for method in ('cnn', 'gan'):
         harvested = harvested_baseline_data.get(method, {})
@@ -763,17 +891,20 @@ def cross_check_baseline_vs_legacy(harvested_baseline_data: dict, legacy_baselin
             report[method] = dict(skipped=True,
                                    reason='harvested candidate-eval rows not found for this method in this checkout'
                                    if not harvested else 'legacy combined source not found',
-                                   max_diff={})
+                                   max_diff={}, ssim_status='n/a')
             continue
+
         max_diff = {}
-        for col in overlap_cols:
-            d = 0.0
-            for si in range(N_EVAL):
-                hv = harvested.get(si, {}).get(col, float('nan'))
-                lv = legacy.get(si, {}).get(col, float('nan'))
-                if math.isnan(hv) or math.isnan(lv):
-                    continue
-                d = max(d, abs(hv - lv))
+        for col in required_overlap_cols:
+            h_finite = _finite_count(harvested, col)
+            l_finite = _finite_count(legacy, col)
+            if h_finite != N_EVAL or l_finite != N_EVAL:
+                raise SystemExit(
+                    f'[hard-fail] {method} overlapping required metric {col!r}: harvested has '
+                    f'{h_finite}/{N_EVAL} finite values, legacy has {l_finite}/{N_EVAL} -- both must be '
+                    f'exactly {N_EVAL}/{N_EVAL} before they can be compared.'
+                )
+            d = max(abs(harvested[si][col] - legacy[si][col]) for si in range(N_EVAL))
             max_diff[col] = d
             if d > OLDER_SOURCE_CROSS_CHECK_TOLERANCE:
                 raise SystemExit(
@@ -781,7 +912,35 @@ def cross_check_baseline_vs_legacy(harvested_baseline_data: dict, legacy_baselin
                     f'baseline rows and the legacy combined source ({d:.6g} > tolerance '
                     f'{OLDER_SOURCE_CROSS_CHECK_TOLERANCE:g}).'
                 )
-        report[method] = dict(skipped=False, max_diff=max_diff)
+
+        h_ssim_finite = _finite_count(harvested, 'ssim_speed')
+        l_ssim_finite = _finite_count(legacy, 'ssim_speed')
+        if h_ssim_finite == N_EVAL and l_ssim_finite == N_EVAL:
+            d = max(abs(harvested[si]['ssim_speed'] - legacy[si]['ssim_speed']) for si in range(N_EVAL))
+            max_diff['ssim_speed'] = d
+            ssim_status = 'compared'
+            if d > OLDER_SOURCE_CROSS_CHECK_TOLERANCE:
+                raise SystemExit(
+                    f'[hard-fail] {method} ssim_speed disagrees between the harvested candidate-eval '
+                    f'baseline rows and the legacy combined source ({d:.6g} > tolerance '
+                    f'{OLDER_SOURCE_CROSS_CHECK_TOLERANCE:g}).'
+                )
+        elif h_ssim_finite == 0 and l_ssim_finite == 0:
+            ssim_status = 'both_unavailable'
+            max_diff['ssim_speed'] = None
+        elif h_ssim_finite in (0, N_EVAL) and l_ssim_finite in (0, N_EVAL):
+            ssim_status = 'availability_mismatch'
+            max_diff['ssim_speed'] = None
+        else:
+            # Partial coverage on either side should already be impossible
+            # (harvested is gated by requirement 2's per-source hard-fail;
+            # legacy is loaded as either fully complete or fully empty per
+            # column by construction) -- defensive hard-fail if it ever occurs.
+            raise SystemExit(
+                f'[hard-fail] {method} ssim_speed has unexpected partial coverage: harvested='
+                f'{h_ssim_finite}/{N_EVAL}, legacy={l_ssim_finite}/{N_EVAL}.'
+            )
+        report[method] = dict(skipped=False, max_diff=max_diff, ssim_status=ssim_status)
     return report
 
 
@@ -1034,15 +1193,25 @@ def validate_raw_arrays(data_out_dir: Path, canonical_in, canonical_gt, require_
         if require_idx:
             reasons.append(f'idx.npy missing at {idx_path}')
     else:
-        idx = np.load(str(idx_path), allow_pickle=False)
+        idx = np.asarray(np.load(str(idx_path), allow_pickle=False))
         if idx.shape != EXPECTED_IDX_SHAPE:
             status['idx_validation_status'] = f'bad_shape {idx.shape}'
             reasons.append(f'idx.npy shape {idx.shape} != {EXPECTED_IDX_SHAPE} at {idx_path}')
-        elif not np.array_equal(np.asarray(idx).astype(np.int64), np.arange(N_EVAL, dtype=np.int64)):
-            status['idx_validation_status'] = 'not_exact_0_167'
-            reasons.append(f'idx.npy is not exactly ordered 0..{N_EVAL - 1} at {idx_path}')
         else:
-            status['idx_validation_status'] = 'exact_0_167'
+            # Never validate through integer truncation: a float array like
+            # [0.5, 1.0, 2.0, ...] must NOT pass just because .astype(int64)
+            # would truncate 0.5 down to 0. Accept either an integer dtype
+            # compared exactly to arange(168), or an exact (uncast) numeric
+            # comparison against arange(168) in the array's own dtype.
+            if np.issubdtype(idx.dtype, np.integer):
+                idx_ok = np.array_equal(idx.astype(np.int64), np.arange(N_EVAL, dtype=np.int64))
+            else:
+                idx_ok = np.array_equal(idx, np.arange(N_EVAL, dtype=idx.dtype))
+            if not idx_ok:
+                status['idx_validation_status'] = 'not_exact_0_167'
+                reasons.append(f'idx.npy is not exactly ordered 0..{N_EVAL - 1} at {idx_path}')
+            else:
+                status['idx_validation_status'] = 'exact_0_167'
 
     # dataIN.npy
     if not in_path.exists():
@@ -1223,10 +1392,10 @@ def main() -> int:
         if rep.get('skipped'):
             log(f"[cross-check:{method}] skipped ({rep['reason']})")
         else:
-            worst_metric = max(rep['max_diff'], key=rep['max_diff'].get) if rep['max_diff'] else None
-            worst_val = rep['max_diff'].get(worst_metric, 0.0) if worst_metric else 0.0
+            worst_metric, worst_val = _worst_numeric_diff(rep['max_diff'])
             log(f"[cross-check:{method}] max diff vs legacy combined source across "
-                f"{len(rep['max_diff'])} overlapping metrics: {worst_metric}={worst_val:.3e}")
+                f"{len(rep['max_diff'])} overlapping metrics: {worst_metric}={worst_val:.3e}; "
+                f"ssim_status={rep.get('ssim_status')}")
 
     baseline_data = build_baseline_per_sample(harvested_baseline_data, legacy_baseline_data)
 
@@ -1783,7 +1952,10 @@ def write_inventory_doc(inventory_rows, legacy_report, harvest_report, cross_che
     for bm in BASELINE_METHODS:
         cr = harvest_report['cross_report'][bm]
         canon = harvest_report['canonical'][bm] or '(none found)'
-        lines.append(f"- **{bm}**: {cr['n_sources']} source(s) with data, canonical source = `{canon}`")
+        ssim_canon = harvest_report['canonical_ssim'].get(bm) or '(none -- all-NaN)'
+        lines.append(f"- **{bm}**: {cr['n_sources']} source(s) with data, canonical source (required metrics) = "
+                     f"`{canon}`; ssim_availability=`{cr['ssim_availability']}`, canonical ssim source = "
+                     f"`{ssim_canon}`")
     lines.append('')
     lines.append('## Baseline (cnn/gan) legacy-source cross-validation')
     lines.append('')
@@ -1801,10 +1973,10 @@ def write_inventory_doc(inventory_rows, legacy_report, harvest_report, cross_che
         if rep.get('skipped'):
             lines.append(f"- **{method}**: skipped ({rep['reason']})")
         else:
-            worst_metric = max(rep['max_diff'], key=rep['max_diff'].get) if rep['max_diff'] else None
-            worst_val = rep['max_diff'].get(worst_metric, 0.0) if worst_metric else 0.0
+            worst_metric, worst_val = _worst_numeric_diff(rep['max_diff'])
             lines.append(f"- **{method}**: max diff across {len(rep['max_diff'])} overlapping metrics: "
-                         f"`{worst_metric}` = {worst_val:.3e} (tolerance {OLDER_SOURCE_CROSS_CHECK_TOLERANCE:g})")
+                         f"`{worst_metric}` = {worst_val:.3e} (tolerance {OLDER_SOURCE_CROSS_CHECK_TOLERANCE:g}); "
+                         f"ssim_status=`{rep.get('ssim_status')}`")
     lines.append('')
     lines.append('## Architecture legend')
     lines.append('')
@@ -1983,8 +2155,10 @@ def write_phase1_report(inventory_rows, topo_val_rows, legacy_report, missingnes
                  'hard-fail the whole run on disagreement):')
     for bm in BASELINE_METHODS:
         cr = harvest_report['cross_report'][bm]
-        lines.append(f"  - **{bm}**: {cr['n_sources']} source(s) with data; canonical source = "
-                     f"`{harvest_report['canonical'][bm] or '(none found)'}`.")
+        ssim_canon = harvest_report['canonical_ssim'].get(bm) or '(none -- all-NaN)'
+        lines.append(f"  - **{bm}**: {cr['n_sources']} source(s) with data; canonical source (required metrics) = "
+                     f"`{harvest_report['canonical'][bm] or '(none found)'}`; "
+                     f"ssim_availability=`{cr['ssim_availability']}`, canonical ssim source = `{ssim_canon}`.")
     lines.append('')
     lines.append('Canonical cnn/gan rows were additionally cross-checked against the older '
                  '`ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` pipeline for overlapping columns '
@@ -1993,10 +2167,9 @@ def write_phase1_report(inventory_rows, topo_val_rows, legacy_report, missingnes
         if rep.get('skipped'):
             lines.append(f"  - **{method}**: skipped ({rep['reason']}).")
         else:
-            worst_metric = max(rep['max_diff'], key=rep['max_diff'].get) if rep['max_diff'] else None
-            worst_val = rep['max_diff'].get(worst_metric, 0.0) if worst_metric else 0.0
+            worst_metric, worst_val = _worst_numeric_diff(rep['max_diff'])
             lines.append(f"  - **{method}**: worst overlapping-column disagreement `{worst_metric}` = "
-                         f"{worst_val:.3e}.")
+                         f"{worst_val:.3e}; ssim_status=`{rep.get('ssim_status')}`.")
     lines.append('')
     lines.append('The independent `ttk_runs_fixed/combined/phase_c_results.csv` PD/MT cross-check remains as before:')
     for method, rep in legacy_report.get('per_method', {}).items():
