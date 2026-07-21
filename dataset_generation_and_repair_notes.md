@@ -9937,3 +9937,873 @@ UV + grad + levelset + E2
 grad-only + L_crit
 grad+levelset + L_crit
 ```
+# Part XXVII — Candidate F descriptor-recombination study at the expanded-2688 scale
+
+## XXVII.1 Purpose
+
+Candidate F was designed after the Candidate B factorial ablation separated the two strongest descriptor-specific training signals observed so far:
+
+- `L_grad` was the dominant persistence-diagram (PD) driver.
+- Repaired low-lambda E2 fixed-index supervision was the strongest merge-tree (MT) driver.
+
+The central experiment asks whether these signals can be combined directly without the full Candidate B or Candidate C scaffold:
+
+```text
+PD-oriented signal: L_grad
+MT-oriented signal: repaired E2 = L_TTKCV + L_TTKpers
+```
+
+Three variants were defined:
+
+| Variant | Objective |
+|---|---|
+| `grad_e2_low` | `L_uv + 0.05 L_grad + 0.004 L_TTKCV + 0.002 L_TTKpers` |
+| `grad_levelset_e2_low` | `L_uv + 0.05 L_grad + 0.25 L_levelset + 0.004 L_TTKCV + 0.002 L_TTKpers` |
+| `grad_crit` | `L_uv + 0.05 L_grad + 0.001 L_crit` |
+
+For both E2 variants:
+
+```text
+lambda_speed = 0
+lambda_crit = 0
+```
+
+For `grad_crit`:
+
+```text
+lambda_levelset = 0
+lambda_TTKCV = 0
+lambda_TTKpers = 0
+no E2 constraints are loaded or built
+```
+
+The recommended run order is:
+
+1. `grad_e2_low`
+2. `grad_levelset_e2_low`
+3. `grad_crit`
+
+---
+
+## XXVII.2 Implementation and workflow-safety audit
+
+Candidate F is implemented through:
+
+- `scripts/run_candidateF_expanded2688_finetune.py`
+- `scripts/run_candidateF_expanded2688_batch.sh`
+
+The final audited implementation includes the following safeguards:
+
+1. `--overwrite` and `--resume` were removed entirely.
+2. Collision protection is unconditional and cannot be bypassed.
+3. Dry runs and `--print-config` are artifact-free.
+4. The canonical training log is opened only after collision checks, preflight validation, E2 constraint validation, and the dry-run return gate.
+5. Execution is anchored to the repository root with `os.chdir(REPO_ROOT)`.
+6. The E2 constraint NPZ is loaded with `allow_pickle=False`.
+7. The NPZ hard-fails unless all of the following hold:
+   - stored `n_samples == 2688`,
+   - `sample_idx`, `sample_start`, and `sample_count` have shape `(2688,)`,
+   - `sample_idx` is exactly `{0, ..., 2687}`, each once,
+   - every sample has exactly 64 pairs,
+   - all starts are nonnegative,
+   - all pair-array lengths agree,
+   - every `sample_start + sample_count` remains within bounds,
+   - birth/death vertex IDs are within `[0, 25599]`,
+   - target values and persistence are finite,
+   - persistence values are nonnegative.
+8. The training TFRecord index set must exactly equal the NPZ index set.
+9. Candidate output `idx.npy` must be exactly ordered `0..167`.
+10. Candidate `dataIN.npy` and `dataGT.npy` must exactly match the fixed CNN benchmark arrays.
+11. TTK is never launched automatically; it remains a manual stage after cheap evaluation.
+
+The audited patch was committed as:
+
+```text
+c08e2d29
+```
+
+---
+
+## XXVII.3 Shared data and training configuration
+
+All Candidate F variants use:
+
+```text
+Training TFRecord:
+example_data_topology_expanded_2688/wind_MR-HR.tfrecord
+
+Evaluation TFRecord:
+example_data_fixed/wind_MR-HR.tfrecord
+
+Repaired E2 constraints:
+ttk_runs_fixed/topology_finetuning/
+candidateE2_fixed_lowlambda_expanded2688_constraints/
+ttk_pd_critical_pairs_gtvalues.npz
+
+Source checkpoint:
+models/wind_mr-hr/trained_cnn/cnn
+
+Training samples: 2688
+Evaluation samples: 168
+Epochs: 3
+Batch size: 4
+Learning rate: 1e-5
+```
+
+The normalized vector-field reconstruction term remains active with unit weight:
+
+```text
+lambda_uv = 1.0
+```
+
+All scalar and topology-derived terms operate on denormalized physical wind speed.
+
+---
+
+## XXVII.4 `grad_e2_low` preflight and environment validation
+
+The `grad_e2_low` dry run passed all safety and data checks:
+
+- no output-path collisions,
+- 2,688 records in the training TFRecord,
+- NPZ `n_samples = 2688`,
+- exact sample IDs `0..2687`,
+- exactly 64 pairs per sample,
+- 172,032 entries in each pair array,
+- valid pair-array bounds,
+- birth vertex IDs in `[0, 25599]`,
+- death vertex IDs in `[1, 25597]`,
+- finite target values,
+- nonnegative persistence,
+- exact TFRecord/NPZ index-set equality,
+- no dry-run artifacts created.
+
+The Python environment produced NumPy 2.x ABI warnings for optional packages such as `numexpr`, `bottleneck`, and `scikit-image`. A dedicated smoke test nevertheless confirmed:
+
+```text
+Candidate F graph built successfully
+pretrained CNN checkpoint restored successfully
+LR shape = (100, 100, 2)
+generator variables = 72
+cheap evaluator imported successfully
+```
+
+The ABI warnings did not prevent TensorFlow graph construction, checkpoint restoration, training, inference, cheap evaluation, or TTK. SSIM remained unavailable because `scikit-image` could not be imported under the current NumPy environment.
+
+---
+
+## XXVII.5 Completed `grad_e2_low` training and numerical behavior
+
+The first Candidate F variant completed successfully:
+
+```text
+grad_e2_low: TRAIN-OK, EVAL-OK
+```
+
+Final model:
+
+```text
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn
+```
+
+Inference outputs:
+
+```text
+data_out/wind_finetune_candidateF_grad_E2_low_expanded2688/
+```
+
+Post-inference validation passed:
+
+- `idx.npy`: `(168,)`, exactly ordered `0..167`,
+- `dataIN.npy`: `(168, 100, 100, 2)`,
+- `dataGT.npy`: `(168, 500, 500, 2)`,
+- `dataSR.npy`: `(168, 500, 500, 2)`,
+- all arrays finite,
+- candidate GT exactly equals the fixed CNN benchmark GT,
+- candidate input exactly equals the fixed CNN benchmark input.
+
+### Representative weighted-loss balance
+
+At iteration 2006:
+
+```text
+L_uv                         = 0.010571
+0.05 × L_grad                = 0.009151
+0.004 × L_TTKCV              = 0.010334
+0.002 × L_TTKpers            = 0.006137
+total_loss_with_ttk          = 0.036192
+```
+
+At iteration 2016:
+
+```text
+L_uv                         = 0.021363
+0.05 × L_grad                = 0.018406
+0.004 × L_TTKCV              = 0.025872
+0.002 × L_TTKpers            = 0.018597
+total_loss_with_ttk          = 0.084238
+```
+
+The E2 terms were influential but remained on the same order as the vector and gradient terms. No NaN, infinity, loss explosion, or training instability was observed.
+
+---
+
+## XXVII.6 `grad_e2_low` cheap-evaluation results
+
+### Summary metrics
+
+| Metric | Bicubic | CNN | GAN | Candidate F: grad+E2 |
+|---|---:|---:|---:|---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | **32.4949** |
+| Speed MAE (m/s) | 0.5963 | 0.6941 | 0.9026 | **0.5899** |
+| Speed RMSE (m/s) | 1.0156 | 1.1078 | 1.3775 | **0.9891** |
+| WPD MAE | 193.5403 | 231.6709 | 310.7328 | **190.6897** |
+| WPD Wasserstein-1 | 55.5103 | 45.2713 | 85.6191 | **24.7322** |
+| WPD absolute bias | 41.2244 | 35.3439 | 78.7236 | **22.6377** |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | **0.3125** |
+| Gradient W1 | 0.3282 | 0.2329 | **0.0564** | 0.1381 |
+| Gradient kurtosis absolute delta | 6.6163 | 3.7004 | 4.2010 | **3.2601** |
+| PSD log-L2 | 1.3625 | 0.8335 | **0.5139** | 0.8147 |
+| PSD slope absolute delta | 1.6684 | **0.9150** | 0.9482 | 1.1385 |
+| Exceedance absolute delta, `s>5` | 0.0095 | 0.0042 | 0.0082 | **0.0025** |
+| Exceedance absolute delta, `s>10` | 0.0085 | 0.0066 | 0.0243 | **0.0052** |
+| Exceedance absolute delta, `s>15` | 0.0074 | 0.0062 | 0.0096 | **0.0027** |
+| Exceedance absolute delta, p90 | 0.0109 | 0.0103 | 0.0123 | **0.0047** |
+| Component-count curve L1 | 173.1855 | 115.5278 | 124.6567 | **81.1815** |
+
+SSIM was not computed because of the existing NumPy/scikit-image binary incompatibility.
+
+### Pairwise improvement against CNN
+
+Candidate F improved over CNN on:
+
+```text
+PSNRuv:                    168/168
+Speed MAE:                 168/168
+Speed RMSE:                168/168
+WPD MAE:                   168/168
+WPD W1:                    156/168
+Gradient MAE:              168/168
+Gradient W1:               167/168
+Exceedance s>5:            123/168
+Exceedance s>10:           117/168
+Exceedance s>15:           143/168
+Exceedance p90:            141/168
+Component-count curve L1:  166/168
+```
+
+### Important regressions and caveats
+
+The main cheap-metric regression was:
+
+```text
+PSD slope absolute delta:
+CNN = 0.9150
+Candidate F = 1.1385
+improved on only 3/168 samples
+```
+
+Although the mean gradient-kurtosis error improved, Candidate F improved that metric on only 68/168 samples and worsened on 100/168. These results should remain visible in any balanced interpretation.
+
+### Scalar-speed plausibility
+
+```text
+GT maximum speed = 33.9885 m/s
+SR maximum speed = 39.4850 m/s
+SR/GT maximum ratio = 1.1617
+Speed MAE = 0.5899 m/s
+```
+
+The SR maximum was approximately 16.2% above the GT maximum, below the script's 1.25 warning threshold and substantially less extreme than the earlier failed candidate with an SR maximum near 44.6 m/s.
+
+---
+
+## XXVII.7 Completed true TTK topology results
+
+The manual one-thread TTK pipeline completed successfully for all 168 samples.
+
+### Mean topology distances
+
+Lower is better.
+
+| Method | PD mean | MT mean |
+|---|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 |
+| GAN baseline | **20.8641** | 8.3481 |
+| Gradient-only factorial | 22.9326 | 6.0560 |
+| Gradient+levelset factorial | **22.6194** | 6.1996 |
+| UV+E2-low | 25.0721 | **5.5940** |
+| B+E2-low | 23.9876 | 5.6774 |
+| C+E2-low | 24.2686 | 5.6628 |
+| **Candidate F: grad+E2-low** | **23.8382** | **5.6566** |
+
+### Candidate F relative to major references
+
+Relative to CNN:
+
+```text
+PD improvement = 27.4063 - 23.8382 = 3.5681
+PD relative reduction ≈ 13.0%
+
+MT improvement = 5.8678 - 5.6566 = 0.2112
+MT relative reduction ≈ 3.6%
+```
+
+Relative to the gradient-only factorial:
+
+```text
+PD: Candidate F is 0.9056 worse
+MT: Candidate F is 0.3994 better
+```
+
+Relative to gradient+levelset:
+
+```text
+PD: Candidate F is 1.2188 worse
+MT: Candidate F is 0.5430 better
+```
+
+Relative to repaired native E2 combinations:
+
+```text
+vs UV+E2:
+  PD better by 1.2339
+  MT worse by 0.0626
+
+vs B+E2:
+  PD better by 0.1494
+  MT better by 0.0208
+
+vs C+E2:
+  PD better by 0.4304
+  MT better by 0.0062
+```
+
+Candidate F therefore improves both mean topology metrics relative to B+E2 and C+E2, while remaining slightly behind UV+E2 on mean MT.
+
+### Per-sample topology counts
+
+```text
+Candidate F PD < CNN: 166/168
+Candidate F MT < CNN: 98/168
+
+Candidate F PD < GAN: 8/168
+```
+
+The GAN remains better in mean PD, but Candidate F is much better in MT and in direct/physical fidelity.
+
+### Recovery of the historical MT-GAN cases
+
+Among the 20 samples on which GAN originally beat CNN in MT:
+
+```text
+Candidate F now wins: 19/20
+GAN still wins:        1/20
+CNN now wins:          0/20
+```
+
+This is important evidence that Candidate F recovers nearly all of the structural cases that previously favored GAN, without inheriting GAN's poor direct-fidelity and physical errors.
+
+---
+
+## XXVII.8 Scientific interpretation
+
+Candidate F `grad_e2_low` is the strongest balanced model produced so far.
+
+It is not the absolute winner on every descriptor:
+
+- GAN remains best in mean PD.
+- Gradient+levelset remains better than Candidate F in mean PD among the tested fine-tuned CNN variants.
+- UV+E2 remains slightly better in mean MT.
+
+However, Candidate F uniquely combines:
+
+1. a strong PD improvement relative to CNN,
+2. a genuine mean MT improvement relative to CNN,
+3. better mean PD and MT than B+E2 and C+E2,
+4. near-best E2-family MT behavior,
+5. substantially improved PSNR, speed, WPD, gradient, exceedance, and component-count metrics,
+6. recovery of 19/20 historical MT-GAN-win cases.
+
+The result supports the descriptor-recombination hypothesis:
+
+> Gradient-magnitude supervision provides the principal PD-oriented signal, while repaired low-lambda TTK fixed-index supervision provides the principal MT-oriented signal. Combining the two does not preserve the absolute best result of either isolated direction, but it produces a substantially better compromise: Candidate F improves mean PD and mean MT relative to the pretrained CNN while simultaneously improving nearly all direct-fidelity, physical, gradient, exceedance, and component-count measures.
+
+A more cautious paper-ready statement is:
+
+> Combining gradient-magnitude supervision with repaired low-weight TTK critical-pair constraints produced the strongest balanced result in our expanded-data study. The combined model reduced mean persistence-diagram distance from 27.4063 to 23.8382 and mean merge-tree distance from 5.8678 to 5.6566 relative to the pretrained CNN. It improved PD on 166 of 168 evaluation samples and MT on 98 of 168, while also improving PSNR, scalar-speed error, wind-power-distribution error, gradient error, exceedance behavior, and component-count curves. The combination did not outperform the GAN in mean PD or UV+E2 in mean MT, indicating a tradeoff rather than universal dominance, but it provided the strongest overall balance across topology, fidelity, and physical metrics.
+
+---
+
+## XXVII.9 Completed artifact index
+
+### Training and inference
+
+```text
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_E2_low_expanded2688/
+
+data_out/
+wind_finetune_candidateF_grad_E2_low_expanded2688/
+```
+
+### Cheap evaluation
+
+```text
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_eval/
+
+docs/
+topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md
+```
+
+### TTK topology
+
+```text
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology_vti/
+
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+
+docs/
+topology_finetuning_candidateF_grad_E2_low_expanded2688_topology_eval.md
+```
+
+### Main result files
+
+```text
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+candidateF_grad_E2_low_expanded2688_pd_mt_distances.csv
+
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+candidateF_grad_E2_low_expanded2688_topology_comparison.csv
+
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+phase_c_final/phase_c_results.csv
+```
+
+### Logs
+
+```text
+logs/candidateF_grad_E2_low_expanded2688_batch.log
+logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log
+logs/topology_candidateF_grad_E2_low_expanded2688.log
+```
+
+---
+
+## XXVII.10 Completed second variant: `grad_levelset_e2_low`
+
+The second Candidate F variant used:
+
+```text
+lambda_uv       = 1.0
+lambda_speed    = 0.0
+lambda_grad     = 0.05
+lambda_levelset = 0.25
+lambda_crit     = 0.0
+lambda_TTKCV    = 0.004
+lambda_TTKpers  = 0.002
+```
+
+The dry run passed all collision, TFRecord, and NPZ checks. Three-epoch training, paired inference, cheap evaluation, and the one-thread TTK pipeline then completed successfully.
+
+### XXVII.10.1 Cheap-evaluation summary
+
+| Metric | CNN | Candidate F2 | Change from CNN |
+|---|---:|---:|---:|
+| PSNRuv | 31.1925 | **32.5762** | +1.3837 |
+| Speed MAE | 0.6941 | **0.5788** | -0.1153 |
+| Speed RMSE | 1.1078 | **0.9776** | -0.1301 |
+| WPD MAE | 231.6709 | **186.8230** | -44.8479 |
+| WPD W1 | 45.2713 | **20.1529** | -25.1184 |
+| WPD bias | 35.3439 | **17.4210** | -17.9229 |
+| Gradient MAE | 0.3491 | **0.3122** | -0.0369 |
+| Gradient W1 | 0.2329 | **0.1459** | -0.0871 |
+| Gradient kurtosis abs. delta | 3.7004 | **3.1483** | -0.5521 |
+| PSD log-L2 | 0.8335 | **0.8292** | -0.0044 |
+| PSD slope abs. delta | **0.9150** | 1.1478 | +0.2327 |
+| Exceedance `s>5` | 0.0042 | **0.0021** | -0.0021 |
+| Exceedance `s>10` | 0.0066 | **0.0035** | -0.0031 |
+| Exceedance `s>15` | 0.0062 | **0.0023** | -0.0039 |
+| Exceedance p90 | 0.0103 | **0.0038** | -0.0064 |
+| Component-count curve L1 | 115.5278 | **83.0784** | -32.4494 |
+
+Per-sample wins relative to CNN included:
+
+```text
+PSNRuv:                    168/168
+Speed MAE:                 168/168
+Speed RMSE:                168/168
+WPD MAE:                   168/168
+WPD W1:                    158/168
+WPD bias:                  151/168
+Gradient MAE:              168/168
+Gradient W1:               167/168
+Exceedance s>5:            132/168
+Exceedance s>10:           126/168
+Exceedance s>15:           143/168
+Exceedance p90:            150/168
+Component-count curve L1:  159/168
+```
+
+The main regression remained PSD slope error, which improved on only 2/168 samples. Mean gradient-kurtosis error improved, but its win count remained 68/168.
+
+Scalar range:
+
+```text
+GT maximum speed = 33.9885 m/s
+SR maximum speed = 39.0536 m/s
+SR/GT maximum ratio ≈ 1.1490
+Speed MAE = 0.5788 m/s
+```
+
+### XXVII.10.2 True topology results
+
+| Method | PD mean | MT mean |
+|---|---:|---:|
+| CNN | 27.4063 | 5.8678 |
+| GAN | 20.8641 | 8.3481 |
+| **Candidate F2** | **23.7481** | **5.6742** |
+
+Relative to CNN:
+
+```text
+PD improvement = 3.6582
+PD relative reduction ≈ 13.35%
+
+MT improvement = 0.1936
+MT relative reduction ≈ 3.30%
+```
+
+Other recorded counts:
+
+```text
+Candidate F2 PD < GAN: 12/168
+
+Among the 20 historical MT-GAN-win cases:
+Candidate F2 now wins: 16/20
+GAN still wins:        4/20
+CNN now wins:          0/20
+```
+
+The exact Candidate F2 `PD < CNN` and `MT < CNN` counts were not copied into these research notes during the run; the mean values and the reported counts above remain authoritative.
+
+### XXVII.10.3 F2 versus F1
+
+```text
+F1 PD = 23.8382
+F2 PD = 23.7481
+F2 improves PD by 0.0901
+
+F1 MT = 5.6566
+F2 MT = 5.6742
+F2 worsens MT by 0.0176
+```
+
+Adding the soft level-set term therefore improved direct fidelity, scalar-speed error, WPD metrics, exceedance behavior, and PD slightly, while slightly weakening MT, gradient W1, and component-count curve L1.
+
+---
+
+## XXVII.11 Completed third variant: `grad_crit`
+
+The final Candidate F variant used:
+
+```text
+lambda_uv       = 1.0
+lambda_speed    = 0.0
+lambda_grad     = 0.05
+lambda_levelset = 0.0
+lambda_crit     = 0.001
+lambda_TTKCV    = 0.0
+lambda_TTKpers  = 0.0
+requires_e2     = False
+constraints_npz = NONE
+```
+
+This was a clean control testing whether the local-maxima critical proxy adds information beyond gradient supervision without any repaired E2 terms.
+
+The dry run, training, paired inference, cheap evaluation, and TTK pipeline all completed successfully.
+
+### XXVII.11.1 Weighted-loss behavior
+
+Representative late-training values showed:
+
+```text
+L_uv:               approximately 0.007–0.024
+0.05 × L_grad:      approximately 0.006–0.025
+0.001 × L_crit:     approximately 0.0006–0.0041
+```
+
+The critical loss was active but appropriately smaller than the base vector and weighted-gradient terms.
+
+### XXVII.11.2 Cheap-evaluation summary
+
+| Metric | CNN | Candidate F3 | Change |
+|---|---:|---:|---:|
+| PSNRuv | 31.1925 | **33.3042** | +2.1117 |
+| Speed MAE | 0.6941 | **0.5326** | -0.1615 |
+| Speed RMSE | 1.1078 | **0.9026** | -0.2052 |
+| WPD MAE | 231.6709 | **174.1976** | -57.4733 |
+| WPD W1 | 45.2713 | **32.0205** | -13.2508 |
+| WPD bias | 35.3439 | **28.3295** | -7.0144 |
+| Gradient MAE | 0.3491 | **0.3087** | -0.0404 |
+| Gradient W1 | 0.2329 | **0.1755** | -0.0574 |
+| Gradient kurtosis abs. delta | 3.7004 | **2.5256** | -1.1748 |
+| PSD log-L2 | **0.8335** | 0.9029 | +0.0693 |
+| PSD slope abs. delta | **0.9150** | 1.6221 | +0.7071 |
+| Exceedance `s>5` | **0.0042** | 0.0063 | +0.0020 |
+| Exceedance `s>10` | **0.0066** | 0.0086 | +0.0021 |
+| Exceedance `s>15` | 0.0062 | **0.0033** | -0.0030 |
+| Exceedance p90 | 0.0103 | **0.0046** | -0.0057 |
+| Component-count curve L1 | 115.5278 | **96.7510** | -18.7768 |
+
+Per-sample wins relative to CNN:
+
+```text
+PSNRuv:                    168/168
+Speed MAE:                 168/168
+Speed RMSE:                168/168
+WPD MAE:                   168/168
+WPD W1:                    150/168
+WPD bias:                  133/168
+Gradient MAE:              168/168
+Gradient W1:               154/168
+Gradient kurtosis:         103/168
+Exceedance s>5:             38/168
+Exceedance s>10:            77/168
+Exceedance s>15:           130/168
+Exceedance p90:            135/168
+Component-count curve L1:  150/168
+```
+
+Candidate F3 produced the best direct-fidelity, speed-error, WPD MAE, gradient MAE, and gradient-kurtosis means among the Candidate F variants. Its low-threshold exceedance, PSD, and component-count behavior were weaker than the E2-based variants.
+
+Scalar range:
+
+```text
+GT maximum speed = 33.9885 m/s
+SR maximum speed = 36.6417 m/s
+SR/GT maximum ratio ≈ 1.0781
+Speed MAE = 0.5326 m/s
+```
+
+### XXVII.11.3 True topology results
+
+| Method | PD mean | MT mean |
+|---|---:|---:|
+| CNN | 27.4063 | **5.8678** |
+| GAN | **20.8641** | 8.3481 |
+| **Candidate F3** | **22.0179** | 5.9840 |
+
+Relative to CNN:
+
+```text
+PD improvement = 5.3884
+PD relative reduction ≈ 19.66%
+
+MT regression = 0.1162
+MT relative increase ≈ 1.98%
+```
+
+Per-sample topology counts:
+
+```text
+Candidate F3 PD < CNN: 168/168
+Candidate F3 MT < CNN: 61/168
+Candidate F3 PD < GAN: 35/168
+```
+
+Among the 20 historical MT-GAN-win cases:
+
+```text
+Candidate F3 now wins: 12/20
+GAN still wins:        8/20
+CNN now wins:          0/20
+```
+
+### XXVII.11.4 F3 versus gradient-only
+
+| Variant | PD mean | MT mean |
+|---|---:|---:|
+| Gradient only | 22.9326 | 6.0560 |
+| **Gradient + critical proxy** | **22.0179** | **5.9840** |
+
+Adding `L_crit` improved PD by `0.9147` and MT by `0.0720` relative to gradient-only. The critical proxy was therefore not redundant, even though mean MT remained worse than CNN.
+
+---
+
+## XXVII.12 Final Candidate F comparison
+
+| Method | Objective summary | PD mean | MT mean | Main strength |
+|---|---|---:|---:|---|
+| CNN | pretrained baseline | 27.4063 | 5.8678 | reference |
+| GAN | adversarial baseline | **20.8641** | 8.3481 | strongest PD |
+| Gradient only | `L_uv + 0.05L_grad` | 22.9326 | 6.0560 | strong PD |
+| **F1: grad+E2** | gradient + repaired E2 | 23.8382 | **5.6566** | best Candidate F MT |
+| **F2: grad+levelset+E2** | F1 + soft level-set | 23.7481 | 5.6742 | preferred overall balance |
+| **F3: grad+crit** | gradient + local-maxima proxy | **22.0179** | 5.9840 | best Candidate F PD/fidelity |
+
+### Direct and physical metrics
+
+| Metric | F1 | F2 | F3 |
+|---|---:|---:|---:|
+| PSNRuv | 32.4949 | 32.5762 | **33.3042** |
+| Speed MAE | 0.5899 | 0.5788 | **0.5326** |
+| Speed RMSE | 0.9891 | 0.9776 | **0.9026** |
+| WPD MAE | 190.6897 | 186.8230 | **174.1976** |
+| WPD W1 | 24.7322 | **20.1529** | 32.0205 |
+| WPD bias | 22.6377 | **17.4210** | 28.3295 |
+| Gradient MAE | 0.3125 | 0.3122 | **0.3087** |
+| Gradient W1 | **0.1381** | 0.1459 | 0.1755 |
+| Component-count L1 | **81.1815** | 83.0784 | 96.7510 |
+
+### Descriptor-specific interpretation
+
+```text
+Gradient + critical proxy:
+  strongest Candidate F PD and direct fidelity
+  improves on gradient-only
+  mean MT remains worse than CNN
+  weak low-threshold exceedance and PSD behavior
+
+Gradient + repaired E2:
+  strongest Candidate F MT
+  recovers 19/20 historical MT-GAN-win cases
+  weaker PD than grad+crit
+
+Gradient + level-set + repaired E2:
+  slightly better PD than grad+E2
+  slightly worse MT than grad+E2
+  strongest WPD and exceedance behavior
+  preferred overall multi-metric balance
+```
+
+These terms capture complementary, not interchangeable, aspects of scalar-field structure.
+
+---
+
+## XXVII.13 Final scientific conclusion
+
+> The completed Candidate F study revealed a descriptor-specific separation between persistence-diagram and merge-tree behavior. Combining gradient-magnitude supervision with a local-maxima critical-value proxy produced the strongest fine-tuned-CNN persistence-diagram result, reducing mean PD from 27.4063 to 22.0179, but mean MT increased from 5.8678 to 5.9840. In contrast, combining gradient supervision with repaired low-weight TTK critical-pair constraints produced smaller PD improvements but genuine MT improvements, with the gradient-plus-E2 variant reaching mean MT 5.6566 and recovering 19 of the 20 historical MT cases that had favored the GAN over the CNN. Adding soft level-set supervision shifted this compromise slightly toward PD, scalar fidelity, WPD, and exceedance accuracy while retaining an improved mean MT of 5.6742. The results indicate that local extrema, threshold-region supervision, and TTK-selected persistence-pair values encode complementary aspects of scalar-field topology rather than interchangeable loss signals.
+
+Final task-dependent ranking:
+
+```text
+Best Candidate F PD and direct fidelity:
+  grad + crit
+  PD = 22.0179
+  MT = 5.9840
+
+Best Candidate F MT:
+  grad + E2
+  PD = 23.8382
+  MT = 5.6566
+
+Preferred overall multi-metric balance:
+  grad + levelset + E2
+  PD = 23.7481
+  MT = 5.6742
+```
+
+This should be presented as a tradeoff, not universal dominance.
+
+---
+
+## XXVII.14 Completed artifact index
+
+### Candidate F2
+
+```text
+Model:
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/cnn/cnn
+
+Inference:
+data_out/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/
+
+Cheap evaluation:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_levelset_E2_low_expanded2688_eval/
+
+Cheap report:
+docs/topology_finetuning_candidateF_grad_levelset_E2_low_expanded2688_eval.md
+
+TTK outputs:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_levelset_E2_low_expanded2688_topology/
+
+Topology report:
+docs/topology_finetuning_candidateF_grad_levelset_E2_low_expanded2688_topology_eval.md
+
+Logs:
+logs/candidateF_grad_levelset_E2_low_expanded2688_batch.log
+logs/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688.log
+logs/topology_candidateF_grad_levelset_E2_low_expanded2688.log
+```
+
+### Candidate F3
+
+```text
+Model:
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_crit_expanded2688/cnn/cnn
+
+Inference:
+data_out/wind_finetune_candidateF_grad_crit_expanded2688/
+
+Cheap evaluation:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_crit_expanded2688_eval/
+
+Cheap report:
+docs/topology_finetuning_candidateF_grad_crit_expanded2688_eval.md
+
+TTK outputs:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_crit_expanded2688_topology/
+
+Topology report:
+docs/topology_finetuning_candidateF_grad_crit_expanded2688_topology_eval.md
+
+Logs:
+logs/candidateF_grad_crit_expanded2688_batch.log
+logs/wind_finetune_candidateF_grad_crit_expanded2688.log
+logs/topology_candidateF_grad_crit_expanded2688.log
+```
+
+---
+
+## XXVII.15 Final Candidate F status
+
+```text
+grad_e2_low:
+  training complete
+  cheap evaluation complete
+  TTK complete
+  PD = 23.8382
+  MT = 5.6566
+
+grad_levelset_e2_low:
+  training complete
+  cheap evaluation complete
+  TTK complete
+  PD = 23.7481
+  MT = 5.6742
+
+grad_crit:
+  training complete
+  cheap evaluation complete
+  TTK complete
+  PD = 22.0179
+  MT = 5.9840
+```
+
+The Candidate F experiment series is complete.
+
+---
