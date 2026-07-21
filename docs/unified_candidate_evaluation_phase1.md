@@ -67,9 +67,43 @@ The independent `ttk_runs_fixed/combined/phase_c_results.csv` PD/MT cross-check 
 
 ## 8. Missingness, especially SSIM
 
-- SSIM (`ssim_speed`): finite for ['cnn', 'gan']. Entirely missing (no source at all, not the known NumPy/scikit-image ABI issue) for the other 17 primary methods in this checkout.
+Every (method, metric) cell in `unified_primary_missingness.csv` is classified into exactly one of three `missing_reason` categories: `no_source_artifact` (no file provides this metric for this method at all), `unavailable_global_dependency` (SSIM specifically, 0/168 finite -- consistent with the documented NumPy/scikit-image ABI incompatibility, not a data-quality bug), or `partial_source_coverage` (1..167/168 finite -- inconsistent coverage, always treated as a strict-mode failure since it indicates a real problem rather than a known benign gap).
+
+- SSIM (`ssim_speed`) is in `OPTIONAL_CHEAP_METRIC_COLUMNS`: strict mode accepts either full (168/168) or fully-unavailable (0/168) coverage, and hard-fails only on partial coverage.
+  - Fully available (168/168): ['cnn', 'gan']
+  - Globally unavailable, accepted (0/168, `unavailable_global_dependency`): none
+  - No source at all for this method (`no_source_artifact`): ['bicubic', 'uv', 'speed_only', 'levelset_only', 'speed_levelset', 'grad_only', 'speed_grad', 'grad_levelset', 'candidate_b', 'candidate_c', 'uv_crit', 'uv_e2', 'b_e2', 'c_e2', 'f1_grad_e2', 'f2_grad_levelset_e2', 'f3_grad_crit']
+  - Partial coverage, would strict-fail (`partial_source_coverage`): none
+- SSIM is never filled, copied from a legacy row into a candidate row, or recomputed -- missing SSIM stays an empty cell in the unified table exactly as found in its source.
+- Pairwise-vs-CNN summaries report `n_valid=0` for SSIM (and every other metric) when the candidate/CNN intersection of finite samples is empty, rather than fabricating a comparison.
 - See `unified_primary_missingness.csv` for the full total/finite/missing breakdown per (method_id, metric).
 - No missing value was filled with zero or inferred; all gaps are empty cells in the CSVs.
+
+## 8b. Raw benchmark/array validation
+
+For every primary method, `idx.npy`/`dataIN.npy`/`dataGT.npy`/`dataSR.npy` under its `data_out_dir` (or `data_out_fixed/wind_mrhr_<method>/` for the three baselines) are validated against the canonical CNN benchmark arrays at `data_out_fixed/wind_mrhr_cnn/{idx,dataIN,dataGT}.npy` -- loaded via `np.load(mmap_mode="r", allow_pickle=False)` and compared in 16-sample chunks so a full (168, 500, 500, 2) array is never fully materialized in memory. Checks: `idx.npy` shape `(168,)` and exactly `np.arange(168)`; `dataIN.npy` shape `(168, 100, 100, 2)` and exactly equal to the canonical `dataIN.npy`; `dataGT.npy` shape `(168, 500, 500, 2)` and exactly equal to the canonical `dataGT.npy`; `dataSR.npy` shape `(168, 500, 500, 2)` and entirely finite. `idx.npy` is not required for bicubic (its generator script does not produce one); every other file is required for every primary method. No `.npy` file is ever written or modified by this script.
+
+| method_id | idx_validation_status | input_alignment_status | gt_alignment_status | sr_shape_status | sr_finiteness_status |
+|---|---|---|---|---|---|
+| bicubic | not_applicable_no_idx_file | missing | missing | missing | missing |
+| cnn | missing | missing | missing | missing | missing |
+| gan | missing | missing | missing | missing | missing |
+| uv | missing | missing | missing | missing | missing |
+| speed_only | missing | missing | missing | missing | missing |
+| levelset_only | missing | missing | missing | missing | missing |
+| speed_levelset | missing | missing | missing | missing | missing |
+| grad_only | missing | missing | missing | missing | missing |
+| speed_grad | missing | missing | missing | missing | missing |
+| grad_levelset | missing | missing | missing | missing | missing |
+| candidate_b | missing | missing | missing | missing | missing |
+| candidate_c | missing | missing | missing | missing | missing |
+| uv_crit | missing | missing | missing | missing | missing |
+| uv_e2 | missing | missing | missing | missing | missing |
+| b_e2 | missing | missing | missing | missing | missing |
+| c_e2 | missing | missing | missing | missing | missing |
+| f1_grad_e2 | missing | missing | missing | missing | missing |
+| f2_grad_levelset_e2 | missing | missing | missing | missing | missing |
+| f3_grad_crit | missing | missing | missing | missing | missing |
 
 ## 9. Candidates that could not be included and why
 

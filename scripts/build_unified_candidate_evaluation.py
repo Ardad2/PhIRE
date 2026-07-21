@@ -61,6 +61,8 @@ import re
 import sys
 from pathlib import Path
 
+import numpy as np
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
 os.chdir(REPO_ROOT)
@@ -85,6 +87,17 @@ BASELINE_CROSS_SOURCE_TOLERANCE = 1e-6
 OLDER_SOURCE_CROSS_CHECK_TOLERANCE = 1e-3
 
 BASELINE_METHODS = ('bicubic', 'cnn', 'gan')
+
+# -----------------------------------------------------------------------
+# Raw benchmark/array validation (requirement 2 of the second patch).
+# -----------------------------------------------------------------------
+CANONICAL_CNN_DIR = 'data_out_fixed/wind_mrhr_cnn'
+EXPECTED_IDX_SHAPE = (N_EVAL,)
+EXPECTED_IN_SHAPE = (N_EVAL, 100, 100, 2)
+EXPECTED_HR_SHAPE = (N_EVAL, 500, 500, 2)
+# Compare/scan large (N_EVAL, 500, 500, 2) arrays in sample-axis chunks so a
+# full candidate GT/SR array is never materialized in memory at once.
+ARRAY_COMPARE_CHUNK_SAMPLES = 16
 
 _LOG_LINES: list[str] = []
 
@@ -145,6 +158,13 @@ METRIC_COLUMNS = [m[0] for m in METRIC_SCHEMA]
 METRIC_DIRECTION = {m[0]: m[1] for m in METRIC_SCHEMA}
 TOPOLOGY_METRIC_COLUMNS = ['pd_distance', 'mt_distance']
 CHEAP_METRIC_COLUMNS = [c for c in METRIC_COLUMNS if c not in TOPOLOGY_METRIC_COLUMNS]
+# ssim_speed is documented to be legitimately, globally NaN across an entire
+# evaluation run because of the known NumPy/scikit-image ABI incompatibility
+# -- that is not a data-quality bug and must not block strict validation.
+# Every other cheap metric has no such known-benign global failure mode and
+# stays required.
+OPTIONAL_CHEAP_METRIC_COLUMNS = {'ssim_speed'}
+REQUIRED_CHEAP_METRIC_COLUMNS = [c for c in CHEAP_METRIC_COLUMNS if c not in OPTIONAL_CHEAP_METRIC_COLUMNS]
 
 IDENTITY_COLUMNS = [
     'sample_idx', 'method_id', 'display_name', 'candidate_family',
@@ -917,21 +937,206 @@ def resolve_candidate_artifacts(entry: dict) -> dict:
 
 
 # =============================================================================
+# SSIM optional-but-audited classification (patch requirement 1).
+# =============================================================================
+
+def classify_ssim_status(per_sample: dict):
+    """Returns (status, n_finite) where status is one of:
+      'full'                        -- 168/168 finite (fully available)
+      'unavailable_global_dependency' -- 0/168 finite (documented ABI issue or
+                                          simply never computed for this method)
+      'partial_source_coverage'     -- 1..167/168 finite (inconsistent
+                                        evaluation coverage -- always a strict
+                                        failure, never accepted)
+      'no_data'                     -- per_sample itself is empty
+    """
+    if not per_sample:
+        return 'no_data', 0
+    n_finite = sum(1 for si in range(N_EVAL)
+                   if math.isfinite(per_sample.get(si, {}).get('ssim_speed', float('nan'))))
+    if n_finite == N_EVAL:
+        return 'full', n_finite
+    if n_finite == 0:
+        return 'unavailable_global_dependency', n_finite
+    return 'partial_source_coverage', n_finite
+
+
+def classify_missing_reason(col: str, per_sample: dict, finite: int, total: int) -> str:
+    """Three-way missingness classification shared by the missingness table
+    and the Phase-1 report (patch requirement 1)."""
+    if not per_sample:
+        return 'no_source_artifact'
+    if finite == total:
+        return ''
+    if col == 'ssim_speed':
+        return 'unavailable_global_dependency' if finite == 0 else 'partial_source_coverage'
+    if finite == 0:
+        return 'no_source_artifact'
+    return 'partial_source_coverage'
+
+
+# =============================================================================
+# Raw benchmark/array validation (patch requirement 2).
+# =============================================================================
+
+def _load_npy_mmap(path: Path):
+    return np.load(str(path), mmap_mode='r', allow_pickle=False)
+
+
+def _arrays_exact_equal_chunked(a, b, chunk: int = ARRAY_COMPARE_CHUNK_SAMPLES):
+    """Compare two (N, ...) array-likes (e.g. memory-mapped) sample-chunk by
+    sample-chunk so neither is ever fully materialized in memory at once.
+    Returns (exact: bool, max_abs_diff: float)."""
+    if a.shape != b.shape:
+        return False, float('inf')
+    n = a.shape[0]
+    exact = True
+    max_diff = 0.0
+    for start in range(0, n, chunk):
+        end = min(start + chunk, n)
+        ca = np.asarray(a[start:end])
+        cb = np.asarray(b[start:end])
+        if not np.array_equal(ca, cb):
+            exact = False
+            max_diff = max(max_diff, float(np.max(np.abs(ca.astype(np.float64) - cb.astype(np.float64)))))
+    return exact, max_diff
+
+
+def _array_all_finite_chunked(a, chunk: int = ARRAY_COMPARE_CHUNK_SAMPLES) -> bool:
+    n = a.shape[0]
+    for start in range(0, n, chunk):
+        end = min(start + chunk, n)
+        c = np.asarray(a[start:end])
+        if not np.isfinite(c).all():
+            return False
+    return True
+
+
+def validate_raw_arrays(data_out_dir: Path, canonical_in, canonical_gt, require_idx: bool = True):
+    """Validate idx/dataIN/dataGT/dataSR .npy files under data_out_dir against
+    the expected shapes and the canonical CNN benchmark arrays (when supplied).
+    Never writes or modifies any file. Returns (status_dict, reasons_list).
+
+    status_dict keys: idx_validation_status, input_alignment_status,
+    gt_alignment_status, sr_shape_status, sr_finiteness_status.
+    """
+    status = {}
+    reasons = []
+
+    idx_path = data_out_dir / 'idx.npy'
+    in_path = data_out_dir / 'dataIN.npy'
+    gt_path = data_out_dir / 'dataGT.npy'
+    sr_path = data_out_dir / 'dataSR.npy'
+
+    # idx.npy
+    if not idx_path.exists():
+        status['idx_validation_status'] = 'missing' if require_idx else 'not_applicable_no_idx_file'
+        if require_idx:
+            reasons.append(f'idx.npy missing at {idx_path}')
+    else:
+        idx = np.load(str(idx_path), allow_pickle=False)
+        if idx.shape != EXPECTED_IDX_SHAPE:
+            status['idx_validation_status'] = f'bad_shape {idx.shape}'
+            reasons.append(f'idx.npy shape {idx.shape} != {EXPECTED_IDX_SHAPE} at {idx_path}')
+        elif not np.array_equal(np.asarray(idx).astype(np.int64), np.arange(N_EVAL, dtype=np.int64)):
+            status['idx_validation_status'] = 'not_exact_0_167'
+            reasons.append(f'idx.npy is not exactly ordered 0..{N_EVAL - 1} at {idx_path}')
+        else:
+            status['idx_validation_status'] = 'exact_0_167'
+
+    # dataIN.npy
+    if not in_path.exists():
+        status['input_alignment_status'] = 'missing'
+        reasons.append(f'dataIN.npy missing at {in_path}')
+    else:
+        din = _load_npy_mmap(in_path)
+        if din.shape != EXPECTED_IN_SHAPE:
+            status['input_alignment_status'] = f'bad_shape {din.shape}'
+            reasons.append(f'dataIN.npy shape {din.shape} != {EXPECTED_IN_SHAPE} at {in_path}')
+        elif canonical_in is None:
+            status['input_alignment_status'] = 'no_canonical_reference_to_compare'
+            reasons.append(f'cannot validate dataIN.npy alignment at {in_path}: canonical CNN benchmark '
+                            f'dataIN.npy not available')
+        else:
+            exact, max_diff = _arrays_exact_equal_chunked(din, canonical_in)
+            status['input_alignment_status'] = 'exact' if exact else f'MISMATCH max_abs_diff={max_diff:.4e}'
+            if not exact:
+                reasons.append(f'dataIN.npy not exactly aligned with canonical CNN dataIN at {in_path} '
+                                f'(max_abs_diff={max_diff:.4e})')
+
+    # dataGT.npy
+    if not gt_path.exists():
+        status['gt_alignment_status'] = 'missing'
+        reasons.append(f'dataGT.npy missing at {gt_path}')
+    else:
+        dgt = _load_npy_mmap(gt_path)
+        if dgt.shape != EXPECTED_HR_SHAPE:
+            status['gt_alignment_status'] = f'bad_shape {dgt.shape}'
+            reasons.append(f'dataGT.npy shape {dgt.shape} != {EXPECTED_HR_SHAPE} at {gt_path}')
+        elif canonical_gt is None:
+            status['gt_alignment_status'] = 'no_canonical_reference_to_compare'
+            reasons.append(f'cannot validate dataGT.npy alignment at {gt_path}: canonical CNN benchmark '
+                            f'dataGT.npy not available')
+        else:
+            exact, max_diff = _arrays_exact_equal_chunked(dgt, canonical_gt)
+            status['gt_alignment_status'] = 'exact' if exact else f'MISMATCH max_abs_diff={max_diff:.4e}'
+            if not exact:
+                reasons.append(f'dataGT.npy not exactly aligned with canonical CNN dataGT at {gt_path} '
+                                f'(max_abs_diff={max_diff:.4e})')
+
+    # dataSR.npy
+    if not sr_path.exists():
+        status['sr_shape_status'] = 'missing'
+        status['sr_finiteness_status'] = 'missing'
+        reasons.append(f'dataSR.npy missing at {sr_path}')
+    else:
+        dsr = _load_npy_mmap(sr_path)
+        if dsr.shape != EXPECTED_HR_SHAPE:
+            status['sr_shape_status'] = f'bad_shape {dsr.shape}'
+            status['sr_finiteness_status'] = 'not_checked_bad_shape'
+            reasons.append(f'dataSR.npy shape {dsr.shape} != {EXPECTED_HR_SHAPE} at {sr_path}')
+        else:
+            status['sr_shape_status'] = 'exact'
+            finite_ok = _array_all_finite_chunked(dsr)
+            status['sr_finiteness_status'] = 'all_finite' if finite_ok else 'NONFINITE_VALUES_PRESENT'
+            if not finite_ok:
+                reasons.append(f'dataSR.npy contains non-finite values at {sr_path}')
+
+    return status, reasons
+
+
+ARRAY_STATUS_FIELDS = ['idx_validation_status', 'input_alignment_status', 'gt_alignment_status',
+                        'sr_shape_status', 'sr_finiteness_status']
+ARRAY_STATUS_NOT_APPLICABLE = {f: 'not_checked_secondary_tier' for f in ARRAY_STATUS_FIELDS}
+
+
+# =============================================================================
 # Requirement 3: strict-mode per-method completeness check.
 # =============================================================================
 
-def check_strict_primary(mid, per_sample, is_bicubic, expected_pd, expected_mt):
-    reasons = []
+def check_strict_primary(mid, per_sample, is_bicubic, expected_pd, expected_mt, array_reasons=()):
+    # Raw-array validation reasons apply unconditionally -- a method with
+    # missing/misaligned/non-finite raw arrays cannot strict-pass even if its
+    # CSV-derived cheap/topology metrics look complete.
+    reasons = list(array_reasons)
+
     idx_set = set(per_sample.keys())
     if idx_set != set(range(N_EVAL)):
         reasons.append(f'cheap/topology rows not exactly {N_EVAL} with sample_idx 0..{N_EVAL - 1} '
                         f'(found {len(idx_set)} rows)')
-        return False, reasons
+        return (len(reasons) == 0), reasons
 
-    cheap_bad = [c for c in CHEAP_METRIC_COLUMNS
+    cheap_bad = [c for c in REQUIRED_CHEAP_METRIC_COLUMNS
                  if not all(math.isfinite(per_sample[si].get(c, float('nan'))) for si in range(N_EVAL))]
     if cheap_bad:
-        reasons.append(f'cheap metric column(s) not finite for all {N_EVAL} samples: {cheap_bad}')
+        reasons.append(f'required cheap metric column(s) not finite for all {N_EVAL} samples: {cheap_bad}')
+
+    ssim_status, ssim_finite = classify_ssim_status(per_sample)
+    if ssim_status == 'partial_source_coverage':
+        reasons.append(f'ssim_speed has partial coverage ({ssim_finite}/{N_EVAL} finite) -- must be either '
+                        f'0/{N_EVAL} (globally unavailable, e.g. the documented ABI issue) or {N_EVAL}/{N_EVAL} '
+                        f'(fully available); partial coverage indicates inconsistent evaluation coverage')
+    # 'full' and 'unavailable_global_dependency' are both acceptable in strict mode.
 
     if is_bicubic:
         return (len(reasons) == 0), reasons
@@ -943,7 +1148,7 @@ def check_strict_primary(mid, per_sample, is_bicubic, expected_pd, expected_mt):
     if not all(math.isfinite(v) and v >= 0 for v in mt_vals):
         reasons.append('mt_distance not finite/nonnegative for all 168 samples')
 
-    if not reasons:
+    if all(math.isfinite(v) and v >= 0 for v in pd_vals) and all(math.isfinite(v) and v >= 0 for v in mt_vals):
         obs_pd = sum(pd_vals) / len(pd_vals)
         obs_mt = sum(mt_vals) / len(mt_vals)
         if expected_pd is not None and abs(obs_pd - expected_pd) > PD_MT_TOLERANCE:
@@ -1060,6 +1265,44 @@ def main() -> int:
             resolved[mid] = resolve_candidate_artifacts(entry)
 
     # -------------------------------------------------------------------
+    # Requirement 2 (raw array validation): load the canonical CNN benchmark
+    # arrays once (mmap'd, never fully materialized), then validate every
+    # primary method's idx/dataIN/dataGT/dataSR .npy files against it.
+    # -------------------------------------------------------------------
+    canonical_dir = rp(CANONICAL_CNN_DIR)
+    canonical_in = canonical_gt = None
+    if (canonical_dir / 'dataIN.npy').exists() and (canonical_dir / 'dataGT.npy').exists():
+        try:
+            canonical_in = _load_npy_mmap(canonical_dir / 'dataIN.npy')
+            canonical_gt = _load_npy_mmap(canonical_dir / 'dataGT.npy')
+            log(f'[arrays] Loaded canonical CNN benchmark arrays (mmap) from {canonical_dir}: '
+                f'dataIN.shape={canonical_in.shape}, dataGT.shape={canonical_gt.shape}')
+        except Exception as e:
+            log(f'[arrays] Failed to load canonical CNN benchmark arrays from {canonical_dir}: {e}')
+    else:
+        log(f'[arrays] Canonical CNN benchmark arrays not found at {canonical_dir} -- alignment cannot be '
+            f'validated for any method until they are present.')
+
+    array_validation = {}
+    for entry in PRIMARY_MANIFEST:
+        mid = entry['method_id']
+        data_out_dir = rp(entry['data_out_dir']) if entry.get('data_out_dir') not in (None, '', 'n/a') else None
+        require_idx = (mid != 'bicubic')
+        if data_out_dir is None:
+            status = dict(ARRAY_STATUS_NOT_APPLICABLE)
+            status['idx_validation_status'] = status['input_alignment_status'] = 'missing'
+            status['gt_alignment_status'] = status['sr_shape_status'] = status['sr_finiteness_status'] = 'missing'
+            reasons = [f'no data_out_dir configured for {mid!r}']
+        else:
+            status, reasons = validate_raw_arrays(data_out_dir, canonical_in, canonical_gt, require_idx=require_idx)
+        array_validation[mid] = (status, reasons)
+        worst = '; '.join(reasons) if reasons else 'OK'
+        log(f'[arrays:{mid}] idx={status.get("idx_validation_status")} '
+            f'in={status.get("input_alignment_status")} gt={status.get("gt_alignment_status")} '
+            f'sr_shape={status.get("sr_shape_status")} sr_finite={status.get("sr_finiteness_status")} '
+            f'-- {worst}')
+
+    # -------------------------------------------------------------------
     # method_inventory.csv (always written -- diagnostic, not a completeness claim)
     # -------------------------------------------------------------------
     inventory_cols = [
@@ -1071,7 +1314,10 @@ def main() -> int:
         'cheap_eval_csv', 'cheap_eval_resolution', 'cheap_pairwise_csv',
         'topology_results_csv', 'topology_results_resolution', 'topology_comparison_csv',
         'cheap_report', 'topology_report', 'row_count_cheap', 'row_count_topology',
-        'sample_index_status', 'gt_alignment_status', 'topology_mean_pd', 'topology_mean_mt',
+        'sample_index_status', 'ssim_status',
+        'idx_validation_status', 'input_alignment_status', 'gt_alignment_status',
+        'sr_shape_status', 'sr_finiteness_status',
+        'topology_mean_pd', 'topology_mean_mt',
         'expected_pd', 'expected_mt', 'validation_status', 'notes',
     ]
     inventory_rows = []
@@ -1116,13 +1362,18 @@ def main() -> int:
             validation_status = 'PASS' if (pd_ok and mt_ok) else 'FAIL'
             notes_extra = f'pd_abs_diff={abs(topo_mean_pd - exp_pd):.6f} mt_abs_diff={abs(topo_mean_mt - exp_mt):.6f}'
 
-        gt_alignment_status = 'not_checked (no dataGT.npy/dataIN.npy present in this checkout)'
-        if mid in BASELINE_METHODS:
-            gt_alignment_status = 'n/a (per-sample metrics sourced from CSV, no raw arrays present)'
+        if mid in array_validation:
+            arr_status, arr_reasons = array_validation[mid]
+        else:
+            arr_status, arr_reasons = dict(ARRAY_STATUS_NOT_APPLICABLE), []
+
+        ssim_status_val, ssim_finite_val = classify_ssim_status(per_sample)
 
         notes = entry.get('exclusion_reason', '') or ''
         if notes_extra:
             notes = (notes + ' ' if notes else '') + notes_extra
+        if arr_reasons:
+            notes = (notes + ' ' if notes else '') + 'Array validation: ' + '; '.join(arr_reasons)
 
         row = dict(
             method_id=mid, display_name=entry['display_name'],
@@ -1143,7 +1394,13 @@ def main() -> int:
             topology_comparison_csv=r.get('topology_comparison_csv', ''),
             cheap_report=entry.get('cheap_report', ''), topology_report=entry.get('topology_report', ''),
             row_count_cheap=r.get('row_count_cheap', 0), row_count_topology=r.get('row_count_topology', 0),
-            sample_index_status=sample_index_status, gt_alignment_status=gt_alignment_status,
+            sample_index_status=sample_index_status,
+            ssim_status=f'{ssim_status_val} ({ssim_finite_val}/{N_EVAL})',
+            idx_validation_status=arr_status.get('idx_validation_status', 'not_checked_secondary_tier'),
+            input_alignment_status=arr_status.get('input_alignment_status', 'not_checked_secondary_tier'),
+            gt_alignment_status=arr_status.get('gt_alignment_status', 'not_checked_secondary_tier'),
+            sr_shape_status=arr_status.get('sr_shape_status', 'not_checked_secondary_tier'),
+            sr_finiteness_status=arr_status.get('sr_finiteness_status', 'not_checked_secondary_tier'),
             topology_mean_pd=topo_mean_pd, topology_mean_mt=topo_mean_mt,
             expected_pd=exp_pd, expected_mt=exp_mt, validation_status=validation_status, notes=notes,
         )
@@ -1177,8 +1434,10 @@ def main() -> int:
         mid = entry['method_id']
         per_sample = resolved[mid].get('per_sample', {})
         exp_pd, exp_mt = EXPECTED_PD_MT.get(mid, (None, None))
+        _, arr_reasons = array_validation.get(mid, ({}, []))
         passed, reasons = check_strict_primary(mid, per_sample, is_bicubic=(mid == 'bicubic'),
-                                                expected_pd=exp_pd, expected_mt=exp_mt)
+                                                expected_pd=exp_pd, expected_mt=exp_mt,
+                                                array_reasons=arr_reasons)
         primary_strict_results[mid] = (passed, reasons)
         log(f"[strict-check:{mid}] {'PASS' if passed else 'FAIL: ' + '; '.join(reasons)}")
 
@@ -1382,14 +1641,7 @@ def main() -> int:
             finite = sum(1 for si in per_sample if col in per_sample[si] and math.isfinite(per_sample[si][col]))
             total = N_EVAL
             missing = total - finite
-            if not per_sample:
-                reason = 'no_source_artifact_found_in_repository'
-            elif finite == total:
-                reason = ''
-            elif col in BASELINE_COMBINED_NOT_AVAILABLE and mid in BASELINE_METHODS:
-                reason = 'not_computed_by_legacy_physics_merged_pipeline_and_no_harvested_row_available'
-            else:
-                reason = 'partial_source_coverage'
+            reason = classify_missing_reason(col, per_sample, finite, total)
             missingness_rows.append(dict(method_id=mid, metric=col, total_rows=total,
                                           finite_rows=finite, missing_rows=missing, missing_reason=reason))
     missingness_path = OUT_DIR / 'unified_primary_missingness.csv'
@@ -1764,14 +2016,55 @@ def write_phase1_report(inventory_rows, topo_val_rows, legacy_report, missingnes
     lines.append('')
     lines.append('## 8. Missingness, especially SSIM')
     lines.append('')
+    lines.append('Every (method, metric) cell in `unified_primary_missingness.csv` is classified into exactly '
+                 'one of three `missing_reason` categories: `no_source_artifact` (no file provides this metric '
+                 'for this method at all), `unavailable_global_dependency` (SSIM specifically, 0/168 finite -- '
+                 'consistent with the documented NumPy/scikit-image ABI incompatibility, not a data-quality bug), '
+                 'or `partial_source_coverage` (1..167/168 finite -- inconsistent coverage, always treated as a '
+                 'strict-mode failure since it indicates a real problem rather than a known benign gap).')
+    lines.append('')
     ssim_rows = [r for r in missingness_rows if r['metric'] == 'ssim_speed']
-    ssim_ok_methods = [r['method_id'] for r in ssim_rows if r['finite_rows'] == r['total_rows']]
-    lines.append(f'- SSIM (`ssim_speed`): finite for {ssim_ok_methods}. Entirely missing (no source at all, not '
-                 f'the known NumPy/scikit-image ABI issue) for the other {len(ssim_rows) - len(ssim_ok_methods)} '
-                 'primary methods in this checkout.')
+    ssim_full = [r['method_id'] for r in ssim_rows if r['missing_reason'] == '']
+    ssim_unavailable = [r['method_id'] for r in ssim_rows if r['missing_reason'] == 'unavailable_global_dependency']
+    ssim_no_source = [r['method_id'] for r in ssim_rows if r['missing_reason'] == 'no_source_artifact']
+    ssim_partial = [r['method_id'] for r in ssim_rows if r['missing_reason'] == 'partial_source_coverage']
+    lines.append(f'- SSIM (`ssim_speed`) is in `OPTIONAL_CHEAP_METRIC_COLUMNS`: strict mode accepts either full '
+                 '(168/168) or fully-unavailable (0/168) coverage, and hard-fails only on partial coverage.')
+    lines.append(f'  - Fully available (168/168): {ssim_full or "none"}')
+    lines.append(f'  - Globally unavailable, accepted (0/168, `unavailable_global_dependency`): {ssim_unavailable or "none"}')
+    lines.append(f'  - No source at all for this method (`no_source_artifact`): {ssim_no_source or "none"}')
+    lines.append(f'  - Partial coverage, would strict-fail (`partial_source_coverage`): {ssim_partial or "none"}')
+    lines.append('- SSIM is never filled, copied from a legacy row into a candidate row, or recomputed -- missing '
+                 'SSIM stays an empty cell in the unified table exactly as found in its source.')
+    lines.append('- Pairwise-vs-CNN summaries report `n_valid=0` for SSIM (and every other metric) when the '
+                 'candidate/CNN intersection of finite samples is empty, rather than fabricating a comparison.')
     lines.append('- See `unified_primary_missingness.csv` for the full total/finite/missing breakdown per '
                  '(method_id, metric).')
     lines.append('- No missing value was filled with zero or inferred; all gaps are empty cells in the CSVs.')
+    lines.append('')
+    lines.append('## 8b. Raw benchmark/array validation')
+    lines.append('')
+    lines.append('For every primary method, `idx.npy`/`dataIN.npy`/`dataGT.npy`/`dataSR.npy` under its '
+                 '`data_out_dir` (or `data_out_fixed/wind_mrhr_<method>/` for the three baselines) are validated '
+                 'against the canonical CNN benchmark arrays at '
+                 f'`{CANONICAL_CNN_DIR}/{{idx,dataIN,dataGT}}.npy` -- loaded via `np.load(mmap_mode="r", '
+                 'allow_pickle=False)` and compared in '
+                 f'{ARRAY_COMPARE_CHUNK_SAMPLES}-sample chunks so a full (168, 500, 500, 2) array is never fully '
+                 'materialized in memory. Checks: `idx.npy` shape `(168,)` and exactly `np.arange(168)`; '
+                 '`dataIN.npy` shape `(168, 100, 100, 2)` and exactly equal to the canonical `dataIN.npy`; '
+                 '`dataGT.npy` shape `(168, 500, 500, 2)` and exactly equal to the canonical `dataGT.npy`; '
+                 '`dataSR.npy` shape `(168, 500, 500, 2)` and entirely finite. `idx.npy` is not required for '
+                 'bicubic (its generator script does not produce one); every other file is required for every '
+                 'primary method. No `.npy` file is ever written or modified by this script.')
+    lines.append('')
+    lines.append('| method_id | idx_validation_status | input_alignment_status | gt_alignment_status | '
+                 'sr_shape_status | sr_finiteness_status |')
+    lines.append('|---|---|---|---|---|---|')
+    for row in inventory_rows:
+        if not row['include_primary']:
+            continue
+        lines.append(f"| {row['method_id']} | {row['idx_validation_status']} | {row['input_alignment_status']} | "
+                     f"{row['gt_alignment_status']} | {row['sr_shape_status']} | {row['sr_finiteness_status']} |")
     lines.append('')
     lines.append('## 9. Candidates that could not be included and why')
     lines.append('')
