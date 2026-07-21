@@ -554,6 +554,16 @@ def _read_csv_rows(path: Path):
         return list(csv.DictReader(fh))
 
 
+def _read_csv_rows_and_fields(path: Path):
+    """Like _read_csv_rows but also returns the header (csv.DictReader.fieldnames),
+    needed to resolve method-suffixed topology distance columns."""
+    with path.open(newline='') as fh:
+        r = csv.DictReader(fh)
+        fieldnames = list(r.fieldnames or [])
+        rows = list(r)
+    return fieldnames, rows
+
+
 # =============================================================================
 # Requirement 1: harvest repeated bicubic/cnn/gan rows from every candidate
 # all_sample_metrics_<name>.csv found anywhere in the tree.
@@ -1001,6 +1011,88 @@ def resolve_with_fallback(exact_path, expected_basename: str):
 
 
 # =============================================================================
+# Strict topology-column resolver: some Spark topology CSVs use method-
+# suffixed distance column names (e.g. pd_distance_candidateF_grad_E2_low_
+# expanded2688) instead of the generic pd_distance/mt_distance names. Reading
+# only the generic names silently produces zero populated values while the
+# row count still looks complete -- this resolver makes that impossible by
+# hard-failing immediately on anything it cannot unambiguously resolve.
+# =============================================================================
+
+_TOPOLOGY_SCHEMA_PRIORITY = ['generic_columns', 'exact_method_suffixed_columns', 'unique_prefix_columns']
+
+
+def _resolve_one_topology_column(fieldnames, fieldset, prefix, original_method_name, path):
+    generic = prefix
+    if generic in fieldset:
+        return generic, 'generic_columns'
+    exact_suffixed = f'{prefix}_{original_method_name}'
+    if exact_suffixed in fieldset:
+        return exact_suffixed, 'exact_method_suffixed_columns'
+    candidates = [f for f in fieldnames if f.startswith(f'{prefix}_')]
+    if len(candidates) > 1:
+        raise SystemExit(
+            f'[hard-fail] Ambiguous {prefix!r} columns for method={original_method_name!r} in {path}: '
+            f'{candidates}. More than one prefix candidate exists -- refusing to guess which is authoritative.'
+        )
+    if len(candidates) == 1:
+        return candidates[0], 'unique_prefix_columns'
+    raise SystemExit(
+        f'[hard-fail] No valid {prefix!r} column found for method={original_method_name!r} in {path}. '
+        f'Looked for exact column {generic!r}, exact method-suffixed column {exact_suffixed!r}, and a unique '
+        f'column starting with {prefix + "_"!r}. Available columns: {fieldnames}.'
+    )
+
+
+def resolve_topology_distance_columns(fieldnames, original_method_name: str, path: Path):
+    """Resolve the actual PD/MT source columns in a candidate topology CSV.
+
+    Priority per metric: (1) exact generic column ('pd_distance'/'mt_distance'),
+    (2) exact method-suffixed column ('pd_distance_<original_method_name>'),
+    (3) a unique column starting with the 'pd_distance_'/'mt_distance_' prefix.
+
+    Hard-fails immediately (SystemExit) when: no valid PD or MT column exists;
+    more than one prefix candidate exists for either; the resolved PD/MT
+    columns' method suffixes disagree; or either resolved column is actually
+    an identity column (sample_idx/pos_idx).
+
+    Returns (pd_source_col, mt_source_col, schema_status), where
+    schema_status is one of 'generic_columns', 'exact_method_suffixed_columns',
+    'unique_prefix_columns' (the two suggested failure states, 'unresolved'
+    and 'ambiguous', are never returned -- they hard-fail immediately instead
+    of producing a value that could be silently treated as success).
+    """
+    fieldnames = list(fieldnames)
+    fieldset = set(fieldnames)
+
+    pd_col, pd_status = _resolve_one_topology_column(fieldnames, fieldset, 'pd_distance', original_method_name, path)
+    mt_col, mt_status = _resolve_one_topology_column(fieldnames, fieldset, 'mt_distance', original_method_name, path)
+
+    for col in (pd_col, mt_col):
+        if col in ('sample_idx', 'pos_idx'):
+            raise SystemExit(
+                f'[hard-fail] Resolved topology distance column {col!r} for method={original_method_name!r} '
+                f'in {path} is identical to an identity column (sample_idx/pos_idx) -- refusing to use it '
+                'as a distance value.'
+            )
+
+    def _suffix(col, prefix):
+        return None if col == prefix else col[len(prefix) + 1:]
+
+    pd_suffix = _suffix(pd_col, 'pd_distance')
+    mt_suffix = _suffix(mt_col, 'mt_distance')
+    if pd_suffix is not None and mt_suffix is not None and pd_suffix != mt_suffix:
+        raise SystemExit(
+            f'[hard-fail] Resolved PD column {pd_col!r} and MT column {mt_col!r} in {path} identify '
+            f'different methods ({pd_suffix!r} vs {mt_suffix!r}) -- refusing to mix distances from two '
+            'different candidates.'
+        )
+
+    schema_status = max(pd_status, mt_status, key=_TOPOLOGY_SCHEMA_PRIORITY.index)
+    return pd_col, mt_col, schema_status
+
+
+# =============================================================================
 # Generic candidate loader (path-discovery fallback + full schema load).
 # =============================================================================
 
@@ -1064,30 +1156,85 @@ def resolve_candidate_artifacts(entry: dict) -> dict:
                 val = row.get(src_col, '')
                 rec[std_col] = float(val) if val not in ('', None) else float('nan')
 
+    res['topology_pd_source_column'] = ''
+    res['topology_mt_source_column'] = ''
+    res['topology_schema_status'] = 'no_source_file'
+
     if pd_mt_csv:
-        rows = _read_csv_rows(pd_mt_csv)
-        row_count_topology = len(rows)
-        seen = set()
+        fieldnames, rows = _read_csv_rows_and_fields(pd_mt_csv)
+
+        # Requirement 1: resolve the real PD/MT columns BEFORE trusting the
+        # row count at all -- hard-fails immediately on anything ambiguous,
+        # missing, cross-method, or colliding with an identity column.
+        pd_col, mt_col, schema_status = resolve_topology_distance_columns(fieldnames, name, pd_mt_csv)
+        res['topology_pd_source_column'] = pd_col
+        res['topology_mt_source_column'] = mt_col
+        res['topology_schema_status'] = schema_status
+
+        # Requirement 3: schema validation (row count, exact sample_idx,
+        # duplicates, pos_idx-vs-sample_idx) before parsing any distance value.
+        seen: dict = {}
+        dup = []
         for row in rows:
-            si = int(row.get('sample_idx', row.get('sample', -1)))
+            si = int(row.get('sample_idx', row.get('sample')))
             if si in seen:
-                raise SystemExit(f'[hard-fail] Duplicate sample_idx={si} for method={name!r} in {pd_mt_csv}.')
-            seen.add(si)
+                dup.append(si)
+                continue
+            seen[si] = row
+        if dup:
+            raise SystemExit(f'[hard-fail] Duplicate sample_idx={sorted(set(dup))} for method={name!r} '
+                              f'in {pd_mt_csv}.')
+        idx_set = set(seen.keys())
+        if len(rows) != N_EVAL or idx_set != set(range(N_EVAL)):
+            raise SystemExit(
+                f'[hard-fail] Topology CSV for method={name!r} at {pd_mt_csv} does not have exactly '
+                f'{N_EVAL} rows with sample_idx exactly 0..{N_EVAL - 1} (found {len(rows)} rows, '
+                f'{len(idx_set)} unique indices).'
+            )
+        if 'pos_idx' in fieldnames:
+            for si, row in seen.items():
+                pos_idx_raw = row.get('pos_idx', '')
+                if pos_idx_raw in (None, ''):
+                    raise SystemExit(f'[hard-fail] pos_idx missing for method={name!r} sample_idx={si} '
+                                      f'in {pd_mt_csv}.')
+                pos_idx = int(float(pos_idx_raw))
+                if pos_idx != si:
+                    raise SystemExit(
+                        f'[hard-fail] pos_idx={pos_idx} does not equal sample_idx={si} for method={name!r} '
+                        f'in {pd_mt_csv}.'
+                    )
+
+        # Requirement 2: every one of the 168 rows must have a nonempty,
+        # finite, nonnegative value in BOTH resolved columns -- never leave
+        # a value silently missing, and never count row_count_topology=168
+        # unless every one of them was actually parsed successfully.
+        n_resolved = 0
+        for si, row in seen.items():
+            pdv_raw = row.get(pd_col, '')
+            mtv_raw = row.get(mt_col, '')
+            if pdv_raw in (None, ''):
+                raise SystemExit(
+                    f'[hard-fail] Missing pd_distance value for method={name!r} sample_idx={si} in '
+                    f'{pd_mt_csv} (resolved column {pd_col!r}).'
+                )
+            if mtv_raw in (None, ''):
+                raise SystemExit(
+                    f'[hard-fail] Missing mt_distance value for method={name!r} sample_idx={si} in '
+                    f'{pd_mt_csv} (resolved column {mt_col!r}).'
+                )
+            pdv = float(pdv_raw)
+            mtv = float(mtv_raw)
+            if not math.isfinite(pdv) or pdv < 0:
+                raise SystemExit(f'[hard-fail] Non-finite/negative pd_distance for method={name!r} '
+                                  f'sample_idx={si} in {pd_mt_csv} (resolved column {pd_col!r}): {pdv}')
+            if not math.isfinite(mtv) or mtv < 0:
+                raise SystemExit(f'[hard-fail] Non-finite/negative mt_distance for method={name!r} '
+                                  f'sample_idx={si} in {pd_mt_csv} (resolved column {mt_col!r}): {mtv}')
             rec = per_sample.setdefault(si, {})
-            pdv = row.get('pd_distance')
-            mtv = row.get('mt_distance')
-            if pdv not in (None, ''):
-                pdv = float(pdv)
-                if not math.isfinite(pdv) or pdv < 0:
-                    raise SystemExit(f'[hard-fail] Non-finite/negative pd_distance for method={name!r} '
-                                      f'sample_idx={si} in {pd_mt_csv}: {pdv}')
-                rec['pd_distance'] = pdv
-            if mtv not in (None, ''):
-                mtv = float(mtv)
-                if not math.isfinite(mtv) or mtv < 0:
-                    raise SystemExit(f'[hard-fail] Non-finite/negative mt_distance for method={name!r} '
-                                      f'sample_idx={si} in {pd_mt_csv}: {mtv}')
-                rec['mt_distance'] = mtv
+            rec['pd_distance'] = pdv
+            rec['mt_distance'] = mtv
+            n_resolved += 1
+        row_count_topology = n_resolved
 
     res['per_sample'] = per_sample
     res['row_count_cheap'] = row_count_cheap
@@ -1424,6 +1571,9 @@ def main() -> int:
                 topology_results_csv=legacy_report['phase_c_path'] if has_topology else '',
                 topology_results_csv_exists=has_topology,
                 topology_results_resolution='legacy_combined' if has_topology else 'not_found',
+                topology_pd_source_column='pd_distance' if has_topology else '',
+                topology_mt_source_column='mt_distance' if has_topology else '',
+                topology_schema_status='generic_columns' if has_topology else 'no_source_file',
                 topology_comparison_csv='', topology_comparison_csv_exists=False,
                 topology_comparison_resolution='not_found',
                 cheap_report_exists=False, topology_report_exists=False,
@@ -1482,6 +1632,7 @@ def main() -> int:
         'repaired_status', 'historical_alias', 'data_out_dir', 'idx_path', 'data_gt_path', 'data_sr_path',
         'cheap_eval_csv', 'cheap_eval_resolution', 'cheap_pairwise_csv',
         'topology_results_csv', 'topology_results_resolution', 'topology_comparison_csv',
+        'topology_pd_source_column', 'topology_mt_source_column', 'topology_schema_status',
         'cheap_report', 'topology_report', 'row_count_cheap', 'row_count_topology',
         'sample_index_status', 'ssim_status',
         'idx_validation_status', 'input_alignment_status', 'gt_alignment_status',
@@ -1561,6 +1712,9 @@ def main() -> int:
             topology_results_csv=r.get('topology_results_csv', ''),
             topology_results_resolution=r.get('topology_results_resolution', ''),
             topology_comparison_csv=r.get('topology_comparison_csv', ''),
+            topology_pd_source_column=r.get('topology_pd_source_column', ''),
+            topology_mt_source_column=r.get('topology_mt_source_column', ''),
+            topology_schema_status=r.get('topology_schema_status', 'no_source_file'),
             cheap_report=entry.get('cheap_report', ''), topology_report=entry.get('topology_report', ''),
             row_count_cheap=r.get('row_count_cheap', 0), row_count_topology=r.get('row_count_topology', 0),
             sample_index_status=sample_index_status,
@@ -1584,9 +1738,30 @@ def main() -> int:
     log(f'[write] {inv_path} ({len(inventory_rows)} rows)')
 
     # -------------------------------------------------------------------
-    # column_mapping.csv (always written)
+    # column_mapping.csv (always written) -- includes one dynamic row per
+    # resolved PD/MT topology source column (requirement 4).
     # -------------------------------------------------------------------
-    write_column_mapping()
+    topology_column_mapping_rows = []
+    for entry in PRIMARY_MANIFEST:
+        mid = entry['method_id']
+        r = resolved[mid]
+        pd_col = r.get('topology_pd_source_column', '')
+        mt_col = r.get('topology_mt_source_column', '')
+        src_path = r.get('topology_results_csv', '')
+        if not (src_path and pd_col and mt_col):
+            continue
+        schema_status = r.get('topology_schema_status', '')
+        topology_column_mapping_rows.append(dict(
+            source_path=src_path, source_column=pd_col, standardized_column='pd_distance',
+            direction='lower_is_better', representation='topology_pd',
+            notes=f'Resolved via {schema_status} for method_id={mid!r}.',
+        ))
+        topology_column_mapping_rows.append(dict(
+            source_path=src_path, source_column=mt_col, standardized_column='mt_distance',
+            direction='lower_is_better', representation='topology_mt',
+            notes=f'Resolved via {schema_status} for method_id={mid!r}.',
+        ))
+    write_column_mapping(topology_column_mapping_rows)
 
     # -------------------------------------------------------------------
     # docs/unified_candidate_evaluation_inventory.md (always written)
@@ -1858,7 +2033,7 @@ def main() -> int:
     return 0
 
 
-def write_column_mapping():
+def write_column_mapping(dynamic_topology_rows=None):
     mapping_rows = []
     for src_col, std_col in sorted(BASELINE_COMBINED_DIRECT_MAP.items()):
         mapping_rows.append(dict(
@@ -1897,6 +2072,18 @@ def write_column_mapping():
             direction=METRIC_DIRECTION[std_col],
             representation=[m[2] for m in METRIC_SCHEMA if m[0] == std_col][0],
             notes='Full candidate/baseline schema written by evaluate_finetune_candidate.py.',
+        ))
+    # Requirement 4: dynamic, per-source-file mapping for topology CSVs whose
+    # PD/MT columns were resolved via resolve_topology_distance_columns()
+    # (generic, exact method-suffixed, or unique-prefix column names) --
+    # one row per resolved column, so the actual column name Spark used is
+    # traceable per method rather than assumed to be the generic name.
+    for row in (dynamic_topology_rows or []):
+        mapping_rows.append(dict(
+            source_path=row['source_path'], source_column=row['source_column'],
+            standardized_column=row['standardized_column'],
+            units=[m[3] for m in METRIC_SCHEMA if m[0] == row['standardized_column']][0],
+            direction=row['direction'], representation=row['representation'], notes=row['notes'],
         ))
     mapping_path = OUT_DIR / 'column_mapping.csv'
     with mapping_path.open('w', newline='') as fh:
@@ -2137,6 +2324,13 @@ def write_phase1_report(inventory_rows, topo_val_rows, legacy_report, missingnes
     lines.append('')
     lines.append('## 5. Validation results')
     lines.append('')
+    lines.append('- Topology PD/MT distance columns are resolved per-file via `resolve_topology_distance_columns()` '
+                 '(generic `pd_distance`/`mt_distance`, exact `pd_distance_<method>`/`mt_distance_<method>`, or a '
+                 'unique `pd_distance_*`/`mt_distance_*` prefix match) rather than assumed to be the generic name -- '
+                 'a topology CSV whose distance columns cannot be unambiguously resolved hard-fails the whole run '
+                 'immediately rather than silently reporting `row_count_topology=168` with unpopulated distances. '
+                 'See `topology_pd_source_column`/`topology_mt_source_column`/`topology_schema_status` in '
+                 '`method_inventory.csv`.')
     lines.append(f'- Topology-mean reproduction: **{n_pass} PASS**, **{n_fail} FAIL**, **{n_no_data} NO_DATA** '
                  f'out of {len(topo_val_rows)} primary methods with an expected value.')
     lines.append('- Cheap-metric completeness (168 rows, sample_idx exactly 0..167, no duplicates): checked for '

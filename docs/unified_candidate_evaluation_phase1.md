@@ -23,6 +23,7 @@ See `column_mapping.csv`. Families: `vector_uv` (psnruv), `scalar_speed` (ssim_s
 
 ## 5. Validation results
 
+- Topology PD/MT distance columns are resolved per-file via `resolve_topology_distance_columns()` (generic `pd_distance`/`mt_distance`, exact `pd_distance_<method>`/`mt_distance_<method>`, or a unique `pd_distance_*`/`mt_distance_*` prefix match) rather than assumed to be the generic name -- a topology CSV whose distance columns cannot be unambiguously resolved hard-fails the whole run immediately rather than silently reporting `row_count_topology=168` with unpopulated distances. See `topology_pd_source_column`/`topology_mt_source_column`/`topology_schema_status` in `method_inventory.csv`.
 - Topology-mean reproduction: **2 PASS**, **0 FAIL**, **16 NO_DATA** out of 18 primary methods with an expected value.
 - Cheap-metric completeness (168 rows, sample_idx exactly 0..167, no duplicates): checked for every primary method with any discovered source (baseline-harvested, legacy-combined, or a resolved candidate all_sample_metrics CSV).
 - Join (cheap metrics <-> true topology, one-to-one on sample_idx): every per-sample record is a single merged dict keyed by sample_idx, so a missing cheap or topology value for a given sample_idx shows up directly as a non-finite cell rather than a silent row-count mismatch.
