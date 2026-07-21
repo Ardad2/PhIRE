@@ -1,0 +1,1177 @@
+#!/usr/bin/env python3
+"""
+Priority 6: superlevel topology robustness evaluation on EXISTING PhIRE
+outputs only.
+
+This script does NOT retrain anything and does NOT modify any existing
+candidate output or any existing (sublevel/default) TTK topology output. It
+only reads already-completed dataGT.npy / dataSR.npy / idx.npy / dataIN.npy
+arrays and produces a brand-new, separate superlevel topology evaluation.
+
+Mathematical basis
+-------------------
+TTK's ttkPersistenceDiagramCmd / ttkMergeTreeCmd (as invoked everywhere else
+in this repo, e.g. scripts/run_candidate_topology_pipeline.sh) compute
+SUBLEVEL-set topology by default -- no sublevel/superlevel flag is ever
+passed anywhere in this codebase. The standard identity
+
+    superlevel topology of a scalar field s  ==  sublevel topology of -s
+
+(persistence pairs, critical points, and merge trees are exactly
+mirror-imaged under negation) means we can get a robust superlevel
+evaluation using the exact same TTK binaries, unmodified, by feeding them a
+NEGATED speed field instead of a superlevel-specific code path. This is the
+approach used here: every VTI written by this script stores -speed, not
+speed, and is then processed by the SAME ttkPersistenceDiagramCmd /
+ttkMergeTreeCmd commands used for the default (sublevel) evaluation.
+
+VTI array-name convention
+--------------------------
+The VTK point-data array is still named "wind_speed" (matching
+scripts/convert_phire_to_vti.py and every existing TTK invocation, which
+all hardcode `-a wind_speed`), so the unmodified `-a wind_speed` TTK CLI
+flag keeps working unchanged. IMPORTANT: despite the array name, the stored
+scalar values are -sqrt(u^2 + v^2), i.e. NEGATED speed, not speed. This is
+intentional and is what makes the sublevel-set TTK computation equal a
+superlevel-set computation on the original (non-negated) speed field.
+
+VTI flattening convention
+--------------------------
+Uses the exact same C-order flattening as scripts/convert_phire_to_vti.py's
+make_vti_from_scalar(): a (H, W) array is written with
+`ravel(order="C")`, and vtkImageData.SetDimensions(W, H, 1) is used, so
+flat[ix + iy*W] == scalar_2d[iy, ix]. This is the repaired VTI convention
+established in docs/candidateD_E_topology_audit.md Section 2.3 (an earlier
+Fortran-order bug silently transposed/scrambled every written field).
+
+Patch convention
+-----------------
+Uses the same 160x160 patch at (x0=0, y0=0) as every other topology
+pipeline in this repo (scripts/run_candidate_topology_pipeline.sh,
+scripts/run_topology_pipeline.sh both default --patch 160 --x0 0 --y0 0),
+so superlevel results are directly comparable to the existing sublevel
+results for the same methods.
+
+Output isolation
+-----------------
+All outputs are written under a brand-new root,
+ttk_runs_fixed/superlevel_topology/, which is disjoint from every existing
+sublevel topology root (ttk_runs_fixed/topology_finetuning/,
+ttk_runs_fixed/cnn/, ttk_runs_fixed/gan/, ttk_runs_fixed/combined/). This
+script asserts that disjointness at startup and refuses to run if it is
+ever violated. It only ever READS from data_out*/models*/ candidate output
+directories, never writes to them.
+
+Methods evaluated (first superlevel robustness set)
+-----------------------------------------------------
+  cnn                                              data_out_fixed/wind_mrhr_cnn
+  gan                                              data_out_fixed/wind_mrhr_gan
+  candidateC_expanded2688                          data_out/wind_finetune_candidateC_expanded2688
+  candidateB_plus_E2_tf_lowlambda_expanded2688      data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688
+  candidateC_plus_E2_tf_lowlambda_expanded2688      data_out/wind_finetune_candidateC_plus_E2_tf_lowlambda_expanded2688
+  candidateUV_plus_E2_tf_lowlambda_expanded2688     data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688
+  candidateUV_plus_crit_expanded2688                data_out/wind_finetune_candidateUV_plus_crit_expanded2688
+
+NOTE on candidateC_plus_E2_tf_lowlambda_expanded2688: this literal directory
+name is what was specified for this priority. Elsewhere in this repo the
+completed "Candidate C stack + repaired E2" native-TF run is named
+candidateE2_tf_lowlambda_expanded2688 (see
+scripts/run_candidateE2_tf_lowlambda_expanded2688_ttkcrit_refiner.py), with
+real output at data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688.
+Both names refer to the same experiment ("C + E2"), but this script does
+NOT silently alias them -- it looks up exactly the path in DEFAULT_METHODS
+and, per the "warn and skip" requirement below, will print a clear warning
+and skip this entry if that literal directory does not exist. If you intend
+to evaluate the real C+E2-2688 run, either edit DEFAULT_METHODS below or use
+--methods to exclude this entry and evaluate it under a corrected mapping.
+
+If any method's directory does not exist, or its required files are
+missing/misshapen, this script prints a clear warning and SKIPS that
+method -- it never fails silently and never aborts the whole run because
+one method is unavailable.
+
+Pipeline stages (mirrors scripts/run_candidate_topology_pipeline.sh)
+-----------------------------------------------------------------------
+  0. Input verification: files present, shapes, idx.npy == 0..167, GT
+     alignment across methods, finiteness.
+  1. VTI generation: writes -speed VTI files under
+     ttk_runs_fixed/superlevel_topology/<method>/vti/. Runs inside the same
+     phire-ttk:latest Docker image as every other VTI-writing stage in this
+     repo, via a hidden --_vti-worker sub-invocation of THIS script (see
+     "Do not change existing scripts" below for why this lives here rather
+     than in convert_phire_to_vti.py).
+  2. TTK PD/MT extraction: ttkPersistenceDiagramCmd / ttkMergeTreeCmd with
+     -a wind_speed, --threads 1, resumable (skips already-completed
+     fields), one field's Docker failure does not abort the run. Hard gate:
+     a method is marked INCOMPLETE (and excluded from distance computation
+     and the final report/CSVs) if its VTI/PD/MT counts are not exactly
+     336 each (2 * 168 samples).
+  3. Distance computation: reuses scripts/compute_composite_tree_distance.py
+     unmodified (native python3 + vtk + topologytoolkit), producing
+     phase_c_results.csv under
+     ttk_runs_fixed/superlevel_topology/<method>/topology/phase_c_final/.
+  4. Combined summary: writes the three requested CSVs and the markdown
+     report, with a side-by-side comparison against the known completed
+     sublevel (default) PD/MT means for the same methods, and a final
+     PASS/FAIL discrepancy checklist.
+
+Do not change existing scripts
+--------------------------------
+convert_phire_to_vti.py has no negation option and is intentionally left
+unmodified (it is reused, unmodified, by every existing sublevel pipeline).
+Rather than adding a --negate flag to a shared script, the small amount of
+VTI-writing code needed here (a near-duplicate of
+convert_phire_to_vti.py's make_vti_from_scalar, computing -sqrt(u^2+v^2)
+instead of sqrt(u^2+v^2)) lives entirely inside this new script.
+
+Usage (from repo root, on Spark)
+-----------------------------------
+  Dry run (input verification + planning only; no Docker, no TTK, no
+  writes under ttk_runs_fixed/ or docs/):
+    python3 scripts/run_superlevel_topology_robustness.py --dry-run
+
+  Full run (writes VTI, runs TTK, computes distances, writes CSVs/report):
+    python3 scripts/run_superlevel_topology_robustness.py --run
+
+  Subset of methods:
+    python3 scripts/run_superlevel_topology_robustness.py --run \\
+      --methods cnn,gan,candidateUV_plus_E2_tf_lowlambda_expanded2688
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import datetime
+import io
+import math
+import os
+import statistics
+import subprocess
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+
+# ---------------------------------------------------------------------------
+# Repository root
+# ---------------------------------------------------------------------------
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT  = SCRIPT_DIR.parent
+
+# ---------------------------------------------------------------------------
+# Constants (mirrors scripts/run_candidate_topology_pipeline.sh defaults)
+# ---------------------------------------------------------------------------
+N_EVAL          = 168
+PATCH           = 160
+X0              = 0
+Y0              = 0
+THREADS_DEFAULT = 1
+DOCKER_IMAGE    = "phire-ttk:latest"
+SCALAR_TOKEN    = "speed"          # filename token only; stored value is -speed
+ARRAY_NAME      = "wind_speed"     # VTK array name; TTK is always invoked with -a wind_speed
+
+EXPECTED_SHAPES: Dict[str, Tuple[int, ...]] = {
+    "idx.npy":    (N_EVAL,),
+    "dataIN.npy": (N_EVAL, 100, 100, 2),
+    "dataGT.npy": (N_EVAL, 500, 500, 2),
+    "dataSR.npy": (N_EVAL, 500, 500, 2),
+}
+REQUIRED_FILES = tuple(EXPECTED_SHAPES.keys())
+
+DEFAULT_METHODS: Dict[str, str] = {
+    "cnn":                                          "data_out_fixed/wind_mrhr_cnn",
+    "gan":                                           "data_out_fixed/wind_mrhr_gan",
+    "candidateC_expanded2688":                       "data_out/wind_finetune_candidateC_expanded2688",
+    "candidateB_plus_E2_tf_lowlambda_expanded2688":  "data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688",
+    "candidateE2_tf_lowlambda_expanded2688":         "data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_crit_expanded2688":            "data_out/wind_finetune_candidateUV_plus_crit_expanded2688",
+}
+
+# Reference (baseline) method for GT-alignment checks and the winner tables.
+REFERENCE_METHOD = "cnn"
+
+# Known completed SUBLEVEL (default) PD/MT means for the same methods, for
+# the side-by-side comparison requested in the report. None means "not
+# available / not yet run at this scale" -- the report prints "N/A" rather
+# than guessing. These are read-only reference numbers; this script never
+# touches the sublevel output directories that produced them.
+KNOWN_SUBLEVEL: Dict[str, Optional[Dict[str, float]]] = {
+    "cnn":                                          {"pd_mean": 27.4063, "mt_mean": 5.8678},
+    "gan":                                           {"pd_mean": 20.8641, "mt_mean": 8.3481},
+    "candidateC_expanded2688":                       {"pd_mean": 22.4944, "mt_mean": 6.0803},
+    "candidateB_plus_E2_tf_lowlambda_expanded2688":  {"pd_mean": 23.9876, "mt_mean": 5.6774},
+    "candidateE2_tf_lowlambda_expanded2688":         {"pd_mean": 24.2686, "mt_mean": 5.6628},
+    "candidateUV_plus_E2_tf_lowlambda_expanded2688": {"pd_mean": 25.0721, "mt_mean": 5.5940},
+    "candidateUV_plus_crit_expanded2688":            {"pd_mean": 29.1143, "mt_mean": 5.6899},
+}
+
+# ---------------------------------------------------------------------------
+# Output locations
+# ---------------------------------------------------------------------------
+OUT_ROOT        = REPO_ROOT / "ttk_runs_fixed" / "superlevel_topology"
+REPORT_PATH     = REPO_ROOT / "docs" / "superlevel_topology_robustness_eval.md"
+CSV_PER_SAMPLE  = OUT_ROOT / "superlevel_pd_mt_per_sample.csv"
+CSV_SUMMARY     = OUT_ROOT / "superlevel_summary_by_method.csv"
+CSV_WINNER      = OUT_ROOT / "superlevel_winner_comparison.csv"
+
+# Existing default (sublevel) TTK output roots -- must never be written to.
+_PROTECTED_SUBLEVEL_DIRS = [
+    REPO_ROOT / "ttk_runs_fixed" / "topology_finetuning",
+    REPO_ROOT / "ttk_runs_fixed" / "cnn",
+    REPO_ROOT / "ttk_runs_fixed" / "gan",
+    REPO_ROOT / "ttk_runs_fixed" / "combined",
+]
+# Existing candidate/model outputs -- this script only ever reads these.
+_PROTECTED_READ_ONLY_DIRS = [
+    REPO_ROOT / "data_out_fixed",
+    REPO_ROOT / "data_out",
+    REPO_ROOT / "models_fixed",
+    REPO_ROOT / "models",
+]
+
+
+def _resolve(p: Path) -> Path:
+    return p.resolve()
+
+
+def _is_inside(child: Path, parent: Path) -> bool:
+    child = _resolve(child)
+    parent = _resolve(parent)
+    return child == parent or str(child).startswith(str(parent) + "/")
+
+
+def _docker_path(p: Path) -> str:
+    """Return a path usable inside the Docker container mounted at /work."""
+    p = Path(p)
+    try:
+        return str(p.resolve().relative_to(REPO_ROOT.resolve()))
+    except ValueError:
+        return str(p)
+
+
+def method_vti_dir(name: str) -> Path:
+    return OUT_ROOT / name / "vti"
+
+
+def method_topology_dir(name: str) -> Path:
+    return OUT_ROOT / name / "topology"
+
+
+# ---------------------------------------------------------------------------
+# Stage 0: input verification
+# ---------------------------------------------------------------------------
+
+class MethodInputs:
+    """Holds the verification outcome and (if ok) the loaded arrays for one
+    method."""
+
+    def __init__(self, name: str, data_dir: Path):
+        self.name = name
+        self.data_dir = data_dir
+        self.ok = False
+        self.skip_reason: Optional[str] = None
+        self.warnings: List[str] = []
+        self.idx: Optional[np.ndarray] = None
+        self.pos_by_sample: Optional[Dict[int, int]] = None
+        # Large arrays are memory-mapped; callers should slice, not load
+        # wholesale, except where finiteness/alignment checks require it.
+        self.data_gt: Optional[np.ndarray] = None
+        self.data_sr: Optional[np.ndarray] = None
+
+
+def verify_method_inputs(name: str, data_dir: Path) -> MethodInputs:
+    m = MethodInputs(name, data_dir)
+
+    if not data_dir.exists():
+        m.skip_reason = f"directory not found: {data_dir}"
+        print(f"[warn] {name}: {m.skip_reason} -- skipping.")
+        return m
+
+    missing = [f for f in REQUIRED_FILES if not (data_dir / f).exists()]
+    if missing:
+        m.skip_reason = f"missing required file(s): {missing}"
+        print(f"[warn] {name}: {m.skip_reason} -- skipping.")
+        return m
+
+    shape_errors: List[str] = []
+    for fname, expected in EXPECTED_SHAPES.items():
+        arr = np.load(data_dir / fname, mmap_mode="r")
+        if tuple(arr.shape) != expected:
+            shape_errors.append(f"{fname}: got {arr.shape}, expected {expected}")
+    if shape_errors:
+        m.skip_reason = "shape mismatch: " + "; ".join(shape_errors)
+        print(f"[warn] {name}: {m.skip_reason} -- skipping.")
+        return m
+
+    idx = np.load(data_dir / "idx.npy").astype(np.int64).ravel()
+    if not np.array_equal(np.sort(idx), np.arange(N_EVAL)):
+        m.skip_reason = (
+            f"idx.npy is not exactly 0..{N_EVAL - 1} "
+            f"(range [{int(idx.min())}, {int(idx.max())}], {len(idx)} entries)"
+        )
+        print(f"[warn] {name}: {m.skip_reason} -- skipping.")
+        return m
+
+    data_gt = np.load(data_dir / "dataGT.npy", mmap_mode="r")
+    data_sr = np.load(data_dir / "dataSR.npy", mmap_mode="r")
+
+    for label, arr in (("dataGT.npy", data_gt), ("dataSR.npy", data_sr)):
+        if not np.isfinite(np.asarray(arr)).all():
+            m.skip_reason = f"{label} contains NaN/inf values"
+            print(f"[warn] {name}: {m.skip_reason} -- skipping.")
+            return m
+
+    m.idx = idx
+    m.pos_by_sample = {int(v): i for i, v in enumerate(idx)}
+    m.data_gt = data_gt
+    m.data_sr = data_sr
+    m.ok = True
+    print(f"[ok]   {name}: files present, shapes OK, idx == 0..{N_EVAL - 1}, arrays finite.")
+    return m
+
+
+def check_gt_alignment(methods: Dict[str, MethodInputs], reference: str) -> List[str]:
+    """Compare every ok method's dataGT (in sample-idx order) against the
+    reference method's dataGT. Returns a list of warning strings; does not
+    raise. If the reference method itself is unavailable, the first
+    available ok method is used instead."""
+    warnings: List[str] = []
+    ok_methods = {n: m for n, m in methods.items() if m.ok}
+    if not ok_methods:
+        return ["no methods available -- GT alignment check skipped"]
+
+    ref_name = reference if reference in ok_methods else next(iter(ok_methods))
+    if ref_name != reference:
+        warnings.append(
+            f"reference method {reference!r} unavailable; using {ref_name!r} "
+            "as the GT-alignment reference instead"
+        )
+    ref = ok_methods[ref_name]
+    ref_order = np.array([ref.pos_by_sample[s] for s in range(N_EVAL)])
+    ref_gt = np.asarray(ref.data_gt)[ref_order].astype(np.float64)
+
+    for name, m in ok_methods.items():
+        if name == ref_name:
+            continue
+        order = np.array([m.pos_by_sample[s] for s in range(N_EVAL)])
+        gt = np.asarray(m.data_gt)[order].astype(np.float64)
+        max_diff = float(np.abs(gt - ref_gt).max())
+        if max_diff > 1e-3:
+            warnings.append(
+                f"{name}: dataGT differs from {ref_name} by up to {max_diff:.4e} "
+                "(possible misalignment or different normalization)"
+            )
+        else:
+            print(f"[ok]   {name}: dataGT aligned with {ref_name} (max_abs_diff={max_diff:.2e}).")
+    return warnings
+
+
+# ---------------------------------------------------------------------------
+# VTI writer (worker mode; runs natively OR inside Docker via --_vti-worker)
+# ---------------------------------------------------------------------------
+
+def _make_vti_from_scalar(scalar_2d: np.ndarray, array_name: str, out_vti: Path) -> None:
+    """Write a 2D scalar field as ASCII VTK ImageData (.vti).
+
+    Identical convention to scripts/convert_phire_to_vti.py's
+    make_vti_from_scalar(): scalar_2d[y, x] -> VTK point (x, y), C-order
+    ravel so flat[ix + iy*W] == scalar_2d[iy, ix].
+    """
+    import vtk  # local import: not needed for --dry-run / orchestration
+    from vtk.util.numpy_support import numpy_to_vtk
+
+    scalar_2d = np.asarray(scalar_2d, dtype=np.float32)
+    if scalar_2d.ndim != 2:
+        raise ValueError(f"Expected 2D scalar, got shape {scalar_2d.shape}")
+    H, W = scalar_2d.shape
+
+    img = vtk.vtkImageData()
+    img.SetDimensions(W, H, 1)
+    img.SetExtent(0, W - 1, 0, H - 1, 0, 0)
+    img.SetSpacing(1.0, 1.0, 1.0)
+    img.SetOrigin(0.0, 0.0, 0.0)
+
+    flat = np.ascontiguousarray(scalar_2d).ravel(order="C")
+    vtk_arr = numpy_to_vtk(flat, deep=True, array_type=vtk.VTK_FLOAT)
+    vtk_arr.SetName(array_name)
+
+    pd = img.GetPointData()
+    pd.AddArray(vtk_arr)
+    pd.SetActiveScalars(array_name)
+    pd.SetScalars(vtk_arr)
+
+    w = vtk.vtkXMLImageDataWriter()
+    w.SetFileName(str(out_vti))
+    w.SetInputData(img)
+    w.SetDataModeToAscii()
+
+    ok = w.Write()
+    if not ok:
+        raise RuntimeError(f"VTK failed to write {out_vti}")
+
+
+def _crop(field: np.ndarray, patch: int, x0: int, y0: int) -> np.ndarray:
+    if not patch:
+        return field
+    H, W = field.shape
+    x1 = min(x0 + patch, W)
+    y1 = min(y0 + patch, H)
+    return field[y0:y1, x0:x1]
+
+
+def _negated_speed(sample_hw2: np.ndarray) -> np.ndarray:
+    """sample_hw2: (H, W, 2) array of [u, v]. Returns -sqrt(u^2 + v^2)."""
+    u = sample_hw2[..., 0].astype(np.float32)
+    v = sample_hw2[..., 1].astype(np.float32)
+    return -np.sqrt(u * u + v * v)
+
+
+def vti_worker_main(args: argparse.Namespace) -> int:
+    """Entry point when invoked as --_vti-worker (typically inside Docker).
+    Writes one VTI per requested sample index from a single .npy file."""
+    in_path = Path(args.input)
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    label = args.label
+
+    arr = np.load(in_path, mmap_mode="r")
+    if arr.ndim != 4 or arr.shape[-1] < 2:
+        print(f"[error] --_vti-worker: unexpected array shape {arr.shape} in {in_path}", file=sys.stderr)
+        return 1
+
+    patch_tag = f"p{PATCH}_x{X0}_y{Y0}" if PATCH else "full"
+    n_written = 0
+    for sidx in args.samples:
+        sample = np.asarray(arr[sidx])  # (H, W, 2)
+        u = _crop(sample[..., 0], PATCH, X0, Y0)
+        v = _crop(sample[..., 1], PATCH, X0, Y0)
+        neg_speed = -np.sqrt(u.astype(np.float32) ** 2 + v.astype(np.float32) ** 2)
+        out_vti = outdir / f"{label}_s{sidx}_{SCALAR_TOKEN}_{patch_tag}.vti"
+        _make_vti_from_scalar(neg_speed, ARRAY_NAME, out_vti)
+        n_written += 1
+    print(f"[_vti-worker] wrote {n_written} VTI file(s) to {outdir} (label={label})")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Stage 1: VTI generation (host-side orchestration; delegates to Docker)
+# ---------------------------------------------------------------------------
+
+def _docker_run(cmd_inner: str, extra_env: Optional[Dict[str, str]] = None) -> int:
+    """Run a shell command natively on the Spark host.
+
+    This replaces the original Docker wrapper. On this machine, vtk and
+    topologytoolkit are available in the host Python environment, and the TTK
+    command-line tools are expected to be available on PATH. Running natively
+    avoids host-path vs container-path mismatches such as /home/adadhwal/PhIRE
+    versus /work.
+    """
+    env = os.environ.copy()
+    for k, v in (extra_env or {}).items():
+        env[k] = str(v)
+
+    print(f"  $ {cmd_inner}")
+    proc = subprocess.run(["bash", "-lc", cmd_inner], cwd=REPO_ROOT, env=env)
+    return proc.returncode
+
+
+
+def generate_vti_for_method(name: str, m: MethodInputs, dry_run: bool) -> bool:
+    """Generate negated-speed VTI files natively on the host.
+
+    Earlier versions delegated this stage to Docker. That made the VTI stage
+    sensitive to host-vs-container path conventions and to the Python packages
+    installed inside phire-ttk:latest. Since the host Python environment has
+    vtk/numpy available, VTI writing is safer natively. TTK extraction still
+    runs through Docker below.
+    """
+    vti_dir = method_vti_dir(name)
+    sample_args = [str(i) for i in range(N_EVAL)]
+    ok = True
+
+    for which, npy_file in (("GT", "dataGT.npy"), ("SR", "dataSR.npy")):
+        label = f"{name}_{which}"
+        existing = list(vti_dir.glob(f"{label}_s*_{SCALAR_TOKEN}_*.vti")) if vti_dir.exists() else []
+        if len(existing) == N_EVAL:
+            print(f"  [skip] {label}: {len(existing)}/{N_EVAL} VTI files already present.")
+            continue
+
+        cmd = [
+            "python3",
+            "scripts/run_superlevel_topology_robustness.py",
+            "--_vti-worker",
+            "--input", str(m.data_dir / npy_file),
+            "--outdir", str(vti_dir),
+            "--label", label,
+            "--samples",
+            *sample_args,
+        ]
+
+        if dry_run:
+            print(f"  [dry-run] would generate {N_EVAL} VTI files for {label} natively:")
+            print("    " + " ".join(cmd))
+            continue
+
+        vti_dir.mkdir(parents=True, exist_ok=True)
+        print(f"  === VTI generation: {label} ===")
+        print("  $ " + " ".join(cmd))
+        proc = subprocess.run(cmd, cwd=REPO_ROOT)
+        if proc.returncode != 0:
+            print(f"  [warn] VTI generation failed for {label} (exit code {proc.returncode}).")
+            ok = False
+
+    return ok
+
+
+
+# ---------------------------------------------------------------------------
+# Stage 2: TTK PD/MT extraction (mirrors run_candidate_topology_pipeline.sh)
+# ---------------------------------------------------------------------------
+
+def _pd_output_exists(pd_dir: Path, base: str) -> bool:
+    for loc in (pd_dir, pd_dir / "GT", pd_dir / "SR"):
+        if (loc / f"{base}_pd_port_0.vtu").exists():
+            return True
+    return False
+
+
+def _mt_output_exists(mt_dir: Path, base: str) -> bool:
+    for loc in (mt_dir, mt_dir / "GT", mt_dir / "SR"):
+        if (
+            (loc / f"{base}_mt_port_0.vtu").exists()
+            and (loc / f"{base}_mt_port_1.vtu").exists()
+            and (loc / f"{base}_mt_port_2.vti").exists()
+        ):
+            return True
+    return False
+
+
+def run_ttk_extraction(name: str, threads: int, dry_run: bool) -> Tuple[bool, Dict[str, int]]:
+    vti_dir = method_vti_dir(name)
+    topo_dir = method_topology_dir(name)
+    pd_dir = topo_dir / "pd"
+    mt_dir = topo_dir / "mt"
+
+    vti_files = sorted(vti_dir.glob(f"{name}_*.vti")) if vti_dir.exists() else []
+    counts = {"vti": len(vti_files), "pd": 0, "mt_port0": 0, "mt_port1": 0, "mt_port2": 0}
+
+    if not vti_files:
+        print(f"  [error] {name}: no VTI files found in {vti_dir} matching {name}_*.vti")
+        return False, counts
+
+    if dry_run:
+        print(f"  [dry-run] would run TTK PD+MT extraction on {len(vti_files)} VTI files "
+              f"(threads={threads}), writing under {topo_dir}")
+        return True, counts
+
+    for d in (pd_dir, pd_dir / "GT", pd_dir / "SR", mt_dir, mt_dir / "GT", mt_dir / "SR"):
+        d.mkdir(parents=True, exist_ok=True)
+
+    env = {"OMP_NUM_THREADS": str(threads), "TTK_NUM_THREADS": str(threads)}
+
+    for f in vti_files:
+        base = f.stem
+        if not _pd_output_exists(pd_dir, base):
+            print(f"  === PD: {base} ===")
+            rc = _docker_run(
+                f"ttkPersistenceDiagramCmd -t {threads} -i {_docker_path(f)} -a {ARRAY_NAME} -o {_docker_path(pd_dir / (base + '_pd'))}",
+                extra_env=env,
+            )
+            if rc != 0:
+                print(f"  [warn] PD failed for {base} (docker exit code {rc}). Will retry on next run.")
+        else:
+            print(f"  [skip] PD {base}")
+
+        if not _mt_output_exists(mt_dir, base):
+            print(f"  === MT: {base} ===")
+            rc = _docker_run(
+                f"ttkMergeTreeCmd -t {threads} -i {_docker_path(f)} -a {ARRAY_NAME} -o {_docker_path(mt_dir / (base + '_mt'))}",
+                extra_env=env,
+            )
+            if rc != 0:
+                print(f"  [warn] MT failed for {base} (docker exit code {rc}). Will retry on next run.")
+        else:
+            print(f"  [skip] MT {base}")
+
+    # Organise top-level GT/SR-labelled outputs into GT/ and SR/ subdirs.
+    for src_dir, dst_root in ((pd_dir, pd_dir), (mt_dir, mt_dir)):
+        for which in ("GT", "SR"):
+            for p in list(src_dir.glob(f"{name}_{which}_*")):
+                if p.is_file():
+                    p.rename(dst_root / which / p.name)
+
+    counts["pd"] = len(list(pd_dir.rglob("*_pd_port_0.vtu")))
+    counts["mt_port0"] = len(list(mt_dir.rglob("*_mt_port_0.vtu")))
+    counts["mt_port1"] = len(list(mt_dir.rglob("*_mt_port_1.vtu")))
+    counts["mt_port2"] = len(list(mt_dir.rglob("*_mt_port_2.vti")))
+
+    expected = 2 * N_EVAL
+    complete = (
+        counts["pd"] == expected
+        and counts["mt_port0"] == expected
+        and counts["mt_port1"] == expected
+        and counts["mt_port2"] == expected
+    )
+    if not complete:
+        print(f"  [error] {name}: TTK extraction incomplete: "
+              f"PD={counts['pd']}/{expected}  "
+              f"MT p0={counts['mt_port0']}/{expected}  "
+              f"p1={counts['mt_port1']}/{expected}  "
+              f"p2={counts['mt_port2']}/{expected}. "
+              f"Hard-failing this method (no distance computation); re-run to retry only "
+              f"missing/failed fields (already-completed fields are skipped, not recomputed).")
+    return complete, counts
+
+
+# ---------------------------------------------------------------------------
+# Stage 3: distance computation (reuses compute_composite_tree_distance.py)
+# ---------------------------------------------------------------------------
+
+def run_distance_computation(name: str, dry_run: bool) -> Optional[Path]:
+    topo_dir = method_topology_dir(name)
+    pd_dir = topo_dir / "pd"
+    mt_dir = topo_dir / "mt"
+    final_dir = topo_dir / "phase_c_final"
+    results_csv = final_dir / "phase_c_results.csv"
+
+    if dry_run:
+        print(f"  [dry-run] would compute PD/MT distances for {name} -> {results_csv}")
+        return None
+
+    if results_csv.exists():
+        print(f"  [skip] {name}: {results_csv} already exists.")
+        return results_csv
+
+    cmd = [
+        "python3", "-X", "faulthandler", "scripts/compute_composite_tree_distance.py",
+        "--pd-dir", str(pd_dir), "--mt-dir", str(mt_dir), "--outdir", str(final_dir),
+        "--isolate-mt",
+    ]
+    print(f"  $ {' '.join(cmd)}")
+    proc = subprocess.run(cmd, cwd=REPO_ROOT)
+    if proc.returncode != 0:
+        print(f"  [error] distance computation failed for {name} (exit code {proc.returncode}).")
+        return None
+    if not results_csv.exists():
+        print(f"  [error] {results_csv} not written despite exit code 0.")
+        return None
+    return results_csv
+
+
+_KEY_POS_RE = None  # set lazily to avoid importing re at module scope twice
+
+
+def _parse_pos_idx(key: str) -> Optional[int]:
+    import re
+    global _KEY_POS_RE
+    if _KEY_POS_RE is None:
+        _KEY_POS_RE = re.compile(r"_s(\d+)_")
+    m = _KEY_POS_RE.search(key)
+    return int(m.group(1)) if m else None
+
+
+def load_phase_c_results(csv_path: Path, method_filter: str) -> Dict[int, Tuple[float, float]]:
+    """Return {pos_idx: (pd_distance, mt_distance)} for rows whose `method`
+    column matches method_filter exactly (case-sensitive) -- this is the
+    'confirm no report accidentally references the wrong method name'
+    safety check applied at parse time: rows for any other method in the
+    same CSV are ignored rather than merged in."""
+    out: Dict[int, Tuple[float, float]] = {}
+    with csv_path.open() as fh:
+        for row in csv.DictReader(fh):
+            method = (row.get("method") or "").strip()
+            if method != method_filter:
+                continue
+            pos = _parse_pos_idx((row.get("key") or "").strip())
+            if pos is None:
+                continue
+            try:
+                pd_v = float(row.get("pd_distance") or "nan")
+            except ValueError:
+                pd_v = float("nan")
+            try:
+                mt_v = float(row.get("mt_distance") or "nan")
+            except ValueError:
+                mt_v = float("nan")
+            out[pos] = (pd_v, mt_v)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Stage 4: combined CSVs + report
+# ---------------------------------------------------------------------------
+
+def _mean(vals: List[float]) -> float:
+    v = [x for x in vals if not math.isnan(x)]
+    return sum(v) / len(v) if v else float("nan")
+
+
+def _std(vals: List[float]) -> float:
+    v = [x for x in vals if not math.isnan(x)]
+    return statistics.pstdev(v) if len(v) > 1 else float("nan")
+
+
+def _fmt(v: Optional[float], d: int = 4) -> str:
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return "N/A"
+    return f"{v:.{d}f}"
+
+
+def build_outputs(
+    method_results: Dict[str, Dict[int, Tuple[float, float]]],
+    methods_run: List[str],
+) -> Tuple[bool, List[str]]:
+    """Build the three CSVs and the markdown report from completed
+    per-method phase_c_results.csv data. Returns (all_ok, checklist_lines)."""
+    checklist: List[str] = []
+    all_ok = True
+
+    def _check(label: str, ok: bool) -> None:
+        nonlocal all_ok
+        checklist.append(f"[{'PASS' if ok else 'FAIL'}] {label}")
+        if not ok:
+            all_ok = False
+
+    completed = [m for m in methods_run if m in method_results and method_results[m]]
+    _check("At least one method has completed distance results", len(completed) > 0)
+    if not completed:
+        return all_ok, checklist
+
+    # --- per-sample CSV (long format: one row per method per sample) ------
+    per_sample_rows: List[Dict[str, object]] = []
+    for name in completed:
+        dists = method_results[name]
+        n_rows_this_method = 0
+        for pos in sorted(dists):
+            pd_v, mt_v = dists[pos]
+            per_sample_rows.append({
+                "method": name,
+                "pos_idx": pos,
+                "sample_idx": pos,  # idx.npy == 0..167 in identity order for all verified methods
+                "pd_distance_superlevel": pd_v,
+                "mt_distance_superlevel": mt_v,
+            })
+            n_rows_this_method += 1
+        _check(f"{name}: per-sample CSV row count == {N_EVAL}", n_rows_this_method == N_EVAL)
+
+    OUT_ROOT.mkdir(parents=True, exist_ok=True)
+    with CSV_PER_SAMPLE.open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=["method", "pos_idx", "sample_idx",
+                                            "pd_distance_superlevel", "mt_distance_superlevel"])
+        w.writeheader()
+        w.writerows(per_sample_rows)
+    print(f"Written: {CSV_PER_SAMPLE}")
+
+    # --- per-method summary stats -------------------------------------------
+    pd_by_method: Dict[str, List[float]] = {}
+    mt_by_method: Dict[str, List[float]] = {}
+    for name in completed:
+        dists = method_results[name]
+        pd_by_method[name] = [dists[p][0] for p in sorted(dists)]
+        mt_by_method[name] = [dists[p][1] for p in sorted(dists)]
+
+    cnn_pd = pd_by_method.get(REFERENCE_METHOD)
+    cnn_mt = mt_by_method.get(REFERENCE_METHOD)
+    gan_pd = pd_by_method.get("gan")
+    gan_mt = mt_by_method.get("gan")
+
+    def _lt_count(cand: Optional[List[float]], base: Optional[List[float]]) -> Optional[int]:
+        if cand is None or base is None or len(cand) != len(base):
+            return None
+        return sum(1 for c, b in zip(cand, base) if not (math.isnan(c) or math.isnan(b)) and c < b)
+
+    # Freshly-computed superlevel MT-GAN win set (samples where GAN's
+    # superlevel MT distance beats CNN's superlevel MT distance), analogous
+    # to the hardcoded 20-sample set used throughout the sublevel reports
+    # but recomputed here from this run's own cnn/gan data.
+    mt_gan_wins: set = set()
+    if REFERENCE_METHOD in method_results and "gan" in method_results:
+        cnn_d = method_results[REFERENCE_METHOD]
+        gan_d = method_results["gan"]
+        for pos in cnn_d:
+            if pos in gan_d:
+                c_mt = cnn_d[pos][1]
+                g_mt = gan_d[pos][1]
+                if not (math.isnan(c_mt) or math.isnan(g_mt)) and g_mt < c_mt:
+                    mt_gan_wins.add(pos)
+
+    summary_rows: List[Dict[str, object]] = []
+    mt_gan_recovery: Dict[str, Dict[str, int]] = {}
+    for name in completed:
+        pd_vals = pd_by_method[name]
+        mt_vals = mt_by_method[name]
+        pd_mean_v = _mean(pd_vals)
+        mt_mean_v = _mean(mt_vals)
+        pd_lt_cnn = _lt_count(pd_vals, cnn_pd) if name != REFERENCE_METHOD else None
+        mt_lt_cnn = _lt_count(mt_vals, cnn_mt) if name != REFERENCE_METHOD else None
+        pd_beats_gan = _lt_count(pd_vals, gan_pd) if name not in (REFERENCE_METHOD, "gan") else None
+        mt_beats_gan = _lt_count(mt_vals, gan_mt) if name not in (REFERENCE_METHOD, "gan") else None
+
+        recovered = still_gan = now_cnn = 0
+        if name not in (REFERENCE_METHOD, "gan") and mt_gan_wins:
+            dists = method_results[name]
+            cnn_d = method_results.get(REFERENCE_METHOD, {})
+            gan_d = method_results.get("gan", {})
+            for pos in mt_gan_wins:
+                if pos not in dists or pos not in cnn_d or pos not in gan_d:
+                    continue
+                vals = {REFERENCE_METHOD: cnn_d[pos][1], "gan": gan_d[pos][1], name: dists[pos][1]}
+                valid = {k: v for k, v in vals.items() if not math.isnan(v)}
+                if not valid:
+                    continue
+                winner = min(valid, key=valid.get)
+                if winner == name:
+                    recovered += 1
+                elif winner == "gan":
+                    still_gan += 1
+                elif winner == REFERENCE_METHOD:
+                    now_cnn += 1
+            mt_gan_recovery[name] = {"recovered": recovered, "still_gan": still_gan, "now_cnn": now_cnn}
+
+        known = KNOWN_SUBLEVEL.get(name)
+        summary_rows.append({
+            "method": name,
+            "n_samples": len(pd_vals),
+            "pd_mean_superlevel": pd_mean_v,
+            "pd_std_superlevel": _std(pd_vals),
+            "mt_mean_superlevel": mt_mean_v,
+            "mt_std_superlevel": _std(mt_vals),
+            "pd_lt_cnn": pd_lt_cnn if pd_lt_cnn is not None else "",
+            "mt_lt_cnn": mt_lt_cnn if mt_lt_cnn is not None else "",
+            "pd_beats_gan": pd_beats_gan if pd_beats_gan is not None else "",
+            "mt_beats_gan": mt_beats_gan if mt_beats_gan is not None else "",
+            "mt_gan_recovered": mt_gan_recovery.get(name, {}).get("recovered", ""),
+            "mt_gan_total": len(mt_gan_wins) if mt_gan_wins else "",
+            "pd_mean_sublevel_known": known["pd_mean"] if known else "",
+            "mt_mean_sublevel_known": known["mt_mean"] if known else "",
+        })
+
+    with CSV_SUMMARY.open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(summary_rows[0].keys()))
+        w.writeheader()
+        w.writerows(summary_rows)
+    print(f"Written: {CSV_SUMMARY}")
+
+    # --- per-sample winner CSV ----------------------------------------------
+    winner_rows: List[Dict[str, object]] = []
+    for pos in range(N_EVAL):
+        pd_candidates = {n: method_results[n][pos][0] for n in completed
+                          if pos in method_results[n] and not math.isnan(method_results[n][pos][0])}
+        mt_candidates = {n: method_results[n][pos][1] for n in completed
+                          if pos in method_results[n] and not math.isnan(method_results[n][pos][1])}
+        pd_winner = min(pd_candidates, key=pd_candidates.get) if pd_candidates else "N/A"
+        mt_winner = min(mt_candidates, key=mt_candidates.get) if mt_candidates else "N/A"
+        winner_rows.append({
+            "sample_idx": pos,
+            "pos_idx": pos,
+            "pd_winner_superlevel": pd_winner,
+            "mt_winner_superlevel": mt_winner,
+            "was_mt_gan_win_superlevel_baseline": int(pos in mt_gan_wins),
+        })
+    _check(f"Winner CSV row count == {N_EVAL}", len(winner_rows) == N_EVAL)
+
+    with CSV_WINNER.open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(winner_rows[0].keys()))
+        w.writeheader()
+        w.writerows(winner_rows)
+    print(f"Written: {CSV_WINNER}")
+
+    # --- markdown report ------------------------------------------------------
+    md = io.StringIO()
+    md.write("# Superlevel topology robustness evaluation\n\n")
+    md.write(f"**Generated:** {datetime.date.today().isoformat()}\n\n")
+    md.write(
+        "**Method:** superlevel topology of speed `s` is computed as sublevel "
+        "topology of `-s`, using the unmodified TTK `ttkPersistenceDiagramCmd`/"
+        "`ttkMergeTreeCmd` commands on VTI files whose `wind_speed` array stores "
+        "`-sqrt(u^2+v^2)` (negated speed), not speed. No existing sublevel/default "
+        "topology output was read, modified, or overwritten, and no model was "
+        "retrained. All outputs live under `ttk_runs_fixed/superlevel_topology/`.\n\n"
+    )
+    md.write("**Note: lower PD/MT distance is better for both metrics, in both the "
+              "superlevel and sublevel evaluations.**\n\n")
+    md.write(f"**Samples evaluated per method:** {N_EVAL}\n\n")
+    md.write(f"**Methods completed:** {', '.join(completed)}\n\n")
+    skipped = [m for m in methods_run if m not in completed]
+    if skipped:
+        md.write(f"**Methods skipped/incomplete:** {', '.join(skipped)} "
+                 "(see console log / PASS-FAIL checklist for reasons)\n\n")
+    if mt_gan_wins:
+        md.write(f"**Superlevel MT-GAN baseline wins (GAN beats CNN on superlevel MT):** "
+                  f"{len(mt_gan_wins)} samples — {sorted(mt_gan_wins)}\n\n")
+
+    md.write("## Mean PD / MT by method (superlevel)\n\n")
+    md.write("| Method | PD mean (superlevel) | MT mean (superlevel) | PD mean (sublevel, known) | "
+              "MT mean (sublevel, known) |\n")
+    md.write("|---|---:|---:|---:|---:|\n")
+    for r in summary_rows:
+        md.write(f"| {r['method']} | {_fmt(r['pd_mean_superlevel'])} | {_fmt(r['mt_mean_superlevel'])} "
+                  f"| {_fmt(r['pd_mean_sublevel_known'] if r['pd_mean_sublevel_known'] != '' else None)} "
+                  f"| {_fmt(r['mt_mean_sublevel_known'] if r['mt_mean_sublevel_known'] != '' else None)} |\n")
+    md.write("\n")
+
+    md.write("## PD / MT wins vs CNN, beats-GAN counts (superlevel)\n\n")
+    md.write(f"| Method | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | "
+              f"MT-GAN recovered (/{len(mt_gan_wins)}) |\n")
+    md.write("|---|---:|---:|---:|---:|---:|\n")
+    for r in summary_rows:
+        md.write(f"| {r['method']} "
+                  f"| {r['pd_lt_cnn'] if r['pd_lt_cnn'] != '' else '--'}/{N_EVAL} "
+                  f"| {r['mt_lt_cnn'] if r['mt_lt_cnn'] != '' else '--'}/{N_EVAL} "
+                  f"| {r['pd_beats_gan'] if r['pd_beats_gan'] != '' else '--'}/{N_EVAL} "
+                  f"| {r['mt_beats_gan'] if r['mt_beats_gan'] != '' else '--'}/{N_EVAL} "
+                  f"| {r['mt_gan_recovered'] if r['mt_gan_recovered'] != '' else '--'} |\n")
+    md.write("\n")
+
+    md.write("## Winner distribution (superlevel)\n\n")
+    for label, col in (("PD", "pd_winner_superlevel"), ("MT", "mt_winner_superlevel")):
+        counts: Dict[str, int] = {}
+        for r in winner_rows:
+            counts[r[col]] = counts.get(r[col], 0) + 1
+        md.write(f"### {label} distance winners\n\n")
+        md.write("| Method | Wins |\n|---|---:|\n")
+        for name, c in sorted(counts.items(), key=lambda kv: -kv[1]):
+            md.write(f"| {name} | {c} |\n")
+        md.write("\n")
+
+    if mt_gan_wins:
+        md.write("## MT-GAN recovery detail (superlevel)\n\n")
+        md.write(f"Samples where GAN's superlevel MT distance beat CNN's superlevel MT "
+                  f"distance: {sorted(mt_gan_wins)}\n\n")
+        md.write("| Method | Recovered (winner becomes method) | Still GAN | Now CNN |\n")
+        md.write("|---|---:|---:|---:|\n")
+        for name, d in mt_gan_recovery.items():
+            md.write(f"| {name} | {d['recovered']} | {d['still_gan']} | {d['now_cnn']} |\n")
+        md.write("\n")
+
+    md.write("## Superlevel vs sublevel side-by-side (known values)\n\n")
+    md.write("| Method | PD superlevel | PD sublevel (known) | MT superlevel | MT sublevel (known) |\n")
+    md.write("|---|---:|---:|---:|---:|\n")
+    for r in summary_rows:
+        md.write(f"| {r['method']} | {_fmt(r['pd_mean_superlevel'])} "
+                  f"| {_fmt(r['pd_mean_sublevel_known'] if r['pd_mean_sublevel_known'] != '' else None)} "
+                  f"| {_fmt(r['mt_mean_superlevel'])} "
+                  f"| {_fmt(r['mt_mean_sublevel_known'] if r['mt_mean_sublevel_known'] != '' else None)} |\n")
+    md.write("\n")
+
+    md.write("## Output files\n\n")
+    md.write(f"- `{CSV_PER_SAMPLE.relative_to(REPO_ROOT)}` — per-sample PD/MT distances, one row per (method, sample)\n")
+    md.write(f"- `{CSV_SUMMARY.relative_to(REPO_ROOT)}` — per-method summary statistics\n")
+    md.write(f"- `{CSV_WINNER.relative_to(REPO_ROOT)}` — per-sample PD/MT winner across all completed methods\n")
+    md.write(f"- `{REPORT_PATH.relative_to(REPO_ROOT)}` — this report\n\n")
+
+    md.write("## Notes\n\n")
+    md.write("- PD distance = bottleneck distance between persistence diagrams "
+              "(`ttkBottleneckDistance`), computed on the negated (`-speed`) scalar field.\n")
+    md.write("- MT distance = Wasserstein-type merge tree distance "
+              "(`ttkMergeTreeDistanceMatrix`), computed on the negated (`-speed`) scalar field.\n")
+    md.write("- Both use 160x160 speed patches at (x0=0, y0=0), matching the sublevel baseline convention.\n")
+    md.write("- **Lower distance is better for both metrics, in both the superlevel and sublevel domains.**\n")
+    md.write("- Existing sublevel/default topology outputs and all candidate data_out*/models*/ "
+              "outputs were never read for writing, modified, or overwritten by this script.\n")
+    md.write("- No model was retrained to produce this evaluation.\n")
+
+    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    REPORT_PATH.write_text(md.getvalue(), encoding="utf-8")
+    print(f"Written: {REPORT_PATH}")
+
+    return all_ok, checklist
+
+
+# ---------------------------------------------------------------------------
+# Safety / discrepancy checks
+# ---------------------------------------------------------------------------
+
+def run_safety_checks() -> List[str]:
+    lines: List[str] = []
+
+    def _check(label: str, ok: bool) -> None:
+        lines.append(f"[{'PASS' if ok else 'FAIL'}] {label}")
+
+    for d in _PROTECTED_SUBLEVEL_DIRS:
+        _check(f"OUT_ROOT does not overlap protected sublevel dir {d.relative_to(REPO_ROOT)}",
+               not _is_inside(OUT_ROOT, d) and not _is_inside(d, OUT_ROOT))
+    for d in _PROTECTED_READ_ONLY_DIRS:
+        _check(f"OUT_ROOT does not overlap read-only data dir {d.relative_to(REPO_ROOT)}",
+               not _is_inside(OUT_ROOT, d))
+    _check("OUT_ROOT resolves under ttk_runs_fixed/superlevel_topology",
+           _is_inside(OUT_ROOT, REPO_ROOT / "ttk_runs_fixed" / "superlevel_topology"))
+    _check("REPORT_PATH resolves under docs/", _is_inside(REPORT_PATH, REPO_ROOT / "docs"))
+    for csv_path in (CSV_PER_SAMPLE, CSV_SUMMARY, CSV_WINNER):
+        _check(f"{csv_path.name} resolves under OUT_ROOT", _is_inside(csv_path, OUT_ROOT))
+
+    return lines
+
+
+# ---------------------------------------------------------------------------
+# Orchestration
+# ---------------------------------------------------------------------------
+
+def _parse_args() -> argparse.Namespace:
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--dry-run", action="store_true",
+                       help="Verify inputs and print the plan; no Docker/TTK calls, no writes.")
+    mode.add_argument("--run", action="store_true",
+                       help="Execute the full pipeline (VTI + TTK + distances + report).")
+    ap.add_argument("--methods", default=None,
+                     help="Comma-separated subset of method names to evaluate "
+                          "(default: all of DEFAULT_METHODS).")
+    ap.add_argument("--threads", type=int, default=THREADS_DEFAULT,
+                     help=f"TTK thread count per Docker call (default: {THREADS_DEFAULT}).")
+
+    # Hidden worker mode (invoked recursively, typically inside Docker).
+    ap.add_argument("--_vti-worker", action="store_true", help=argparse.SUPPRESS)
+    ap.add_argument("--input", default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--outdir", default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--label", default=None, help=argparse.SUPPRESS)
+    ap.add_argument("--samples", type=int, nargs="+", default=None, help=argparse.SUPPRESS)
+
+    return ap.parse_args()
+
+
+def main() -> int:
+    args = _parse_args()
+
+    if getattr(args, "_vti_worker"):
+        return vti_worker_main(args)
+
+    if not args.dry_run and not args.run:
+        print("[error] exactly one of --dry-run or --run is required.")
+        return 2
+
+    dry_run = bool(args.dry_run)
+
+    if args.methods:
+        requested = [s.strip() for s in args.methods.split(",") if s.strip()]
+        unknown = [r for r in requested if r not in DEFAULT_METHODS]
+        if unknown:
+            print(f"[error] unknown method name(s) in --methods: {unknown}. "
+                  f"Known methods: {sorted(DEFAULT_METHODS)}")
+            return 2
+        methods = {r: DEFAULT_METHODS[r] for r in requested}
+    else:
+        methods = dict(DEFAULT_METHODS)
+
+    print("=" * 72)
+    print(f"Superlevel topology robustness evaluation ({'DRY RUN' if dry_run else 'RUN'})")
+    print("=" * 72)
+    print(f"  Methods requested : {list(methods)}")
+    print(f"  Output root       : {OUT_ROOT}")
+    print(f"  Report path       : {REPORT_PATH}")
+    print(f"  Threads           : {args.threads}")
+    print("=" * 72)
+    print()
+
+    print("--- Safety checks ---")
+    safety_lines = run_safety_checks()
+    for line in safety_lines:
+        print(f"  {line}")
+    if any(l.startswith("[FAIL]") for l in safety_lines):
+        print("[error] safety checks failed; aborting before touching any output path.")
+        return 1
+    print()
+
+    print("--- Stage 0: input verification ---")
+    verified: Dict[str, MethodInputs] = {}
+    for name, rel_dir in methods.items():
+        verified[name] = verify_method_inputs(name, REPO_ROOT / rel_dir)
+    print()
+
+    print("--- GT alignment across methods ---")
+    align_warnings = check_gt_alignment(verified, REFERENCE_METHOD)
+    for w in align_warnings:
+        print(f"  [warn] {w}")
+    print()
+
+    ok_methods = [n for n, m in verified.items() if m.ok]
+    if not ok_methods:
+        print("[warn] no methods passed input verification -- nothing to evaluate.")
+        print()
+        checklist = [f"[{'FAIL'}] at least one method available"] + safety_lines
+        print("--- Final PASS/FAIL checklist ---")
+        for line in checklist:
+            print(f"  {line}")
+        return 0 if dry_run else 1
+
+    if dry_run:
+        print("--- Stage 1-3 plan (dry-run; nothing executed) ---")
+        for name in ok_methods:
+            vti_dir = method_vti_dir(name)
+            topo_dir = method_topology_dir(name)
+            print(f"  {name}:")
+            print(f"    VTI dir      : {vti_dir}  (would write {2 * N_EVAL} files: "
+                  f"{N_EVAL} GT + {N_EVAL} SR, each storing -speed)")
+            print(f"    Topology dir : {topo_dir}")
+            print(f"    Expect       : VTI={2 * N_EVAL} PD={2 * N_EVAL} "
+                  f"MT_port0={2 * N_EVAL} MT_port1={2 * N_EVAL} MT_port2={2 * N_EVAL}")
+        print()
+        print("--- Final PASS/FAIL checklist (dry-run) ---")
+        checklist = safety_lines + [f"[PASS] input verification: {name}" for name in ok_methods]
+        checklist += [f"[SKIP-dry-run] {name}: VTI/TTK/distance stages not executed" for name in ok_methods]
+        for line in checklist:
+            print(f"  {line}")
+        print()
+        print("Dry run complete. No Docker/TTK calls were made; no files were written "
+              "under ttk_runs_fixed/ or docs/.")
+        return 0
+
+    # --run mode below this point.
+    method_results: Dict[str, Dict[int, Tuple[float, float]]] = {}
+    stage_checklist: List[str] = list(safety_lines)
+
+    for name in ok_methods:
+        print(f"--- {name}: Stage 1 (VTI generation) ---")
+        vti_ok = generate_vti_for_method(name, verified[name], dry_run=False)
+        stage_checklist.append(f"[{'PASS' if vti_ok else 'FAIL'}] {name}: VTI generation")
+
+        print(f"--- {name}: Stage 2 (TTK PD/MT extraction) ---")
+        extraction_ok, counts = run_ttk_extraction(name, threads=args.threads, dry_run=False)
+        stage_checklist.append(
+            f"[{'PASS' if extraction_ok else 'FAIL'}] {name}: complete TTK outputs "
+            f"(VTI={counts['vti']} PD={counts['pd']} MT_p0={counts['mt_port0']} "
+            f"MT_p1={counts['mt_port1']} MT_p2={counts['mt_port2']}, expect {2 * N_EVAL} each)"
+        )
+        if not (vti_ok and extraction_ok):
+            print(f"  [error] {name}: hard-failing (VTI/TTK stage incomplete); "
+                  "skipping distance computation for this method.")
+            continue
+
+        print(f"--- {name}: Stage 3 (distance computation) ---")
+        results_csv = run_distance_computation(name, dry_run=False)
+        if results_csv is None:
+            stage_checklist.append(f"[FAIL] {name}: distance computation")
+            continue
+        stage_checklist.append(f"[PASS] {name}: distance computation")
+
+        dists = load_phase_c_results(results_csv, method_filter=name)
+        stage_checklist.append(
+            f"[{'PASS' if len(dists) == N_EVAL else 'FAIL'}] {name}: "
+            f"phase_c_results.csv row count for method={name!r} == {N_EVAL} (got {len(dists)})"
+        )
+        method_results[name] = dists
+        print()
+
+    print("--- Stage 4: combined CSVs + report ---")
+    outputs_ok, outputs_checklist = build_outputs(method_results, ok_methods)
+    stage_checklist += outputs_checklist
+    print()
+
+    print("--- Final PASS/FAIL checklist ---")
+    for line in stage_checklist:
+        print(f"  {line}")
+
+    overall_ok = all(l.startswith("[PASS]") or l.startswith("[SKIP") for l in stage_checklist)
+    print()
+    print("Superlevel topology robustness evaluation "
+          f"{'COMPLETE (all checks passed)' if overall_ok else 'FINISHED WITH FAILURES'}.")
+    return 0 if overall_ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

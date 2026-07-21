@@ -12,7 +12,7 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: bicubic_interpolation
 - **data_out directory**: `data_out_fixed/wind_mrhr_bicubic`
 - **model directory**: `n/a`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv` [harvested_baseline_row]
 - **pairwise-vs-CNN CSV**: `(not resolved)`
 - **PD/MT per-sample CSV**: `(not resolved)` [not_found]
 - **topology comparison CSV**: `(not resolved)`
@@ -31,7 +31,7 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: pretrained_cnn
 - **data_out directory**: `data_out_fixed/wind_mrhr_cnn`
 - **model directory**: `models/wind_mr-hr/trained_cnn`
-- **cheap-metric CSV**: `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` [legacy_combined]
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv` [harvested_baseline_row]
 - **pairwise-vs-CNN CSV**: `(not resolved)`
 - **PD/MT per-sample CSV**: `ttk_runs_fixed/combined/phase_c_results.csv` [legacy_combined]
 - **topology comparison CSV**: `(not resolved)`
@@ -50,7 +50,7 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: pretrained_gan
 - **data_out directory**: `data_out_fixed/wind_mrhr_gan`
 - **model directory**: `models/wind_mr-hr/trained_gan`
-- **cheap-metric CSV**: `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` [legacy_combined]
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv` [harvested_baseline_row]
 - **pairwise-vs-CNN CSV**: `(not resolved)`
 - **PD/MT per-sample CSV**: `ttk_runs_fixed/combined/phase_c_results.csv` [legacy_combined]
 - **topology comparison CSV**: `(not resolved)`
@@ -69,10 +69,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateUV_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateUV_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_eval/all_sample_metrics_candidateUV_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_eval/pairwise_cnn_vs_candidateUV_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_topology/candidateUV_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_topology/candidateUV_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateUV_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateUV_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 29.6121
@@ -88,10 +88,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_factorial_speed_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_speed_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_eval/all_sample_metrics_candidateB_factorial_speed_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_speed_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_topology/candidateB_factorial_speed_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_topology/candidateB_factorial_speed_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_factorial_speed_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_factorial_speed_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 29.5783
@@ -107,10 +107,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_factorial_levelset_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_levelset_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_eval/all_sample_metrics_candidateB_factorial_levelset_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_levelset_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_topology/candidateB_factorial_levelset_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_topology/candidateB_factorial_levelset_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 29.5953
@@ -126,10 +126,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_factorial_speed_levelset_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_speed_levelset_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_eval/all_sample_metrics_candidateB_factorial_speed_levelset_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_speed_levelset_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_topology/candidateB_factorial_speed_levelset_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_topology/candidateB_factorial_speed_levelset_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 29.4363
@@ -145,10 +145,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_factorial_grad_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_grad_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_eval/all_sample_metrics_candidateB_factorial_grad_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_grad_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_topology/candidateB_factorial_grad_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_topology/candidateB_factorial_grad_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_factorial_grad_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_factorial_grad_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 22.9326
@@ -164,10 +164,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_factorial_speed_grad_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_speed_grad_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_eval/all_sample_metrics_candidateB_factorial_speed_grad_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_speed_grad_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_topology/candidateB_factorial_speed_grad_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_topology/candidateB_factorial_speed_grad_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 22.9706
@@ -183,10 +183,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_factorial_grad_levelset_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_grad_levelset_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_eval/all_sample_metrics_candidateB_factorial_grad_levelset_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_grad_levelset_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_topology/candidateB_factorial_grad_levelset_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_topology/candidateB_factorial_grad_levelset_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 22.6194
@@ -202,10 +202,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/all_sample_metrics_candidateB_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/pairwise_cnn_vs_candidateB_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/candidateB_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/candidateB_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 22.707
@@ -221,10 +221,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateC_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateC_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_eval/all_sample_metrics_candidateC_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_eval/pairwise_cnn_vs_candidateC_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_topology/candidateC_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_topology/candidateC_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateC_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateC_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 22.4944
@@ -240,10 +240,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateUV_plus_crit_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_eval/all_sample_metrics_candidateUV_plus_crit_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_eval/pairwise_cnn_vs_candidateUV_plus_crit_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology/candidateUV_plus_crit_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology/candidateUV_plus_crit_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 29.1143
@@ -259,10 +259,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_eval/all_sample_metrics_candidateUV_plus_E2_tf_lowlambda_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_eval/pairwise_cnn_vs_candidateUV_plus_E2_tf_lowlambda_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/candidateUV_plus_E2_tf_lowlambda_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 25.0721
@@ -278,10 +278,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_plus_E2_tf_lowlambda_expanded2688_eval/all_sample_metrics_candidateB_plus_E2_tf_lowlambda_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_plus_E2_tf_lowlambda_expanded2688_eval/pairwise_cnn_vs_candidateB_plus_E2_tf_lowlambda_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_plus_E2_tf_lowlambda_expanded2688_topology/candidateB_plus_E2_tf_lowlambda_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateB_plus_E2_tf_lowlambda_expanded2688_topology/candidateB_plus_E2_tf_lowlambda_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 23.9876
@@ -297,10 +297,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateE2_tf_lowlambda_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateE2_tf_lowlambda_expanded2688_eval/all_sample_metrics_candidateE2_tf_lowlambda_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateE2_tf_lowlambda_expanded2688_eval/pairwise_cnn_vs_candidateE2_tf_lowlambda_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateE2_tf_lowlambda_expanded2688_topology/candidateE2_tf_lowlambda_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateE2_tf_lowlambda_expanded2688_topology/candidateE2_tf_lowlambda_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateE2_tf_lowlambda_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateE2_tf_lowlambda_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 24.2686
@@ -316,10 +316,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateF_grad_E2_low_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_eval/all_sample_metrics_candidateF_grad_E2_low_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_eval/pairwise_cnn_vs_candidateF_grad_E2_low_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology/candidateF_grad_E2_low_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology/candidateF_grad_E2_low_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 23.8382
@@ -335,10 +335,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_levelset_E2_low_expanded2688_eval/all_sample_metrics_candidateF_grad_levelset_E2_low_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_levelset_E2_low_expanded2688_eval/pairwise_cnn_vs_candidateF_grad_levelset_E2_low_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_levelset_E2_low_expanded2688_topology/candidateF_grad_levelset_E2_low_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_levelset_E2_low_expanded2688_topology/candidateF_grad_levelset_E2_low_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateF_grad_levelset_E2_low_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateF_grad_levelset_E2_low_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 23.7481
@@ -354,10 +354,10 @@ Human-readable reference for every primary method in the Phase-1 unified evaluat
 - **architecture**: native_tf
 - **data_out directory**: `data_out/wind_finetune_candidateF_grad_crit_expanded2688`
 - **model directory**: `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_crit_expanded2688`
-- **cheap-metric CSV**: `(not resolved)` [not_found]
-- **pairwise-vs-CNN CSV**: `(not resolved)`
-- **PD/MT per-sample CSV**: `(not resolved)` [not_found]
-- **topology comparison CSV**: `(not resolved)`
+- **cheap-metric CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_crit_expanded2688_eval/all_sample_metrics_candidateF_grad_crit_expanded2688.csv` [exact_path]
+- **pairwise-vs-CNN CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_crit_expanded2688_eval/pairwise_cnn_vs_candidateF_grad_crit_expanded2688.csv`
+- **PD/MT per-sample CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_crit_expanded2688_topology/candidateF_grad_crit_expanded2688_pd_mt_distances.csv` [exact_path]
+- **topology comparison CSV**: `ttk_runs_fixed/topology_finetuning/candidateF_grad_crit_expanded2688_topology/candidateF_grad_crit_expanded2688_topology_comparison.csv`
 - **cheap report**: `docs/topology_finetuning_candidateF_grad_crit_expanded2688_eval.md`
 - **topology report**: `docs/topology_finetuning_candidateF_grad_crit_expanded2688_topology_eval.md`
 - **expected validation PD mean**: 22.0179

@@ -1702,3 +1702,9108 @@ When the validated reconstruction was completed, the status by stage was:
 - repaired figure-set generation: **inventory-level exact structural match**
 
 These are the reconstruction outcomes that should be treated as the expected reference state. The remaining caveats are bounded and explicitly documented; none represent a massive deviation from the original validated conclusions.
+
+
+# Part VIII — Codex pipeline audit and Spark verification notes
+
+This section records the later repository audit performed with Codex, together with the Spark verification commands that were run afterward. The goal is to make the representation choices, topology-distance semantics, and reproducibility checks explicit enough that another researcher can reconstruct not only the dataset path, but also the exact meaning of the reported PSNR / SSIM / PD / MT results.
+
+## 1. Plain-English verdict from the audit
+
+The current study is **valid as an evaluation of derived wind-speed magnitude** `sqrt(u^2 + v^2)`, not as a direct evaluation of the model's original training target. The PhIRE models are trained to predict normalized two-channel velocity components `[u, v]`, while the topology branch, SSIM branch, and physics-metric branch all operate on the scalar speed magnitude derived from those components. There is therefore **no representation mismatch within the topology branch itself**, but there is a **representation mismatch between PSNR and the rest of the study**, because PSNR is currently computed on the raw `[u, v]` tensor while SSIM, topology, and physics metrics are computed on speed magnitude.
+
+This distinction should be preserved explicitly in both the methods notes and the paper.
+
+---
+
+## 2. What the model is actually trained to predict
+
+The audit found that the model target is the normalized two-channel wind-velocity field `[u, v]`, not scalar speed magnitude.
+
+### Repo-specific evidence recovered by the audit
+
+- `build_wtk_tfrecords.py` converts raw WIND Toolkit fields to vector components (audit notes: lines 72--73):
+
+```python
+u = -wind_speed * np.sin(dir_rad)
+v = -wind_speed * np.cos(dir_rad)
+```
+
+- `PhIREGANs.py` applies per-channel normalization before the model sees the data (audit notes: normalization path around lines 422, 457--459, 479--483).
+- `run_paired_wind_mr_hr.py` and `run_paired_wind_mr_hr_cnn.py` use the same two-channel `mu_sig` statistics for `[u, v]` (audit notes cite `run_paired_wind_mr_hr.py:8` and `run_paired_wind_mr_hr_cnn.py:7`).
+- `PhIREGANs.py` computes MSE loss over all channels together during pretraining, confirming that the model predicts the full 2-channel field.
+
+### Practical interpretation
+
+The model never sees scalar speed as its training target. The speed field used in the topology/SSIM/physics analysis is a **derived quantity** computed later from the denormalized `[u, v]` outputs.
+
+---
+
+## 3. What is stored in `dataIN.npy`, `dataGT.npy`, and `dataSR.npy`
+
+The audit concluded that all saved arrays are denormalized two-channel velocity fields in physical units (m/s):
+
+- `dataIN.npy` = LR input `[u, v]`
+- `dataGT.npy` = HR ground-truth `[u, v]`
+- `dataSR.npy` = SR prediction `[u, v]`
+
+The saved arrays are not scalar speed fields. Speed magnitude is always derived on-the-fly downstream.
+
+### Spark verification run
+
+The following command was run on Spark:
+
+```bash
+python3 - <<'EOF'
+import numpy as np
+for tag, p in [("CNN", "data_out/wind_mrhr_cnn"), ("GAN", "data_out/wind_mrhr_gan")]:
+    gt = np.load(f"{p}/dataGT.npy")
+    sr = np.load(f"{p}/dataSR.npy")
+    idx = np.load(f"{p}/idx.npy")
+    print(f"\n=== {tag} ===")
+    print(f"  dataGT shape: {gt.shape}  dtype: {gt.dtype}")
+    print(f"  dataSR shape: {sr.shape}  dtype: {sr.dtype}")
+    print(f"  idx.npy shape: {idx.shape}  values[:5]: {idx[:5]}")
+    print(f"  GT u range: [{gt[...,0].min():.3f}, {gt[...,0].max():.3f}]  mean={gt[...,0].mean():.3f}")
+    print(f"  GT v range: [{gt[...,1].min():.3f}, {gt[...,1].max():.3f}]  mean={gt[...,1].mean():.3f}")
+    speed_gt = np.sqrt(gt[...,0]**2 + gt[...,1]**2)
+    speed_sr = np.sqrt(sr[...,0]**2 + sr[...,1]**2)
+    print(f"  GT speed range: [{speed_gt.min():.3f}, {speed_gt.max():.3f}]  mean={speed_gt.mean():.3f}")
+    print(f"  SR speed range: [{speed_sr.min():.3f}, {speed_sr.max():.3f}]  mean={speed_sr.mean():.3f}")
+    print(f"  CNN GT==GAN GT (sample 0): {np.allclose(np.load('data_out/wind_mrhr_cnn/dataGT.npy')[0], np.load('data_out/wind_mrhr_gan/dataGT.npy')[0])}")
+EOF
+```
+
+Observed output:
+
+```text
+=== CNN ===
+  dataGT shape: (168, 500, 500, 2)  dtype: float64
+  dataSR shape: (168, 500, 500, 2)  dtype: float64
+  idx.npy shape: (168,)  values[:5]: [0 1 2 3 4]
+  GT u range: [-16.174, 30.812]  mean=4.299
+  GT v range: [-30.468, 28.131]  mean=4.054
+  GT speed range: [0.012, 33.988]  mean=9.628
+  SR speed range: [0.000, 51.454]  mean=13.688
+  CNN GT==GAN GT (sample 0): True
+
+=== GAN ===
+  dataGT shape: (168, 500, 500, 2)  dtype: float64
+  dataSR shape: (168, 500, 500, 2)  dtype: float64
+  idx.npy shape: (168,)  values[:5]: [0 1 2 3 4]
+  GT u range: [-16.174, 30.812]  mean=4.299
+  GT v range: [-30.468, 28.131]  mean=4.054
+  GT speed range: [0.012, 33.988]  mean=9.628
+  SR speed range: [0.001, 64.836]  mean=14.149
+  CNN GT==GAN GT (sample 0): True
+```
+
+### Interpretation
+
+This confirms that the saved outputs are 2-channel vector fields of shape `(168, 500, 500, 2)` and that CNN and GAN share the same ground truth.
+
+---
+
+## 4. What scalar field is actually fed into VTI / TTK
+
+The scalar field written into every VTI file is **wind-speed magnitude**, computed from the denormalized vector field in `convert_phire_to_vti.py` (audit notes: lines 145--156):
+
+```python
+field = np.sqrt(u**2 + v**2)
+array_name = "wind_speed"
+```
+
+This conversion happens in `scripts/convert_phire_to_vti.py`, and the same conversion path is used for:
+
+- GT
+- CNN SR
+- GAN SR
+
+There is therefore **no asymmetry** in how GT and SR are converted for topology.
+
+### Practical consequence
+
+The topology pipeline is a study of **derived scalar speed magnitude**, not a study of the raw `[u, v]` training target.
+
+---
+
+## 5. Exact TTK call chain recovered by the audit
+
+The recovered pipeline has three TTK stages per sample.
+
+### Stage 1 — CLI extraction inside Docker
+
+From the recovered shell scripts:
+
+```bash
+ttkPersistenceDiagramCmd -t 20 -i vtk_inputs/<stem>.vti -a wind_speed -o <out_root>/<method>/pd/<stem>_pd
+ttkMergeTreeCmd          -t 20 -i vtk_inputs/<stem>.vti -a wind_speed -o <out_root>/<method>/mt/<stem>_mt
+```
+
+These commands always operate on the scalar array named `wind_speed`, i.e. `sqrt(u^2 + v^2)`.
+
+### Stage 2 — PD distance computation
+
+The main pipeline script is `scripts/compute_composite_tree_distance.py`.
+The audit found that the PD distance path instantiates:
+
+```python
+bd = ttk.ttkBottleneckDistance()
+```
+
+and then attempts to force the bottleneck / `L_\infty` Wasserstein case with:
+
+```python
+bd.SetWassersteinMetric(-1)
+```
+
+with a build-dependent fallback to `0` when needed.
+
+### Current best description of `pd_distance`
+
+The intended PD distance in the current study is:
+
+> **bottleneck distance** (equivalently the `L_\infty` Wasserstein case) between GT and SR persistence diagrams of wind-speed magnitude.
+
+### Important reproducibility caveat
+
+Because the TTK Python bindings vary across builds, the exact setter behavior depends on the Docker image. The command recommended by the audit is:
+
+```bash
+docker run --rm phire-ttk:latest python3 - <<'EOF'
+import topologytoolkit as ttk
+bd = ttk.ttkBottleneckDistance()
+has_setter = hasattr(bd, "SetWassersteinMetric")
+print(f"SetWassersteinMetric available: {has_setter}")
+if has_setter:
+    try:
+        bd.SetWassersteinMetric(-1)
+        print("SetWassersteinMetric(-1) succeeded — distance is bottleneck (L∞)")
+    except Exception as e:
+        try:
+            bd.SetWassersteinMetric(0)
+            print(f"SetWassersteinMetric(-1) failed ({e}); SetWassersteinMetric(0) used — check TTK docs for this build's encoding")
+        except Exception as e2:
+            print(f"Both SetWassersteinMetric calls failed: {e2} — using TTK build default")
+else:
+    print("SetWassersteinMetric not exposed — using TTK build default (check TTK version)")
+EOF
+```
+
+This command was run on Spark during the later audit pass, but the output was not preserved in the notes captured here. Therefore, the precise setter result should still be treated as a pending confirmation unless the shell output is recovered separately.
+
+### Stage 3 — MT distance computation
+
+The same script computes MT distance through:
+
+```python
+flt = ttk.ttkMergeTreeDistanceMatrix()
+```
+
+with `SetOutputDistanceMatrix(1)`, `SetComputeDistanceMatrix(1)`, and `SetThreadNumber(1)`, and extracts the off-diagonal value of the `2 × 2` GT/SR distance matrix.
+
+### Current best description of `mt_distance`
+
+The current study uses:
+
+> **TTK merge-tree distance** returned by `ttkMergeTreeDistanceMatrix`, i.e. a Wasserstein-type merge-tree edit distance between GT and SR merge trees of wind-speed magnitude.
+
+### Important methodological note
+
+This means the current paper should **not** describe `d_MT` as the geometry-aware labeled interleaving distance of Yan et al. unless that distance is actually rerun separately. The current implementation uses TTK's merge-tree distance machinery, not the geometry-aware interleaving framework.
+
+---
+
+## 6. Representation consistency checks from the audit
+
+### 6.1 Sample alignment
+
+The audit found the sample alignment to be consistent:
+
+- positional indexing is used consistently across `dataGT.npy`, `dataSR.npy`, VTI generation, and SSIM evaluation,
+- `idx.npy` is sequential in the validated run.
+
+Spark verification run:
+
+```bash
+python3 - <<'EOF'
+import numpy as np
+for tag, p in [("CNN", "data_out/wind_mrhr_cnn"), ("GAN", "data_out/wind_mrhr_gan")]:
+    idx = np.load(f"{p}/idx.npy")
+    diff = np.diff(idx)
+    print(f"{tag} idx[:10]={idx[:10]}  all sequential: {np.all(diff==1)}")
+    if not np.all(diff==1):
+        print(f"  WARNING: gaps at positions {np.where(diff!=1)[0]}")
+EOF
+```
+
+Observed output:
+
+```text
+CNN idx[:10]=[0 1 2 3 4 5 6 7 8 9]  all sequential: True
+GAN idx[:10]=[0 1 2 3 4 5 6 7 8 9]  all sequential: True
+```
+
+### 6.2 GT identity between CNN and GAN runs
+
+Spark verification run:
+
+```bash
+python3 - <<'EOF'
+import numpy as np
+cnn_gt = np.load("data_out/wind_mrhr_cnn/dataGT.npy")
+gan_gt = np.load("data_out/wind_mrhr_gan/dataGT.npy")
+print(f"CNN GT shape: {cnn_gt.shape}")
+print(f"GAN GT shape: {gan_gt.shape}")
+if cnn_gt.shape == gan_gt.shape:
+    print(f"GT arrays identical: {np.allclose(cnn_gt, gan_gt)}")
+    print(f"Max GT diff: {np.abs(cnn_gt - gan_gt).max()}")
+else:
+    print("WARNING: shapes differ — they may have been produced from different test sets")
+EOF
+```
+
+Observed output:
+
+```text
+CNN GT shape: (168, 500, 500, 2)
+GAN GT shape: (168, 500, 500, 2)
+GT arrays identical: True
+Max GT diff: 0.0
+```
+
+### 6.3 PSNR representation mismatch check
+
+The audit flagged that PSNR is currently computed on the full `[u, v]` tensor, while SSIM / topology / physics metrics are all on speed magnitude.
+
+Spark verification run:
+
+```bash
+python3 - <<'EOF'
+import numpy as np, math
+gt = np.load("data_out/wind_mrhr_cnn/dataGT.npy")
+sr = np.load("data_out/wind_mrhr_cnn/dataSR.npy")
+# PSNR as computed in analysis_compare.py (on [u,v] jointly)
+d = sr - gt
+mse_uv = np.mean(d*d, axis=(1,2,3))
+dr_uv  = gt.max(axis=(1,2,3)) - gt.min(axis=(1,2,3))
+psnr_uv = [20*math.log10(float(dr_uv[i])) - 10*math.log10(float(mse_uv[i])) for i in range(len(mse_uv))]
+# PSNR on speed magnitude
+speed_gt = np.sqrt(gt[...,0]**2 + gt[...,1]**2)
+speed_sr = np.sqrt(sr[...,0]**2 + sr[...,1]**2)
+mse_spd  = np.mean((speed_sr - speed_gt)**2, axis=(1,2))
+dr_spd   = speed_gt.max(axis=(1,2)) - speed_gt.min(axis=(1,2))
+psnr_spd = [20*math.log10(float(dr_spd[i])) - 10*math.log10(float(mse_spd[i])) for i in range(len(mse_spd))]
+print("Sample  PSNR_uv  PSNR_speed  (should differ if representation matters)")
+for i in range(min(5, len(psnr_uv))):
+    print(f"  {i}:   {psnr_uv[i]:.2f}    {psnr_spd[i]:.2f}")
+EOF
+```
+
+Observed output:
+
+```text
+Sample  PSNR_uv  PSNR_speed  (should differ if representation matters)
+  0:   16.80    15.90
+  1:   16.76    15.71
+  2:   16.33    15.14
+  3:   16.19    14.86
+  4:   15.53    14.49
+```
+
+### Interpretation
+
+The difference is systematic rather than negligible. This confirms that the paper should explicitly describe the current PSNR as a **vector-field PSNR** and treat any future speed-based PSNR as a separate optional follow-up analysis.
+
+---
+
+## 7. Why GT / CNN / GAN may look visually different
+
+The audit ranked the most likely causes as follows:
+
+1. **MSE training smooths CNN outputs** relative to GT.
+2. **Color-scale mismatch** can exaggerate differences if panels are not plotted on a shared scale.
+3. **GAN adversarial artifacts** can create fine structure not present in GT.
+4. **Nonlinear vector-to-speed conversion** can magnify or suppress perceived differences.
+5. **Patch placement** may emphasize a difficult region.
+6. **Index alignment mismatch** was checked and is less likely in the validated run.
+
+The recommended sanity visualization command was run on Spark and saved `sanity_uv_speed.png` successfully. The Axes3D warning emitted by matplotlib is benign in this context and did not prevent plot creation.
+
+---
+
+## 8. Minimal code changes recommended by the audit
+
+The audit recommended the following small follow-up changes:
+
+1. **Relabel current PSNR explicitly** as vector-field PSNR, or add a clear note that it is computed on `[u, v]` while SSIM / topology / physics are on speed.
+2. **Optionally add `psnr_speed`** as an additional column so that PSNR, SSIM, PD, and MT all share the same scalar representation.
+3. **Assert GT-array identity** between CNN and GAN runs at the start of the combined analysis scripts to catch any future test-set divergence.
+
+These are best treated as post-audit cleanup improvements rather than as mandatory reruns for the current paper.
+
+---
+
+## 9. Practical paper wording implications
+
+The Codex audit implies the following wording changes in the paper and methods notes:
+
+### 9.1 What the study should be called
+
+The current study is best described as:
+
+> a descriptor-specific post hoc evaluation of **derived wind-speed magnitude** computed from PhIRE GAN/CNN `[u, v]` outputs.
+
+### 9.2 What should not be claimed
+
+The current paper should **not** imply that:
+
+- topology was computed directly on the original `[u, v]` training target,
+- `d_PD` was a generic Wasserstein distance unless the implementation is changed,
+- `d_MT` was the geometry-aware labeled interleaving distance unless that alternative method is rerun explicitly.
+
+### 9.3 What is safe to say now
+
+It is safe to say that:
+
+- the PhIRE models predict denormalized `[u, v]` velocity components,
+- the topology / SSIM / physics branches all operate on the derived scalar speed field,
+- the conversion from `[u, v]` to speed is identical for GT, CNN, and GAN,
+- the topology branch is therefore internally consistent,
+- the current PD distance is the TTK bottleneck-distance path,
+- the current MT distance is the TTK `MergeTreeDistanceMatrix` path,
+- and the present paper evaluates descriptor behavior on derived wind-speed magnitude rather than on the full original vector-field target.
+
+---
+
+## 10. Recommended follow-up analyses after the current paper draft
+
+Two follow-up analyses remain scientifically attractive but are not required to validate the current paper draft:
+
+### A. Replace / augment PD bottleneck with Wasserstein-p PD distance
+
+The current main pipeline uses the bottleneck-distance path. A separate rerun using the alternate Wasserstein-p PD script would be a useful future comparison, but it is not required to support the current claims.
+
+### B. Add speed-based PSNR
+
+The current main paper can explicitly state that PSNR is on `[u, v]` while SSIM/topology/physics are on speed magnitude. A future analysis can add `psnr_speed` so that all metrics live on the same scalar field.
+
+These should be treated as optional follow-up experiments rather than as blockers for the current paper.
+
+
+
+---
+
+# Part VII.B — Internal authorship of the 168-sample TFRecords and paper-framing note
+
+## 1. What the 168-sample TFRecords actually are
+
+The 168-sample wind TFRecords used in this project were generated by the author, not provided as-is by NREL or by the original PhIRE repository. They were created by extending the original small-sample wind example-data workflow from 5 samples to 168 samples and by using a different but related WIND Toolkit slice. The sample-generation prompts explicitly describe editing `build_example_data_extension_500.py`, changing `N_SAMPLES` from `5` to `168`, setting `SAMPLE_INDICES = list(range(N_SAMPLES))`, writing the larger TFRecords into `example_data_extension_500/`, and then installing those TFRecords into `example_data/` before running paired inference.
+
+## 2. Ethical framing implication
+
+This distinction matters for the paper. The MR-construction error that was later diagnosed and corrected was an error in the author's own internally generated 168-sample evaluation artifacts, not an error in the original NREL-distributed or PhIRE-distributed example data. Therefore:
+
+- the repair/correction history should be documented for transparency,
+- but it should **not** be presented as a scientific contribution of the paper,
+- and it should **not** be phrased as if an externally supplied benchmark dataset was broken and then fixed by the paper.
+
+A cleaner framing is:
+
+> the paper studies MT vs. PD behavior on a validated 168-sample evaluation set constructed for this study; the detailed internal repair/correction history belongs in reproducibility notes or an appendix.
+
+## 3. What is appropriate to say in the main paper
+
+In the main paper, it is appropriate to say that:
+
+- the 168-sample evaluation set was constructed for this study from WIND Toolkit source data,
+- all reported results use the final validated version of that evaluation set,
+- detailed internal repair/correction history is documented separately,
+- and the scientific contributions concern descriptor behavior (MT vs. PD), not the act of fixing an internal preprocessing mistake.
+
+In particular, the paper should avoid listing the corrected pipeline itself as a contribution. A better contribution list is limited to:
+
+- the post hoc descriptor-specific evaluation framework,
+- the empirical characterization of the ambiguous regime on this evaluation set,
+- the MT-vs-PD selector ablation,
+- and the trend-analysis characterization of MT vs. PD behavior.
+
+## 4. What is appropriate to keep in notes / appendix
+
+The following belong naturally in the notes file and, if desired, in a supplement or appendix rather than in the paper's main contribution framing:
+
+- the full internal repair strategy prompts,
+- the chronological chat-based diagnosis path,
+- the Spark repair and rerun command history,
+- the pair-audit and forensic-audit scripts used to validate the final evaluation set,
+- and the distinction between early flawed internal versions and the final validated artifact.
+
+## 5. Supporting validation evidence to retain here
+
+The internal-validation record is still useful and should remain documented here. In particular:
+
+- Spark audit commands confirmed that `dataGT.npy` and `dataSR.npy` are shape `(168, 500, 500, 2)` and that the stored fields are denormalized vector outputs in physical units.
+- `idx.npy` was sequential in both CNN and GAN runs (`0..167`).
+- GT arrays were identical between CNN and GAN runs with `np.allclose(...) == True` and `max diff = 0.0`.
+- The `audit_wind_mr_hr_pairing.py` smoke test and full audit both completed successfully for `example_data_extension_500/wind_MR-HR.tfrecord`, writing `per_sample_metrics.csv`, `orientation_check.csv`, `summary.md`, and diagnostic figures despite environment warnings.
+
+These checks strengthen confidence in the final validated evaluation set, but they should be used as methodological support rather than paper-level contributions.
+
+## 6. Recommended paper-language rule
+
+A simple rule for future writing is:
+
+- In the **main paper**, say **validated 168-sample evaluation set constructed for this study**.
+- In the **appendix / reproducibility notes**, explain the internal MR-construction mistake, how it was diagnosed, and how the final validated artifact was produced.
+- Do **not** describe the repair itself as a contribution.
+
+---
+
+# Part VIII — Report-table CSV generation and robust all-metric sweep
+
+## Goal of this addition
+
+This section documents the reproducible generation of the report-table CSV files added to the paper and the robust all-sample metric sweep requested after the evaluator-bias audit. The goal is to make the tables in the paper reproducible from the final repaired artifacts instead of manually maintained.
+
+This stage covers:
+
+1. generating one CSV for each paper table derived from the final repaired metrics,
+2. generating a long-form and wide-form all-sample metric sweep across standard, topology, physics, and domain measures,
+3. explicitly listing unranked source columns so that no measurement column is silently ignored,
+4. preserving the code used to generate these tables in the repository.
+
+## New reproducibility script
+
+Add the following script to the repository:
+
+```text
+scripts/generate_report_tables_and_metric_sweep.py
+```
+
+A copy of this script was generated with this documentation. It reads the final repaired merged table and, when available, the repaired selector-ablation outputs:
+
+```text
+ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+ttk_runs_fixed/selector_ablation_full/
+```
+
+The script writes all derived table CSVs to:
+
+```text
+ttk_runs_fixed/report_tables/
+```
+
+## Command to regenerate all paper-table CSVs and metric sweeps
+
+Run from the repository root:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/generate_report_tables_and_metric_sweep.py \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --selector-ablation-dir ttk_runs_fixed/selector_ablation_full \
+  --out-dir ttk_runs_fixed/report_tables
+```
+
+Expected terminal output:
+
+```text
+Generated report tables and metric sweep CSVs in ttk_runs_fixed/report_tables
+```
+
+## Generated files
+
+The script generates the following files:
+
+```text
+ttk_runs_fixed/report_tables/table_near_tie_counts.csv
+ttk_runs_fixed/report_tables/table_all_sample_selector_winner_counts.csv
+ttk_runs_fixed/report_tables/table_domain_metric_winner_counts.csv
+ttk_runs_fixed/report_tables/table_selector_ablation_agreement.csv
+ttk_runs_fixed/report_tables/table_near_tie_validator_winners.csv
+ttk_runs_fixed/report_tables/table_opposite_direction_cases.csv
+ttk_runs_fixed/report_tables/metric_winner_summary_all_rankable.csv
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_long.csv
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+ttk_runs_fixed/report_tables/raw_numeric_measurements_long.csv
+ttk_runs_fixed/report_tables/unranked_source_columns.csv
+ttk_runs_fixed/report_tables/mt_gan_diagnostic_samples.csv
+ttk_runs_fixed/report_tables/README_report_tables.md
+```
+
+## Meaning of each generated CSV
+
+| File | Purpose |
+|---|---|
+| `table_near_tie_counts.csv` | Reproduces the paper table of SSIM near-tie counts for thresholds 0.03, 0.05, 0.075, and 0.10. |
+| `table_all_sample_selector_winner_counts.csv` | Reproduces the all-168 winner-count table for PSNR, SSIM, MT, PD, and the configured physics-group majority. |
+| `table_domain_metric_winner_counts.csv` | Reproduces the domain-metric decomposition table used in the paper. |
+| `table_selector_ablation_agreement.csv` | Reproduces the MT-vs-PD agreement table for the 0.05 and 0.075 SSIM near-tie selector-ablation regimes. |
+| `table_near_tie_validator_winners.csv` | Reproduces the independent-validator winner-count table inside the SSIM near-tie subsets. |
+| `table_opposite_direction_cases.csv` | Reproduces the table of SSIM-vs-MT opposite-direction cases. |
+| `metric_winner_summary_all_rankable.csv` | Robust sweep summary across all rankable standard, topology, physics, and domain metrics. |
+| `metric_sweep_all_samples_long.csv` | One row per sample and per rankable metric, including CNN value, GAN value, delta, criterion, and winner. |
+| `metric_sweep_all_samples_wide.csv` | One row per sample with CNN/GAN values, deltas, and winners for each rankable metric. |
+| `raw_numeric_measurements_long.csv` | Long-form export of every numeric source column for both CNN and GAN rows, including reference/raw GT/SR values. |
+| `unranked_source_columns.csv` | Explicit list of columns not used for winner comparisons, usually because they are GT/SR reference values or duplicated by an error/absolute-delta column. |
+| `mt_gan_diagnostic_samples.csv` | List of samples where MT selects GAN across all 168 samples. |
+
+## Winner criteria used by the script
+
+The script uses explicit winner rules for every rankable metric:
+
+| Metric type | Winner rule |
+|---|---|
+| PSNR | higher is better |
+| SSIM | higher is better |
+| MT distance | lower is better |
+| PD distance | lower is better |
+| Error/distance metrics such as MAE, RMSE, W1, PSD log-L2, gradient MAE | lower is better |
+| Signed bias or signed delta metrics | smaller absolute value is better |
+| GT/SR reference columns | not ranked directly; exported in `raw_numeric_measurements_long.csv` and listed in `unranked_source_columns.csv` when not part of the winner sweep |
+
+This distinction is important because columns such as `psd_slope_gt`, `psd_slope_sr`, `exceed_frac_gt_*`, and `exceed_frac_sr_*` are reference/model values rather than direct winner metrics. The corresponding signed-delta or absolute-delta columns are used for winner comparisons.
+
+## Paper-table reconstruction results
+
+The regenerated paper-table CSVs reproduce the current paper values:
+
+### SSIM near-tie counts
+
+| Threshold | Near-tie count | Interpretation |
+|---:|---:|---|
+| 0.03 | 4 | Too small |
+| 0.05 | 15 | Robustness check |
+| 0.075 | 36 | Primary regime |
+| 0.10 | 81 | Broader but looser |
+
+### All-sample selector behavior
+
+| Selector / validator | CNN wins | GAN wins | Ties / unavailable |
+|---|---:|---:|---:|
+| PSNR_uv | 168 | 0 | 0 |
+| SSIM | 168 | 0 | 0 |
+| Merge tree (MT) | 148 | 20 | 0 |
+| Bottleneck PD | 2 | 166 | 0 |
+| Physics group majority | 168 | 0 | 0 |
+
+The 20 MT-GAN diagnostic samples are:
+
+```text
+6 8 12 16 17 18 19 20 25 48 62 63 65 68 77 79 80 82 92 154
+```
+
+### Domain-metric decomposition across all 168 samples
+
+| Measure | CNN wins | GAN wins | Ties |
+|---|---:|---:|---:|
+| WPD bias absolute error | 115 | 53 | 0 |
+| WPD MAE | 168 | 0 | 0 |
+| WPD RMSE | 167 | 1 | 0 |
+| WPD Wasserstein-1 | 119 | 49 | 0 |
+| PSD log-L2 | 25 | 143 | 0 |
+| PSD slope absolute delta | 77 | 91 | 0 |
+| Gradient MAE | 168 | 0 | 0 |
+| Gradient Wasserstein-1 | 1 | 167 | 0 |
+| Gradient kurtosis absolute delta | 96 | 72 | 0 |
+| Exceedance absolute delta, s>5 | 112 | 56 | 0 |
+| Exceedance absolute delta, s>10 | 142 | 26 | 0 |
+| Exceedance absolute delta, s>15 | 101 | 67 | 0 |
+| Exceedance absolute delta, p90 | 104 | 64 | 0 |
+| Exceedance absolute delta, p95 | 83 | 85 | 0 |
+| Exceedance absolute delta, p99 | 76 | 92 | 0 |
+
+This confirms that the configured physics-group majority is CNN-favoring, but the full domain-metric sweep is not uniformly CNN-favoring. GAN receives strong support from spectral, gradient-distribution, PSD-slope, and high-tail exceedance measures.
+
+### MT-vs-PD selector-ablation agreement
+
+| Threshold | MT/LR | MT/Extreme | MT/Physics | PD/LR | PD/Extreme | PD/Physics |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.05 | 13/15 (86.7%) | 8/9 (88.9%) | 13/15 (86.7%) | 0/15 (0.0%) | 0/9 (0.0%) | 0/15 (0.0%) |
+| 0.075 | 33/36 (91.7%) | 24/28 (85.7%) | 33/36 (91.7%) | 0/36 (0.0%) | 2/28 (7.1%) | 0/36 (0.0%) |
+
+### Independent-validator winners inside SSIM near-tie subsets
+
+| Threshold / validator | CNN wins | GAN wins | Ties | Majority CNN/GAN |
+|---|---:|---:|---:|---:|
+| 0.05 LR group | 15 | 0 | 0 |  |
+| 0.05 Extreme group | 9 | 0 | 6 |  |
+| 0.05 Physics group | 15 | 0 | 0 |  |
+| 0.05 3-validator majority | 15 | 0 | 0 | 15/0 |
+| 0.075 LR group | 36 | 0 | 0 |  |
+| 0.075 Extreme group | 26 | 2 | 8 |  |
+| 0.075 Physics group | 36 | 0 | 0 |  |
+| 0.075 3-validator majority | 36 | 0 | 0 | 36/0 |
+
+### Opposite-direction cases
+
+| Threshold | Sample | SSIM winner | MT winner | PD winner | Validator majority | MT support count |
+|---:|---:|---|---|---|---|---:|
+| 0.05 | 12 | CNN | GAN | GAN | CNN | 0 |
+| 0.05 | 25 | CNN | GAN | GAN | CNN | 0 |
+| 0.075 | 8 | CNN | GAN | GAN | CNN | 0 |
+| 0.075 | 12 | CNN | GAN | GAN | CNN | 0 |
+| 0.075 | 25 | CNN | GAN | GAN | CNN | 0 |
+
+These cases should be interpreted as topology-consensus-but-validator-disagreement cases rather than MT rescue cases.
+
+## Robust sweep conclusion
+
+The robust sweep confirms the audit-driven interpretation in the paper:
+
+1. PSNR and SSIM are uniformly CNN-favoring on this evaluation set.
+2. Bottleneck PD is nearly uniformly GAN-favoring.
+3. MT is intermediate, choosing CNN in 148/168 samples and GAN in 20/168 samples.
+4. The configured physics-group majority is CNN-favoring because WPD MAE, WPD RMSE, and gradient MAE strongly favor CNN.
+5. The full domain-metric decomposition is more nuanced: GAN is strongly supported by PSD log-L2, gradient Wasserstein-1, PSD slope absolute error, and p95/p99 tail exceedance metrics.
+6. The validator groups should therefore be treated as informative but not neutral ground truth.
+7. The scientifically safest claim remains that MT, PD, SSIM, PSNR, and domain metrics expose different evaluator biases, with MT serving as a complementary structural diagnostic rather than a universal selector.
+
+## Reproducibility status
+
+This stage is reproducible from the final repaired merged table and selector-ablation outputs. It should be treated as an additional reconstruction stage after the exact repaired selector-ablation and exact metric-trend reconstruction stages already documented above.
+
+
+---
+
+# Part IX — Qualitative observation-group generation
+
+## Purpose
+
+This stage adds a reproducible way to generate qualitative observation groups for manual inspection. It follows the audit-driven interpretation that the experiment should not be framed as a single metric proving a universal winner. Instead, the goal is to identify samples that represent different parts of the distortion--distribution--topology tradeoff.
+
+The groups are intended to help answer questions such as:
+
+1. Where do direct-error metrics, SSIM, PSNR, and MT all favor CNN?
+2. Where do distributional or tail-oriented measures favor GAN even though direct-error metrics favor CNN?
+3. Where do PD and MT disagree?
+4. Where does PD favor GAN while MT favors CNN, suggesting a candidate structural-hallucination signature?
+5. Where does MT favor GAN, making the sample useful for visual/topological diagnosis?
+
+## Script added
+
+The script for this stage is:
+
+```text
+scripts/generate_observation_groups.py
+```
+
+The chat-generated copy is also provided as:
+
+```text
+generate_observation_groups.py
+```
+
+## Command to run on Spark
+
+The script is now repo-root aware, so it can be run either from the repository root or from the `scripts/` directory.
+
+Recommended command from the `scripts/` directory:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py
+```
+
+Equivalent command from the repository root:
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 scripts/generate_observation_groups.py
+```
+
+Both forms auto-detect the repo root and use these default paths:
+
+```text
+merged CSV: ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+outdir:     ttk_runs_fixed/observation_groups
+```
+
+If auto-detection ever fails, pass `--repo-root ~/PhIRE` explicitly:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py \
+  --repo-root ~/PhIRE
+```
+
+This uses the final repaired merged table:
+
+```text
+ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+```
+
+which belongs to the fixed/authoritative pipeline already documented above.
+
+## Output directory
+
+The script writes:
+
+```text
+ttk_runs_fixed/observation_groups/
+```
+
+Expected output files:
+
+```text
+README_observation_groups.md
+observation_groups_per_sample.csv
+observation_group_summary.csv
+observation_metric_winner_summary.csv
+group_cnn_consensus_core.csv
+group_gan_distributional_cases.csv
+group_pd_mt_disagreement.csv
+group_candidate_structural_hallucination_signature.csv
+group_mt_gan_diagnostic.csv
+group_topology_consensus_gan.csv
+group_topology_consensus_cnn.csv
+group_neartie_topology_validator_disagreement.csv
+recommended_visual_inspection_cases.csv
+recommended_visual_inspection_unique_samples.csv
+sample_ids_cnn_consensus_core.txt
+sample_ids_gan_distributional_cases.txt
+sample_ids_pd_mt_disagreement.txt
+sample_ids_candidate_structural_hallucination_signature.txt
+sample_ids_mt_gan_diagnostic.txt
+sample_ids_topology_consensus_gan.txt
+sample_ids_topology_consensus_cnn.txt
+sample_ids_neartie_topology_validator_disagreement.txt
+sample_ids_recommended_visual_inspection_unique.txt
+```
+
+## Group definitions
+
+The script defines the following groups:
+
+### 1. `cnn_consensus_core`
+
+Samples where:
+
+- PSNR favors CNN,
+- SSIM favors CNN,
+- MT favors CNN,
+- the direct-error group favors CNN,
+- the configured physics group favors CNN.
+
+This is the main group for distortion-faithful / structurally safe CNN-aligned examples.
+
+### 2. `gan_distributional_cases`
+
+Samples where:
+
+- PSNR favors CNN,
+- SSIM favors CNN,
+- the direct-error group favors CNN,
+- but the distributional group favors GAN.
+
+This group highlights the perception--distortion tradeoff: CNN is closer to the specific GT field under direct-error criteria, while GAN better matches distributional/spectral/tail structure.
+
+### 3. `pd_mt_disagreement`
+
+Samples where the PD-selected topology winner and MT-selected topology winner differ.
+
+This group is useful because PD and MT are not interchangeable. PD summarizes birth--death lifetimes, while MT retains merge hierarchy. Their disagreement is therefore diagnostically meaningful.
+
+### 4. `candidate_structural_hallucination_signature`
+
+Samples where:
+
+- PD favors GAN,
+- MT favors CNN.
+
+This is a candidate structural-hallucination signature. The cautious interpretation is:
+
+> GAN may have plausible topological feature lifetimes at the PD level, but those features may not match the GT merge hierarchy as well as CNN does.
+
+This should not be stated as proof of hallucination without visual inspection. It is a shortlist of samples where hallucination-like behavior should be checked.
+
+### 5. `mt_gan_diagnostic`
+
+Samples where MT favors GAN.
+
+These are important because MT is mostly CNN-aligned overall. When MT favors GAN, the sample should be inspected visually to determine whether MT is rewarding genuine structural fidelity or GAN-generated artifacts.
+
+### 6. `topology_consensus_gan`
+
+Samples where both PD and MT favor GAN.
+
+These are topology-consensus GAN cases. In the near-tie regime, these were previously observed to be topology-consensus-but-validator-disagreement cases.
+
+### 7. `topology_consensus_cnn`
+
+Samples where both PD and MT favor CNN.
+
+This group is expected to be small in the current results because bottleneck PD is strongly GAN-favoring.
+
+### 8. `neartie_topology_validator_disagreement`
+
+Samples where:
+
+- the sample is inside the SSIM 0.075 near-tie regime,
+- SSIM favors CNN,
+- PD favors GAN,
+- MT favors GAN,
+- the direct-error group favors CNN,
+- the configured physics group favors CNN.
+
+These are the highest-priority qualitative audit cases because they represent topology-consensus GAN behavior inside the main SSIM small-margin window, while the configured validators still favor CNN.
+
+## Winner conventions
+
+The script uses the following winner logic:
+
+- PSNR and SSIM: higher is better.
+- PD and MT distances: lower is better.
+- Error/distance metrics: lower is better.
+- Signed bias/delta metrics: lower absolute value is better.
+- Absolute-delta metrics: lower is better.
+
+The script also computes signed deltas where positive values mean CNN preference and negative values mean GAN preference.
+
+## Metric families used by the script
+
+### Direct-error group
+
+```text
+PSNR_uv
+SSIM_speed
+WPD_MAE
+WPD_RMSE
+Gradient_MAE
+```
+
+### Distributional group
+
+```text
+PSD_log_L2
+PSD_slope_abs_delta
+Gradient_W1
+Exceed_abs_p95
+Exceed_abs_p99
+```
+
+### Tail group
+
+```text
+Exceed_abs_p90
+Exceed_abs_p95
+Exceed_abs_p99
+```
+
+### Configured physics group
+
+```text
+WPD_RMSE
+WPD_MAE
+PSD_log_L2
+Gradient_MAE
+```
+
+This configured physics group is retained to stay consistent with the earlier selector-ablation interpretation, but the full domain-metric decomposition should still be reported separately because it shows that GAN receives support from several distributional and tail metrics.
+
+## Validated counts from the current repaired table
+
+The current run produced the following group counts:
+
+```text
+cnn_consensus_core: 148 samples
+gan_distributional_cases: 148 samples
+pd_mt_disagreement: 146 samples
+candidate_structural_hallucination_signature: 146 samples
+mt_gan_diagnostic: 20 samples
+topology_consensus_gan: 20 samples
+topology_consensus_cnn: 2 samples
+neartie_topology_validator_disagreement: 3 samples
+```
+
+These counts are consistent with the earlier robust sweep:
+
+- MT selects CNN in 148/168 and GAN in 20/168.
+- PD selects GAN in 166/168 and CNN in 2/168.
+- PD and MT agree on 22 samples: 20 topology-consensus-GAN cases and 2 topology-consensus-CNN cases.
+- Therefore, PD/MT disagreement occurs in 146 samples.
+- The candidate PD-GAN / MT-CNN group contains the same 146 samples, because these are exactly the cases where PD favors GAN while MT favors CNN.
+- The MT-GAN group contains 20 samples.
+
+## Recommended visual-inspection workflow
+
+For each recommended sample, generate or inspect a panel with:
+
+```text
+GT speed | CNN speed | GAN speed | |CNN-GT| |GAN-GT|
+```
+
+The main questions are:
+
+1. Does GAN add sharper structures that are actually present in GT?
+2. Are GAN high-speed ridges or local extrema shifted relative to GT?
+3. Does CNN look smoother but more spatially aligned?
+4. Does PD favor GAN because it captures feature lifetimes while MT penalizes incorrect merge hierarchy?
+5. Do the MT-GAN cases show genuine GAN structural fidelity, or are they sharper but hallucinated artifacts?
+
+## Suggested follow-up visualization sets
+
+The following generated sample-ID files are the most useful for figure generation:
+
+```text
+sample_ids_neartie_topology_validator_disagreement.txt
+sample_ids_mt_gan_diagnostic.txt
+sample_ids_candidate_structural_hallucination_signature.txt
+sample_ids_gan_distributional_cases.txt
+sample_ids_recommended_visual_inspection_unique.txt
+```
+
+The highest-priority qualitative set is:
+
+```text
+sample_ids_neartie_topology_validator_disagreement.txt
+```
+
+because it targets the key topology-consensus / validator-disagreement cases inside the SSIM 0.075 near-tie regime.
+
+## Interpretation note
+
+This stage strengthens the current paper framing:
+
+- The result is not that MT universally corrects SSIM.
+- The result is that different evaluators occupy different roles:
+  - PSNR/SSIM/direct-error metrics emphasize distortion to one GT realization,
+  - distributional/tail metrics often support GAN,
+  - PD is strongly GAN-facing,
+  - MT is intermediate,
+  - PD-MT disagreement identifies samples where topological feature lifetimes and topological merge hierarchy tell different stories.
+
+The safest claim is:
+
+> PD-MT disagreement provides candidate structural-hallucination cases for visual inspection, not automatic proof of hallucination.
+
+## Reproducibility status
+
+This stage is reproducible from the final repaired merged table. It should be treated as an additional reconstruction and qualitative-audit stage after the report-table CSV generation and robust metric sweep documented in Part VIII.
+
+
+
+## Troubleshooting note: repo root detected as `~/PhIRE/scripts`
+
+If the script prints:
+
+```text
+repo_root=/home/.../PhIRE/scripts
+```
+
+then an older failed run may have created a misleading directory such as:
+
+```text
+~/PhIRE/scripts/ttk_runs_fixed/
+```
+
+The updated script version avoids accepting `scripts/` as the repo root. You can also clean the accidental directory if it only contains failed-output folders:
+
+```bash
+cd ~/PhIRE/scripts
+rm -rf ttk_runs_fixed
+```
+
+Then rerun:
+
+```bash
+cd ~/PhIRE/scripts
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py
+```
+
+Expected path printout:
+
+```text
+repo_root=/home/adadhwal/PhIRE
+merged_csv=/home/adadhwal/PhIRE/ttk_runs_fixed/combined/psnr_topology_physics_merged.csv
+outdir=/home/adadhwal/PhIRE/ttk_runs_fixed/observation_groups
+```
+
+
+---
+
+# Part X — Visual-inspection panel generation and qualitative audit
+
+## Purpose
+
+This stage generates qualitative visual-inspection panels from the final repaired CNN/GAN outputs and the observation groups produced in Part IX. The goal is to inspect representative samples visually rather than relying only on metric winner counts.
+
+The audit is motivated by the current interpretation of the experiment:
+
+- direct-error metrics such as PSNR, SSIM, WPD MAE/RMSE, and gradient MAE tend to favor CNN,
+- distributional and tail-sensitive metrics such as PSD log-\(L_2\), gradient Wasserstein-1, and some upper-tail exceedance metrics often support GAN,
+- bottleneck PD is strongly GAN-facing,
+- MT is intermediate and therefore useful as a structural diagnostic,
+- PD--MT disagreement provides candidate structural-hallucination cases for visual inspection, not automatic proof of hallucination.
+
+## Script added
+
+The script for this stage is:
+
+```text
+scripts/generate_visual_inspection_panels.py
+```
+
+The script is designed to be run from the `scripts/` directory, consistent with the rest of this workflow.
+
+## Command to run on Spark
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py
+```
+
+The script auto-detects the repository root and uses the following default paths:
+
+```text
+CNN directory:       data_out_fixed/wind_mrhr_cnn/
+GAN directory:       data_out_fixed/wind_mrhr_gan/
+observation groups:  ttk_runs_fixed/observation_groups/
+output directory:    ttk_runs_fixed/visual_inspection/
+```
+
+## Optional commands
+
+Generate full-field panels in addition to the default 160x160 crop panels:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --include-full-panels
+```
+
+Generate u/v component panels in addition to speed panels:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --include-uv-panels
+```
+
+Generate only the small starter set:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --preset starter
+```
+
+## Output directory
+
+The default output directory is:
+
+```text
+ttk_runs_fixed/visual_inspection/
+```
+
+Expected files and folders:
+
+```text
+README_visual_inspection.md
+index.html
+visual_inspection_manifest.csv
+visual_observation_template.csv
+panels_crop160/
+contact_sheets/
+```
+
+If optional flags are used, these may also be created:
+
+```text
+panels_full/
+panels_uv/
+```
+
+## Default panel format
+
+Each generated speed/error panel contains:
+
+```text
+GT speed | CNN speed | GAN speed | |CNN-GT| |GAN-GT|
+```
+
+The default panel uses a 160x160 crop beginning at `(y=0, x=0)`, matching the topology-evaluation crop used in the current pipeline.
+
+## Recommended inspection plan
+
+### Phase 1 — Core contrast set
+
+Inspect these first:
+
+```text
+8, 12, 25, 27, 31, 37, 39, 29, 32
+```
+
+Interpretation:
+
+- samples `8, 12, 25` are near-tie topology-consensus-GAN / validator-disagreement cases,
+- samples `27, 31, 37, 39, 29, 32` are MT-primary / CNN-control cases.
+
+This is the highest-value first pass because it contrasts the most interesting edge cases against stable CNN-aligned controls.
+
+### Phase 2 — MT-GAN diagnostic set
+
+Inspect all MT-GAN samples:
+
+```text
+6, 8, 12, 16, 17, 18, 19, 20, 25, 48,
+62, 63, 65, 68, 77, 79, 80, 82, 92, 154
+```
+
+Question:
+
+> When MT favors GAN, does GAN better preserve GT structure, or does it introduce sharper but misleading structures?
+
+### Phase 3 — PD-GAN / MT-CNN disagreement cases
+
+Use:
+
+```text
+ttk_runs_fixed/observation_groups/group_candidate_structural_hallucination_signature.csv
+```
+
+Question:
+
+> Does PD favor GAN because GAN has plausible feature lifetimes, while MT favors CNN because GAN's features are spatially or hierarchically misorganized?
+
+### Phase 4 — GAN-distributional cases
+
+Use:
+
+```text
+ttk_runs_fixed/observation_groups/group_gan_distributional_cases.csv
+```
+
+Question:
+
+> Do the spectral/distributional advantages of GAN correspond to visually meaningful wind structure?
+
+### Phase 5 — Controls
+
+Use:
+
+```text
+ttk_runs_fixed/observation_groups/group_cnn_consensus_core.csv
+ttk_runs_fixed/observation_groups/group_topology_consensus_cnn.csv
+```
+
+Question:
+
+> What do stable CNN-favoring examples look like, and how do they differ from GAN-favoring or topology-disagreement samples?
+
+## Observation template
+
+The script writes:
+
+```text
+ttk_runs_fixed/visual_inspection/visual_observation_template.csv
+```
+
+This file should be used to record manual inspection notes. Suggested labels include:
+
+```text
+CNN clearly closer
+GAN visually sharper but suspicious
+GAN plausible structure
+GAN shifted/misaligned
+CNN oversmoothed
+ambiguous
+needs topology visualization
+```
+
+Suggested columns to fill include:
+
+- `visual_winner`,
+- `gan_sharper`,
+- `gan_artifact_or_hallucination_candidate`,
+- `cnn_oversmoothed`,
+- `which_is_closer_to_gt_structure`,
+- `notes`.
+
+## Reproducibility status
+
+This stage is reproducible from:
+
+- the final repaired CNN/GAN arrays under `data_out_fixed/`,
+- the observation group outputs under `ttk_runs_fixed/observation_groups/`.
+
+It should be treated as a qualitative-audit stage following the quantitative report-table generation, robust metric sweep, and observation-group generation.
+
+## Interpretation note
+
+This stage should be used carefully. The visual panels can support or weaken the candidate hallucination interpretation, but they should not be used to claim hallucination automatically. The safe claim remains:
+
+> PD--MT disagreement identifies candidate structural-hallucination cases that require visual inspection.
+
+
+---
+
+# Part XI — Full physics/domain breakdown tables and browser dashboard
+
+## Purpose
+
+This stage was added after the qualitative visual-inspection work to make the physics/domain metric decomposition easier to audit across **all 168 samples**, not only the manually inspected MT-GAN subset. The goal is to support three additional checks:
+
+1. inspect the physics/domain metric breakdown for every sample,
+2. separate rare `PD = CNN` cases and GAN-majority cases,
+3. identify adjacent sample-index transitions where MT or the 15-measure physics/domain majority changes.
+
+This stage should be treated as an audit and interpretation layer on top of the repaired/final outputs. It does not regenerate model outputs or topology distances; it reorganizes the existing final merged/sweep tables into easier-to-read CSV and HTML views.
+
+## Script added
+
+```text
+scripts/generate_full_physics_domain_breakdown.py
+```
+
+The current version of this script is designed to be run from the `scripts/` directory. It detects the repository root as the parent directory when run from `~/PhIRE/scripts`.
+
+The script reads:
+
+```text
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+```
+
+It also uses the following optional metadata files when available:
+
+```text
+ttk_runs_fixed/observation_groups/observation_groups_per_sample.csv
+ttk_runs_fixed/visual_inspection/visual_inspection_manifest.csv
+```
+
+The optional metadata files are used only to enrich the output tables with group labels, recommendation labels, and selector/group winners. The core physics/domain metric breakdown comes from the wide metric-sweep CSV.
+
+## Command to run on Spark
+
+```bash
+cd ~/PhIRE/scripts
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_full_physics_domain_breakdown.py
+```
+
+Expected printed paths:
+
+```text
+repo_root=/home/adadhwal/PhIRE
+input=/home/adadhwal/PhIRE/ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+outdir=/home/adadhwal/PhIRE/ttk_runs_fixed/report_tables/full_physics_domain_breakdown
+html=/home/adadhwal/PhIRE/ttk_runs_fixed/report_tables/full_physics_domain_breakdown/physics_domain_breakdown_index.html
+```
+
+## Output directory
+
+```text
+ttk_runs_fixed/report_tables/full_physics_domain_breakdown/
+```
+
+## Generated CSV outputs
+
+The script writes:
+
+```text
+physics_domain_breakdown_all_samples.csv
+physics_domain_breakdown_non_mt_gan.csv
+physics_domain_breakdown_mt_gan.csv
+physics_domain_breakdown_pd_cnn_cases.csv
+physics_domain_breakdown_gan_majority_cases.csv
+physics_domain_breakdown_gan_majority_mt_not_gan.csv
+physics_domain_breakdown_mt_gan_strong_moderate_lower.csv
+adjacency_runs_all_samples.csv
+adjacency_runs_mt_gan.csv
+adjacency_runs_gan_majority.csv
+adjacency_transition_pairs.csv
+summary_counts.csv
+README_full_physics_domain_breakdown.md
+```
+
+## Generated web dashboard
+
+The script also writes a static HTML dashboard:
+
+```text
+physics_domain_breakdown_index.html
+```
+
+Open it locally or through the repository browser after pushing:
+
+```bash
+open ttk_runs_fixed/report_tables/full_physics_domain_breakdown/physics_domain_breakdown_index.html
+```
+
+On Spark or another remote machine, the file can be downloaded or opened through a GitHub raw/local preview workflow.
+
+The dashboard contains:
+
+- summary cards for total samples, MT-GAN cases, PD-CNN cases, GAN-majority cases, GAN-majority / MT-not-GAN cases, and adjacent transition pairs,
+- searchable/filterable all-sample table,
+- presets for MT-GAN, PD-CNN, GAN-majority, GAN-majority-but-MT-not-GAN, and Strong/Moderate/Lower MT-GAN tiers,
+- per-sample expandable 15-measure physics/domain breakdown,
+- links to all generated CSVs,
+- adjacency-transition cards for neighboring sample IDs where MT or the physics/domain majority changes.
+
+## Measures included
+
+The 15 physics/domain measures are:
+
+```text
+WPD Bias |·|
+WPD MAE
+WPD RMSE
+WPD Wasserstein-1
+PSD log-L2
+PSD slope |Δ|
+Gradient MAE
+Gradient Wasserstein-1
+Gradient kurtosis |Δ|
+Exceedance |Δ|, s>5
+Exceedance |Δ|, s>10
+Exceedance |Δ|, s>15
+Exceedance |Δ|, p90
+Exceedance |Δ|, p95
+Exceedance |Δ|, p99
+```
+
+For all measures, the winner is the model with the lower error. For signed quantities such as WPD bias, PSD slope delta, gradient-kurtosis delta, and exceedance deltas, the comparison uses absolute error relative to GT.
+
+## Important generated subsets
+
+### 1. `physics_domain_breakdown_pd_cnn_cases.csv`
+
+This file isolates the rare cases where the persistence-diagram selector picks CNN instead of GAN. Since PD is otherwise strongly GAN-favoring, these cases are important controls. They help show that topology is not mechanically forced to prefer GAN.
+
+### 2. `physics_domain_breakdown_gan_majority_cases.csv`
+
+This file isolates samples where GAN wins a majority of the 15 physics/domain measures. These are the strongest non-topological candidates for cases where GAN may be doing something scientifically meaningful despite losing conservative metrics such as PSNR/SSIM.
+
+### 3. `physics_domain_breakdown_gan_majority_mt_not_gan.csv`
+
+This file is especially important. It contains cases where GAN wins the majority of the 15 physics/domain measures but MT does **not** select GAN. These are counterexamples to a simple interpretation that MT only follows distributional/tail metrics. They should be visually inspected as cases where GAN may match distributional statistics but fail spatial/hierarchical organization.
+
+### 4. `adjacency_transition_pairs.csv`
+
+This file identifies adjacent sample-index pairs where either the MT winner or the physics/domain majority changes. Because the dataset consists of consecutive hourly samples, adjacent IDs may represent a slowly evolving meteorological regime. These transition pairs are useful for asking:
+
+> What changed between two neighboring timesteps such that MT flipped, or such that GAN/CNN physics-domain majority flipped?
+
+## Recommended visual follow-up
+
+After running this script, inspect in this order:
+
+1. `physics_domain_breakdown_gan_majority_mt_not_gan.csv`  
+   These are the strongest counterexamples to the idea that MT merely follows GAN-friendly physics/domain metrics.
+
+2. `physics_domain_breakdown_pd_cnn_cases.csv`  
+   These are rare topology-consensus or PD-CNN control cases.
+
+3. `adjacency_transition_pairs.csv`  
+   These are useful for temporal/adjacent-sample reasoning.
+
+4. `physics_domain_breakdown_gan_majority_cases.csv`  
+   These are candidate samples where GAN has broader physics/domain support and may deserve visual inspection even when MT does not select GAN.
+
+## Interpretation note
+
+This dashboard should be used as an interpretive audit, not as a new ground truth. A safe interpretation is:
+
+> CNN remains consistently strong on conservative pointwise and energy-error measures, while GAN often wins distributional, spectral, gradient-distribution, and tail-oriented measures. MT should be interpreted as a structural diagnostic that may agree with GAN when the added GAN structure is hierarchically meaningful, but it may reject GAN even when GAN wins several distributional or tail measures.
+
+The useful scientific question is therefore not simply which model wins, but which notion of quality each metric family is measuring.
+
+## Reproducibility status
+
+This stage is reproducible from:
+
+```text
+ttk_runs_fixed/report_tables/metric_sweep_all_samples_wide.csv
+```
+
+and optionally enriched by:
+
+```text
+ttk_runs_fixed/observation_groups/observation_groups_per_sample.csv
+ttk_runs_fixed/visual_inspection/visual_inspection_manifest.csv
+```
+
+It is downstream of the report-table sweep, observation-group generation, and visual-inspection index generation.
+
+## Suggested Git commands
+
+```bash
+cd ~/PhIRE
+
+git add scripts/generate_full_physics_domain_breakdown.py
+git add dataset_generation_and_repair_notes.md
+
+git add -f ttk_runs_fixed/report_tables/full_physics_domain_breakdown/*.csv
+git add -f ttk_runs_fixed/report_tables/full_physics_domain_breakdown/*.md
+git add -f ttk_runs_fixed/report_tables/full_physics_domain_breakdown/*.html
+
+git commit -m "Add full physics-domain breakdown dashboard"
+git push origin $(git branch --show-current)
+```
+
+## Script inventory added during this audit phase
+
+The following scripts now form the reproducibility chain for the report-table, grouping, visual-inspection, and full-breakdown audits:
+
+```text
+scripts/generate_report_tables_and_metric_sweep.py
+scripts/generate_observation_groups.py
+scripts/generate_visual_inspection_panels.py
+scripts/generate_visual_inspection_index_with_metric_breakdown.py
+scripts/generate_full_physics_domain_breakdown.py
+```
+
+Recommended run order:
+
+```bash
+cd ~/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_report_tables_and_metric_sweep.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_observation_groups.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_index_with_metric_breakdown.py
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_full_physics_domain_breakdown.py
+```
+
+If a later script fails because an expected upstream CSV is missing, rerun the preceding script in this chain first.
+
+
+# Candidate B Topology-Inspired Fine-Tuning Pilot
+
+This section documents the completed Candidate B pilot: its motivation, implementation, commands, outputs, and quantitative/qualitative results. It is intended to be appended to the project reproducibility notes and used as source material for the paper's Methods/Results sections.
+
+---
+
+## 1. Motivation
+
+The original evaluation showed a strong split between metric families:
+
+- PSNRuv and SSIM favored the CNN.
+- Persistence diagrams (PD) strongly favored the GAN.
+- Merge trees (MT) were more selective, favoring GAN in only 20/168 samples and CNN in the remaining 148.
+- Component-count and branch-proxy analyses suggested that GAN often restores additional scalar-field structure, especially at lower speed thresholds, but may also over-fragment the field.
+
+Candidate B tests whether these post-hoc topology/physics observations can motivate a training-time objective. It does **not** optimize PD or MT distance directly. Instead, it fine-tunes the pretrained CNN using differentiable scalar-field losses that are physically and topologically motivated.
+
+---
+
+## 2. Representation
+
+The PhIRE wind model predicts two-channel vector wind fields `[u, v]`.
+
+- Base reconstruction loss: computed on normalized `[u, v]`.
+- PSNR convention: computed on vector `[u, v]`.
+- Scalar/physics/topology metrics: computed on scalar speed  
+  `speed = sqrt(u^2 + v^2)`.
+
+The auxiliary losses use physical speed, so the normalized network outputs are first denormalized:
+
+```python
+mu  = [0.7684, -0.4575]
+sig = [5.02455, 5.9017]
+
+u_phys = sig[0] * x[..., 0] + mu[0]
+v_phys = sig[1] * x[..., 1] + mu[1]
+speed  = sqrt(u_phys**2 + v_phys**2 + 1e-8)
+```
+
+---
+
+## 3. Candidate B objective
+
+Candidate B uses the pretrained CNN as initialization and fine-tunes with:
+
+```text
+L_total = L_uv
+        + lambda_speed    * L_speed
+        + lambda_grad     * L_grad
+        + lambda_levelset * L_levelset
+```
+
+where:
+
+- `L_uv`: original normalized vector `[u, v]` reconstruction loss.
+- `L_speed`: MSE on physical scalar speed.
+- `L_grad`: MSE on scalar-speed gradient magnitude.
+- `L_levelset`: soft superlevel-set mask MSE at physical thresholds `[5, 10, 15]` m/s.
+- `L_wpd`: implemented as MAE on `speed^3`, but disabled in Candidate B because diagnostics showed it was too large relative to `L_uv`.
+
+Candidate B configuration:
+
+```python
+PhysicsLossConfig(
+    use_aux_losses=True,
+    mu=[0.7684, -0.4575],
+    sig=[5.02455, 5.9017],
+    lambda_speed=0.01,
+    lambda_grad=0.05,
+    lambda_wpd=0.0,
+    lambda_levelset=0.25,
+    levelset_temperature=10.0,
+    levelset_thresholds=[5.0, 10.0, 15.0],
+    diagnostic_mode=True,
+)
+```
+
+Training configuration:
+
+```text
+checkpoint: models/wind_mr-hr/trained_cnn/cnn
+data:       example_data_fixed/wind_MR-HR.tfrecord
+epochs:     3
+batch size: 4
+lr:         1e-5
+output:     models_fixed/topology_finetuning/wind_finetune_pilot_candidateB/
+inference:  data_out/wind_finetune_pilot_candidateB/
+```
+
+---
+
+## 4. Reproduction commands
+
+### 4.1 Loss-magnitude diagnostic
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_physics_loss_diagnostic.py \
+  --data-path example_data_fixed/wind_MR-HR.tfrecord \
+  --model-path models/wind_mr-hr/trained_cnn/cnn \
+  --batch-size 4 \
+  --max-batches 0
+```
+
+Expected key output:
+
+```text
+Record count: 168
+Processed batches: 42
+```
+
+The diagnostic showed that `L_levelset` was naturally close to `L_uv`, `L_speed` and `L_grad` required smaller weights, and `L_wpd` was too large for the first pilot.
+
+### 4.2 Candidate B fine-tuning and paired inference
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_physics_finetune_pilot.py
+```
+
+Expected outputs:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateB/cnn/cnn
+data_out/wind_finetune_pilot_candidateB/dataSR.npy
+data_out/wind_finetune_pilot_candidateB/dataGT.npy
+data_out/wind_finetune_pilot_candidateB/dataIN.npy
+data_out/wind_finetune_pilot_candidateB/idx.npy
+logs/wind_finetune_pilot_candidateB.log
+```
+
+### 4.3 Scalar/physics/component evaluation
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/evaluate_finetune_candidateB.py \
+  --candidate-dir data_out/wind_finetune_pilot_candidateB \
+  --cnn-dir       data_out_fixed/wind_mrhr_cnn \
+  --gan-dir       data_out_fixed/wind_mrhr_gan \
+  --merged-csv    ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir       ttk_runs_fixed/topology_finetuning/candidateB_eval
+```
+
+Outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv
+ttk_runs_fixed/topology_finetuning/candidateB_eval/pairwise_cnn_vs_candidateB.csv
+ttk_runs_fixed/topology_finetuning/candidateB_eval/winner_counts.csv
+ttk_runs_fixed/topology_finetuning/candidateB_eval/adjacent_cluster_table.csv
+docs/topology_finetuning_candidateB_eval.md
+```
+
+### 4.4 Candidate B topology extraction
+
+The full TTK run extracts PD and MT outputs for 168 GT fields and 168 Candidate B SR fields.
+
+```bash
+cd /home/adadhwal/PhIRE
+
+rm -rf ttk_runs_fixed/topology_finetuning/candidateB_vti \
+       ttk_runs_fixed/topology_finetuning/candidateB_topology
+
+mkdir -p logs
+
+tmux new -s candb_topology
+```
+
+Inside tmux:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+bash scripts/run_candidateB_topology_pipeline.sh --skip-viz \
+  2>&1 | tee logs/candidateB_topology_pipeline.log
+```
+
+Expected Stage 2 completion counts:
+
+```text
+PD files: 336
+MT port0: 336
+MT port1: 336
+MT port2: 336
+```
+
+If Stage 3 completes but the report is not regenerated, run Stage 5 manually:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/build_candidateB_topology_comparison.py \
+  --candidateB-results ttk_runs_fixed/topology_finetuning/candidateB_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results   ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidateB-idx     data_out/wind_finetune_pilot_candidateB/idx.npy \
+  --out-dir            ttk_runs_fixed/topology_finetuning/candidateB_topology \
+  --report-path        docs/topology_finetuning_candidateB_topology_eval.md
+```
+
+Expected validation:
+
+```text
+Candidate B topology entries: 168
+PD valid: 168
+MT valid: 168
+candidateB_pd_mt_distances.csv: 169 lines
+candidateB_topology_comparison.csv: 169 lines
+```
+
+### 4.5 Visual inspection panels
+
+```bash
+cd /home/adadhwal/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 18,25,63,80
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 10,11,12,13,90,91,92,93,162,163
+```
+
+The Candidate B visualization panels show:
+
+```text
+GT speed | CNN speed | Candidate B speed | GAN speed | |CNN-GT| | |CandB-GT| | |GAN-GT|
+```
+
+---
+
+## 5. Scalar/physics/component results
+
+Candidate B improves over baseline CNN on most scalar-fidelity and physics metrics.
+
+| Metric | Bicubic | CNN | GAN | Candidate B | Improved vs CNN |
+|---|---:|---:|---:|---:|---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | 32.5394 | 168/168 |
+| Speed MAE | 0.5963 | 0.6941 | 0.9026 | 0.5885 | 168/168 |
+| Speed RMSE | 1.0156 | 1.1078 | 1.3775 | 0.9641 | 168/168 |
+| WPD MAE | 193.5403 | 231.6709 | 310.7328 | 191.4653 | 168/168 |
+| WPD W1 | 55.5103 | 45.2713 | 85.6191 | 30.4994 | 125/168 |
+| WPD bias abs | 41.2244 | 35.3439 | 78.7236 | 21.5107 | 119/168 |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | 0.3272 | 168/168 |
+| Gradient W1 | 0.3282 | 0.2329 | 0.0564 | 0.2109 | 143/168 |
+| Gradient kurtosis abs Δ | 6.6163 | 3.7004 | 4.2010 | 2.7542 | 87/168 |
+| PSD log-L2 | 1.3625 | 0.8335 | 0.5139 | 0.9465 | 4/168 |
+| PSD slope abs Δ | 1.6684 | 0.9150 | 0.9482 | 1.2079 | 0/168 |
+| Exceedance abs Δ s>5 | 0.0095 | 0.0042 | 0.0082 | 0.0044 | 89/168 |
+| Exceedance abs Δ s>10 | 0.0085 | 0.0066 | 0.0243 | 0.0038 | 118/168 |
+| Exceedance abs Δ s>15 | 0.0074 | 0.0062 | 0.0096 | 0.0043 | 104/168 |
+| Exceedance abs Δ p90 | 0.0109 | 0.0103 | 0.0123 | 0.0060 | 131/168 |
+| Component-count proxy L1 | 173.1855 | 115.5278 | 124.6567 | 105.8363 | 147/168 |
+
+Interpretation:
+
+- Candidate B improves direct vector PSNR and scalar speed error over CNN.
+- Candidate B improves WPD MAE on all 168 samples.
+- Candidate B improves gradient MAE on all 168 samples and gradient W1 on 143/168.
+- Candidate B improves the component-count proxy on 147/168 samples.
+- Candidate B does not improve spectral metrics; PSD log-L2 and PSD slope worsen relative to CNN. This is expected because no spectral loss was included.
+- Exceedance at `s > 5` is nearly neutral/slightly worse on average, while `s > 10`, `s > 15`, and p90 improve.
+
+---
+
+## 6. True topology results from TTK
+
+Candidate B was evaluated using the same TTK-based PD and MT pipeline as the CNN/GAN baselines.
+
+| Metric | CNN | GAN | Candidate B |
+|---|---:|---:|---:|
+| Mean PD distance | 27.4063 | 20.8641 | 26.1794 |
+| Mean MT distance | 5.8678 | 8.3481 | 6.0186 |
+| PD better than CNN | — | 166/168 | 136/168 |
+| MT better than CNN | — | 20/168 | 66/168 |
+| PD better than GAN | — | — | 1/168 |
+| Original MT-GAN cases recovered | — | 20/20 | 4/20 |
+
+Interpretation:
+
+- Candidate B improves PD relative to CNN on 136/168 samples, despite not directly optimizing PD.
+- Candidate B does not close the PD gap to GAN.
+- Candidate B improves MT over CNN on 66/168 samples.
+- Candidate B recovers 4 of the 20 original MT-GAN cases.
+- Candidate B's mean MT distance is slightly worse than CNN, so the MT effect is localized rather than globally dominant.
+
+Recovered original MT-GAN cases:
+
+| Sample | CNN MT | GAN MT | Candidate B MT |
+|---:|---:|---:|---:|
+| 18 | 6.2586 | 5.5544 | 5.5258 |
+| 25 | 11.3716 | 10.5015 | 6.5420 |
+| 63 | 7.6606 | 7.5776 | 6.9816 |
+| 80 | 6.9827 | 6.1767 | 5.7105 |
+
+---
+
+## 7. Adjacent-cluster MT behavior
+
+| Sample | CNN MT | GAN MT | Candidate B MT | Winner before | Winner after |
+|---:|---:|---:|---:|---|---|
+| 10 | 6.6345 | 7.4238 | 6.3437 | CNN | Candidate B |
+| 11 | 5.9107 | 7.8317 | 6.7322 | CNN | CNN |
+| 12 | 6.6164 | 5.9137 | 6.0934 | GAN | GAN |
+| 13 | 6.0738 | 7.4023 | 6.8512 | CNN | CNN |
+| 90 | 5.2579 | 5.6635 | 5.4967 | CNN | CNN |
+| 91 | 5.5083 | 5.5198 | 6.5752 | CNN | CNN |
+| 92 | 5.7358 | 5.6779 | 5.8324 | GAN | GAN |
+| 93 | 6.5070 | 6.8160 | 5.8948 | CNN | Candidate B |
+
+Rare topology-CNN controls:
+
+| Sample | CNN MT | GAN MT | Candidate B MT | Winner after |
+|---:|---:|---:|---:|---|
+| 162 | 4.5406 | 9.6957 | 6.3513 | CNN |
+| 163 | 5.6989 | 6.7890 | 5.1843 | Candidate B |
+
+Interpretation:
+
+- Candidate B becomes the MT winner for samples 10 and 93.
+- Samples 12 and 92 remain GAN-favored.
+- Sample 163 is a useful rare-control success: it was originally topology-CNN, but Candidate B improves beyond CNN.
+- Sample 162 remains CNN-favored, showing that Candidate B is not uniformly better and may over-sharpen in some cases.
+
+---
+
+## 8. Qualitative observations
+
+Visual inspection of samples 18, 25, 63, and 80 shows that Candidate B generally remains CNN-like in global organization while restoring sharper ridge-like scalar-speed structures. It is less speckled than GAN and does not simply imitate adversarial texture.
+
+Strong qualitative examples:
+
+- **Sample 25**: strongest recovered MT-GAN case. Candidate B sharply reduces MT distance and visually restores the main front/ridge structure while avoiding much of the GAN's excess texture.
+- **Sample 80**: Candidate B sharpens central/top-right ridge structures while staying less noisy than GAN.
+- **Sample 10**: Candidate B becomes the MT winner in the adjacent 10–13 cluster.
+- **Sample 93**: Candidate B becomes the MT winner in the adjacent 90–93 cluster.
+- **Sample 163**: Candidate B improves beyond CNN in a rare topology-CNN control region.
+
+Cautionary cases:
+
+- **Sample 11** and **sample 91** show that added detail does not always improve MT hierarchy.
+- **Sample 162** remains CNN-favored, suggesting that Candidate B can over-sharpen when CNN was already topologically close.
+
+---
+
+## 9. Paper-ready interpretation
+
+Candidate B provides feasibility evidence that topology-inspired differentiable surrogates can improve scientific SR outputs.
+
+A concise paper statement:
+
+> Candidate B improves scalar physical fidelity, gradient metrics, component-count topology proxies, and PD distance relative to the baseline CNN. It also recovers 4 of the 20 original MT-GAN cases. However, mean MT distance remains slightly worse than CNN, indicating that speed, gradient, and soft level-set losses capture feature prominence and superlevel-set support better than full merge-tree hierarchy. These results support topology-inspired training as a useful direction while motivating future work on differentiable or learned merge-tree-aware losses.
+
+Important caveat:
+
+> Candidate B was trained and evaluated on the same 168-sample fixed set. The result should therefore be framed as an in-corpus feasibility pilot, not as a generalization claim. A UV-only fine-tuning control is needed to separate the effect of auxiliary physics/topology-inspired losses from the effect of additional fine-tuning alone.
+
+---
+
+## 10. Recommended figures to include
+
+### Figure A: Candidate B qualitative recovered MT-GAN cases
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_recovered_mt_cases.pdf
+```
+
+Suggested samples:
+
+```text
+18, 25, 63, 80
+```
+
+Suggested caption:
+
+> Recovered MT-GAN cases after Candidate B fine-tuning. Each row compares GT, CNN, Candidate B, GAN, and absolute-error maps. Candidate B remains closer to CNN in global organization but restores sharper ridge-like scalar-speed structures, especially in samples 25 and 80.
+
+### Figure B: Candidate B adjacent-cluster examples
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_adjacent_cases.pdf
+```
+
+Suggested samples:
+
+```text
+10, 12, 93, 163
+```
+
+Suggested caption:
+
+> Adjacent and control examples illustrating localized MT behavior after Candidate B fine-tuning. Candidate B becomes the MT winner for samples 10 and 93, sample 12 remains GAN-favored, and sample 163 shows improvement beyond CNN in a rare topology-CNN control.
+
+### Figure C: Candidate B metric summary
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_metric_summary.pdf
+```
+
+Suggested content:
+
+- Bar chart of CNN vs Candidate B for PSNRuv, speed MAE, WPD MAE, gradient MAE, component-count L1, PD, and MT.
+- Use lower-is-better arrows or annotate PSNR separately.
+
+### Figure D: Candidate B topology summary
+
+Suggested filename:
+
+```text
+figures/fig_candidateB_topology_summary.pdf
+```
+
+Suggested content:
+
+- PD mean distances: CNN, GAN, Candidate B.
+- MT mean distances: CNN, GAN, Candidate B.
+- Annotation: `PD CandB < CNN: 136/168`, `MT CandB < CNN: 66/168`, `MT-GAN recovered: 4/20`.
+
+---
+
+## 11. Next steps
+
+1. Run the UV-only fine-tuning ablation:
+   - same checkpoint,
+   - same TFRecord,
+   - same 3 epochs,
+   - same learning rate,
+   - all auxiliary lambdas set to zero.
+
+2. Compare UV-only against Candidate B:
+   - physics metrics,
+   - component-count proxy,
+   - PD/MT if time permits.
+
+3. Try a low-threshold-weighted variant:
+   - `levelset_thresholds = [5.0, 5.0, 10.0, 15.0]`
+
+4. If time permits, prototype a PyTorch PD-based loss:
+   - direct persistence-feature prominence objective,
+   - compare PD improvement against Candidate B,
+   - frame differentiable merge-tree losses as future work.
+
+
+---
+
+# Part VIII — Candidate B/C topology-aware fine-tuning addendum
+
+## Purpose
+
+This addendum documents the topology-aware fine-tuning experiments that were added after the original repaired CNN/GAN evaluation. These experiments use the same corrected 168-sample wind-field artifacts described above and fine-tune the pretrained PhIRE vector CNN checkpoint. The goal is to test whether the post-hoc topology analysis can be converted into training-time losses that preserve CNN-like direct fidelity while improving scalar-field structure and true TTK topology metrics.
+
+The two fine-tuned variants are:
+
+- **Candidate B:** speed + gradient + soft level-set auxiliary losses.
+- **Candidate C:** Candidate B + a critical-value / topological-extrema proxy loss.
+
+Both candidates operate on the vector `[u,v]` model, but all auxiliary scalar-field losses are computed after denormalizing `[u,v]` and converting to physical scalar speed.
+
+---
+
+## VIII.1 Representation and denormalization
+
+The pretrained PhIRE wind model predicts normalized two-channel wind components. Auxiliary losses are applied to physical scalar speed after denormalization:
+
+```python
+mu  = [0.7684, -0.4575]
+sig = [5.02455, 5.9017]
+
+u_phys = sig[0] * x[..., 0] + mu[0]
+v_phys = sig[1] * x[..., 1] + mu[1]
+speed  = sqrt(u_phys**2 + v_phys**2 + eps)
+```
+
+This distinction is essential. Physical thresholds such as 5, 10, and 15 m/s must be applied to scalar speed after denormalization, not to normalized `[u,v]` channels.
+
+---
+
+## VIII.2 Candidate B: speed, gradient, and soft level-set fine-tuning
+
+### Objective
+
+Candidate B fine-tunes the pretrained CNN with:
+
+```text
+L_total = L_uv
+        + lambda_speed    * L_speed
+        + lambda_grad     * L_grad
+        + lambda_levelset * L_levelset
+```
+
+where:
+
+- `L_uv` is the original normalized vector reconstruction loss,
+- `L_speed` is MSE on physical scalar speed,
+- `L_grad` is MSE on physical scalar-speed gradient magnitude,
+- `L_levelset` compares soft superlevel-set masks at 5, 10, and 15 m/s.
+
+Candidate B uses:
+
+```python
+lambda_speed    = 0.01
+lambda_grad     = 0.05
+lambda_wpd      = 0.0
+lambda_levelset = 0.25
+levelset_temperature = 10.0
+levelset_thresholds  = [5.0, 10.0, 15.0]
+learning_rate   = 1e-5
+epochs          = 3
+batch_size      = 4
+```
+
+### Main Candidate B outputs
+
+```text
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateB/
+data_out/wind_finetune_pilot_candidateB/
+logs/wind_finetune_pilot_candidateB.log
+
+ttk_runs_fixed/topology_finetuning/candidateB_eval/
+ttk_runs_fixed/topology_finetuning/candidateB_topology/
+docs/topology_finetuning_candidateB_eval.md
+docs/topology_finetuning_candidateB_topology_eval.md
+```
+
+### Candidate B headline results
+
+Candidate B preserved and improved CNN-like direct fidelity and improved several scalar/physics metrics. It also improved PD relative to the baseline CNN on many samples, but MT behavior was more mixed.
+
+```text
+PD mean: CNN 27.4063, GAN 20.8641, CandidateB 26.1794
+MT mean: CNN 5.8678, GAN 8.3481, CandidateB 6.0186
+PD CandidateB < CNN: 136/168
+MT CandidateB < CNN: 66/168
+PD CandidateB < GAN: 1/168
+Original MT-GAN cases recovered: 4/20
+Recovered samples: [18, 25, 63, 80]
+```
+
+Interpretation:
+
+> Candidate B shows that differentiable scalar-field surrogates can improve speed fidelity, gradient behavior, component-count topology proxies, and PD distance, but soft level-set and gradient losses alone do not consistently improve merge-tree hierarchy.
+
+---
+
+## VIII.3 Candidate C: critical-value / topological-extrema proxy
+
+### Motivation
+
+Candidate C was introduced to make the fine-tuning objective more explicitly topology-aware. It is inspired by topology-aware neural interpolation work that uses persistence-based losses, including critical-value enforcement and persistence-diagram Wasserstein losses. Candidate C does **not** implement full differentiable PD optimization. Instead, it adds a TensorFlow-1-compatible proxy that penalizes speed mismatch at GT high-speed local maxima.
+
+For superlevel-set topology, high-speed local maxima correspond to births of connected components. Matching the scalar values at these locations provides a spatially anchored topological-extrema signal.
+
+### Objective
+
+Candidate C uses:
+
+```text
+L_total = L_uv
+        + lambda_speed    * L_speed
+        + lambda_grad     * L_grad
+        + lambda_levelset * L_levelset
+        + lambda_crit     * L_crit
+```
+
+The critical-value proxy is computed as follows:
+
+1. Convert GT physical scalar speed to shape `[B,H,W,1]`.
+2. Use a 3x3 max-pooling neighborhood to detect local maxima.
+3. Keep only maxima above an adaptive threshold:
+
+```text
+threshold = mean(speed_GT) + crit_high_z * std(speed_GT)
+```
+
+4. Penalize Candidate C's scalar-speed error only at those selected GT maxima:
+
+```text
+L_crit = sum(mask * (speed_SR - speed_GT)^2) / max(sum(mask), 1)
+```
+
+Candidate C uses:
+
+```python
+lambda_speed    = 0.01
+lambda_grad     = 0.05
+lambda_wpd      = 0.0
+lambda_levelset = 0.25
+lambda_crit     = 0.001
+crit_high_z     = 1.0
+crit_pool       = 3
+crit_include_minima = False
+learning_rate   = 1e-5
+epochs          = 3
+batch_size      = 4
+```
+
+### Lambda calibration
+
+The initial diagnostic showed:
+
+```text
+L_uv mean      = 0.031759
+L_crit mean    = 6.064671
+L_crit / L_uv  = 190.9567x
+```
+
+The initially proposed `lambda_crit=0.05` would have contributed:
+
+```text
+w_L_crit = 0.303234 = 954.78% of L_uv
+```
+
+This was too dominant. The calibrated Candidate C setting uses `lambda_crit=0.001`, which contributes approximately 19% of `L_uv`. During training, `w_L_crit` remained in the approximate range `0.0034–0.0071`, while total loss stayed in a stable range.
+
+---
+
+## VIII.4 Candidate C reproduction commands
+
+### Run loss diagnostic
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_physics_loss_diagnostic.py \
+  --data-path  example_data_fixed/wind_MR-HR.tfrecord \
+  --model-path models/wind_mr-hr/trained_cnn/cnn \
+  --batch-size 4 \
+  --max-batches 0 \
+  --lambda-speed 0.01 \
+  --lambda-grad 0.05 \
+  --lambda-wpd 0.0 \
+  --lambda-levelset 0.25 \
+  --lambda-crit 0.001 \
+  --crit-high-z 1.0 \
+  --crit-pool 3
+```
+
+### Run Candidate C fine-tuning and inference
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/run_candidateC_crit_finetune.py
+```
+
+Expected outputs:
+
+```text
+data_out/wind_finetune_pilot_candidateC/idx.npy
+data_out/wind_finetune_pilot_candidateC/dataIN.npy
+data_out/wind_finetune_pilot_candidateC/dataGT.npy
+data_out/wind_finetune_pilot_candidateC/dataSR.npy
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateC/
+logs/wind_finetune_pilot_candidateC.log
+```
+
+Expected shape sanity check:
+
+```text
+idx.npy    (168,)
+dataIN.npy (168, 100, 100, 2)
+dataGT.npy (168, 500, 500, 2)
+dataSR.npy (168, 500, 500, 2)
+```
+
+### Evaluate scalar/physics/proxy metrics
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateC \
+  --candidate-dir data_out/wind_finetune_pilot_candidateC \
+  --cnn-dir       data_out_fixed/wind_mrhr_cnn \
+  --gan-dir       data_out_fixed/wind_mrhr_gan \
+  --merged-csv    ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir       ttk_runs_fixed/topology_finetuning/candidateC_eval
+```
+
+Expected outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_eval/all_sample_metrics_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/pairwise_cnn_vs_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/winner_counts_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/adjacent_cluster_table_candidateC.csv
+docs/topology_finetuning_candidateC_eval.md
+```
+
+### Run Candidate C topology extraction
+
+Smoke test:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+rm -rf ttk_runs_fixed/topology_finetuning/candidateC_vti \
+       ttk_runs_fixed/topology_finetuning/candidateC_topology
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateC \
+  --data-dir data_out/wind_finetune_pilot_candidateC \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateC_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateC_topology \
+  --n-samples 2 \
+  --skip-viz \
+  --debug
+```
+
+Full run:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+rm -rf ttk_runs_fixed/topology_finetuning/candidateC_vti \
+       ttk_runs_fixed/topology_finetuning/candidateC_topology
+
+mkdir -p logs
+
+tmux new -s candC_topology
+```
+
+Inside tmux:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateC \
+  --data-dir data_out/wind_finetune_pilot_candidateC \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateC_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateC_topology \
+  --skip-viz \
+  2>&1 | tee logs/candidateC_topology_pipeline.log
+```
+
+Expected final TTK counts:
+
+```bash
+find ttk_runs_fixed/topology_finetuning/candidateC_topology/pd -name "*.vtu" | wc -l
+find ttk_runs_fixed/topology_finetuning/candidateC_topology/mt -name "*_port_0.vtu" | wc -l
+```
+
+Expected output:
+
+```text
+336
+336
+```
+
+If Stage 2 completes but Stage 3 does not run, organize the files into GT/SR subdirectories and run the distance computation manually:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+METHOD="candidateC"
+OUT_BASE="ttk_runs_fixed/topology_finetuning/candidateC_topology"
+PD_DIR="$OUT_BASE/pd"
+MT_DIR="$OUT_BASE/mt"
+FINAL_DIR="$OUT_BASE/phase_c_final"
+
+mkdir -p "$PD_DIR/GT" "$PD_DIR/SR" "$MT_DIR/GT" "$MT_DIR/SR"
+
+shopt -s nullglob
+PD_GT=("$PD_DIR"/${METHOD}_GT_*)
+PD_SR=("$PD_DIR"/${METHOD}_SR_*)
+MT_GT=("$MT_DIR"/${METHOD}_GT_*)
+MT_SR=("$MT_DIR"/${METHOD}_SR_*)
+shopt -u nullglob
+
+[[ ${#PD_GT[@]} -gt 0 ]] && mv -f -- "${PD_GT[@]}" "$PD_DIR/GT/"
+[[ ${#PD_SR[@]} -gt 0 ]] && mv -f -- "${PD_SR[@]}" "$PD_DIR/SR/"
+[[ ${#MT_GT[@]} -gt 0 ]] && mv -f -- "${MT_GT[@]}" "$MT_DIR/GT/"
+[[ ${#MT_SR[@]} -gt 0 ]] && mv -f -- "${MT_SR[@]}" "$MT_DIR/SR/"
+
+rm -rf "$FINAL_DIR"
+
+python3 -u -X faulthandler scripts/compute_composite_tree_distance.py \
+  --pd-dir "$PD_DIR" \
+  --mt-dir "$MT_DIR" \
+  --outdir "$FINAL_DIR" \
+  --isolate-mt \
+  --debug 2>&1 | tee logs/candidateC_stage3_distance.log
+```
+
+Expected result:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_topology/phase_c_final/phase_c_results.csv
+```
+
+with 169 lines (`1 header + 168 samples`).
+
+### Build Candidate C topology comparison report
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateC \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateC_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results   ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx      data_out/wind_finetune_pilot_candidateC/idx.npy \
+  --out-dir            ttk_runs_fixed/topology_finetuning/candidateC_topology \
+  --report-path        docs/topology_finetuning_candidateC_topology_eval.md
+```
+
+Expected outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_topology_comparison.csv
+docs/topology_finetuning_candidateC_topology_eval.md
+```
+
+---
+
+## VIII.5 Candidate C scalar/physics/proxy results
+
+Candidate C preserves CNN-like direct fidelity and improves many scalar/physics/proxy metrics relative to the baseline CNN.
+
+```text
+PSNRuv: CNN=31.1925, GAN=29.1380, CandidateC=32.4344
+Speed MAE: CNN=0.6941, GAN=0.9026, CandidateC=0.5951
+Speed RMSE: CNN=1.1078, GAN=1.3775, CandidateC=0.9755
+WPD MAE: CNN=231.6709, GAN=310.7328, CandidateC=195.1476
+WPD W1: CNN=45.2713, GAN=85.6191, CandidateC=21.9732
+WPD bias abs: CNN=35.3439, GAN=78.7236, CandidateC=9.7407
+Gradient MAE: CNN=0.3491, GAN=0.3806, CandidateC=0.3255
+Gradient W1: CNN=0.2329, GAN=0.0564, CandidateC=0.2028
+Gradient kurtosis abs Δ: CNN=3.7004, GAN=4.2010, CandidateC=2.6852
+PSD log-L2: CNN=0.8335, GAN=0.5139, CandidateC=0.9095
+PSD slope abs Δ: CNN=0.9150, GAN=0.9482, CandidateC=1.2550
+Exceedance abs Δ s>5: CNN=0.0042, GAN=0.0082, CandidateC=0.0053
+Exceedance abs Δ s>10: CNN=0.0066, GAN=0.0243, CandidateC=0.0063
+Exceedance abs Δ s>15: CNN=0.0062, GAN=0.0096, CandidateC=0.0021
+Exceedance abs Δ p90: CNN=0.0103, GAN=0.0123, CandidateC=0.0022
+Component-count curve L1: CNN=115.5278, GAN=124.6567, CandidateC=99.6786
+```
+
+Candidate C improved over CNN on:
+
+```text
+PSNRuv: 168/168
+Speed MAE: 168/168
+Speed RMSE: 168/168
+WPD MAE: 168/168
+WPD W1: 160/168
+WPD bias abs: 153/168
+Gradient MAE: 168/168
+Gradient W1: 150/168
+Gradient kurtosis abs Δ: 88/168
+Exceedance s>15: 136/168
+Exceedance p90: 146/168
+Component-count curve L1: 151/168
+```
+
+Compared with Candidate B, Candidate C is slightly weaker on direct fidelity but stronger on several distributional/topology-adjacent metrics:
+
+```text
+WPD W1: Candidate C better than B on 163/168 samples
+WPD bias abs: Candidate C better than B on 149/168 samples
+Gradient MAE: Candidate C better than B on 160/168 samples
+Gradient W1: Candidate C better than B on 168/168 samples
+PSD log-L2: Candidate C better than B on 158/168 samples
+Component-count curve L1: Candidate C better than B on 136/168 samples
+```
+
+Interpretation:
+
+> Candidate C shifts the model away from purely pointwise fidelity and toward improved high-speed feature structure, component-count agreement, gradient distribution, and spectral behavior, while still retaining CNN-like reconstruction quality.
+
+---
+
+## VIII.6 Candidate C true topology results
+
+Candidate C was evaluated with true TTK PD and MT distances on all 168 samples.
+
+```text
+PD mean: CNN=27.4063, GAN=20.8641, CandidateC=27.0021
+MT mean: CNN=5.8678, GAN=8.3481, CandidateC=5.7141
+PD CandidateC < CNN: 120/168
+MT CandidateC < CNN: 102/168
+PD CandidateC < GAN: 0/168
+MT CandidateC < GAN: 157/168
+Original MT-GAN cases recovered by CandidateC: 11/20
+```
+
+The original 20 MT-GAN baseline cases were:
+
+```text
+[6, 8, 12, 16, 17, 18, 19, 20, 25, 48, 62, 63, 65, 68, 77, 79, 80, 82, 92, 154]
+```
+
+Candidate C recovered the following 11 cases:
+
+```text
+[6, 18, 20, 25, 62, 63, 65, 68, 79, 80, 92]
+```
+
+Per-sample MT distances for recovered cases:
+
+| sample_idx | MT CNN | MT GAN | MT CandidateC | winner before | winner after |
+|---|---:|---:|---:|---|---|
+| 6 | 6.1440 | 6.0106 | 5.7881 | GAN | CandidateC |
+| 18 | 6.2586 | 5.5544 | 5.2225 | GAN | CandidateC |
+| 20 | 6.2541 | 5.6891 | 5.4852 | GAN | CandidateC |
+| 25 | 11.3716 | 10.5015 | 6.5417 | GAN | CandidateC |
+| 62 | 6.7203 | 6.6502 | 6.5421 | GAN | CandidateC |
+| 63 | 7.6606 | 7.5776 | 6.5270 | GAN | CandidateC |
+| 65 | 5.8208 | 5.5768 | 5.2142 | GAN | CandidateC |
+| 68 | 6.0743 | 5.6709 | 5.5099 | GAN | CandidateC |
+| 79 | 6.8565 | 6.4670 | 6.2650 | GAN | CandidateC |
+| 80 | 6.9827 | 6.1767 | 5.2586 | GAN | CandidateC |
+| 92 | 5.7358 | 5.6779 | 5.2720 | GAN | CandidateC |
+
+Adjacent-cluster MT behavior:
+
+| sample_idx | MT CNN | MT GAN | MT CandidateC | winner before | winner after |
+|---|---:|---:|---:|---|---|
+| 10 | 6.6345 | 7.4238 | 6.0843 | CNN | CandidateC |
+| 11 | 5.9107 | 7.8317 | 5.8242 | CNN | CandidateC |
+| 12 | 6.6164 | 5.9137 | 6.1039 | GAN | GAN |
+| 13 | 6.0738 | 7.4023 | 6.6037 | CNN | CNN |
+| 90 | 5.2579 | 5.6635 | 5.0751 | CNN | CandidateC |
+| 91 | 5.5083 | 5.5198 | 5.7392 | CNN | CNN |
+| 92 | 5.7358 | 5.6779 | 5.2720 | GAN | CandidateC |
+| 93 | 6.5070 | 6.8160 | 6.1437 | CNN | CandidateC |
+
+Rare topology-CNN controls:
+
+| sample_idx | MT CNN | MT GAN | MT CandidateC | winner before | winner after |
+|---|---:|---:|---:|---|---|
+| 162 | 4.5406 | 9.6957 | 5.1857 | CNN | CNN |
+| 163 | 5.6989 | 6.7890 | 4.9161 | CNN | CandidateC |
+
+Interpretation:
+
+> Candidate C is the strongest merge-tree result in this project so far. It improves mean MT distance below the baseline CNN, improves MT over CNN on 102/168 samples, and recovers 11 of the 20 original MT-GAN cases. It does not close the PD gap to GAN, which supports the interpretation that PD and MT reward different structural properties.
+
+---
+
+## VIII.7 Visualization panel generation with Candidate B and Candidate C
+
+The visualization script was updated to include Candidate C and a direct Candidate-C-minus-Candidate-B difference panel.
+
+Updated panel layout:
+
+```text
+Top row:
+GT | CNN | Candidate B | Candidate C | GAN
+
+Bottom row:
+|CNN-GT| | |CandB-GT| | |CandC-GT| | |GAN-GT| | |CandC-CandB|
+```
+
+The `|CandC-CandB|` panel is useful because Candidate C is visually close to Candidate B. It isolates the local scalar-speed changes introduced by the critical-value/topological-extrema term.
+
+Recommended sample sets:
+
+```bash
+cd /home/adadhwal/PhIRE/scripts
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 6,18,20,25,62,63,65,68,79,80,92
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 generate_visual_inspection_panels.py \
+  --samples 10,11,12,13,90,91,92,93,162,163
+```
+
+Paper-worthy samples:
+
+```text
+Recovered MT-GAN examples: 6, 18, 25, 63, 80, 92
+Adjacent/control examples: 10, 12, 90, 92, 93, 163
+```
+
+Qualitative interpretation:
+
+> Candidate C remains CNN-like in global structure and does not become GAN-like. It often sharpens or preserves selected ridges and high-speed structures while avoiding the spatially diffuse GAN texture. This matches the quantitative result: Candidate C improves MT hierarchy without becoming the PD-favored GAN-like solution.
+
+---
+
+## VIII.8 Paper-facing Candidate C summary
+
+A concise statement for the paper:
+
+> Candidate C adds a critical-value/topological-extrema proxy to Candidate B, inspired by persistence-based critical-value losses in topology-aware scalar-field interpolation. Although this proxy does not directly optimize merge-tree distance, it produces the strongest MT improvement among the tested fine-tuned variants: mean MT distance decreases from 5.8678 for the baseline CNN to 5.7141, MT improves over CNN on 102/168 samples, and 11/20 original MT-GAN cases are recovered. Candidate C does not beat GAN on PD, indicating that the PD and MT objectives reward different structural properties. This supports the central hypothesis that merge-tree-aware training signals may preserve hierarchy not captured by PD-based or purely level-set objectives.
+
+Candidate C should be framed as:
+
+- a **topology-derived proxy**, not a full topology loss;
+- a stronger MT result than Candidate B;
+- evidence that critical-value supervision can improve hierarchical topology;
+- motivation for future differentiable merge-tree-aware losses.
+
+---
+
+## VIII.9 Files to preserve for Candidate C
+
+Small files that should be safe to commit:
+
+```text
+scripts/run_candidateC_crit_finetune.py
+scripts/evaluate_finetune_candidate.py
+scripts/run_candidate_topology_pipeline.sh
+scripts/build_candidate_topology_comparison.py
+scripts/generate_visual_inspection_panels.py
+
+docs/topology_finetuning_candidateC_eval.md
+docs/topology_finetuning_candidateC_topology_eval.md
+
+ttk_runs_fixed/topology_finetuning/candidateC_eval/all_sample_metrics_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/pairwise_cnn_vs_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/winner_counts_candidateC.csv
+ttk_runs_fixed/topology_finetuning/candidateC_eval/adjacent_cluster_table_candidateC.csv
+
+ttk_runs_fixed/topology_finetuning/candidateC_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_topology/candidateC_topology_comparison.csv
+```
+
+Large files to avoid committing unless Git LFS or external storage is intended:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_vti/
+ttk_runs_fixed/topology_finetuning/candidateC_topology/pd/
+ttk_runs_fixed/topology_finetuning/candidateC_topology/mt/
+data_out/wind_finetune_pilot_candidateC/dataSR.npy
+models_fixed/topology_finetuning/wind_finetune_pilot_candidateC/
+```
+
+---
+
+## Updated final takeaway with Candidate C
+
+The repaired/final pipeline now supports both post-hoc topology evaluation and an initial topology-aware fine-tuning result. Candidate B demonstrates that speed, gradient, and soft level-set losses can improve scalar fidelity and PD-like behavior. Candidate C demonstrates a stronger merge-tree result: adding a critical-value/topological-extrema proxy improves true MT distance, recovers more than half of the original MT-GAN cases, and preserves CNN-like direct fidelity. This provides concrete evidence that topology-derived training signals can improve scientific SR structure, while also showing that PD and MT remain distinct objectives.
+
+---
+
+# Part IX - Expanded seasonal dataset and expanded candidate ablations
+
+## Purpose
+
+This section records the expanded-data experiments performed after the original 168-sample candidate pilots. The goal was to test whether topology-aware fine-tuning effects were robust to training on samples that were not part of the final 168-sample benchmark.
+
+The expanded experiments use the original corrected 168-sample benchmark only for evaluation. Training is done on a separate 672-sample seasonal WIND Toolkit subset.
+
+## Expanded 672-sample dataset
+
+A new PhIRE-compatible dataset was generated from the same WIND Toolkit source family and same spatial crop as the corrected 168-sample benchmark. The dataset uses four non-overlapping 168-hour windows:
+
+| Window | WTK time-index range | Approximate start | Samples |
+|---|---:|---|---:|
+| Winter | 336-503 | 2007-01-15 00:00 | 168 |
+| Spring | 2160-2327 | 2007-04-01 00:00 | 168 |
+| Summer | 4344-4511 | 2007-07-01 00:00 | 168 |
+| Fall | 6552-6719 | 2007-10-01 00:00 | 168 |
+| Total | 336-6719 | - | 672 |
+
+The original benchmark uses WTK time indices 0-167, so the expanded training set has no temporal overlap with the benchmark.
+
+The generated data products were:
+
+```text
+example_data_topology_expanded_672/wind_LR-MR.tfrecord
+example_data_topology_expanded_672/wind_MR-HR.tfrecord
+example_data_topology_expanded_672/hr_stack.npy  # (672, 500, 500, 2)
+example_data_topology_expanded_672/mr_stack.npy  # (672, 100, 100, 2)
+example_data_topology_expanded_672/lr_stack.npy  # (672, 10, 10, 2)
+example_data_topology_expanded_672/manifest.csv
+example_data_topology_expanded_672/stats.json
+```
+
+Important validation checks:
+
+- HR/MR/LR array shapes matched the intended PhIRE hierarchy.
+- No NaN or infinite values were detected.
+- No WTK time index overlapped the benchmark range 0-167.
+- The expanded data were compatible with the pretrained PhIRE normalization constants.
+- The pretrained normalization was not changed, because the experiments fine-tune a released PhIRE checkpoint rather than train a new model from scratch.
+
+The endpoint issue encountered during generation was caused by the retired `developer.nrel.gov` HSDS endpoint. The working endpoint override was:
+
+```bash
+export HS_ENDPOINT="https://developer.nlr.gov/api/hsds"
+export HSDS_ENDPOINT="$HS_ENDPOINT"
+```
+
+## Expanded candidate definitions
+
+All expanded candidates were trained on:
+
+```text
+example_data_topology_expanded_672/wind_MR-HR.tfrecord
+```
+
+and evaluated on:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+All used the same pretrained CNN checkpoint, learning rate `1e-5`, batch size `4`, and 3 fine-tuning epochs.
+
+### Candidate UV-expanded-672
+
+Purpose: expanded-data fine-tuning-only control.
+
+Loss:
+
+```text
+L_total = L_uv
+```
+
+All auxiliary weights were set to zero:
+
+```text
+lambda_speed = 0.0
+lambda_grad = 0.0
+lambda_wpd = 0.0
+lambda_levelset = 0.0
+lambda_crit = 0.0
+```
+
+This tests whether changes in topology are caused simply by seeing 672 new samples during fine-tuning.
+
+### Candidate B-expanded-672
+
+Purpose: expanded-data physics/level-set ablation.
+
+Loss:
+
+```text
+L_total = L_uv
+        + 0.01 * L_speed
+        + 0.05 * L_grad
+        + 0.25 * L_levelset
+```
+
+with:
+
+```text
+lambda_wpd = 0.0
+lambda_crit = 0.0
+```
+
+This tests whether speed, gradient, and soft threshold-region supervision improve topology without using the critical-value/high-speed-extrema proxy.
+
+### Candidate C-expanded-672
+
+Purpose: expanded-data topology-inspired loss.
+
+Loss:
+
+```text
+L_total = L_uv
+        + 0.01  * L_speed
+        + 0.05  * L_grad
+        + 0.25  * L_levelset
+        + 0.001 * L_crit
+```
+
+The `L_crit` term targets high-speed local extrema and was intended to provide a simple differentiable proxy for topology-relevant critical values.
+
+## Expanded candidate output locations
+
+```text
+data_out/wind_finetune_candidateUV_expanded672/
+data_out/wind_finetune_candidateB_expanded672/
+data_out/wind_finetune_candidateC_expanded672/
+
+models_fixed/topology_finetuning/wind_finetune_candidateUV_expanded672/
+models_fixed/topology_finetuning/wind_finetune_candidateB_expanded672/
+models_fixed/topology_finetuning/wind_finetune_candidateC_expanded672/
+```
+
+## TTK topology evaluation workflow
+
+Each expanded candidate was evaluated using the same TTK pipeline as the earlier candidates. For each method, the target final checks were:
+
+```text
+VTI files: 336
+PD VTU files: 336
+MT port0 VTU files: 336
+phase_c_results.csv lines: 169
+```
+
+Candidate B-expanded-672 completed the full pipeline cleanly. Candidate UV-expanded-672 initially stopped during TTK extraction with partial counts:
+
+```text
+VTI: 336
+PD: 234
+MT: 233
+```
+
+A missing-only resume pass was used to fill the remaining SR PD/MT outputs. After organizing outputs into GT/SR folders, the final counts were:
+
+```text
+PD total: 336
+MT port0 total: 336
+PD GT/SR: 168 / 168
+MT GT/SR: 168 / 168
+phase_c_results.csv lines: 169
+```
+
+This confirmed that Candidate UV-expanded-672 had a valid full TTK result.
+
+## Final expanded-data topology results
+
+All distances below are TTK distances on the original corrected 168-sample benchmark. Lower is better.
+
+| Method | Training data | Objective | PD mean | MT mean | PD < CNN | MT < CNN | Original MT-GAN cases recovered |
+|---|---|---|---:|---:|---:|---:|---:|
+| CNN baseline | original PhIRE | released CNN | 27.4063 | 5.8678 | - | - | - |
+| GAN baseline | original PhIRE | released GAN | 20.8641 | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate UV-expanded-672 | 672 seasonal | `L_uv` only | 29.8747 | 6.2891 | 6/168 | 43/168 | 3/20 |
+| Candidate B-expanded-672 | 672 seasonal | `L_uv + L_speed + L_grad + L_levelset` | 23.7094 | 6.3124 | 167/168 | 36/168 | 5/20 |
+| Candidate C-expanded-672 | 672 seasonal | Candidate B + `L_crit` | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+
+## Interpretation
+
+The expanded-data ablation is scientifically useful because Candidate UV-expanded-672 worsened both PD and MT relative to CNN. Therefore, the PD gains of Candidate B-expanded-672 and Candidate C-expanded-672 are not explained by expanded fine-tuning alone.
+
+Candidate B-expanded-672 achieved the best expanded PD mean and beat CNN on PD for 167/168 samples, which suggests that speed, gradient, and soft level-set losses are useful for persistence-style topology.
+
+Candidate C-expanded-672 gave the best expanded MT behavior: it had lower MT mean than Candidate UV-expanded-672 and Candidate B-expanded-672, beat CNN on MT for 54/168 samples, and recovered 7/20 original MT-GAN cases. However, it still did not beat the original CNN mean MT distance.
+
+The key conclusion is that the current differentiable losses can influence topology, especially PD, but they do not fully encode merge-tree hierarchy. This supports the future direction of merge-tree-specific proxies or learned differentiable MT-distance surrogates.
+
+## Meeting-ready summary
+
+A concise verbal summary is:
+
+> I expanded the fine-tuning experiments to a non-overlapping 672-sample seasonal WIND Toolkit training set and evaluated all outputs on the original 168-sample benchmark. The UV-only expanded control worsened PD and MT, so expanded fine-tuning alone does not explain the topology gains. Candidate B-expanded and Candidate C-expanded both strongly improved PD, showing that the auxiliary physics/level-set losses transfer beyond the original benchmark week. Candidate C-expanded had the best MT behavior among the expanded models, but still did not beat the original CNN mean MT. This suggests that our current losses are useful topology-aware proxies, but that merge-tree hierarchy likely requires a more explicit MT-aware surrogate.
+
+
+---
+
+# Part VIII — Candidate Dpd-expanded-672 active PD-loss audit and results
+
+## Purpose
+
+This section records the correction and expanded-data rerun for the Candidate D family.
+During the expanded-candidate audit, the original Candidate D pilot was found to have
+implemented a differentiable PyTorch persistence-diagram loss but used
+`lambda_pd = 0.0`. Therefore, the original Candidate D run should be treated as a
+PD-gradient diagnostic / residual-refiner proxy rather than as an active PD-loss
+training experiment.
+
+Candidate Dpd-expanded-672 was introduced as the corrected active PD-loss experiment.
+It uses the same 672-sample non-overlapping seasonal training set as Candidate
+UV/B/C-expanded and evaluates on the original corrected 168-sample benchmark.
+
+## Expanded CNN SR training arrays
+
+Candidate Dpd trains a PyTorch residual refiner on frozen CNN SR outputs, so the first
+step was to generate pretrained CNN outputs on the expanded 672-sample training set.
+
+Verification before generation showed that `data_out/wind_mrhr_cnn_expanded672/` did not
+exist. After running paired CNN inference on
+`example_data_topology_expanded_672/wind_MR-HR.tfrecord`, the expected arrays were
+created:
+
+```text
+idx.npy    -> (672,)
+dataIN.npy -> (672, 100, 100, 2)
+dataGT.npy -> (672, 500, 500, 2)
+dataSR.npy -> (672, 500, 500, 2)
+```
+
+The TensorFlow `OUT_OF_RANGE: End of sequence` message appeared at the end of paired
+inference. This was expected and simply indicated that the TFRecord iterator had reached
+the end of the dataset.
+
+## Candidate Dpd-expanded-672 training configuration
+
+Candidate Dpd-expanded-672 uses a small PyTorch residual refiner:
+
+```text
+SR_Dpd = SR_CNN + 0.1 * body(SR_CNN)
+```
+
+The active training objective was:
+
+```text
+L_total = L_uv
+        + 0.01     * L_speed
+        + 0.05     * L_grad
+        + 0.001    * L_crit
+        + 0.001904 * L_PD
+```
+
+where `L_PD` is a differentiable Wasserstein-2 persistence-diagram loss computed on a
+100x100 crop. The coefficient `0.001904` was selected from the previous diagnostic to
+make the PD term approximately a 10% contribution relative to `L_uv` at initialization.
+
+The training log confirmed:
+
+```text
+lambda_pd = 0.001904
+PD gradient check passed
+L_PD computed every step and included in L_total
+```
+
+Training completed successfully and wrote:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateDpd_expanded672/refiner_final.pt
+data_out/wind_finetune_candidateDpd_expanded672/dataSR.npy
+data_out/wind_finetune_candidateDpd_expanded672/dataGT.npy
+data_out/wind_finetune_candidateDpd_expanded672/dataIN.npy
+data_out/wind_finetune_candidateDpd_expanded672/idx.npy
+```
+
+The final benchmark output arrays had the expected shapes:
+
+```text
+idx.npy    -> (168,)
+dataIN.npy -> (168, 100, 100, 2)
+dataGT.npy -> (168, 500, 500, 2)
+dataSR.npy -> (168, 500, 500, 2)
+```
+
+## Scalar/proxy evaluation
+
+The scalar/proxy evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/all_sample_metrics_candidateDpd_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/winner_counts_candidateDpd_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/pairwise_cnn_vs_candidateDpd_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateDpd_expanded672_eval/adjacent_cluster_table_candidateDpd_expanded672.csv
+docs/topology_finetuning_candidateDpd_expanded672_eval.md
+```
+
+## TTK topology completion
+
+The full TTK pipeline completed cleanly:
+
+```text
+VTI files       : 336 / 336
+PD VTU files    : 336 / 336
+MT port0 files  : 336 / 336
+phase_c_results : 169 lines
+```
+
+The final topology comparison report was written to:
+
+```text
+docs/topology_finetuning_candidateDpd_expanded672_topology_eval.md
+```
+
+## Final true-topology result
+
+Lower PD/MT distance is better.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | Original MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate UV-expanded-672 | 29.8747 | 6.2891 | 6/168 | 43/168 | 3/20 |
+| Candidate B-expanded-672 | 23.7094 | 6.3124 | 167/168 | 36/168 | 5/20 |
+| Candidate C-expanded-672 | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Candidate Dpd-expanded-672 | 28.7656 | 6.2210 | 0/168 | 23/168 | 1/20 |
+
+Candidate Dpd-expanded-672 does not improve mean PD or mean MT relative to the CNN
+baseline. It recovers one original MT-GAN case, sample 25, where MT distance improves to
+6.6562. However, the overall result is negative for full-field TTK topology metrics.
+
+## Interpretation
+
+The corrected interpretation is:
+
+- Original Candidate D: PD-capable residual refiner / gradient diagnostic, not an active
+  PD-loss training run because `lambda_pd = 0.0`.
+- Candidate Dpd-expanded-672: first active differentiable PD-loss run.
+- Candidate E2: active TTK-guided persistence critical-pair loss with nonzero
+  `lambda_ttkcv` and `lambda_ttkpers`.
+
+This means the earlier claim that Candidate D showed direct PD losses were ineffective
+was too strong. The revised conclusion is more precise: the active PD-loss experiment
+Candidate Dpd-expanded-672 shows that a naive cropped differentiable PD Wasserstein loss
+is not sufficient in this setting to improve final TTK PD or MT. Candidate E2 similarly
+shows that fixed persistence-pair supervision is feasible but not enough to improve the
+final true topology metrics. These results motivate specifically merge-tree-aware
+proxies or learned MT-distance surrogates.
+
+---
+
+# Part IX — Candidate E2-expanded-672 faithful TTK critical-pair expansion
+
+## Purpose
+
+Candidate E2-expanded-672 was added after the active differentiable PD-loss audit to complete the expanded-data comparison for the two explicit PD-oriented directions:
+
+- **Candidate Dpd-expanded-672**: differentiable PD Wasserstein loss computed in PyTorch.
+- **Candidate E2-expanded-672**: TTK-guided persistence critical-pair supervision, where TTK supplies birth/death vertices and PyTorch supervises scalar values and persistence gaps at those fixed positions.
+
+This run is scientifically important because Candidate E2, unlike the original Candidate D pilot, used active PD-pair loss terms. Expanding E2 to the same 672-sample seasonal training set makes the comparison with UV/B/C/Dpd-expanded more robust.
+
+## Safety correction: approximate helper was separated from faithful E2
+
+An early helper for E2-expanded constraints used scipy local maxima as birth vertices and the global minimum as the death vertex. This was only an approximation and not a faithful TTK critical-pair extraction. It was preserved only as a development reference:
+
+```text
+scripts/build_candidateE2approx_expanded672_constraints.py
+```
+
+To prevent accidental overwrite of the real E2 constraints, this approximate helper was patched to write to:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2approx_expanded672_constraints/
+```
+
+The faithful E2-expanded run uses:
+
+```text
+scripts/build_candidateE2_expanded672_ttk_constraints.py
+```
+
+which writes the real constraints to:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+## Faithful TTK constraint generation
+
+The faithful builder performs the following steps for each of the 672 expanded GT samples:
+
+1. Compute scalar speed from the expanded GT `[u,v]` field.
+2. Extract the 160 x 160 speed crop used in the rest of the topology evaluation.
+3. Write an ASCII VTI file with point-data array `wind_speed`.
+4. Run `ttkPersistenceDiagramCmd` through the `phire-ttk:latest` Docker image.
+5. Parse the resulting TTK PD VTU file using the same parser as the original E/E2 constraint extraction code.
+6. Extract actual TTK birth/death vertex IDs.
+7. Correct birth/death target values by reading GT speed directly from the NumPy array at those TTK vertex IDs.
+8. Store the result in the `TTKConstraints`-compatible NPZ format.
+
+The corrected target convention is:
+
+```text
+birth_val = speed_GT[birth_vid // 160, birth_vid % 160]
+death_val = speed_GT[death_vid // 160, death_vid % 160]
+persistence = |birth_val - death_val|
+```
+
+This preserves the key E2 idea: **TTK selects the topology-critical vertices, but the training targets come from the GT scalar field itself.**
+
+## Constraint build verification
+
+The faithful constraints were built successfully.
+
+Observed outputs:
+
+```text
+n_samples   : 672
+total pairs : 43008
+sample_count min/mean/max: 64 / 64.0 / 64
+birth_val range: 0.018310546875 to 28.528701782226562
+death_val range: 0.079345703125 to 31.125829696655273
+persistence range: 0.0 to 26.844085693359375
+```
+
+Intermediate TTK files:
+
+```text
+VTI files: 672
+TTK PD VTU files: 672
+```
+
+Sanity check:
+
+```text
+max birth_val error : 0.00e+00
+max death_val error : 0.00e+00
+Sanity check PASSED.
+```
+
+## Candidate E2-expanded-672 training configuration
+
+Candidate E2-expanded-672 uses the same residual-refiner setup as the other PyTorch topology-loss candidates:
+
+```text
+SR_E2 = SR_CNN + 0.1 * body(SR_CNN)
+```
+
+The pretrained PhIRE CNN remains frozen. Only the residual refiner is trained.
+
+Training input:
+
+```text
+data_out/wind_mrhr_cnn_expanded672/dataSR.npy  (672, 500, 500, 2)
+data_out/wind_mrhr_cnn_expanded672/dataGT.npy  (672, 500, 500, 2)
+```
+
+Evaluation input:
+
+```text
+data_out_fixed/wind_mrhr_cnn/
+```
+
+Final output:
+
+```text
+data_out/wind_finetune_candidateE2_expanded672/dataSR.npy
+data_out/wind_finetune_candidateE2_expanded672/dataGT.npy
+data_out/wind_finetune_candidateE2_expanded672/dataIN.npy
+data_out/wind_finetune_candidateE2_expanded672/idx.npy
+```
+
+The training objective was:
+
+```text
+L_E2 = L_uv
+     + 0.01  L_speed
+     + 0.05  L_grad
+     + 0.001 L_crit
+     + 0.25  L_levelset
+     + 0.04  L_TTKCV
+     + 0.02  L_TTKpers
+```
+
+where:
+
+```text
+L_TTKCV   = MSE at TTK birth/death vertices
+L_TTKpers = MSE between SR persistence gaps and GT persistence gaps
+```
+
+Training completed successfully in approximately 483.4 seconds, produced the final refiner checkpoint, and wrote valid 168-sample benchmark outputs. The output arrays were verified:
+
+```text
+idx.npy    (168,)
+dataIN.npy (168, 100, 100, 2)
+dataGT.npy (168, 500, 500, 2)
+dataSR.npy (168, 500, 500, 2)
+```
+
+## Scalar/proxy evaluation
+
+The scalar/proxy evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/all_sample_metrics_candidateE2_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/winner_counts_candidateE2_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/pairwise_cnn_vs_candidateE2_expanded672.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_expanded672_eval/adjacent_cluster_table_candidateE2_expanded672.csv
+docs/topology_finetuning_candidateE2_expanded672_eval.md
+```
+
+## TTK topology evaluation
+
+The first topology extraction pass stopped partway through Stage 2, as happened for several previous candidates. The missing PD/MT outputs were completed using the missing-file resume procedure. Stage 3 then completed successfully:
+
+```text
+phase_c_results.csv lines: 169
+pd_pairwise_distances.csv written
+mt_pairwise_distances.csv written
+phase_c_summary.csv written
+phase_c_summary.txt written
+```
+
+Final topology comparison validation:
+
+```text
+candidateE2_expanded672 topology entries: 168 (PD valid: 168, MT valid: 168)
+Baseline CNN entries: 168, GAN entries: 168
+```
+
+## Final Candidate E2-expanded-672 topology result
+
+Lower is better for both PD and MT.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | Original MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | - | - | - |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate E2-expanded-672 | 28.6697 | 6.1622 | 0/168 | 24/168 | 2/20 |
+
+Recovered original MT-GAN cases:
+
+| sample_idx | MT CNN | MT GAN | MT Candidate E2-expanded | Winner after |
+|---:|---:|---:|---:|---|
+| 25 | 11.3716 | 10.5015 | 6.6751 | Candidate E2-expanded |
+| 92 | 5.7358 | 5.6779 | 5.6222 | Candidate E2-expanded |
+
+## Correct interpretation
+
+Candidate E2-expanded-672 is a faithful expanded-data TTK+PyTorch critical-pair experiment. It uses actual TTK PD birth/death vertices and active topology-pair losses. However, it does not improve mean PD or mean MT relative to CNN:
+
+```text
+PD: CNN = 27.4063, E2-expanded = 28.6697  (worse)
+MT: CNN = 5.8678,  E2-expanded = 6.1622   (worse)
+```
+
+It slightly improves over Candidate Dpd-expanded-672 in mean PD, mean MT, and recovered MT-GAN cases, but it still remains worse than CNN on both mean topology metrics and does not improve PD on any sample.
+
+This supports the emerging conclusion that **PD-oriented supervision is feasible but not automatically effective for final TTK topology metrics**, and that merge-tree improvement likely requires objectives that explicitly encode hierarchy: branch matching, saddle relationships, parent-child structure, or learned MT-distance surrogates.
+
+## Updated expanded-candidate matrix
+
+| Candidate | Main idea | PD mean | MT mean | PD < CNN | MT < CNN | Recovered MT-GAN |
+|---|---|---:|---:|---:|---:|---:|
+| UV-expanded | UV-only fine-tuning | 29.8747 | 6.2891 | 6/168 | 43/168 | 3/20 |
+| B-expanded | speed + gradient + soft level-set | 23.7094 | 6.3124 | 167/168 | 36/168 | 5/20 |
+| C-expanded | B + high-speed extrema proxy | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Dpd-expanded | active differentiable PD Wasserstein loss | 28.7656 | 6.2210 | 0/168 | 23/168 | 1/20 |
+| E2-expanded | actual TTK birth/death-pair supervision | 28.6697 | 6.1622 | 0/168 | 24/168 | 2/20 |
+
+## Meeting-ready summary
+
+The full expanded ablation now shows that UV-only fine-tuning worsens topology, while B/C proxy losses strongly improve PD. Candidate C-expanded gives the best expanded MT behavior, though it still does not beat CNN mean MT. In contrast, both direct PD-oriented variants, Dpd-expanded and E2-expanded, are feasible but do not improve final TTK PD/MT over CNN. This suggests that PD supervision and fixed critical-pair supervision are not enough by themselves; the next meaningful step is a merge-tree-specific hierarchy-aware proxy or surrogate.
+
+---
+
+# Part IX — Candidate C-expanded-1344 scaling experiment
+
+## Purpose
+
+After the 672-sample expanded-data ablation, Candidate C was scaled to a larger
+1344-sample non-overlapping seasonal training set. The purpose was to test whether the
+Candidate C topology-aware proxy loss remains robust as the amount of training data grows,
+while still evaluating on the same corrected 168-sample benchmark.
+
+Candidate C uses the same objective as before:
+
+```text
+L_C = L_uv
+    + 0.01  L_speed
+    + 0.05  L_grad
+    + 0.25  L_levelset
+    + 0.001 L_crit
+```
+
+where `L_crit` is the high-speed local-extrema / critical-value proxy. No loss weights or
+hyperparameters were changed relative to Candidate C-expanded-672; only the training set
+size was increased.
+
+## Dataset generated
+
+A new expanded dataset was generated at:
+
+```text
+example_data_topology_expanded_1344/
+```
+
+The dry run verified the same spatial crop as the previous corrected datasets:
+
+```text
+Nearest grid center: 39.4998 N, -75.0064 W
+Crop: rows 720:1220, cols 2102:2602
+```
+
+The dataset contains eight non-overlapping 168-hour windows, two per season:
+
+| Window | WTK indices | Samples |
+|---|---:|---:|
+| winter_1 | 336-503 | 168 |
+| winter_2 | 504-671 | 168 |
+| spring_1 | 2160-2327 | 168 |
+| spring_2 | 2328-2495 | 168 |
+| summer_1 | 4344-4511 | 168 |
+| summer_2 | 4512-4679 | 168 |
+| fall_1 | 6552-6719 | 168 |
+| fall_2 | 6720-6887 | 168 |
+| **Total** |  | **1344** |
+
+All windows are disjoint from the benchmark WTK indices `0..167`.
+
+## Dataset verification
+
+The generated arrays were verified as:
+
+| File | Shape | dtype | min | max |
+|---|---:|---|---:|---:|
+| `hr_stack.npy` | `(1344, 500, 500, 2)` | `float64` | -29.2494 | 37.1275 |
+| `mr_stack.npy` | `(1344, 100, 100, 2)` | `float64` | -27.6688 | 31.8134 |
+| `lr_stack.npy` | `(1344, 10, 10, 2)` | `float64` | -20.1521 | 21.8779 |
+
+Additional generated files:
+
+```text
+wind_MR-HR.tfrecord  5,591,262,976 bytes
+wind_LR-MR.tfrecord    217,398,592 bytes
+manifest.csv           401,699 bytes
+stats.json               1,218 bytes
+```
+
+The pretrained PhIRE normalization remained compatible with the expanded dataset:
+
+```text
+normalization compatible: True
+u_z = 0.4789
+v_z = 0.0649
+```
+
+## Training and benchmark inference
+
+Candidate C-expanded-1344 was trained from the pretrained CNN checkpoint on:
+
+```text
+example_data_topology_expanded_1344/wind_MR-HR.tfrecord
+```
+
+and evaluated on the fixed corrected benchmark:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+The final benchmark outputs were written to:
+
+```text
+data_out/wind_finetune_candidateC_expanded1344/
+```
+
+Verified output arrays:
+
+| File | Shape | dtype | min | max |
+|---|---:|---|---:|---:|
+| `idx.npy` | `(168,)` | `int64` | 0 | 167 |
+| `dataIN.npy` | `(168, 100, 100, 2)` | `float64` | -21.5213 | 26.9345 |
+| `dataGT.npy` | `(168, 500, 500, 2)` | `float64` | -30.4676 | 30.8122 |
+| `dataSR.npy` | `(168, 500, 500, 2)` | `float64` | -27.1581 | 28.7150 |
+
+The TensorFlow `OUT_OF_RANGE: End of sequence` message during paired inference was expected
+and indicates that the dataset iterator completed.
+
+## Scalar / physics / domain evaluation
+
+The scalar/physics/domain evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/all_sample_metrics_candidateC_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/winner_counts_candidateC_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/pairwise_cnn_vs_candidateC_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/adjacent_cluster_table_candidateC_expanded1344.csv
+docs/topology_finetuning_candidateC_expanded1344_eval.md
+```
+
+`skimage` SSIM was unavailable because of a NumPy binary incompatibility, so SSIM values
+were reported as `NaN` by the current environment. Other physics/domain metrics were still
+computed.
+
+## TTK topology evaluation
+
+The first TTK extraction pass stopped partway through Stage 2, as seen in earlier candidate
+runs. A missing-only resume pass completed the PD/MT extraction successfully:
+
+```text
+PD: 336
+MT: 336
+Failures: none
+```
+
+Stage 3 distance computation completed and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/pd_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/mt_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/phase_c_summary.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_topology/phase_c_final/phase_c_summary.txt
+```
+
+The final `phase_c_results.csv` had 169 lines, corresponding to 168 evaluated samples plus
+header.
+
+## Final topology comparison result
+
+The final topology comparison reported:
+
+```text
+candidateC_expanded1344 topology entries: 168 (PD valid: 168, MT valid: 168)
+PD: CNN=27.4063, GAN=20.8641, candidateC_expanded1344=22.8623
+MT: CNN=5.8678, GAN=8.3481, candidateC_expanded1344=6.1236
+PD candidateC_expanded1344 < CNN: 168/168
+MT candidateC_expanded1344 < CNN: 49/168
+PD candidateC_expanded1344 < GAN: 17/168
+MT-GAN wins -> candidateC_expanded1344: 9/20, still GAN: 11, now CNN: 0
+```
+
+Summary table:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | Recovered MT-GAN |
+|---|---:|---:|---:|---:|---:|
+| CNN | 27.4063 | **5.8678** | - | - | - |
+| GAN | **20.8641** | 8.3481 | 166/168 | 20/168 | 20/20 |
+| Candidate C-expanded-672 | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Candidate C-expanded-1344 | **22.8623** | 6.1236 | **168/168** | 49/168 | **9/20** |
+
+Candidate C-expanded-1344 improves PD over CNN on all 168 benchmark samples and improves
+mean PD further relative to Candidate C-expanded-672. It also recovers 9 of the 20 original
+MT-GAN cases, compared with 7/20 for Candidate C-expanded-672. However, mean MT remains
+worse than the original CNN baseline, which supports the current interpretation: Candidate C
+scales well for persistence-style topology and selected MT cases, but it is still not a full
+merge-tree hierarchy loss.
+
+The matching next ablation is `CandidateUV-expanded-1344`, trained on the same 1344-sample
+dataset with only `L_uv`, to verify that the Candidate C gains are not simply caused by
+larger-data fine-tuning.
+
+
+---
+
+# Part IX — Candidate C / UV 1344-sample expanded ablation update (2026-05-29)
+
+## Purpose
+
+After the 672-sample seasonal ablation, the Candidate C proxy-loss experiment was
+scaled to a larger 1344-sample non-overlapping seasonal dataset, and a matching
+UV-only ablation was run on the exact same 1344-sample dataset. This pair is the
+current cleanest test of whether Candidate C's topology-aware proxy losses improve
+true topology metrics beyond generic larger-data fine-tuning.
+
+## 1344-sample dataset
+
+The expanded dataset uses the same Mid-Atlantic 500 x 500 spatial crop centered at
+39.5 N, -75.0 W, with the same WIND Toolkit variables and PhIRE preprocessing as the
+672-sample dataset. It contains eight non-overlapping 168-hour windows:
+
+| Window | WTK start | WTK end | Samples |
+|---|---:|---:|---:|
+| winter_1 | 336 | 503 | 168 |
+| winter_2 | 504 | 671 | 168 |
+| spring_1 | 2160 | 2327 | 168 |
+| spring_2 | 2328 | 2495 | 168 |
+| summer_1 | 4344 | 4511 | 168 |
+| summer_2 | 4512 | 4679 | 168 |
+| fall_1 | 6552 | 6719 | 168 |
+| fall_2 | 6720 | 6887 | 168 |
+
+The generated arrays were verified as:
+
+- `hr_stack.npy`: `(1344, 500, 500, 2)`
+- `mr_stack.npy`: `(1344, 100, 100, 2)`
+- `lr_stack.npy`: `(1344, 10, 10, 2)`
+- `wind_MR-HR.tfrecord`: written successfully
+- `wind_LR-MR.tfrecord`: written successfully
+- no overlap with the held-out benchmark WTK indices `0..167`
+- normalization compatibility: `True`, with `u_z=0.4789`, `v_z=0.0649`
+
+The build emitted NumPy/TensorFlow compatibility warnings during `utils` import, but
+completed successfully and wrote the NPY stacks, TFRecords, manifest, stats JSON, and
+expanded dataset notes.
+
+## Candidate C-expanded-1344
+
+Candidate C-expanded-1344 was trained on the 1344-sample dataset and evaluated on the
+fixed 168-sample benchmark. The loss was unchanged from Candidate C-expanded-672:
+
+```text
+L_C = L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset + 0.001 L_crit
+```
+
+The benchmark inference outputs were verified:
+
+- `idx.npy`: `(168,)`, range `0..167`
+- `dataIN.npy`: `(168, 100, 100, 2)`
+- `dataGT.npy`: `(168, 500, 500, 2)`
+- `dataSR.npy`: `(168, 500, 500, 2)`
+
+Scalar/physics/domain evaluation completed and wrote:
+
+- `ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/all_sample_metrics_candidateC_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/winner_counts_candidateC_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateC_expanded1344_eval/pairwise_cnn_vs_candidateC_expanded1344.csv`
+- `docs/topology_finetuning_candidateC_expanded1344_eval.md`
+
+SSIM was unavailable in the current Spark environment due to a scikit-image / NumPy
+binary incompatibility and should be recomputed in a compatible environment if needed.
+
+The TTK topology pipeline initially stopped early, then was resumed successfully. Final
+counts were:
+
+- VTI: `336`
+- PD VTU: `336`
+- MT port-0 VTU: `336`
+- `phase_c_results.csv`: `169` lines including header
+
+The final true-topology comparison was:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | Recovered MT-GAN |
+|---|---:|---:|---:|---:|---:|---:|
+| CNN | 27.4063 | 5.8678 | — | — | — | — |
+| GAN | 20.8641 | 8.3481 | 166/168 | 20/168 | — | 20/20 |
+| Candidate C-expanded-1344 | 22.8623 | 6.1236 | 168/168 | 49/168 | 17/168 | 9/20 |
+
+The recovered original MT-GAN cases were samples `6, 18, 25, 62, 68, 77, 79, 80, 82`.
+
+## Candidate UV-expanded-1344
+
+Candidate UV-expanded-1344 is the matching larger-data control for Candidate C-expanded-1344.
+It used the same 1344 training samples, same pretrained CNN checkpoint, same learning
+rate, same batch size, and same number of epochs, but used only:
+
+```text
+L_total = L_uv
+```
+
+All auxiliary losses were set to zero:
+
+```text
+lambda_speed = lambda_grad = lambda_wpd = lambda_levelset = lambda_crit = 0
+```
+
+Training completed successfully. The log confirmed that auxiliary raw losses were computed
+for diagnostics, but all weighted auxiliary terms were zero and `total_loss = L_uv`.
+The benchmark inference outputs were verified:
+
+- `idx.npy`: `(168,)`, range `0..167`
+- `dataIN.npy`: `(168, 100, 100, 2)`
+- `dataGT.npy`: `(168, 500, 500, 2)`
+- `dataSR.npy`: `(168, 500, 500, 2)`
+
+Scalar/physics/domain evaluation completed and wrote:
+
+- `ttk_runs_fixed/topology_finetuning/candidateUV_expanded1344_eval/all_sample_metrics_candidateUV_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateUV_expanded1344_eval/winner_counts_candidateUV_expanded1344.csv`
+- `ttk_runs_fixed/topology_finetuning/candidateUV_expanded1344_eval/pairwise_cnn_vs_candidateUV_expanded1344.csv`
+- `docs/topology_finetuning_candidateUV_expanded1344_eval.md`
+
+The TTK topology pipeline initially stopped early at `VTI=336`, `PD=53`, `MT=52`, then
+was resumed and completed. The final topology comparison reported 168 valid PD and MT
+entries.
+
+The final true-topology comparison was:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | Recovered MT-GAN |
+|---|---:|---:|---:|---:|---:|---:|
+| Candidate UV-expanded-1344 | 29.5514 | 6.0787 | 10/168 | 54/168 | 0/168 | 5/20 |
+
+The recovered original MT-GAN cases were samples `18, 25, 63, 68, 92`.
+
+## Interpretation of the 1344-sample pair
+
+The 1344-sample pair is important because Candidate C-expanded-1344 and Candidate
+UV-expanded-1344 differ only in the auxiliary loss terms. The results show:
+
+- Candidate C-expanded-1344 strongly improves PD over CNN: `22.8623` vs `27.4063`.
+- Candidate UV-expanded-1344 worsens PD over CNN: `29.5514` vs `27.4063`.
+- Candidate C-expanded-1344 improves PD on `168/168` samples, while UV-expanded-1344
+  improves PD on only `10/168` samples.
+- Candidate C-expanded-1344 recovers more original MT-GAN cases (`9/20`) than
+  UV-expanded-1344 (`5/20`).
+- Neither 1344-sample run improves mean MT over the CNN baseline.
+- UV-expanded-1344 has slightly lower mean MT than Candidate C-expanded-1344
+  (`6.0787` vs `6.1236`), so the MT story remains mixed and should not be overclaimed.
+
+The paper-safe conclusion is that Candidate C's auxiliary topology-aware proxy losses
+are responsible for the large persistence-diagram improvement, but the current proxy is
+not yet a complete merge-tree hierarchy loss. Conventional metrics (PSNR/SSIM when
+available, speed/WPD/gradient/PSD/exceedance metrics) should be reported alongside the
+true topology metrics to make the topology-fidelity trade-off explicit.
+
+---
+
+# Part VIII — Candidate C / UV Expanded-2688 Scaling Study
+
+## Purpose
+
+After Candidate C-expanded-1344 showed strong persistence-diagram improvement, the Candidate C training set was doubled again to 2688 non-overlapping seasonal samples. The purpose was to test whether the Candidate C topology-aware proxy loss remains robust as training data increases, and to verify the result with a matched UV-only ablation on the exact same 2688-sample dataset.
+
+## 2688-sample dataset
+
+The 2688-sample dataset was generated with `scripts/build_wind_mrhr_expanded_dataset_2688.py`. It uses the same spatial crop and PhIRE preprocessing as the corrected benchmark and earlier expanded datasets:
+
+- center: 39.5°N, -75.0°W
+- nearest grid center: approximately 39.4998°N, -75.0064°W
+- crop: rows 720:1220, cols 2102:2602
+- HR: 500 × 500 × 2
+- MR: 100 × 100 × 2
+- LR: 10 × 10 × 2
+- variables: `windspeed_100m`, `winddirection_100m`
+- vector conversion: `u = -speed * sin(theta)`, `v = -speed * cos(theta)`
+
+The temporal windows are 16 non-overlapping 168-hour windows, four per season:
+
+| Season/window | WTK index range |
+|---|---:|
+| winter_1 | 336-503 |
+| winter_2 | 504-671 |
+| winter_3 | 672-839 |
+| winter_4 | 840-1007 |
+| spring_1 | 2160-2327 |
+| spring_2 | 2328-2495 |
+| spring_3 | 2496-2663 |
+| spring_4 | 2664-2831 |
+| summer_1 | 4344-4511 |
+| summer_2 | 4512-4679 |
+| summer_3 | 4680-4847 |
+| summer_4 | 4848-5015 |
+| fall_1 | 6552-6719 |
+| fall_2 | 6720-6887 |
+| fall_3 | 6888-7055 |
+| fall_4 | 7056-7223 |
+
+The expanded set has no overlap with the held-out benchmark WTK indices 0-167.
+
+## Dataset validation
+
+The 2688-sample dataset was built successfully with the NLR HSDS endpoint:
+
+```bash
+export HS_ENDPOINT="https://developer.nlr.gov/api/hsds"
+export HSDS_ENDPOINT="$HS_ENDPOINT"
+python3 scripts/build_wind_mrhr_expanded_dataset_2688.py \
+  --out-dir example_data_topology_expanded_2688
+```
+
+Validation output:
+
+| Artifact | Shape | Speed range |
+|---|---:|---:|
+| `hr_stack.npy` | `(2688, 500, 500, 2)` | 0.0000 to 44.3464 |
+| `mr_stack.npy` | `(2688, 100, 100, 2)` | 0.0000 to 39.1591 |
+| `lr_stack.npy` | `(2688, 10, 10, 2)` | 0.0000 to 30.4480 |
+
+Additional build checks:
+
+- no NaN/Inf in HR/MR/LR stacks,
+- no WTK overlap with benchmark indices 0-167,
+- u range: -37.500 to 37.127,
+- v range: -39.461 to 38.160,
+- speed range: 0.000 to 44.346,
+- normalization compatible with pretrained PhIRE constants: `compatible=True`, `u_z=0.46`, `v_z=0.10`.
+
+## Candidate C-expanded-2688
+
+Candidate C-expanded-2688 was trained with the same Candidate C objective and hyperparameters as Candidate C-expanded-1344:
+
+```text
+L_C = L_uv
+    + 0.01  L_speed
+    + 0.05  L_grad
+    + 0.25  L_levelset
+    + 0.001 L_crit
+```
+
+Training data:
+
+```text
+example_data_topology_expanded_2688/wind_MR-HR.tfrecord
+```
+
+Evaluation data:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+Candidate C-expanded-2688 output validation:
+
+| Artifact | Shape | Min/max |
+|---|---:|---:|
+| `idx.npy` | `(168,)` | 0 to 167 |
+| `dataIN.npy` | `(168, 100, 100, 2)` | -21.5213 to 26.9345 |
+| `dataGT.npy` | `(168, 500, 500, 2)` | -30.4676 to 30.8122 |
+| `dataSR.npy` | `(168, 500, 500, 2)` | -27.4534 to 29.3187 |
+
+Scalar/physics/domain evaluation completed and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_eval/all_sample_metrics_candidateC_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_eval/pairwise_cnn_vs_candidateC_expanded2688.csv
+```
+
+TTK topology evaluation completed successfully:
+
+| Check | Count |
+|---|---:|
+| VTI files | 336 |
+| PD VTU files | 336 |
+| MT port-0 VTU files | 336 |
+| `phase_c_results.csv` lines | 169 |
+
+Final topology summary:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|---:|
+| CNN | 27.4063 | 5.8678 | — | — | — | — |
+| GAN | 20.8641 | 8.3481 | 166/168 | 20/168 | — | 20/20 |
+| Candidate C-expanded-2688 | 22.4944 | 6.0803 | 168/168 | 52/168 | 20/168 | 10/20 |
+
+Interpretation:
+
+- Candidate C-expanded-2688 improves PD over CNN on all 168 benchmark samples.
+- It improves mean PD further than Candidate C-expanded-1344.
+- It beats GAN on PD for 20/168 samples.
+- It recovers 10/20 original MT-GAN cases.
+- Mean MT remains worse than CNN, so the method improves persistence-style topology more robustly than full merge-tree hierarchy.
+
+## Candidate UV-expanded-2688 ablation
+
+Candidate UV-expanded-2688 is the matched data-volume control for Candidate C-expanded-2688. It trains on the same 2688-sample dataset with the same checkpoint, learning rate, batch size, and epochs, but uses only:
+
+```text
+L_UV = L_uv
+```
+
+All auxiliary weights are zero:
+
+```text
+lambda_speed = lambda_grad = lambda_wpd = lambda_levelset = lambda_crit = 0
+```
+
+Candidate UV-expanded-2688 output validation:
+
+| Artifact | Shape | Min/max |
+|---|---:|---:|
+| `idx.npy` | `(168,)` | 0 to 167 |
+| `dataIN.npy` | `(168, 100, 100, 2)` | -21.5213 to 26.9345 |
+| `dataGT.npy` | `(168, 500, 500, 2)` | -30.4676 to 30.8122 |
+| `dataSR.npy` | `(168, 500, 500, 2)` | -25.9588 to 28.0704 |
+
+Scalar/physics/domain evaluation completed and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_eval/all_sample_metrics_candidateUV_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_eval/pairwise_cnn_vs_candidateUV_expanded2688.csv
+```
+
+TTK topology extraction initially stopped partway, as in earlier candidate runs, but was completed by resuming missing PD/MT files. The final topology report has 168 valid PD and MT entries.
+
+Final UV-expanded-2688 topology summary:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD < GAN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|---:|
+| Candidate UV-expanded-2688 | 29.6121 | 6.0119 | 9/168 | 64/168 | 0/168 | 5/20 |
+
+## Candidate C vs UV at 2688 samples
+
+The 2688-sample ablation directly addresses whether the Candidate C gains are merely a result of fine-tuning on more data.
+
+Topology comparison:
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|
+| Candidate UV-expanded-2688 | 29.6121 | 6.0119 | 9/168 | 64/168 | 5/20 |
+| Candidate C-expanded-2688 | 22.4944 | 6.0803 | 168/168 | 52/168 | 10/20 |
+
+Interpretation:
+
+- UV-only fine-tuning improves direct reconstruction metrics but worsens PD relative to CNN.
+- Candidate C-expanded-2688 improves PD strongly relative to CNN and UV.
+- Therefore, the PD improvement is not explained by larger-data fine-tuning alone.
+- Mean MT remains mixed: UV has slightly better mean MT, while Candidate C recovers more of the original MT-GAN cases.
+
+Representative non-topology comparison:
+
+| Metric | CNN | UV-2688 | C-2688 | Main interpretation |
+|---|---:|---:|---:|---|
+| PSNR-UV ↑ | 31.1925 | 33.7892 | 33.4807 | UV best direct reconstruction |
+| Speed MAE ↓ | 0.6941 | 0.4958 | 0.5147 | UV best pointwise speed |
+| Speed RMSE ↓ | 1.1078 | 0.8555 | 0.8796 | UV best pointwise speed |
+| WPD bias abs ↓ | 35.3439 | 31.3033 | 7.9858 | C much better aggregate WPD bias |
+| WPD MAE ↓ | 231.6709 | 158.9769 | 165.9447 | UV slightly better direct WPD error |
+| WPD W1 ↓ | 45.2713 | 39.3927 | 16.1544 | C much better WPD distribution |
+| Gradient MAE ↓ | 0.3491 | 0.3247 | 0.3105 | C best gradient magnitude error |
+| Gradient W1 ↓ | 0.2329 | 0.2496 | 0.1942 | C best gradient distribution |
+| Exceedance p95 abs Δ ↓ | 0.0089 | 0.0062 | 0.0019 | C best high-speed exceedance |
+| Component curve L1 ↓ | 115.5278 | 141.9157 | 112.7014 | C best aggregate component proxy |
+
+Metric-count summary excluding SSIM:
+
+| Scale | C better than CNN | UV better than CNN | C better than matched UV |
+|---|---:|---:|---:|
+| 168-sample pilot | 22/25 | 13/25 | 19/25 |
+| 672 seasonal | 21/25 | 14/25 | 20/25 |
+| 1344 seasonal | 21/25 | 13/25 | 20/25 |
+| 2688 seasonal | 21/25 | 13/25 | 20/25 |
+
+## SSIM status and recomputation plan
+
+SSIM is currently unavailable in the candidate metric CSVs because the Spark environment reports a scikit-image/NumPy binary incompatibility:
+
+```text
+ValueError('numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject')
+```
+
+This is an environment issue, not a model result. Since all candidate output arrays are already saved, SSIM can be recomputed without rerunning training or topology.
+
+Recommended next step:
+
+1. Create a clean isolated Python environment with compatible `numpy` and `scikit-image` versions.
+2. Load `dataGT.npy` and `dataSR.npy` for CNN, UV, and Candidate C.
+3. Compute SSIM consistently on the same 168 benchmark samples, preferably on scalar speed and optionally on the u/v channels separately.
+4. Regenerate or patch only the non-topology metric tables.
+
+Until this is done, report SSIM as unavailable rather than as a win/loss.
+
+---
+
+# Part XII — Recomputed SSIM scale sweep for Candidate C and UV ablations
+
+## Purpose
+
+The original scalar/physics/domain evaluation script produced `NaN` SSIM values because the Spark Python environment had a `scikit-image`/NumPy binary incompatibility. This was an environment issue, not a failure of the saved model outputs. Since every candidate already saved aligned `idx.npy`, `dataGT.npy`, and `dataSR.npy` arrays on the common 168-sample benchmark, SSIM was recomputed as a standalone post-processing pass in a clean Python virtual environment.
+
+This pass was designed to answer two questions:
+
+1. Does Candidate C preserve or improve structural similarity relative to the original CNN baseline?
+2. Are SSIM gains mainly caused by ordinary UV-only fine-tuning, or by Candidate C's auxiliary topology/physics proxy losses?
+
+## Clean SSIM environment
+
+A separate virtual environment was created and verified:
+
+```bash
+cd /home/adadhwal/PhIRE
+
+python3 -m venv .venv_ssim
+PYTHONNOUSERSITE=1 .venv_ssim/bin/python -m pip install --upgrade pip
+PYTHONNOUSERSITE=1 .venv_ssim/bin/python -m pip install \
+  "numpy==1.26.4" \
+  "scikit-image==0.22.0" \
+  "pandas" \
+  "tabulate"
+```
+
+Verification output:
+
+```text
+numpy: 1.26.4
+skimage: 0.22.0
+SSIM import OK: True
+```
+
+The missing `tabulate` dependency only affected Markdown formatting through `pandas.DataFrame.to_markdown()`. The SSIM CSV files had already been written before that formatting failure. Installing `tabulate` allowed the Markdown summary to be generated from the already-written CSVs without recomputing SSIM.
+
+## SSIM definitions
+
+Two SSIM variants were computed for each method/sample:
+
+- `ssim_speed`: SSIM on scalar wind-speed magnitude fields, where `speed = sqrt(u^2 + v^2)`.
+- `ssim_uv_mean`: average of separate SSIM scores on the `u` and `v` vector components.
+
+For the paper, `ssim_speed` is the most topology-aligned SSIM because PD/MT are computed on scalar wind-speed fields. `ssim_uv_mean` is kept as a vector-fidelity side metric.
+
+## Methods evaluated
+
+All methods were evaluated on the same 168-sample corrected benchmark:
+
+- CNN baseline
+- GAN baseline
+- Candidate C pilot, 168 training samples
+- Candidate C-expanded-672
+- Candidate C-expanded-1344
+- Candidate C-expanded-2688
+- Candidate UV pilot, 168 training samples
+- Candidate UV-expanded-672
+- Candidate UV-expanded-1344
+- Candidate UV-expanded-2688
+
+The 168-sample pilot runs are in-corpus/pilot controls. The expanded 672/1344/2688 runs are trained on non-overlapping seasonal windows and evaluated on the fixed 168-sample benchmark.
+
+## Generated SSIM artifacts
+
+The recomputation wrote:
+
+```text
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_per_sample_scale_sweep.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_summary_scale_sweep.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_pairwise_vs_cnn.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_wins_vs_cnn.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_candidateC_vs_UV_by_scale.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_candidateC_vs_UV_by_scale_summary.csv
+ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_scale_sweep_summary.md
+```
+
+## Summary by method
+
+| Method | Family | Training size | n | Speed SSIM mean | Mean u/v SSIM |
+|---|---|---:|---:|---:|---:|
+| CNN | baseline | baseline | 168 | 0.741175 | 0.771031 |
+| GAN | baseline | baseline | 168 | 0.677418 | 0.698833 |
+| Candidate C | candidateC | 168 | 168 | 0.777743 | 0.809682 |
+| Candidate C-expanded-672 | candidateC | 672 | 168 | 0.794862 | 0.830481 |
+| Candidate C-expanded-1344 | candidateC | 1344 | 168 | 0.804386 | 0.840138 |
+| Candidate C-expanded-2688 | candidateC | 2688 | 168 | 0.812622 | 0.848110 |
+| Candidate UV | candidateUV | 168 | 168 | 0.775180 | 0.811189 |
+| Candidate UV-expanded-672 | candidateUV | 672 | 168 | 0.795236 | 0.835095 |
+| Candidate UV-expanded-1344 | candidateUV | 1344 | 168 | 0.805511 | 0.845448 |
+| Candidate UV-expanded-2688 | candidateUV | 2688 | 168 | 0.813443 | 0.853551 |
+
+## Wins versus CNN
+
+| Method | Training size | Speed SSIM > CNN | Mean delta speed SSIM vs CNN | Mean delta u/v SSIM vs CNN |
+|---|---:|---:|---:|---:|
+| Candidate C | 168 | 166/168 | +0.036568 | +0.038651 |
+| Candidate C-expanded-672 | 672 | 168/168 | +0.053686 | +0.059451 |
+| Candidate C-expanded-1344 | 1344 | 168/168 | +0.063211 | +0.069108 |
+| Candidate C-expanded-2688 | 2688 | 168/168 | +0.071447 | +0.077080 |
+| Candidate UV | 168 | 166/168 | +0.034005 | +0.040159 |
+| Candidate UV-expanded-672 | 672 | 168/168 | +0.054061 | +0.064065 |
+| Candidate UV-expanded-1344 | 1344 | 168/168 | +0.064336 | +0.074417 |
+| Candidate UV-expanded-2688 | 2688 | 168/168 | +0.072268 | +0.082520 |
+| GAN | baseline | 3/168 | -0.063757 | -0.072198 |
+
+## Candidate C versus UV by training size
+
+| Training size | n | C speed SSIM > UV | C u/v SSIM > UV | Mean C - UV speed SSIM | Mean C - UV u/v SSIM |
+|---:|---:|---:|---:|---:|---:|
+| 168 | 168 | 135/168 | 38/168 | +0.002563 | -0.001507 |
+| 672 | 168 | 81/168 | 3/168 | -0.000374 | -0.004614 |
+| 1344 | 168 | 47/168 | 1/168 | -0.001125 | -0.005309 |
+| 2688 | 168 | 54/168 | 2/168 | -0.000821 | -0.005440 |
+
+## Interpretation
+
+The SSIM recomputation confirms that both Candidate C and UV-only fine-tuning improve structural similarity relative to the original CNN baseline. Candidate C-expanded-2688 improves speed SSIM from `0.741175` to `0.812622`, and mean u/v SSIM from `0.771031` to `0.848110`. Therefore, Candidate C's topology improvements are not obtained by degrading structural similarity.
+
+At the same time, UV-only fine-tuning is slightly better than Candidate C on SSIM at larger training sizes. Candidate UV-expanded-2688 reaches speed SSIM `0.813443` and mean u/v SSIM `0.853551`, compared with Candidate C-expanded-2688 at `0.812622` and `0.848110`. This matches the PSNR and pointwise-error pattern: UV-only fine-tuning is the strongest pure reconstruction/SSIM control.
+
+The important conclusion is therefore a trade-off rather than a universal win. UV-only fine-tuning explains much of the SSIM and direct reconstruction improvement, but it does not explain the PD improvement. Candidate UV-expanded-2688 worsens PD relative to CNN, while Candidate C-expanded-2688 strongly improves PD. Thus Candidate C retains most of the SSIM/reconstruction gain from fine-tuning while shifting the scalar field toward persistence-relevant and domain-structured behavior.
+
+## Paper-ready takeaway
+
+> Recomputed SSIM shows that Candidate C does not improve topology by damaging conventional structural quality. Candidate C-expanded-2688 improves speed SSIM from 0.7412 to 0.8126 relative to CNN. UV-only fine-tuning is slightly higher on SSIM, indicating that SSIM gains are primarily driven by ordinary reconstruction fine-tuning. However, UV does not reproduce Candidate C's PD improvement, so Candidate C's contribution is best framed as a topology-aware trade-off: it preserves most SSIM and pointwise-fidelity gains while producing substantially better persistence-style topology and structure-sensitive domain behavior.
+---
+
+# Part XIII — Post-submission Candidate D/Dpd/E/E2 infrastructure repair and E2-fixed low-lambda audit
+
+## Purpose
+
+This section records the post-submission audit and repair of the Candidate D/Dpd/E/E2 infrastructure. It is **not** part of the submitted TopoInVis paper's central result. The submitted paper primarily used Candidate C and the repaired/final CNN/GAN baseline pipeline. The E2 work documented here should be treated as future-work evidence and as an explanation of why the earlier Candidate D/Dpd/E/E2 experiments were unreliable before the infrastructure repairs.
+
+The main conclusion is:
+
+> After fixing the PyTorch `L_uv` scale and the VTI coordinate mapping, the original Candidate E2 TTK-critical-pair weights were too strong and degraded pointwise fidelity. A 10× lower-weight E2-fixed run restored near-CNN fidelity while improving several distributional, gradient, exceedance, component-count, and true topology metrics. The low-lambda run modestly improved PD relative to CNN and more clearly improved MT relative to CNN/GAN, but it did not close the GAN PD gap.
+
+## XIII.1 Infrastructure bugs repaired
+
+### Bug 1 — `L_uv` normalization in PyTorch RefinerNet scripts
+
+The PyTorch RefinerNet scripts for Candidate D/Dpd/E/E2 loaded `dataSR.npy` and `dataGT.npy` as already denormalized physical-unit `[u, v]` arrays. However, the PyTorch `l_uv(sr, gt)` term had been computing MSE directly in physical units. This was inconsistent with the TF1 Candidate B/C convention, where the vector reconstruction loss is computed in normalized vector space, while scalar-speed and topology-inspired losses operate in physical units.
+
+The fix applied to the D/Dpd/E/E2 refiner scripts was:
+
+```python
+_MU_UV = (0.7684, -0.4575)
+_SIGMA_UV = (5.02455, 5.9017)
+
+def _normalize_uv(uv):
+    mu = torch.tensor(_MU_UV, dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    sigma = torch.tensor(_SIGMA_UV, dtype=uv.dtype, device=uv.device).view(1, 2, 1, 1)
+    return (uv - mu) / sigma
+
+def l_uv(sr, gt):
+    return F.mse_loss(_normalize_uv(sr), _normalize_uv(gt))
+```
+
+Important interpretation:
+
+- `L_uv` now matches the normalized-vector convention used by earlier Candidate B/C fine-tuning.
+- `_speed_t`, `l_speed`, `l_grad`, `l_crit`, and TTK/PD-style scalar losses remain in physical speed units.
+- This changes the effective loss balance for Candidate D/Dpd/E/E2 and therefore requires lambda retuning.
+
+A real Torch sanity check showed that normalized `L_uv` was about 29× smaller than the raw physical-unit MSE on the tested tensors, consistent with the expected scale change from the vector standard deviations.
+
+### Bug 2 — VTI coordinate mapping
+
+The VTI writer had used Fortran-order flattening with `SetDimensions(W, H, 1)`. VTK uses point IDs of the form:
+
+```text
+pointId = ix + iy * W
+```
+
+Therefore the correct mapping is:
+
+```text
+scalar_2d[y, x] -> VTK point (x, y)
+```
+
+and the correct flattening is:
+
+```python
+flat = np.ascontiguousarray(scalar_2d).ravel(order="C")
+```
+
+This fix was applied both to:
+
+- `scripts/convert_phire_to_vti.py`
+- the independent internal writer `_write_vti_ascii()` inside `scripts/build_candidateE2_expanded672_ttk_constraints.py`
+
+The second location was important because the Candidate E2 constraint builder does **not** call `convert_phire_to_vti.py`; it had its own VTI writer and therefore needed the same coordinate fix.
+
+Validation scripts:
+
+```bash
+python3 scripts/verify_vti_coordinate_mapping.py
+python3 scripts/smoke_test_candidateE2_fixed_constraints.py
+```
+
+Both checks passed. The non-square VTK read/write test confirmed that `grid[x, y] == scalar_2d[y, x]`, and the synthetic E2 smoke test confirmed the fixed internal writer on 160×160 synthetic VTI files.
+
+## XIII.2 Fixed Candidate E2 constraint regeneration
+
+The fixed Candidate E2 constraints were regenerated from scratch into new directories so they would not collide with stale `candidateE2_expanded672_constraints` artifacts.
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \
+  python scripts/build_candidateE2_expanded672_ttk_constraints.py \
+    --out-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints \
+    --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_vti \
+    --vti-label candidateE2fixed_GT
+```
+
+Final constraint artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+Validated regeneration summary:
+
+| Quantity | Value |
+|---|---:|
+| samples | 672 |
+| total pairs | 43008 |
+| pairs/sample | 64 |
+| birth value range | [0.0183, 25.1930] |
+| persistence range | [0.9827, 20.7739] |
+| max stored birth-value error | 0.00e+00 |
+| max stored death-value error | 0.00e+00 |
+
+Interpretation of the `0.00e+00` stored-value check:
+
+- It confirms internal consistency between stored vertex IDs and stored target values in the NPZ.
+- It should not be overinterpreted as a standalone proof of the VTI coordinate fix.
+- The stronger coordinate-mapping evidence is the corrected code path plus the VTK read-back regression test and synthetic smoke test.
+
+## XIII.3 High-lambda E2-fixed rerun: repaired infrastructure but bad loss balance
+
+The original Candidate E2 training script was patched to point to the fixed constraints and new output directories:
+
+```text
+CONSTRAINTS_NPZ : ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+MODEL_DIR       : models_fixed/topology_finetuning/wind_finetune_candidateE2_fixed
+OUT_DIR         : data_out/wind_finetune_candidateE2_fixed
+LOG_PATH        : logs/wind_finetune_candidateE2_fixed.log
+```
+
+Training configuration retained the original E2 TTK weights:
+
+```text
+LAMBDA_TTKCV    = 0.04
+LAMBDA_TTKPERS  = 0.02
+EPOCHS          = 3
+LR              = 1e-4
+RESIDUAL_SCALE  = 0.1
+```
+
+Training completed successfully and wrote valid 168-sample benchmark arrays:
+
+```text
+data_out/wind_finetune_candidateE2_fixed/dataSR.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed/idx.npy     (168,)
+```
+
+No NaNs were observed. However, the physical speed range already showed a warning sign:
+
+| Quantity | Value |
+|---|---:|
+| SR speed max | 44.5880 |
+| GT speed max | 33.9885 |
+| mean absolute speed error | 0.75063 |
+
+Cheap scalar/physics/domain evaluation confirmed that the high-lambda E2-fixed run degraded fidelity relative to the CNN baseline:
+
+| Metric | CNN mean | E2-fixed high-lambda mean | Δ candidate − CNN | Improved / 168 | Worsened / 168 |
+|---|---:|---:|---:|---:|---:|
+| PSNR-u/v | 31.1925 | 30.5559 | -0.6366 | 0 | 168 |
+| speed MAE | 0.6941 | 0.7506 | +0.0566 | 0 | 168 |
+| speed RMSE | 1.1078 | 1.1809 | +0.0731 | 0 | 168 |
+| WPD MAE | 231.671 | 254.356 | +22.685 | 0 | 168 |
+| WPD RMSE | 448.692 | 491.495 | +42.803 | 0 | 168 |
+| WPD W1 | 45.271 | 69.656 | +24.385 | 34 | 134 |
+| PSD log L2 | 0.8335 | 0.7668 | -0.0667 | 136 | 32 |
+| gradient MAE | 0.3491 | 0.3476 | -0.0015 | 105 | 63 |
+| gradient W1 | 0.2329 | 0.1624 | -0.0705 | 168 | 0 |
+| component curve L1 | 115.528 | 94.643 | -20.885 | 168 | 0 |
+
+Interpretation:
+
+- The repaired high-lambda E2 run is a useful negative result.
+- The original TTK-critical-pair weights became too strong after the `L_uv` normalization fix.
+- The model improved some structure/proxy metrics but harmed core field reconstruction and WPD metrics.
+- The expensive TTK topology pass was not run for this high-lambda version because the cheap evaluation already showed broad fidelity regression.
+
+## XIII.4 Low-lambda E2-fixed rerun
+
+A 10× lower-weight E2-fixed script was created to test whether the repaired infrastructure could produce a useful result once the TTK-critical-pair terms were retuned:
+
+```text
+script: scripts/run_candidateE2_fixed_lowlambda_ttkcrit_refiner.py
+CONSTRAINTS_NPZ : ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+MODEL_DIR       : models_fixed/topology_finetuning/wind_finetune_candidateE2_fixed_lowlambda
+OUT_DIR         : data_out/wind_finetune_candidateE2_fixed_lowlambda
+LOG_PATH        : logs/wind_finetune_candidateE2_fixed_lowlambda.log
+LAMBDA_TTKCV    = 0.004
+LAMBDA_TTKPERS  = 0.002
+```
+
+Training completed successfully, and the 168-sample benchmark outputs passed shape validation:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda/dataSR.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda/idx.npy     (168,)
+```
+
+Physical speed sanity check:
+
+| Quantity | Value |
+|---|---:|
+| SR vector range | [-31.0852, 31.1981] |
+| GT vector range | [-30.4676, 30.8122] |
+| SR speed range | [0.0014, 43.5240] |
+| GT speed range | [0.0122, 33.9885] |
+| mean absolute speed error | 0.695157 |
+
+The maximum SR speed remained higher than the GT maximum, but the mean speed error returned to near-CNN level.
+
+### Cheap scalar/physics/domain evaluation
+
+Command:
+
+```bash
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateE2_fixed_lowlambda \
+  --candidate-dir  data_out/wind_finetune_candidateE2_fixed_lowlambda \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_eval
+```
+
+Key comparison against CNN:
+
+| Metric | CNN mean | E2-fixed low-lambda mean | Δ candidate − CNN | Improved / 168 | Worsened / 168 |
+|---|---:|---:|---:|---:|---:|
+| PSNR-u/v | 31.1925 | 31.1573 | -0.0352 | 32 | 136 |
+| speed MAE | 0.6941 | 0.6952 | +0.0011 | 88 | 80 |
+| speed RMSE | 1.1078 | 1.1099 | +0.0022 | 71 | 97 |
+| WPD bias abs | 35.3439 | 12.5397 | -22.8043 | 152 | 16 |
+| WPD MAE | 231.671 | 232.196 | +0.5253 | 78 | 90 |
+| WPD RMSE | 448.692 | 449.213 | +0.5214 | 86 | 82 |
+| WPD W1 | 45.2713 | 29.8082 | -15.4631 | 138 | 30 |
+| PSD log L2 | 0.8335 | 0.8130 | -0.0205 | 114 | 54 |
+| PSD slope abs delta | 0.9150 | 0.8806 | -0.0344 | 131 | 37 |
+| gradient MAE | 0.3491 | 0.3457 | -0.0034 | 161 | 7 |
+| gradient W1 | 0.2329 | 0.2163 | -0.0167 | 146 | 22 |
+| gradient kurtosis abs delta | 3.7004 | 3.9368 | +0.2364 | 71 | 97 |
+| exceed abs t10 | 0.0066 | 0.0050 | -0.0016 | 109 | 59 |
+| exceed abs t15 | 0.0062 | 0.0037 | -0.0025 | 132 | 36 |
+| exceed abs p90 | 0.0103 | 0.0054 | -0.0049 | 143 | 25 |
+| exceed abs p95 | 0.0089 | 0.0051 | -0.0038 | 147 | 21 |
+| exceed abs p99 | 0.0043 | 0.0031 | -0.0011 | 144 | 24 |
+| component curve L1 | 115.528 | 109.440 | -6.0873 | 140 | 27 |
+
+Note: for `component curve L1`, the pairwise table reports 140 improved samples and 27 worsened samples out of 168 valid samples. The remaining sample is a tie, so this row intentionally sums to 167 when only the improved and worsened columns are shown.
+
+Interpretation:
+
+- Low-lambda E2-fixed is no longer a catastrophic fidelity regression.
+- PSNR and speed errors are nearly tied with CNN rather than clearly better.
+- Many distributional, gradient, exceedance, and component-count metrics improve.
+- WPD bias and WPD W1 improve strongly, while WPD MAE/RMSE remain essentially tied or slightly worse.
+
+## XIII.5 Low-lambda true topology evaluation with TTK
+
+The true TTK topology evaluation was run only for the low-lambda E2-fixed result.
+
+Command:
+
+```bash
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateE2_fixed_lowlambda \
+  --data-dir data_out/wind_finetune_candidateE2_fixed_lowlambda \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology \
+  --n-samples 168
+```
+
+The comparison/report step was also run explicitly. The pipeline's Stage 5 invokes the same comparison logic, but recording the standalone command makes the generated report reproducible:
+
+```bash
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateE2_fixed_lowlambda \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results  ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx     data_out/wind_finetune_candidateE2_fixed_lowlambda/idx.npy \
+  --out-dir           ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology \
+  --report-path       docs/topology_finetuning_candidateE2_fixed_lowlambda_topology_eval.md
+```
+
+The topology pipeline completed with:
+
+```text
+PD valid samples: 168
+MT valid samples: 168
+```
+
+Main TTK comparison:
+
+| Metric | CNN baseline | GAN baseline | E2-fixed low-lambda |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 27.1011 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7522 |
+| PD wins vs CNN | — | 166/168 | 130/168 |
+| MT wins vs CNN | — | 20/168 | 113/168 |
+| PD beats GAN | — | — | 2/168 |
+| MT beats GAN | — | — | 153/168 |
+
+Additional MT-GAN diagnostic:
+
+```text
+Original MT-GAN baseline wins: 20 samples
+E2-fixed low-lambda takes over from GAN on MT: 6/20
+Still GAN after E2-fixed low-lambda: 14/20
+Now CNN: 0/20
+```
+
+Winner distribution after adding E2-fixed low-lambda:
+
+| Metric family | CNN wins | GAN wins | E2-fixed low-lambda wins |
+|---|---:|---:|---:|
+| PD distance | 2 | 166 | 0 |
+| MT distance | 53 | 14 | 101 |
+
+Interpretation:
+
+- E2-fixed low-lambda gives a small mean PD improvement over CNN (`27.4063 -> 27.1011`) and lower PD than CNN on 130/168 samples.
+- E2-fixed low-lambda does **not** close the GAN PD gap. GAN remains much better on PD on average, and E2-fixed low-lambda beats GAN on PD for only 2/168 samples.
+- E2-fixed low-lambda gives a clearer MT improvement, improving mean MT relative to CNN (`5.8678 -> 5.7522`) and winning MT on 101/168 samples in the three-way CNN/GAN/E2 comparison.
+- This suggests the repaired E2 fixed-index supervision is more promising for merge-tree-style structural refinement than for reproducing GAN-like persistence-diagram behavior.
+
+## XIII.6 Final interpretation of the E2 repair audit
+
+The repaired E2 experiments support the following interpretation:
+
+1. The infrastructure fixes were necessary. Candidate D/Dpd/E/E2 results produced before the `L_uv` normalization fix and VTI coordinate fix should not be treated as final evidence.
+2. Candidate C remains meaningful because it did not depend on the TTK fixed-index constraint pipeline affected by the VTI-coordinate bug.
+3. The original high-lambda E2 configuration is best treated as a negative control after repair: it overemphasizes sparse fixed critical-pair supervision and harms global field fidelity.
+4. The low-lambda E2-fixed configuration is a valid positive ablation: it restores near-CNN pointwise fidelity while improving several domain/proxy metrics and modestly improving true topology relative to CNN.
+5. E2-fixed low-lambda is not a GAN-level PD method. Its strongest evidence is in MT distance and structure-sensitive metrics, not in PD bottleneck distance.
+
+Paper/future-work framing:
+
+> Post-submission infrastructure repairs showed that the original E2 fixed-index TTK-critical-pair losses required retuning after correcting vector-loss normalization and VTI coordinate mapping. With the original weights, E2-fixed degraded pointwise fidelity. Reducing the TTK-critical-pair weights by 10× restored near-CNN fidelity and produced small PD improvements and stronger MT improvements relative to CNN. These results are useful for future work, but they do not change the submitted paper's main Candidate C narrative.
+
+## XIII.7 Files and artifacts to preserve
+
+Code / documentation:
+
+```text
+scripts/convert_phire_to_vti.py
+scripts/build_candidateE2_expanded672_ttk_constraints.py
+scripts/verify_vti_coordinate_mapping.py
+scripts/smoke_test_candidateE2_fixed_constraints.py
+scripts/run_candidateD_pd_refiner.py
+scripts/run_candidateD_expanded672_pd_refiner.py
+scripts/run_candidateDpd_expanded672_pd_refiner.py
+scripts/run_candidateE_ttkcrit_refiner.py
+scripts/run_candidateE2_expanded672_ttkcrit_refiner.py
+scripts/run_candidateE2_fixed_lowlambda_ttkcrit_refiner.py
+docs/candidateD_E_infra_fix_notes.md
+```
+
+Generated constraints and E2-fixed outputs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_vti/
+data_out/wind_finetune_candidateE2_fixed/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_eval/
+data_out/wind_finetune_candidateE2_fixed_lowlambda/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_eval/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology_vti/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology/
+docs/topology_finetuning_candidateE2_fixed_lowlambda_eval.md
+docs/topology_finetuning_candidateE2_fixed_lowlambda_topology_eval.md
+```
+
+Important storage note:
+
+- Track lightweight scripts and documentation in Git.
+- Avoid committing large generated `.npy`, `.vti`, `.vtu`, and full `ttk_runs_fixed/...` directories unless the repository is intentionally configured for generated artifacts.
+- At minimum, preserve the exact commands, logs, summary CSVs, and reports needed to regenerate or audit the E2-fixed outputs.
+
+## XIII.8 Codex consistency-audit prompt
+
+Use the following prompt if asking Codex to audit this section against the repository state:
+
+```text
+Please audit the new Part XIII section in docs/dataset_generation_and_repair_notes.md for consistency with the current PhIRE repository and generated outputs.
+
+Check the following:
+1. The E2 infrastructure-fix description matches the actual code changes:
+   - normalized L_uv in D/Dpd/E/E2 PyTorch refiner scripts;
+   - speed/topology losses still in physical units;
+   - VTI flattening fixed to C order in convert_phire_to_vti.py and the internal writer in build_candidateE2_expanded672_ttk_constraints.py.
+2. The fixed E2 constraint path exists and has expected contents:
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+   with 672 samples, 43008 total pairs, and 64 pairs/sample.
+3. The high-lambda E2-fixed output paths and scalar-evaluation claims match:
+   data_out/wind_finetune_candidateE2_fixed/
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_eval/
+4. The low-lambda E2-fixed script and outputs match:
+   scripts/run_candidateE2_fixed_lowlambda_ttkcrit_refiner.py
+   data_out/wind_finetune_candidateE2_fixed_lowlambda/
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_eval/
+5. The low-lambda TTK topology outputs match:
+   ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_topology/phase_c_final/phase_c_results.csv
+   docs/topology_finetuning_candidateE2_fixed_lowlambda_topology_eval.md
+6. Verify that the reported summary numbers are correct:
+   - high-lambda speed_mae 0.75063 vs CNN 0.6941;
+   - low-lambda speed_mae 0.695157 vs CNN 0.6941;
+   - low-lambda PD means CNN=27.4063, GAN=20.8641, E2=27.1011;
+   - low-lambda MT means CNN=5.8678, GAN=8.3481, E2=5.7522;
+   - low-lambda PD < CNN on 130/168, MT < CNN on 113/168, PD < GAN on 2/168.
+7. Confirm that Part XIII does not imply these E2 results were part of the submitted TopoInVis paper's main claim; they should be framed as post-submission audit/future-work results.
+
+Please report any path mismatch, stale filename, wrong metric sign, or overclaiming.
+```
+
+## XIII.9 Low-lambda E2 scale-up: expanded 1344 and 2688 training sets
+
+After the repaired low-lambda E2-fixed run produced a useful 672-sample result, the same configuration was scaled to larger expanded training sets. The goal was to test whether the MT-oriented signal was stable with more training data, and whether larger constraint sets improved true topology enough to justify any added fidelity tradeoff.
+
+The two scale-up settings were:
+
+| Setting | Expanded training samples | TTK critical pairs/sample | Total TTK critical pairs | TTK weights |
+|---|---:|---:|---:|---:|
+| E2-low-1344 | 1344 | 64 | 86016 | `LAMBDA_TTKCV=0.004`, `LAMBDA_TTKPERS=0.002` |
+| E2-low-2688 | 2688 | 64 | 172032 | `LAMBDA_TTKCV=0.004`, `LAMBDA_TTKPERS=0.002` |
+
+Both runs used the same low-lambda strategy as `candidateE2_fixed_lowlambda`, but with expanded training data and expanded TTK fixed-index critical-pair constraints.
+
+### 1344 expanded CNN output generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/generate_expanded_cnn_sr.py \
+  --data-type wind_mrhr_cnn_expanded1344 \
+  --tfrecord example_data_topology_expanded_1344/wind_MR-HR.tfrecord \
+  --n-expected 1344 \
+  --out-dir data_out/wind_mrhr_cnn_expanded1344
+```
+
+Validation confirmed:
+
+```text
+idx.npy    (1344,)
+dataIN.npy (1344, 100, 100, 2)
+dataGT.npy (1344, 500, 500, 2)
+dataSR.npy (1344, 500, 500, 2)
+idx.npy: 1344 unique indices, range [0, 1343]
+```
+
+The TensorFlow/NumPy environment emitted compatibility warnings, but the run completed successfully. The full 1344 CNN forward pass took roughly 18-19 minutes at batch size 1.
+
+### 1344 constraint generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidateE2_expanded672_ttk_constraints.py \
+  --gt-path    data_out/wind_mrhr_cnn_expanded1344/dataGT.npy \
+  --idx-path   data_out/wind_mrhr_cnn_expanded1344/idx.npy \
+  --n-expected 1344 \
+  --out-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_vti \
+  --vti-label  candidateE2fixedlowlambda1344_GT \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded1344_constraints.log
+```
+
+Constraint NPZ validation:
+
+| Quantity | Value |
+|---|---:|
+| `n_samples` | 1344 |
+| `sample_idx` shape | `(1344,)` |
+| `sample_idx` range | `[0, 1343]` |
+| `sample_count` min/mean/max | `64 / 64.0 / 64` |
+| total pairs | 86016 |
+| expanded `idx.npy` equals NPZ `sample_idx` set | `True` |
+
+Final constraint artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+### 1344 training and benchmark output validation
+
+Training command:
+
+```bash
+cd ~/PhIRE
+
+micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \
+  python scripts/run_candidateE2_fixed_lowlambda_expanded1344_ttkcrit_refiner.py
+```
+
+The training script completed successfully and saved the 168-sample benchmark outputs:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/idx.npy     (168,)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/dataSR.npy  (168, 500, 500, 2)
+```
+
+Sanity check:
+
+| Quantity | Value |
+|---|---:|
+| SR vector range | `[-30.3043, 31.4301]` |
+| GT vector range | `[-30.4676, 30.8122]` |
+| SR speed range | `[0.0014, 41.6725]` |
+| GT speed range | `[0.0122, 33.9885]` |
+| mean absolute speed error | 0.698034 |
+| `idx.npy` | exactly 168 unique indices, range `[0, 167]` |
+
+Interpretation:
+
+- The 1344 run was non-catastrophic.
+- Mean speed MAE was slightly worse than CNN and slightly worse than the 672 low-lambda run, but still close enough to justify cheap evaluation and then true TTK evaluation.
+
+### 1344 cheap scalar/physics/domain evaluation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded1344 \
+  --candidate-dir  data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval
+```
+
+The cheap evaluation completed successfully and wrote:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/all_sample_metrics_candidateE2_fixed_lowlambda_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/winner_counts_candidateE2_fixed_lowlambda_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/pairwise_cnn_vs_candidateE2_fixed_lowlambda_expanded1344.csv
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/adjacent_cluster_table_candidateE2_fixed_lowlambda_expanded1344.csv
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_eval.md
+```
+
+The report noted that SSIM was unavailable because of a local `skimage` / NumPy binary mismatch. This did not affect the non-SSIM scalar, physics, component-proxy, or TTK topology evaluations.
+
+Key cheap-eval comparison against CNN:
+
+| Metric | Direction vs CNN | Improved / 168 |
+|---|---:|---:|
+| PSNR-u/v | `-0.0282` | not primary |
+| speed MAE | `+0.0040` | not primary |
+| speed RMSE | `+0.0064` | not primary |
+| WPD W1 | better | 153 |
+| WPD bias abs | better | 154 |
+| gradient MAE | better | 162 |
+| gradient W1 | better | 149 |
+| p90 exceedance error | better | 151 |
+| component curve L1 | better | 140 |
+
+Interpretation:
+
+- The direct-fidelity loss was small.
+- Structural/domain proxies improved strongly enough to justify a full TTK topology run.
+- Any PD/MT rows in the cheap report before the TTK run were not valid for the candidate, because candidate topology had not yet been computed.
+
+### 1344 true TTK topology evaluation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateE2_fixed_lowlambda_expanded1344 \
+  --data-dir data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344 \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology \
+  --n-samples 168 \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded1344_topology_pipeline.log
+```
+
+Comparison/report command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded1344 \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results  ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx     data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/idx.npy \
+  --out-dir           ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology \
+  --report-path       docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_topology_eval.md
+```
+
+Main true topology result:
+
+| Metric | CNN baseline | GAN baseline | E2-low-1344 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 26.9905 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7102 |
+| PD wins vs CNN | — | 166/168 | 128/168 |
+| MT wins vs CNN | — | 20/168 | 120/168 |
+| PD beats GAN | — | — | 2/168 |
+| MT beats GAN | — | — | 159/168 |
+| MT-GAN recovered by E2-low-1344 | — | — | 11/20 |
+
+Winner distribution after adding E2-low-1344:
+
+| Metric family | CNN wins | GAN wins | E2-low-1344 wins |
+|---|---:|---:|---:|
+| PD distance | 2 | 166 | 0 |
+| MT distance | 47 | 9 | 112 |
+
+Interpretation:
+
+- E2-low-1344 improved mean PD over CNN, but did not approach GAN's PD performance.
+- E2-low-1344 strengthened the MT-oriented signal, improving mean MT and taking many MT wins in the three-way comparison.
+- It recovered 11/20 original MT-GAN cases, matching the later 2688 result on this hard subset.
+- This was the strongest balanced result at this point because fidelity loss remained small while true MT improved.
+
+## XIII.10 Low-lambda E2 scale-up to 2688
+
+The 2688 run tested whether the scale-stable MT-oriented effect continued with an even larger expanded constraint set.
+
+### 2688 expanded CNN output generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/generate_expanded_cnn_sr.py \
+  --data-type wind_mrhr_cnn_expanded2688 \
+  --tfrecord example_data_topology_expanded_2688/wind_MR-HR.tfrecord \
+  --n-expected 2688 \
+  --out-dir data_out/wind_mrhr_cnn_expanded2688
+```
+
+Validation confirmed:
+
+```text
+idx.npy    (2688,)
+dataIN.npy (2688, 100, 100, 2)
+dataGT.npy (2688, 500, 500, 2)
+dataSR.npy (2688, 500, 500, 2)
+idx.npy: 2688 unique indices, range [0, 2687]
+```
+
+### 2688 constraint generation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidateE2_expanded672_ttk_constraints.py \
+  --gt-path    data_out/wind_mrhr_cnn_expanded2688/dataGT.npy \
+  --idx-path   data_out/wind_mrhr_cnn_expanded2688/idx.npy \
+  --n-expected 2688 \
+  --out-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_vti \
+  --vti-label  candidateE2fixedlowlambda2688_GT \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded2688_constraints.log
+```
+
+Constraint NPZ validation:
+
+| Quantity | Value |
+|---|---:|
+| `n_samples` | 2688 |
+| `sample_idx` shape | `(2688,)` |
+| `sample_idx` range | `[0, 2687]` |
+| `sample_count` min/mean/max | `64 / 64.0 / 64` |
+| total pairs | 172032 |
+| expanded `idx.npy` equals NPZ `sample_idx` set | `True` |
+
+Final constraint artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+### 2688 training and benchmark output validation
+
+Training command:
+
+```bash
+cd ~/PhIRE
+
+micromamba run -p /home/adadhwal/PhIRE/.mamba_candidateD_pd \
+  python scripts/run_candidateE2_fixed_lowlambda_expanded2688_ttkcrit_refiner.py
+```
+
+The training script completed successfully and saved valid 168-sample benchmark outputs:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/idx.npy     (168,)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/dataIN.npy  (168, 100, 100, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/dataGT.npy  (168, 500, 500, 2)
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/dataSR.npy  (168, 500, 500, 2)
+```
+
+### 2688 cheap scalar/physics/domain evaluation
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded2688 \
+  --candidate-dir  data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_eval
+```
+
+Key cheap-eval comparison against CNN:
+
+| Metric | Direction vs CNN | Improved / 168 |
+|---|---:|---:|
+| PSNR-u/v | `-0.0996` | not primary |
+| speed MAE | `+0.0208` | not primary |
+| speed RMSE | `+0.0264` | not primary |
+| WPD W1 | better | 121 |
+| gradient MAE | better | 164 |
+| gradient W1 | better | 154 |
+| component curve L1 | better | 152 |
+| PSD log L2 | better | 146 |
+
+Interpretation:
+
+- The 2688 run had a larger direct-fidelity penalty than 1344.
+- Structural/proxy metrics still improved strongly.
+- Because the cheap metrics remained healthy on the structure side, the full TTK topology run was justified.
+
+### 2688 true TTK topology evaluation and interrupted-run recovery
+
+Initial topology command:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method candidateE2_fixed_lowlambda_expanded2688 \
+  --data-dir data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688 \
+  --vti-dir ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology_vti \
+  --out-base ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology \
+  --n-samples 168 \
+  2>&1 | tee logs/candidateE2_fixed_lowlambda_expanded2688_topology_pipeline.log
+```
+
+The first attempts exited before producing `phase_c_final/phase_c_results.csv`. This was diagnosed as an interrupted partial TTK run rather than a bad sample or invalid candidate.
+
+Partial-run evidence from one failed attempt:
+
+| Artifact count | Observed | Complete expected |
+|---|---:|---:|
+| VTI files | 336 | 336 |
+| PD `.vtu` files | 170 | 336 |
+| MT output files | 507 | 1008 |
+| `phase_c_final/phase_c_results.csv` | missing | present |
+
+Partial-run evidence from a later failed attempt:
+
+| Artifact count | Observed | Complete expected |
+|---|---:|---:|
+| VTI files | 336 | 336 |
+| PD `.vtu` files | 316 | 336 |
+| MT output files | 945 | 1008 |
+| `phase_c_final/phase_c_results.csv` | missing | present |
+
+Missing-output diagnostic after the later partial run:
+
+```text
+GT missing PD: []
+GT missing MT: []
+
+SR missing PD: [8, 9, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]
+SR missing MT: [8, 9, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99]
+```
+
+Interpretation of the interrupted runs:
+
+- The VTI conversion stage was complete.
+- GT topology extraction was complete.
+- The failures occurred during the SR half of TTK topology extraction.
+- Different attempts stopped at different SR samples (`SR_s100` in one run, `SR_s81` in another), so the evidence points to runtime/session/process interruption rather than a deterministic bad sample.
+- The model outputs and topology pipeline were not invalidated by these interruptions.
+
+The successful completion was obtained by rerunning/resuming the topology command in a plain interactive `tmux` pane rather than relying on fragile nested shell quoting. Final validation:
+
+```text
+PD VTU: 336
+MT files: 1008
+phase_c_final/phase_c_results.csv: present
+```
+
+Final completed artifact:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology/phase_c_final/phase_c_results.csv
+```
+
+### 2688 comparison/report step
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/build_candidate_topology_comparison.py \
+  --candidate-name candidateE2_fixed_lowlambda_expanded2688 \
+  --candidate-results ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology/phase_c_final/phase_c_results.csv \
+  --baseline-results  ttk_runs_fixed/combined/phase_c_results.csv \
+  --candidate-idx     data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/idx.npy \
+  --out-dir           ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology \
+  --report-path       docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_topology_eval.md
+```
+
+Main true topology result:
+
+| Metric | CNN baseline | GAN baseline | E2-low-2688 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 26.4934 |
+| MT distance mean | 5.8678 | 8.3481 | 5.6989 |
+| PD wins vs CNN | — | 166/168 | 142/168 |
+| MT wins vs CNN | — | 20/168 | 118/168 |
+| PD beats GAN | — | — | 2/168 |
+| MT beats GAN | — | — | 159/168 |
+| MT-GAN recovered by E2-low-2688 | — | — | 11/20 |
+
+Winner distribution after adding E2-low-2688:
+
+| Metric family | CNN wins | GAN wins | E2-low-2688 wins |
+|---|---:|---:|---:|
+| PD distance | 2 | 166 | 0 |
+| MT distance | 49 | 9 | 110 |
+
+Changed cases among the original 20 MT-GAN baseline wins:
+
+```text
+E2-low-2688 takes over from GAN on MT: 11/20
+Still GAN after E2-low-2688: 9/20
+Now CNN: 0/20
+```
+
+Interpretation:
+
+- E2-low-2688 improved mean PD more than E2-low-1344.
+- E2-low-2688 produced the lowest mean MT among the E2-low runs documented here, but only by a very small margin over 1344.
+- E2-low-2688 did not improve the MT-GAN hard-case recovery count relative to 1344; both recovered 11/20.
+- E2-low-2688 had a larger cheap-metric direct-fidelity penalty than 1344.
+
+## XIII.11 672 vs 1344 vs 2688 E2-low comparison
+
+Main true topology comparison:
+
+| Metric | E2-low-672 | E2-low-1344 | E2-low-2688 | Best value |
+|---|---:|---:|---:|---|
+| PD mean | 27.1011 | 26.9905 | 26.4934 | 2688 |
+| MT mean | 5.7522 | 5.7102 | 5.6989 | 2688 |
+| PD < CNN | 130/168 | 128/168 | 142/168 | 2688 |
+| MT < CNN | 113/168 | 120/168 | 118/168 | 1344 |
+| PD < GAN | 2/168 | 2/168 | 2/168 | tied |
+| MT beats GAN | 153/168 | 159/168 | 159/168 | 1344/2688 tied |
+| MT-GAN recovered | 6/20 | 11/20 | 11/20 | 1344/2688 tied |
+
+Balanced interpretation:
+
+- E2-low scale-up is stable: all three low-lambda E2-fixed variants improve mean PD and mean MT relative to CNN.
+- The PD effect strengthens most clearly at 2688, but the method remains far from GAN on PD.
+- The strongest scientific signal remains MT-oriented rather than PD-oriented.
+- 1344 is the best balanced setting because it gives strong MT behavior with smaller direct-fidelity degradation than 2688.
+- 2688 is the best topology-only setting if prioritizing mean PD and mean MT, but its advantage over 1344 on MT is tiny and comes with a larger cheap-metric fidelity penalty.
+
+Recommended wording:
+
+> Repaired low-weight E2 critical-pair supervision shows a scale-stable MT-oriented topology signal. Increasing the expanded training set from 672 to 1344 and 2688 improves mean topology distances relative to CNN, with the strongest PD improvement at 2688. However, the method still does not close the GAN PD gap, and the 2688 run incurs a larger pointwise/physics fidelity tradeoff. The 1344 setting is therefore the best balanced E2-low configuration, while 2688 is useful as evidence that the topology signal persists at larger scale.
+
+## XIII.12 Additional files and artifacts to preserve from scale-up
+
+Scripts:
+
+```text
+scripts/generate_expanded_cnn_sr.py
+scripts/build_candidateE2_expanded672_ttk_constraints.py
+scripts/run_candidateE2_fixed_lowlambda_expanded1344_ttkcrit_refiner.py
+scripts/run_candidateE2_fixed_lowlambda_expanded2688_ttkcrit_refiner.py
+scripts/evaluate_finetune_candidate.py
+scripts/run_candidate_topology_pipeline.sh
+scripts/build_candidate_topology_comparison.py
+```
+
+Expanded CNN outputs:
+
+```text
+data_out/wind_mrhr_cnn_expanded1344/
+data_out/wind_mrhr_cnn_expanded2688/
+```
+
+Expanded constraints:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz
+```
+
+Fine-tuned benchmark outputs:
+
+```text
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/
+data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/
+```
+
+Cheap-evaluation reports:
+
+```text
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_eval.md
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_eval.md
+```
+
+True TTK topology reports:
+
+```text
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_topology_eval.md
+docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_topology_eval.md
+```
+
+True TTK topology output directories:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_topology/
+ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_topology/
+```
+
+Partial/interrupted 2688 topology runs should be preserved only as debugging/provenance evidence if disk permits. They should not be treated as final analysis outputs.
+
+## XIII.13 Updated Codex consistency-audit prompt for E2 scale-up
+
+Use the following prompt if asking Codex to audit the expanded E2-low 1344/2688 documentation against the repository state:
+
+```text
+Please audit Part XIII of docs/dataset_generation_and_repair_notes.md, especially sections XIII.9 through XIII.12, against the current PhIRE repository and generated outputs.
+
+Check the following:
+
+1. Confirm that the expanded CNN output directories exist and contain valid arrays:
+   - data_out/wind_mrhr_cnn_expanded1344/
+   - data_out/wind_mrhr_cnn_expanded2688/
+   Expected shapes:
+   - 1344: idx.npy (1344,), dataIN.npy (1344,100,100,2), dataGT.npy/dataSR.npy (1344,500,500,2)
+   - 2688: idx.npy (2688,), dataIN.npy (2688,100,100,2), dataGT.npy/dataSR.npy (2688,500,500,2)
+
+2. Confirm that the expanded constraint NPZ files exist and have expected counts:
+   - candidateE2_fixed_lowlambda_expanded1344_constraints: n_samples=1344, sample_count min/mean/max=64/64/64, total pairs=86016
+   - candidateE2_fixed_lowlambda_expanded2688_constraints: n_samples=2688, sample_count min/mean/max=64/64/64, total pairs=172032
+
+3. Confirm that the training scripts exist and point to the documented paths:
+   - scripts/run_candidateE2_fixed_lowlambda_expanded1344_ttkcrit_refiner.py
+   - scripts/run_candidateE2_fixed_lowlambda_expanded2688_ttkcrit_refiner.py
+   Verify that they use LAMBDA_TTKCV=0.004 and LAMBDA_TTKPERS=0.002, and that their N_TRAIN values are 1344 and 2688 respectively.
+
+4. Confirm that the fine-tuned benchmark output directories exist and contain 168-sample arrays:
+   - data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded1344/
+   - data_out/wind_finetune_candidateE2_fixed_lowlambda_expanded2688/
+   Expected shapes:
+   - idx.npy (168,)
+   - dataIN.npy (168,100,100,2)
+   - dataGT.npy/dataSR.npy (168,500,500,2)
+
+5. Confirm that the cheap-evaluation reports and pairwise CSVs exist:
+   - docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded1344_eval.md
+   - docs/topology_finetuning_candidateE2_fixed_lowlambda_expanded2688_eval.md
+   - ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_eval/
+   - ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_eval/
+
+6. Confirm that the true topology outputs are complete:
+   - candidateE2_fixed_lowlambda_expanded1344_topology: 336 PD VTU files, 1008 MT output files, and phase_c_final/phase_c_results.csv
+   - candidateE2_fixed_lowlambda_expanded2688_topology: 336 PD VTU files, 1008 MT output files, and phase_c_final/phase_c_results.csv
+
+7. Verify the reported 1344 true topology summary:
+   - PD mean: CNN=27.4063, GAN=20.8641, E2-low-1344=26.9905
+   - MT mean: CNN=5.8678, GAN=8.3481, E2-low-1344=5.7102
+   - PD < CNN: 128/168
+   - MT < CNN: 120/168
+   - PD < GAN: 2/168
+   - MT beats GAN: 159/168
+   - MT-GAN recovered: 11/20
+
+8. Verify the reported 2688 true topology summary:
+   - PD mean: CNN=27.4063, GAN=20.8641, E2-low-2688=26.4934
+   - MT mean: CNN=5.8678, GAN=8.3481, E2-low-2688=5.6989
+   - PD < CNN: 142/168
+   - MT < CNN: 118/168
+   - PD < GAN: 2/168
+   - MT beats GAN: 159/168
+   - MT-GAN recovered: 11/20
+
+9. Check that the 2688 interrupted-run discussion is documented as a runtime/session issue, not as a data or model failure. Confirm that the final completed 2688 topology output is the one used in the report.
+
+10. Check for overclaiming:
+   - The notes should not imply E2-low closes the GAN PD gap.
+   - The notes should not imply 2688 is strictly better overall than 1344.
+   - The notes should frame 1344 as the best balanced setting and 2688 as stronger on mean topology but with a larger fidelity tradeoff.
+
+Please report any path mismatch, stale filename, wrong metric sign, incomplete artifact count, or overclaiming.
+```
+
+---
+
+# Part XIV — Native PhIRE TensorFlow Candidate E2-low fine-tuning audit
+
+## XIV.1 Motivation after the E2 residual audit
+
+After the repaired residual E2-low runs, the main remaining concern was comparability. Candidate C was implemented as native PhIRE/TensorFlow fine-tuning of the pretrained CNN generator, while repaired E2-low had initially been implemented as a PyTorch residual refiner on top of the CNN output. Therefore, even when repaired E2-low showed promising MT behavior, it was not an apples-to-apples comparison with Candidate C.
+
+The next experiment was therefore to implement repaired E2-low directly inside the original PhIRE TensorFlow fine-tuning path. The goal was not to port the full PhIRE model to PyTorch, but to keep the Candidate C training setting and add TTK-derived critical-pair supervision as an additional differentiable loss.
+
+Important naming caveat:
+
+- `candidateE2_tf_lowlambda_expanded672` is best interpreted as **TF C+E2-low**, not as pure Candidate E.
+- It keeps the Candidate C loss stack and adds repaired TTK critical-pair losses.
+- `candidateB_plus_E2_tf_lowlambda_expanded672` is the cleaner **TF B+E2-low** ablation with `L_crit` disabled.
+- The B+E2 ablation is now complete and should be treated as the cleanest repaired E2 ablation for isolating the effect of the repaired TTK fixed-index supervision.
+
+## XIV.2 Native TensorFlow implementation summary: TF C+E2-low
+
+The completed native-PhIRE E2-low experiment used:
+
+```text
+script: scripts/run_candidateE2_tf_lowlambda_expanded672_ttkcrit_refiner.py
+method/output name: candidateE2_tf_lowlambda_expanded672
+training set: expanded672
+constraint NPZ: ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+model dir: models_fixed/topology_finetuning/wind_finetune_candidateE2_tf_lowlambda_expanded672
+output dir: data_out/wind_finetune_candidateE2_tf_lowlambda_expanded672
+```
+
+Loss interpretation:
+
+```text
+L_total =
+  L_uv
+  + 0.01  L_speed
+  + 0.05  L_grad
+  + 0.25  L_levelset
+  + 0.001 L_crit
+  + 0.004 L_TTKCV
+  + 0.002 L_TTKPERS
+```
+
+Where:
+
+- `L_uv`, `L_speed`, `L_grad`, `L_levelset`, and `L_crit` match Candidate C's native TensorFlow/PhIRE fine-tuning stack.
+- `L_TTKCV` uses fixed TTK birth/death vertex IDs and penalizes the predicted scalar speed at those positions against GT critical values.
+- `L_TTKPERS` penalizes the predicted persistence gap at the same fixed TTK pair locations.
+- TTK critical-pair targets come from the repaired fixed-index constraint NPZ produced after the VTI coordinate-mapping fix.
+
+The TensorFlow implementation uses the stable `index` field already decoded from the PhIRE TFRecord pipeline to feed the correct per-sample TTK constraints for each shuffled batch. This avoids modifying the shared PhIRE parser or dataset format.
+
+## XIV.3 Topology pipeline interruption and resumability repair
+
+During true TTK evaluation of `candidateE2_tf_lowlambda_expanded672`, the topology pipeline repeatedly stopped before `phase_c_final/phase_c_results.csv` was created. Diagnostics showed:
+
+```text
+VTI files: 336
+PD files: partial
+MT files: partial
+```
+
+The failure was not a model-output issue. It was a runtime/pipeline-resume issue:
+
+1. Stage 2 of `scripts/run_candidate_topology_pipeline.sh` recomputed every PD/MT field on every restart.
+2. A single TTK segfault aborted the entire script because of `set -euo pipefail`.
+3. The script defaulted to 20 TTK threads unless `--threads` was explicitly passed.
+4. Environment variables such as `OMP_NUM_THREADS=1` did not help because the Docker command used the TTK CLI `-t` argument.
+
+The topology pipeline was patched by Codex in commit:
+
+```text
+e4e56b86
+```
+
+Key repair behavior:
+
+- Stage 2 now skips existing PD outputs.
+- Stage 2 now skips existing MT outputs only when all three MT ports are present.
+- Existing outputs are not overwritten.
+- Individual TTK failures are logged and do not abort the full Stage 2 loop.
+- A hard completeness gate prevents Stage 3 distance computation unless all expected PD/MT outputs exist.
+- `--threads` should be passed explicitly; for the repaired TF E2 runs, `--threads 1` was used.
+
+Successful resume command for TF C+E2-low:
+
+```bash
+cd ~/PhIRE
+
+METHOD=candidateE2_tf_lowlambda_expanded672
+DATA=data_out/wind_finetune_candidateE2_tf_lowlambda_expanded672
+TOPO=ttk_runs_fixed/topology_finetuning/${METHOD}_topology
+VTI=ttk_runs_fixed/topology_finetuning/${METHOD}_topology_vti
+LOG=logs/${METHOD}_topology_pipeline_resume_skip_existing_threads1.log
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method "$METHOD" \
+  --data-dir "$DATA" \
+  --vti-dir "$VTI" \
+  --out-base "$TOPO" \
+  --n-samples 168 \
+  --threads 1 \
+  --skip-viz \
+  2>&1 | tee "$LOG"
+```
+
+Final completed topology-output check for TF C+E2-low:
+
+```text
+VTI files: 336
+PD files: 336
+MT port0: 336
+MT port1: 336
+MT port2: 336
+phase_c_results.csv: present
+docs/topology_finetuning_candidateE2_tf_lowlambda_expanded672_topology_eval.md: present
+```
+
+The same patched resumable topology pipeline was later used successfully for the B+E2 ablation.
+
+## XIV.4 Native TF C+E2-low true topology results
+
+True topology report:
+
+```text
+docs/topology_finetuning_candidateE2_tf_lowlambda_expanded672_topology_eval.md
+```
+
+Summary table:
+
+| Metric | CNN baseline | GAN baseline | TF C+E2-low-672 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 24.9844 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7076 |
+| PD wins vs CNN | — | 166/168 | 162/168 |
+| MT wins vs CNN | — | 20/168 | 96/168 |
+| PD beats GAN | — | — | 4/168 |
+| MT beats GAN | — | — | 160/168 |
+
+Additional winner-distribution summary:
+
+| Metric | Candidate wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD three-way winners after adding TF C+E2-low | 2 | 2 | 164 |
+| MT three-way winners after adding TF C+E2-low | 92 | 70 | 6 |
+
+MT-GAN baseline-case behavior:
+
+- Original MT-GAN baseline wins before candidate: 20 samples.
+- After adding TF C+E2-low:
+  - 14/20 changed from GAN to the candidate.
+  - 6/20 stayed GAN.
+  - 0/20 changed to CNN.
+
+This first native TF E2 run showed that repaired TTK critical-pair supervision can provide a merge-tree-relevant signal in the native PhIRE fine-tuning setting. However, because `L_crit` was still active, it did not isolate whether the MT gain came from the repaired TTK terms or from an interaction with Candidate C's local-maxima proxy.
+
+## XIV.5 Clean TF B+E2-low ablation with `L_crit` disabled
+
+The clean ablation was created as:
+
+```text
+script: scripts/run_candidateB_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py
+method/output name: candidateB_plus_E2_tf_lowlambda_expanded672
+training set: expanded672
+constraint NPZ: ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz
+model dir: models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672
+output dir: data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672
+cheap eval report: docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_eval.md
+true topology report: docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md
+```
+
+Target loss:
+
+```text
+L_total =
+  L_uv
+  + 0.01 L_speed
+  + 0.05 L_grad
+  + 0.25 L_levelset
+  + 0.004 L_TTKCV
+  + 0.002 L_TTKPERS
+```
+
+with:
+
+```text
+L_crit = 0
+```
+
+Implementation notes:
+
+- The script was derived from the TF C+E2-low script.
+- The only intended loss-stack difference is `LAMBDA_CRIT = 0.0`.
+- The raw `L_crit` op is still constructed and printed for diagnostics, but the weighted contribution `w_L_crit` is always exactly `0.0`.
+- The same native PhIRE/TensorFlow generator fine-tuning path, 672-sample training data, pretrained CNN initialization, repaired constraints NPZ, optimizer, epochs, batch size, output shapes, and normalized `L_uv` convention are retained.
+- The script protects the completed TF C+E2-low output directories so the sibling ablation cannot overwrite them.
+
+Training and inference completed successfully. The final output validation reported:
+
+```text
+idx.npy:    (168,)
+dataIN.npy: (168, 100, 100, 2)
+dataGT.npy: (168, 500, 500, 2)
+dataSR.npy: (168, 500, 500, 2)
+idx.npy values: exactly 0..167
+```
+
+## XIV.6 TF B+E2-low cheap scalar/domain evaluation
+
+Cheap evaluation was run before the expensive TTK topology pipeline:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateB_plus_E2_tf_lowlambda_expanded672 \
+  --candidate-dir  data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateB_plus_E2_tf_lowlambda_expanded672_eval
+```
+
+The result was non-catastrophic and strongly positive relative to CNN on most scalar/domain metrics:
+
+| Metric | CNN baseline | TF B+E2-low-672 | Direction |
+|---|---:|---:|---|
+| PSNRuv (dB) | 31.1925 | 32.1146 | better |
+| Speed MAE | 0.6941 | 0.6178 | better |
+| Speed RMSE | 1.1078 | 1.0240 | better |
+| WPD MAE | 231.6709 | 202.2449 | better |
+| WPD W1 | 45.2713 | 19.5757 | better |
+| WPD bias abs | 35.3439 | 13.1372 | better |
+| Gradient MAE | 0.3491 | 0.3212 | better |
+| Gradient W1 | 0.2329 | 0.1492 | better |
+| Gradient kurtosis abs Δ | 3.7004 | 3.0060 | better |
+| PSD log-L2 | 0.8335 | 0.8096 | better |
+| PSD slope abs Δ | 0.9150 | 1.0791 | worse |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0027 | better |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0037 | better |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0018 | better |
+| Exceedance abs Δ p90 | 0.0103 | 0.0032 | better |
+| Component-count curve L1 | 115.5278 | 84.1935 | better |
+
+Per-sample improvement counts relative to CNN included:
+
+- PSNRuv: improved on 168/168 samples.
+- Speed MAE: improved on 168/168 samples.
+- WPD MAE: improved on 168/168 samples.
+- WPD W1: improved on 156/168 samples.
+- Gradient MAE: improved on 168/168 samples.
+- Gradient W1: improved on 162/168 samples.
+- Component-count curve L1: improved on 155/168 samples.
+
+This justified running the true TTK topology evaluation.
+
+## XIV.7 TF B+E2-low true TTK topology evaluation
+
+Topology pipeline command:
+
+```bash
+cd ~/PhIRE
+
+METHOD=candidateB_plus_E2_tf_lowlambda_expanded672
+DATA=data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672
+TOPO=ttk_runs_fixed/topology_finetuning/${METHOD}_topology
+VTI=ttk_runs_fixed/topology_finetuning/${METHOD}_topology_vti
+LOG=logs/${METHOD}_topology_pipeline_threads1.log
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method "$METHOD" \
+  --data-dir "$DATA" \
+  --vti-dir "$VTI" \
+  --out-base "$TOPO" \
+  --n-samples 168 \
+  --threads 1 \
+  --skip-viz \
+  2>&1 | tee "$LOG"
+```
+
+The topology pipeline completed successfully:
+
+```text
+VTI files: 336
+PD files: 336
+MT port0: 336
+MT port1: 336
+MT port2: 336
+phase_c_results.csv: present
+docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md: present
+```
+
+True topology report:
+
+```text
+docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md
+```
+
+Summary table:
+
+| Metric | CNN baseline | GAN baseline | TF B+E2-low-672 |
+|---|---:|---:|---:|
+| PD distance mean | 27.4063 | 20.8641 | 24.7596 |
+| MT distance mean | 5.8678 | 8.3481 | 5.7161 |
+| PD wins vs CNN | — | 166/168 | 162/168 |
+| MT wins vs CNN | — | 20/168 | 99/168 |
+| PD beats GAN | — | — | 4/168 |
+| MT beats GAN | — | — | 164/168 |
+
+Additional winner-distribution summary:
+
+| Metric | Candidate wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD three-way winners after adding TF B+E2-low | 2 | 2 | 164 |
+| MT three-way winners after adding TF B+E2-low | 96 | 68 | 4 |
+
+MT-GAN baseline-case behavior:
+
+- Original MT-GAN baseline wins before candidate: 20 samples.
+- After adding TF B+E2-low:
+  - 16/20 changed from GAN to the candidate.
+  - 4/20 stayed GAN.
+  - 0/20 changed to CNN.
+
+Changed MT-GAN cases included samples:
+
+```text
+6, 16, 17, 18, 20, 25, 48, 62, 63, 65, 68, 77, 79, 80, 82, 92
+```
+
+The four MT-GAN cases that remained GAN were:
+
+```text
+8, 12, 19, 154
+```
+
+## XIV.8 Comparison across Candidate C, TF C+E2-low, and TF B+E2-low
+
+The key 672-sample comparison is:
+
+| Method | Implementation | Mean PD | Mean MT | PD < CNN | MT < CNN / MT wins | MT-GAN recovered |
+|---|---|---:|---:|---:|---:|---:|
+| Candidate C-expanded-672 | native PhIRE TF fine-tuning, local-max proxy | 23.9580 | 6.0765 | 168/168 | 54/168 | 7/20 |
+| Residual E2-low-672 | PyTorch residual refiner, repaired TTK pairs | 27.1011 | 5.7522 | 130/168 | three-way MT wins 101/168 | 6/20 |
+| TF C+E2-low-672 | native PhIRE TF fine-tuning, Candidate C + repaired TTK pairs | 24.9844 | 5.7076 | 162/168 | 96/168 vs CNN; 92 three-way wins | 14/20 |
+| TF B+E2-low-672 | native PhIRE TF fine-tuning, Candidate B + repaired TTK pairs; `L_crit=0` | 24.7596 | 5.7161 | 162/168 | 99/168 vs CNN; 96 three-way wins | 16/20 |
+
+Interpretation:
+
+- Candidate C remains stronger on PD bottleneck distance than either TF C+E2-low or TF B+E2-low.
+- Both native TF E2-low variants are substantially stronger on MT distance than Candidate C.
+- TF C+E2-low has the slightly best mean MT distance: 5.7076 vs 5.7161 for TF B+E2-low.
+- TF B+E2-low has the slightly better mean PD distance among the two TF E2 variants: 24.7596 vs 24.9844.
+- TF B+E2-low has stronger count-based MT behavior: 99/168 MT wins vs CNN and 16/20 original MT-GAN cases recovered, compared with 96/168 and 14/20 for TF C+E2-low.
+- The B+E2 ablation shows that removing `L_crit` does not remove the MT improvement.
+- Therefore, the repaired TTK fixed-index terms themselves carry a merge-tree-relevant training signal.
+
+This is the cleanest repaired E2 ablation so far because it removes Candidate C's local-maxima proxy and keeps the native PhIRE fine-tuning setting fixed.
+
+## XIV.9 Scientific interpretation after the B+E2 ablation
+
+The current best interpretation is:
+
+> Removing `L_crit` does not remove the MT improvement. The repaired TTK fixed-index losses alone, when added to the Candidate B loss stack in the native PhIRE/TensorFlow fine-tuning setting, are sufficient to produce the MT-oriented gain. `L_crit` is therefore not necessary for the observed merge-tree improvement.
+
+Recommended framing:
+
+- Candidate C remains the main submitted/paper result and the strongest controlled PD-oriented result.
+- TF C+E2-low was the first repaired native-PhIRE E2 experiment and showed strong MT improvement, but it still included `L_crit`.
+- TF B+E2-low is the clean ablation that isolates the repaired TTK fixed-index terms.
+- TF B+E2-low should be treated as the cleanest post-submission/future-work evidence that TTK critical-pair supervision provides an MT-oriented signal.
+- Neither TF E2-low run closes the GAN PD gap, so the claim should remain descriptor-specific: improved MT behavior and improved PD relative to CNN, but not GAN-level PD.
+
+Suggested advisor-update wording:
+
+> The B+E2 ablation is complete. It removes the local-maxima `L_crit` term while keeping the repaired TTK critical-pair losses. The result still improves mean PD over CNN from 27.41 to 24.76 and mean MT from 5.87 to 5.72. It improves MT over CNN on 99/168 samples and recovers 16/20 of the original MT-GAN cases. This suggests the MT gain is coming from the repaired TTK fixed-index supervision itself, not from the Candidate C local-maxima proxy.
+
+## XIV.10 Neighborhood-aware extension suggested in advisor meeting
+
+In the advisor meeting, a useful next conceptual direction was discussed: instead of supervising only the exact birth/death critical pixels, supervise a local neighborhood around each TTK critical point.
+
+Potential variants:
+
+1. Gaussian-weighted patch loss around each birth/death vertex.
+2. Local gradient or Hessian-shape consistency near each critical point.
+3. Enforcing that the selected point remains locally extremal relative to its neighborhood.
+4. Small-patch scalar-speed matching around TTK critical vertices.
+
+This may address a limitation of single-pixel critical-value supervision: exact critical points can be brittle under small spatial shifts, while the surrounding neighborhood may better encode the scalar-field structure that gives rise to the persistence pair or merge-tree branch.
+
+## XIV.11 Updated takeaway after native TF E2-low and B+E2-low
+
+The post-submission Candidate E audit now has a constructive conclusion:
+
+- The original residual E/E2 runs were confounded by infrastructure bugs, loss-balance issues, and a residual-refiner implementation that was not directly comparable to Candidate C.
+- After repairing the infrastructure and lowering the TTK weights, residual E2-low showed promising MT behavior.
+- Implementing repaired E2-low inside native PhIRE TensorFlow fine-tuning produced an apples-to-apples Candidate C-style experiment.
+- The native TF C+E2-low run improved both PD and MT relative to CNN, and was especially strong on MT.
+- The native TF B+E2-low ablation removed `L_crit` and still produced essentially the same MT improvement, with stronger MT win counts.
+- The cleanest current repaired-E2 claim is that TTK-derived fixed critical-pair supervision provides a merge-tree-relevant signal in native PhIRE fine-tuning.
+
+The strongest current claim is:
+
+> TTK-derived critical-pair supervision appears to provide a merge-tree-relevant training signal when added to native PhIRE topology-inspired fine-tuning. The B+E2 ablation shows that this MT-oriented improvement persists even when Candidate C's local-maxima proxy is disabled, suggesting that the repaired TTK fixed-index terms themselves are responsible for much of the MT gain. Further work should test neighborhood-aware critical-point supervision and direct merge-tree-aware proxies.
+
+---
+
+# Part XV — TF B+E2-low scale-up to 1344 and 2688 samples
+
+## XV.1 Motivation
+
+After the clean `candidateB_plus_E2_tf_lowlambda_expanded672` ablation showed that the repaired TTK fixed-index losses could improve merge-tree behavior even with Candidate C's `L_crit` disabled, the next question was whether this behavior would persist at larger training scales. The goal of this scale-up was to make an apples-to-apples comparison against the already completed Candidate C scale ladder.
+
+The scaled B+E2 runs preserve the same native PhIRE/TensorFlow fine-tuning setup as the 672 B+E2 run:
+
+- pretrained PhIRE CNN initialization,
+- normalized `[u,v]` reconstruction loss,
+- physical-unit scalar speed, gradient, level-set, and TTK losses,
+- repaired low-lambda TTK terms,
+- no Candidate C local-maxima contribution (`LAMBDA_CRIT = 0.0`),
+- same corrected 168-sample benchmark evaluation set,
+- same true TTK PD/MT evaluation pipeline.
+
+The only intended differences across the B+E2 scale ladder are the training TFRecord size and the corresponding repaired TTK constraint file.
+
+## XV.2 Objective and method names
+
+The scaled B+E2 objective is:
+
+$$
+L_{\mathrm{B+E2}} =
+L_{uv}+0.01L_{\mathrm{speed}}+0.05L_{\mathrm{grad}}
++0.25L_{\mathrm{levelset}}
++0.004L_{\mathrm{TTKCV}}
++0.002L_{\mathrm{TTKpers}}.
+$$
+
+`L_crit` is explicitly disabled:
+
+$$
+\lambda_{\mathrm{crit}} = 0.
+$$
+
+| Scale | Script | Method/output name | Training TFRecord | Constraint NPZ |
+|---:|---|---|---|---|
+| 672 | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py` | `candidateB_plus_E2_tf_lowlambda_expanded672` | `example_data_topology_expanded_672/wind_MR-HR.tfrecord` | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 1344 | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` | `candidateB_plus_E2_tf_lowlambda_expanded1344` | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 2688 | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` | `candidateB_plus_E2_tf_lowlambda_expanded2688` | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+
+## XV.3 Output artifacts
+
+| Scale | Model directory | SR output directory | Cheap eval report | True topology report |
+|---:|---|---|---|---|
+| 672 | `models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672` | `data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded672` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_eval.md` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded672_topology_eval.md` |
+| 1344 | `models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded1344` | `data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded1344` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded1344_eval.md` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded1344_topology_eval.md` |
+| 2688 | `models_fixed/topology_finetuning/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688` | `data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded2688_eval.md` | `docs/topology_finetuning_candidateB_plus_E2_tf_lowlambda_expanded2688_topology_eval.md` |
+
+## XV.4 Cheap scalar/domain evaluation across the B+E2 scale ladder
+
+The 1344 and 2688 cheap evaluations were healthy enough to justify the expensive TTK runs. Both had 168 common benchmark samples and exact GT alignment. Across scales, B+E2 improved the main direct-fidelity and scalar/domain metrics relative to the pretrained CNN baseline.
+
+| Metric | CNN baseline | GAN baseline | B+E2-low-672 | B+E2-low-1344 | B+E2-low-2688 | Direction |
+|---|---:|---:|---:|---:|---:|---|
+| PSNRuv (dB) | 31.1925 | 29.1380 | 32.1146 | 32.4480 | **32.6889** | higher is better |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | 0.6178 | 0.5884 | **0.5684** | lower is better |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | 1.0240 | 0.9852 | **0.9629** | lower is better |
+| WPD MAE | 231.6709 | 310.7328 | 202.2449 | 191.8304 | **183.4170** | lower is better |
+| WPD W1 | 45.2713 | 85.6191 | 19.5757 | 19.3128 | **16.0868** | lower is better |
+| WPD bias abs | 35.3439 | 78.7236 | 13.1372 | **11.5541** | 12.6851 | lower is better |
+| Gradient MAE | 0.3491 | 0.3806 | 0.3212 | 0.3180 | **0.3120** | lower is better |
+| Gradient W1 | 0.2329 | 0.0564 | 0.1492 | 0.1654 | 0.1543 | lower is better |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | 3.0060 | **2.9293** | 2.9747 | lower is better |
+| PSD log-L2 | 0.8335 | 0.5139 | **0.8096** | 0.8560 | 0.8509 | lower is better |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.0791 | 1.1891 | 1.2029 | lower is better |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | 0.0027 | 0.0029 | **0.0020** | lower is better |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | 0.0037 | 0.0027 | **0.0026** | lower is better |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | 0.0018 | 0.0023 | **0.0018** | lower is better |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | 0.0032 | 0.0031 | **0.0028** | lower is better |
+| Component-count curve L1 | 115.5278 | 124.6567 | 84.1935 | 91.1538 | **88.0060** | lower is better |
+
+Pairwise improvement counts relative to CNN:
+
+| Metric | B+E2-low-672 improved / 168 | B+E2-low-1344 improved / 168 | B+E2-low-2688 improved / 168 |
+|---|---:|---:|---:|
+| PSNRuv | 168 | 168 | 168 |
+| Speed MAE | 168 | 168 | 168 |
+| Speed RMSE | 168 | 168 | 168 |
+| WPD MAE | 168 | 168 | 168 |
+| WPD W1 | 156 | 139 | 157 |
+| WPD bias abs | 152 | 124 | 140 |
+| Gradient MAE | 168 | 168 | 168 |
+| Gradient W1 | 162 | 155 | 162 |
+| Exceedance abs Δ s>5 | 116 | 118 | 132 |
+| Exceedance abs Δ s>10 | 117 | 123 | 134 |
+| Exceedance abs Δ s>15 | 137 | 124 | 141 |
+| Exceedance abs Δ p90 | 155 | 136 | 148 |
+| Component-count curve L1 | 155 | 153 | 155 |
+
+The repeated caution is PSD slope: B+E2 improves many spatial/scalar metrics but worsens PSD slope relative to CNN at all three scales. This should be reported as a caveat rather than hidden.
+
+## XV.5 True TTK topology results across the B+E2 scale ladder
+
+All true topology evaluations used the corrected 168-sample benchmark, the fixed CNN/GAN baselines, 160×160 speed patches at `(x0=0, y0=0)`, TTK bottleneck distance for PD, and TTK merge-tree distance for MT. Lower is better for both PD and MT.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| B+E2-low-672 | 24.7596 | 5.7161 | 162/168 | 99/168 | 4/168 | 164/168 | 16/20 |
+| B+E2-low-1344 | 24.4965 | **5.6514** | 160/168 | 97/168 | 4/168 | 166/168 | **18/20** |
+| B+E2-low-2688 | **23.9876** | 5.6774 | 166/168 | 90/168 | 8/168 | 166/168 | **18/20** |
+
+Winner distributions after adding each B+E2 candidate:
+
+| Scale | PD winner: B+E2 | PD winner: CNN | PD winner: GAN | MT winner: B+E2 | MT winner: CNN | MT winner: GAN |
+|---:|---:|---:|---:|---:|---:|---:|
+| 672 | 2 | 2 | 164 | 96 | 68 | 4 |
+| 1344 | 3 | 2 | 163 | 95 | 71 | 2 |
+| 2688 | 6 | 2 | 160 | 90 | 76 | 2 |
+
+## XV.6 Apples-to-apples comparison with Candidate C
+
+The scaled B+E2 ladder gives an apples-to-apples comparison against the Candidate C scale ladder because both families use native PhIRE/TensorFlow fine-tuning from the pretrained CNN and the same fixed benchmark evaluation.
+
+| Scale | Candidate C PD | Candidate C MT | B+E2-low PD | B+E2-low MT | Interpretation |
+|---:|---:|---:|---:|---:|---|
+| 672 | **23.9580** | 6.0765 | 24.7596 | **5.7161** | C better PD; B+E2 better MT |
+| 1344 | **22.8623** | 6.1236 | 24.4965 | **5.6514** | C better PD; B+E2 much better MT |
+| 2688 | **22.4944** | 6.0803 | 23.9876 | **5.6774** | C better PD; B+E2 better MT and improved PD vs 672 |
+
+The key readout is descriptor-specific:
+
+- Candidate C remains the stronger PD-oriented objective at larger scales.
+- B+E2-low is the stronger MT-oriented objective at all tested scales.
+- B+E2-low's PD improves with scale: 24.7596 → 24.4965 → 23.9876.
+- B+E2-low's best mean MT is at 1344 samples: 5.6514.
+- B+E2-low recovers 18/20 original MT-GAN cases at both 1344 and 2688 samples.
+
+## XV.7 Updated scientific interpretation
+
+The completed B+E2 scale-up strengthens the repaired E2 conclusion. The original Candidate E result should not be treated as a definitive failure of TTK critical-pair supervision because it was confounded by target, mapping, normalization, and loss-scale issues. After repair, the clean native PhIRE B+E2 ablation shows that TTK-derived fixed-index critical-pair supervision provides a stable merge-tree-oriented signal.
+
+The most accurate interpretation is:
+
+> Candidate C remains the main submitted PD-oriented topology-inspired result. However, the repaired B+E2-low scale ladder shows that TTK critical-pair supervision, when implemented with corrected vertex mapping, GT scalar targets, normalized vector reconstruction, and low weights, consistently improves merge-tree agreement relative to CNN and Candidate C. This effect persists after removing Candidate C's local-maxima proxy, so the MT improvement is attributable to the repaired TTK fixed-index terms rather than to `L_crit`.
+
+## XV.8 Updated takeaway
+
+The B+E2 scale-up adds a new post-submission/future-work conclusion:
+
+> Repaired TTK fixed-index critical-pair supervision is a stable MT-oriented training signal. It does not replace Candidate C as the submitted PD-oriented result, but it gives a stronger route for future merge-tree-aware learning. The natural next step is a factorial ablation that tests `UV+E2`, `UV+crit`, `B+E2`, and `C+E2`, followed by neighborhood-aware or branch-aware critical-pair losses.
+
+
+---
+
+# Part XVI — Priority 3 C+E2-low scale-up audit
+
+This part records the next repaired-E2 experiment after the clean B+E2-low scale ladder. The goal was to scale the native PhIRE/TensorFlow **C+E2-low** objective to 1344 and 2688 samples. This family differs from B+E2-low because it keeps Candidate C's local-maxima critical-value proxy enabled while adding repaired low-lambda TTK fixed-index supervision.
+
+## XVI.1 Experiment definition
+
+The C+E2-low objective is
+
+```text
+L_total = L_uv
+        + 0.01  L_speed
+        + 0.05  L_grad
+        + 0.25  L_levelset
+        + 0.001 L_crit
+        + 0.004 L_TTKCV
+        + 0.002 L_TTKpers
+```
+
+Important distinctions:
+
+- `L_crit` is enabled with weight `0.001`.
+- This is Candidate C + repaired E2, not the B+E2 ablation.
+- The implementation uses native PhIRE/TensorFlow generator fine-tuning from the pretrained CNN checkpoint, not the PyTorch residual-refiner path.
+- The 168-sample corrected benchmark remains the evaluation set.
+- TTK evaluation uses the same fixed CNN/GAN baselines, same 160×160 speed patches at `(x0=0, y0=0)`, TTK bottleneck distance for PD, and TTK merge-tree distance for MT.
+
+## XVI.2 Scripts generated and validated
+
+Two new scripts were generated from the completed 672-sample native TF C+E2-low script:
+
+| Script | Method | Training data | Constraints | `L_crit` status |
+|---|---|---|---|---|
+| `scripts/run_candidateE2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` | `candidateE2_tf_lowlambda_expanded1344` | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` | `candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` | enabled, `0.001` |
+| `scripts/run_candidateE2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` | `candidateE2_tf_lowlambda_expanded2688` | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` | `candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` | enabled, `0.001` |
+
+Validation performed before running included:
+
+1. `py_compile` for both scripts,
+2. constant extraction for method names, training paths, constraints paths, `N_TRAIN`, and lambda values,
+3. confirmation that `LAMBDA_CRIT=0.001` is enabled in both scripts,
+4. self-block checks to confirm each script does not protect its own output directory,
+5. completed-run protection checks for the 672 C+E2 run and all B+E2 runs,
+6. sibling cross-protection between the 1344 and 2688 C+E2 scripts,
+7. dry-run precondition checks.
+
+## XVI.3 C+E2-low-1344 cheap scalar/domain evaluation
+
+The C+E2-low-1344 run completed training and paired inference successfully on the fixed 168-sample benchmark. The cheap evaluation was healthy enough for TTK: 168 common samples were present and GT alignment was exact.
+
+| Metric | CNN | GAN | C+E2-low-1344 | Direction |
+|---|---:|---:|---:|---|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.3659** | higher is better |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5925** | lower is better |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9947** | lower is better |
+| WPD MAE | 231.6709 | 310.7328 | **193.1359** | lower is better |
+| WPD W1 | 45.2713 | 85.6191 | **14.7417** | lower is better |
+| WPD bias abs | 35.3439 | 78.7236 | **4.7898** | lower is better |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3173** | lower is better |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1530 | lower is better |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.8428** | lower is better |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.8302 | lower is better |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.1317 | lower is better |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0030** | lower is better |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0030** | lower is better |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0013** | lower is better |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0018** | lower is better |
+| Component-count curve L1 | 115.5278 | 124.6567 | **88.8919** | lower is better |
+
+Pairwise improvement counts relative to CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 165 | 3 |
+| WPD bias abs | 155 | 13 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 165 | 3 |
+| Gradient kurtosis abs Δ | 79 | 89 |
+| PSD log-L2 | 98 | 70 |
+| PSD slope abs Δ | 3 | 165 |
+| Exceedance abs Δ s>5 | 117 | 51 |
+| Exceedance abs Δ s>10 | 123 | 45 |
+| Exceedance abs Δ s>15 | 141 | 26 |
+| Exceedance abs Δ p90 | 160 | 8 |
+| Component-count curve L1 | 156 | 12 |
+
+The main caveat is PSD slope: it worsened on most samples, as in the B+E2 scale ladder. This did not block TTK because the direct-fidelity, scalar-speed, WPD, gradient, exceedance, and component-count proxy metrics were strong.
+
+## XVI.4 C+E2-low-1344 true TTK topology evaluation
+
+The topology pipeline completed successfully for C+E2-low-1344:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| C+E2-low-1344 | 24.3389 | 5.7479 | 164/168 | 90/168 | 6/168 | 161/168 | 16/20 |
+
+Winner distributions after adding C+E2-low-1344:
+
+| Metric family | C+E2 wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD | 4 | 2 | 162 |
+| MT | 87 | 77 | 4 |
+
+## XVI.5 Interpretation against C and B+E2 at 1344
+
+| Method | Objective summary | PD mean | MT mean | PD < CNN | MT < CNN | MT-GAN cases recovered | Interpretation |
+|---|---|---:|---:|---:|---:|---:|---|
+| C-1344 | B + `0.001 L_crit` | **22.8623** | 6.1236 | 168/168 | 49/168 | 9/20 | strongest PD at this scale |
+| B+E2-low-1344 | B + low-lambda TTK, no `L_crit` | 24.4965 | **5.6514** | 160/168 | 97/168 | **18/20** | strongest MT at this scale |
+| C+E2-low-1344 | B + `L_crit` + low-lambda TTK | 24.3389 | 5.7479 | 164/168 | 90/168 | 16/20 | intermediate: better PD than B+E2, weaker MT |
+
+The 1344 result suggests that adding Candidate C's `L_crit` back into the repaired E2 stack slightly improves PD relative to B+E2-low-1344, but weakens the MT signal and recovers fewer of the original MT-GAN cases. This supports the interpretation that the repaired TTK fixed-index terms are the main source of the merge-tree improvement, while `L_crit` is more PD-oriented or at least not purely MT-helpful in this repaired E2 setting.
+
+## XVI.6 C+E2-low-2688 cheap scalar/domain evaluation
+
+C+E2-low-2688 completed training, paired inference, and cheap evaluation successfully. The run used the native TensorFlow/PhIRE path, kept Candidate C's `L_crit=0.001` enabled, and added the repaired low-lambda E2 terms.
+
+The cheap evaluation completed on the fixed 168-sample benchmark:
+
+| Check | Result |
+|---|---|
+| Common samples | 168 |
+| GT alignment | OK (`max_abs_diff=0.00e+00`) |
+| Topology lookup | 336 baseline CNN/GAN entries loaded |
+| Total metric rows | 672 |
+| SSIM | not computed because of the known local `skimage`/NumPy binary mismatch |
+
+Summary metrics:
+
+| Metric | CNN | GAN | C+E2-low-2688 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.7329** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5649** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9566** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **182.9106** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **12.9098** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **6.7038** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3116** |
+| Gradient W1 | 0.2329 | 0.0564 | **0.1582** |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.9537** |
+| PSD log-L2 | **0.8335** | 0.5139 | 0.8589 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.2509 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0022** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0024** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0015** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0017** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **91.8690** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 166 | 2 |
+| WPD bias abs | 148 | 20 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 165 | 3 |
+| Gradient kurtosis abs Δ | 80 | 88 |
+| PSD log-L2 | 79 | 89 |
+| PSD slope abs Δ | 0 | 168 |
+| Exceedance abs Δ s>5 | 131 | 37 |
+| Exceedance abs Δ s>10 | 126 | 42 |
+| Exceedance abs Δ s>15 | 140 | 28 |
+| Exceedance abs Δ p90 | 155 | 13 |
+| Component-count curve L1 | 154 | 14 |
+
+The cheap evaluation again shows the recurring PSD-slope caveat, but the direct-fidelity, scalar-speed, WPD, gradient, exceedance, and component-count proxy metrics were strong enough to justify the true TTK run.
+
+## XVI.7 C+E2-low-2688 true TTK topology evaluation
+
+The topology pipeline completed successfully for C+E2-low-2688:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| C+E2-low-2688 | 24.2686 | 5.6628 | 165/168 | 94/168 | 7/168 | 167/168 | 19/20 |
+
+Winner distributions after adding C+E2-low-2688:
+
+| Metric family | C+E2 wins | CNN wins | GAN wins |
+|---|---:|---:|---:|
+| PD | 5 | 2 | 161 |
+| MT | 93 | 74 | 1 |
+
+The 20 original MT-GAN baseline wins were nearly all recovered: the MT winner changed to C+E2-low-2688 in 19 of the 20 cases, stayed GAN in 1 case, and changed to CNN in 0 cases.
+
+## XVI.8 Completed Priority 3 comparison
+
+| Scale | Method | Objective summary | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---:|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 672 | C | B + `0.001 L_crit` | **23.9580** | 6.0765 | 168/168 | 54/168 | -- | -- | 7/20 |
+| 672 | B+E2-low | B + low-lambda TTK, no `L_crit` | 24.7596 | 5.7161 | 162/168 | 99/168 | 4/168 | 164/168 | 16/20 |
+| 672 | C+E2-low | B + `L_crit` + low-lambda TTK | 24.9844 | **5.7076** | 162/168 | 96/168 | 4/168 | 160/168 | 14/20 |
+| 1344 | C | B + `0.001 L_crit` | **22.8623** | 6.1236 | 168/168 | 49/168 | -- | -- | 9/20 |
+| 1344 | B+E2-low | B + low-lambda TTK, no `L_crit` | 24.4965 | **5.6514** | 160/168 | 97/168 | 4/168 | 166/168 | 18/20 |
+| 1344 | C+E2-low | B + `L_crit` + low-lambda TTK | 24.3389 | 5.7479 | 164/168 | 90/168 | 6/168 | 161/168 | 16/20 |
+| 2688 | C | B + `0.001 L_crit` | **22.4944** | 6.0803 | 168/168 | 52/168 | 20/168 | -- | 10/20 |
+| 2688 | B+E2-low | B + low-lambda TTK, no `L_crit` | 23.9876 | 5.6774 | 166/168 | 90/168 | 8/168 | 166/168 | 18/20 |
+| 2688 | C+E2-low | B + `L_crit` + low-lambda TTK | 24.2686 | **5.6628** | 165/168 | 94/168 | 7/168 | 167/168 | **19/20** |
+
+Priority 3 interpretation:
+
+1. Candidate C remains the strongest PD-oriented objective at every scale.
+2. Repaired E2 terms are consistently MT-oriented and substantially outperform Candidate C alone on MT.
+3. B+E2 proves that repaired TTK fixed-index supervision can produce MT gains even without `L_crit`.
+4. C+E2-2688 shows that reintroducing `L_crit` at larger scale does not destroy the MT signal; it gives the strongest 2688-scale MT mean (`5.6628`) and recovers `19/20` original MT-GAN cases.
+5. Across all repaired E2 runs so far, the best absolute mean MT is B+E2-low-1344 (`5.6514`), with C+E2-low-2688 close behind (`5.6628`).
+6. The repaired E2 variants do not close the PD gap to GAN, but they improve PD over CNN on most samples while strongly improving MT relative to Candidate C.
+
+## XVII. Priority 4 complete: UV+E2-low-672
+
+Priority 4 tested whether Candidate B's scalar-speed, gradient, and level-set scaffold is necessary for repaired E2 to produce useful topology behavior.
+
+### XVII.1 Scientific question
+
+The question was:
+
+> Can repaired TTK fixed-index critical-pair supervision produce a useful topology signal when the only other loss is normalized vector reconstruction?
+
+This ablation removes all Candidate B/C scalar proxy terms and keeps only `L_uv` plus the repaired low-lambda E2 terms.
+
+Objective:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++ 0.004L_{\mathrm{TTKCV}}
++ 0.002L_{\mathrm{TTKpers}}.
+$$
+
+Disabled terms:
+
+- `L_speed = 0`
+- `L_grad = 0`
+- `L_levelset = 0`
+- `L_crit = 0`
+
+### XVII.2 Primary files and reconstruction anchors
+
+This section records the file names needed to reconstruct the UV+E2-low-672 experiment.
+
+#### Script and code provenance
+
+| Artifact | Path / name | Notes |
+|---|---|---|
+| Training/inference script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py` | Native TensorFlow/PhIRE generator fine-tuning; no PyTorch residual refiner |
+| Source sibling script | `scripts/run_candidateB_plus_E2_tf_lowlambda_expanded672_ttkcrit_refiner.py` | Closest base; same data/constraints/optimizer, but Candidate B losses are active there |
+| Commit noted from Codex | `acc78748` | Commit that added the UV+E2-low-672 script |
+| Script log path | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672.log` | Internal tee log written by the script |
+| Manual run log path | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672_manual.log` | Manual terminal log from the training + paired inference command |
+
+#### Input files
+
+| Artifact | Path / name | Notes |
+|---|---|---|
+| Training TFRecord | `example_data_topology_expanded_672/wind_MR-HR.tfrecord` | Same 672-sample expanded seasonal training data as B+E2-low-672 |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` | Fixed 168-sample benchmark |
+| Pretrained CNN checkpoint | `models/wind_mr-hr/trained_cnn/cnn` | Read-only initialization |
+| Repaired E2 constraints | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_constraints/ttk_pd_critical_pairs_gtvalues.npz` | Same repaired low-lambda 672 E2 constraints used by B+E2-low-672 and C+E2-low-672 |
+| Baseline merged CSV | `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` | Supplies precomputed CNN/GAN PD/MT entries for cheap eval reports |
+
+#### Output files
+
+| Artifact | Path / name | Notes |
+|---|---|---|
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672/` | Saved fine-tuned checkpoint |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded672/` | Contains `idx.npy`, `dataIN.npy`, `dataGT.npy`, `dataSR.npy` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/` | Cheap scalar/domain/proxy metrics |
+| Cheap eval all metrics | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/all_sample_metrics_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | Per-sample metrics for bicubic/CNN/GAN/candidate |
+| Cheap eval pairwise CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/pairwise_cnn_vs_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | CNN-vs-candidate deltas |
+| Cheap eval winner counts | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/winner_counts_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | Winner-count table for cheap metrics |
+| Cheap eval adjacent clusters | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_eval/adjacent_cluster_table_candidateUV_plus_E2_tf_lowlambda_expanded672.csv` | Samples 10–13, 90–93, 162–163 |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded672_eval.md` | Human-readable cheap evaluation report |
+| VTI directory | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology_vti/` | GT/SR VTI files for TTK |
+| TTK topology directory | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/` | PD/MT outputs and comparison files |
+| TTK phase-C results | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/phase_c_results.csv` | Per-sample candidate PD/MT distances |
+| TTK PD pairwise CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/pd_pairwise_distances.csv` | PD pairwise distances |
+| TTK MT pairwise CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/mt_pairwise_distances.csv` | MT pairwise distances |
+| TTK summary CSV | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/phase_c_summary.csv` | Summary table |
+| TTK summary TXT | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/phase_c_final/phase_c_summary.txt` | Text summary |
+| Candidate PD/MT distances | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/candidateUV_plus_E2_tf_lowlambda_expanded672_pd_mt_distances.csv` | Candidate distances per sample |
+| 3-way topology comparison | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded672_topology/candidateUV_plus_E2_tf_lowlambda_expanded672_topology_comparison.csv` | CNN/GAN/candidate comparison |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded672_topology_eval.md` | Human-readable true TTK topology report |
+| TTK pipeline log | `logs/candidateUV_plus_E2_tf_lowlambda_expanded672_topology_pipeline_threads1.log` | Full TTK pipeline log with `--threads 1 --skip-viz` |
+
+### XVII.3 Training and paired inference
+
+The script completed training and paired inference on the fixed 168-sample benchmark. Output validation passed:
+
+| Output file | Expected shape |
+|---|---:|
+| `idx.npy` | `(168,)` |
+| `dataIN.npy` | `(168, 100, 100, 2)` |
+| `dataGT.npy` | `(168, 500, 500, 2)` |
+| `dataSR.npy` | `(168, 500, 500, 2)` |
+
+The output index values were exactly `0..167`.
+
+### XVII.4 Cheap scalar/domain evaluation
+
+UV+E2-low-672 completed cheap evaluation successfully. The report is:
+
+- `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded672_eval.md`
+
+Summary metrics:
+
+| Metric | CNN | GAN | UV+E2-low-672 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **31.8657** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.6386** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **1.0574** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **210.1936** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **20.2967** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **12.1275** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3260** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1466 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.9402** |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.7724 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 0.9683 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0029** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0040** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0019** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0034** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **83.8552** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 155 | 13 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 129 | 39 |
+| WPD MAE | 163 | 5 |
+| WPD W1 | 154 | 14 |
+| WPD bias abs | 144 | 24 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 159 | 9 |
+| Gradient kurtosis abs Δ | 86 | 82 |
+| PSD log-L2 | 128 | 40 |
+| PSD slope abs Δ | 55 | 113 |
+| Exceedance abs Δ s>5 | 115 | 53 |
+| Exceedance abs Δ s>10 | 119 | 48 |
+| Exceedance abs Δ s>15 | 131 | 37 |
+| Exceedance abs Δ p90 | 145 | 23 |
+| Component-count curve L1 | 154 | 13 |
+
+The cheap evaluation was healthy enough to justify the true TTK topology pipeline.
+
+### XVII.5 True TTK topology evaluation
+
+The true TTK topology pipeline completed successfully:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+E2-low-672 | 25.2675 | 5.6645 | 161/168 | 103/168 | 2/168 | 162/168 | 16/20 |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 4 |
+| MT winner changes to UV+E2-low-672 | 16 |
+| MT winner changes to CNN | 0 |
+
+MT winner distribution after adding UV+E2-low-672:
+
+| Method | MT wins |
+|---|---:|
+| UV+E2-low-672 | 101 |
+| CNN | 63 |
+| GAN | 4 |
+
+### XVII.6 Interpretation
+
+Priority 4 is complete.
+
+Main conclusions:
+
+1. Candidate B is not necessary for repaired E2 to produce an MT signal.
+2. UV+E2-low-672 improves mean MT relative to CNN (`5.6645` vs `5.8678`) and gives the strongest 672-scale MT mean among the repaired native TensorFlow/PhIRE E2 variants.
+3. UV+E2-low-672 also improves the component-count proxy strongly (`83.8552` vs CNN `115.5278`).
+4. Candidate B/C scalar scaffold terms still appear helpful for PD: UV+E2-low-672 has weaker PD than B+E2-low-672 and C+E2-low-672.
+5. The repaired fixed-index TTK loss is therefore a genuine MT-oriented training signal, not merely a side effect of Candidate B's speed/gradient/level-set losses.
+
+## XVIII. Priority 5 complete: UV+crit-672
+
+Priority 5 tested Candidate C's high-speed local-maxima / critical-value proxy without Candidate B's scalar-speed, gradient, and level-set scaffold.
+
+### XVIII.1 Scientific question
+
+The question was:
+
+> Can Candidate C's local-maxima / critical-value proxy produce a topology-relevant training signal when the only other loss is normalized vector reconstruction?
+
+This ablation removes all Candidate B scalar proxy terms and all repaired E2 fixed-index TTK terms. It keeps only `L_uv + 0.001 L_crit`.
+
+### XVIII.2 Objective and disabled terms
+
+Native TensorFlow/PhIRE objective:
+
+$$
+L_{\mathrm{UV+crit}} =
+L_{uv}
++ 0.001L_{\mathrm{crit}}.
+$$
+
+Disabled terms:
+
+- `L_speed = 0`
+- `L_grad = 0`
+- `L_levelset = 0`
+- `L_TTKCV = 0`
+- `L_TTKpers = 0`
+
+### XVIII.3 Reconstruction anchors and file inventory
+
+| Artifact | Path / name |
+|---|---|
+| Script | `scripts/run_candidateUV_plus_crit_expanded672_refiner.py` |
+| Method name | `candidateUV_plus_crit_expanded672` |
+| Training TFRecord | `example_data_topology_expanded_672/wind_MR-HR.tfrecord` |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` |
+| Source checkpoint | `models/wind_mr-hr/trained_cnn/cnn` |
+| Log file | `logs/wind_finetune_candidateUV_plus_crit_expanded672.log` |
+| Manual run log | `logs/wind_finetune_candidateUV_plus_crit_expanded672_manual.log` |
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded672/` |
+| Final checkpoint | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded672/cnn/cnn` |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/` |
+| SR output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/dataSR.npy` |
+| GT output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/dataGT.npy` |
+| LR/MR input output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/dataIN.npy` |
+| Sample index output | `data_out/wind_finetune_candidateUV_plus_crit_expanded672/idx.npy` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/` |
+| Cheap eval all-sample metrics | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/all_sample_metrics_candidateUV_plus_crit_expanded672.csv` |
+| Cheap eval pairwise table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/pairwise_cnn_vs_candidateUV_plus_crit_expanded672.csv` |
+| Cheap eval winner counts | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/winner_counts_candidateUV_plus_crit_expanded672.csv` |
+| Adjacent-cluster table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_eval/adjacent_cluster_table_candidateUV_plus_crit_expanded672.csv` |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded672_eval.md` |
+| Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology_vti/` |
+| Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/` |
+| PD/MT per-sample distances | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/candidateUV_plus_crit_expanded672_pd_mt_distances.csv` |
+| Three-way topology comparison | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/candidateUV_plus_crit_expanded672_topology_comparison.csv` |
+| Phase-C distance summary | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded672_topology/phase_c_final/phase_c_results.csv` |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded672_topology_eval.md` |
+
+### XVIII.4 Training and paired inference validation
+
+Training completed and wrote the final checkpoint:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded672/cnn/cnn
+```
+
+Paired inference on the fixed 168-sample benchmark completed successfully. Output validation passed:
+
+| Output | Expected shape | Status |
+|---|---:|---|
+| `idx.npy` | `(168,)` | OK |
+| `dataIN.npy` | `(168, 100, 100, 2)` | OK |
+| `dataGT.npy` | `(168, 500, 500, 2)` | OK |
+| `dataSR.npy` | `(168, 500, 500, 2)` | OK |
+
+`idx.npy` was exactly `0..167`.
+
+### XVIII.5 Cheap scalar/domain evaluation
+
+Summary metrics:
+
+| Metric | CNN | GAN | UV+crit-672 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **33.1536** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5385** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9093** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **176.0295** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **27.2570** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **12.0790** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3296** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.2439 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.9691** |
+| PSD log-L2 | 0.8335 | **0.5139** | 1.0670 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.3543 |
+| Exceedance abs Δ s>5 | **0.0042** | 0.0082 | 0.0091 |
+| Exceedance abs Δ s>10 | **0.0066** | 0.0243 | 0.0081 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0024** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0027** |
+| Component-count curve L1 | **115.5278** | 124.6567 | 133.9722 |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 150 | 18 |
+| WPD bias abs | 151 | 17 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 56 | 112 |
+| Gradient kurtosis abs Δ | 87 | 81 |
+| PSD log-L2 | 0 | 168 |
+| PSD slope abs Δ | 0 | 168 |
+| Exceedance abs Δ s>5 | 5 | 163 |
+| Exceedance abs Δ s>10 | 81 | 86 |
+| Exceedance abs Δ s>15 | 133 | 35 |
+| Exceedance abs Δ p90 | 147 | 21 |
+| Component-count curve L1 | 9 | 158 |
+
+The cheap evaluation was mixed. UV+crit-672 strongly improved direct fidelity and scalar/WPD magnitude metrics, but worsened PSD metrics, low-threshold exceedance, and component-count behavior.
+
+### XVIII.6 True TTK topology evaluation
+
+The true TTK topology pipeline completed successfully:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+crit-672 | 29.4764 | 5.9217 | 8/168 | 65/168 | 0/168 | 149/168 | 7/20 |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 13 |
+| MT winner changes to UV+crit-672 | 7 |
+| MT winner changes to CNN | 0 |
+
+MT winner distribution after adding UV+crit-672:
+
+| Method | MT wins |
+|---|---:|
+| UV+crit-672 | 58 |
+| CNN | 97 |
+| GAN | 13 |
+
+PD winner distribution after adding UV+crit-672 remained CNN 2 and GAN 166; UV+crit-672 did not become the PD winner on any sample.
+
+### XVIII.7 Interpretation
+
+Priority 5 is complete.
+
+Main conclusions:
+
+1. `L_crit` alone does not reproduce Candidate C's PD improvement. UV+crit-672 is worse than CNN on mean PD (`29.4764` vs `27.4063`) and improves over CNN on only `8/168` samples.
+2. Candidate C's strong 672-scale PD behavior therefore appears to require Candidate B's scalar-speed, gradient, and level-set scaffold.
+3. UV+crit-672 slightly improves over UV-only on MT (`5.9217` vs `6.2891`) and recovers `7/20` original MT-GAN cases, but it does not beat CNN on mean MT.
+4. The cheap component-count result predicted this weakness: component-count L1 worsened from CNN `115.5278` to UV+crit `133.9722`, improving on only `9/168` samples.
+5. This sharply contrasts with Priority 4: UV+E2-low-672 showed that repaired fixed-index TTK supervision can drive an MT signal without Candidate B, while UV+crit-672 shows that the local-maxima proxy alone is not enough for robust PD or MT improvement.
+
+## XIX. Robustness scale-up plan: UV+E2-low and UV+crit at 1344 and 2688 samples
+
+After completing Priorities 4 and 5 at 672 samples, the next robustness check is to scale both ablations to the larger 1344- and 2688-sample training sets.
+
+### XIX.1 Scientific motivation
+
+The 672-sample results suggest two complementary findings:
+
+1. `UV+E2-low-672` shows repaired TTK fixed-index losses can drive an MT signal without Candidate B.
+2. `UV+crit-672` shows Candidate C's `L_crit` alone does not reproduce Candidate C's PD improvement.
+
+Scaling both families to 1344 and 2688 samples tests whether these findings are stable or whether either ablation is data-scale sensitive.
+
+### XIX.2 Planned scale-up matrix
+
+| Family | 672 result | 1344 status | 2688 status | Main question |
+|---|---|---|---|---|
+| UV+E2-low | complete; MT-strong | **complete; MT-strong** | **complete; MT-strong** | Repaired E2 alone remains MT-effective and improves with scale. |
+| UV+crit | complete; topology-weak despite strong fidelity | complete; PD-weak, modest MT improvement | **complete; PD-weak, stronger but limited MT improvement** | `L_crit` alone remains insufficient for PD, but MT improves with scale. |
+
+### XIX.3 Planned UV+E2-low scale-up reconstruction anchors
+
+| Scale | Artifact | Planned path / name |
+|---:|---|---|
+| 1344 | Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` |
+| 1344 | Method name | `candidateUV_plus_E2_tf_lowlambda_expanded1344` |
+| 1344 | Training TFRecord | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` |
+| 1344 | Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 1344 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| 1344 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| 1344 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/` |
+| 1344 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_vti/` |
+| 1344 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/` |
+| 1344 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_eval.md` |
+| 1344 | Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_eval.md` |
+| 2688 | Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` |
+| 2688 | Method name | `candidateUV_plus_E2_tf_lowlambda_expanded2688` |
+| 2688 | Training TFRecord | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` |
+| 2688 | Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| 2688 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| 2688 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| 2688 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_eval/` |
+| 2688 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_vti/` |
+| 2688 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/` |
+| 2688 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_eval.md` |
+| 2688 | Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_eval.md` |
+
+Planned UV+E2-low objective at both scales:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++0.004L_{\mathrm{TTKCV}}
++0.002L_{\mathrm{TTKpers}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_crit=0`.
+
+### XIX.4 Planned UV+crit scale-up reconstruction anchors
+
+| Scale | Artifact | Planned path / name |
+|---:|---|---|
+| 1344 | Script | `scripts/run_candidateUV_plus_crit_expanded1344_refiner.py` |
+| 1344 | Method name | `candidateUV_plus_crit_expanded1344` |
+| 1344 | Training TFRecord | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` |
+| 1344 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_eval/` |
+| 1344 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology_vti/` |
+| 1344 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology/` |
+| 1344 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_eval.md` |
+| 1344 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_topology_eval.md` |
+| 2688 | Script | `scripts/run_candidateUV_plus_crit_expanded2688_refiner.py` |
+| 2688 | Method name | `candidateUV_plus_crit_expanded2688` |
+| 2688 | Training TFRecord | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` |
+| 2688 | Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_eval/` |
+| 2688 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology_vti/` |
+| 2688 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology/` |
+| 2688 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_eval.md` |
+| 2688 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_topology_eval.md` |
+
+Planned UV+crit objective at both scales:
+
+$$
+L_{\mathrm{UV+crit}} =
+L_{uv}
++0.001L_{\mathrm{crit}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_TTKCV=L_TTKpers=0`.
+
+### XIX.5 Expected interpretation after scaling
+
+| Outcome | Interpretation |
+|---|---|
+| UV+E2-low remains MT-strong at 1344/2688 | Repaired fixed-index TTK supervision is robustly MT-oriented without Candidate B |
+| UV+E2-low weakens at scale | Candidate B may stabilize E2 when training data become more diverse |
+| UV+crit remains topology-weak at 1344/2688 | Candidate C's PD gains require Candidate B's scalar scaffold |
+| UV+crit improves substantially at 1344/2688 | `L_crit` may be data-scale sensitive and should be reconsidered as a standalone local-extrema signal |
+
+---
+
+## XX. UV+E2-low-1344 scale-up complete
+
+This section records the completed 1344-sample scale-up of the UV+E2-low ablation. It updates the Part XIX robustness plan with the first completed larger-scale run.
+
+### XX.1 Scientific question
+
+The question was:
+
+> Does repaired E2 fixed-index TTK supervision remain MT-effective without Candidate B's scalar-speed, gradient, and level-set scaffold when the training set is increased from 672 to 1344 samples?
+
+The objective was unchanged from UV+E2-low-672:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++0.004L_{\mathrm{TTKCV}}
++0.002L_{\mathrm{TTKpers}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_crit=0`.
+
+### XX.2 Reconstruction anchors and file inventory
+
+| Artifact | Path / name |
+|---|---|
+| Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded1344_ttkcrit_refiner.py` |
+| Method name | `candidateUV_plus_E2_tf_lowlambda_expanded1344` |
+| Training TFRecord | `example_data_topology_expanded_1344/wind_MR-HR.tfrecord` |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` |
+| Source checkpoint | `models/wind_mr-hr/trained_cnn/cnn` |
+| Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded1344_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| Log file | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344.log` |
+| Manual run log | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344_manual.log` |
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| Final checkpoint | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/cnn/cnn` |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/` |
+| SR output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/dataSR.npy` |
+| GT output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/dataGT.npy` |
+| LR/MR input output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/dataIN.npy` |
+| Sample index output | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/idx.npy` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/` |
+| Cheap eval all-sample metrics | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/all_sample_metrics_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Cheap eval pairwise table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/pairwise_cnn_vs_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Cheap eval winner counts | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/winner_counts_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Adjacent-cluster table | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_eval/adjacent_cluster_table_candidateUV_plus_E2_tf_lowlambda_expanded1344.csv` |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_eval.md` |
+| Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_vti/` |
+| Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/` |
+| Phase-C distance summary | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/phase_c_final/phase_c_results.csv` |
+| Three-way topology comparison | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology/candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_comparison.csv` |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded1344_topology_eval.md` |
+
+### XX.3 Training and paired inference validation
+
+Training completed and wrote the final checkpoint:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded1344/cnn/cnn
+```
+
+Paired inference on the fixed 168-sample benchmark completed successfully. Output validation passed:
+
+| Output | Expected shape | Status |
+|---|---:|---|
+| `idx.npy` | `(168,)` | OK |
+| `dataIN.npy` | `(168, 100, 100, 2)` | OK |
+| `dataGT.npy` | `(168, 500, 500, 2)` | OK |
+| `dataSR.npy` | `(168, 500, 500, 2)` | OK |
+
+`idx.npy` was exactly `0..167`.
+
+### XX.4 Cheap scalar/domain evaluation
+
+Summary metrics:
+
+| Metric | CNN | GAN | UV+E2-low-1344 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.1573** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.6118** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **1.0235** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **200.2107** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **22.7899** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **18.5849** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3226** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1572 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **2.8830** |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.8099 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.0799 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0025** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0040** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0024** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0044** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **88.8442** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 154 | 14 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 140 | 28 |
+| WPD bias abs | 124 | 44 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 161 | 7 |
+| Gradient kurtosis abs Δ | 83 | 85 |
+| Exceedance abs Δ s>5 | 122 | 46 |
+| Exceedance abs Δ s>10 | 106 | 62 |
+| Exceedance abs Δ s>15 | 127 | 41 |
+| Exceedance abs Δ p90 | 134 | 34 |
+| Component-count curve L1 | 156 | 12 |
+
+The cheap evaluation was healthy enough to justify the true TTK topology pipeline.
+
+### XX.5 True TTK topology evaluation
+
+The true TTK topology pipeline completed successfully:
+
+| Output type | Count |
+|---|---:|
+| VTI files | 336 |
+| PD files | 336 |
+| MT port0 | 336 |
+| MT port1 | 336 |
+| MT port2 | 336 |
+
+The final true topology result was:
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+E2-low-1344 | 25.1566 | **5.6300** | 158/168 | 105/168 | 2/168 | 165/168 | **18/20** |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 2 |
+| MT winner changes to UV+E2-low-1344 | 18 |
+| MT winner changes to CNN | 0 |
+
+Winner distributions after adding UV+E2-low-1344:
+
+| Metric | CNN wins | GAN wins | UV+E2-low-1344 wins |
+|---|---:|---:|---:|
+| PD | 2 | 165 | 1 |
+| MT | 62 | 2 | 104 |
+
+### XX.6 Interpretation
+
+Main conclusions:
+
+1. UV+E2-low-1344 strengthens the Priority 4 conclusion. Repaired E2 fixed-index supervision remains MT-effective without Candidate B at a larger training scale.
+2. UV+E2-low-1344 improves mean MT from CNN `5.8678` to `5.6300`, beats CNN on MT in `105/168` samples, beats GAN on MT in `165/168` samples, and recovers `18/20` original MT-GAN cases.
+3. UV+E2-low-1344 is the strongest mean-MT native TensorFlow repaired-E2 result so far, improving on B+E2-low-1344 (`5.6514`) and C+E2-low-1344 (`5.7479`) on mean MT.
+4. The result remains descriptor-specific: Candidate C-1344 is much stronger on mean PD (`22.8623` vs UV+E2-low-1344 `25.1566`), while UV+E2-low-1344 is much stronger on mean MT (`5.6300` vs Candidate C-1344 `6.1236`).
+5. Running UV+E2-low-2688 is scientifically worthwhile for consistency and for determining whether the UV+E2 MT signal saturates, weakens, or continues improving with scale.
+
+---
+
+
+## XXI. UV+E2-low-2688 scale-up complete
+
+This section records the completed 2688-sample UV+E2-low scale-up, including training, paired inference, cheap scalar/domain evaluation, and true TTK topology evaluation.
+
+### XXI.1 Goal
+
+This run extends the UV+E2-low ablation from 672 and 1344 training samples to 2688 training samples, using the same objective:
+
+$$
+L_{\mathrm{UV+E2}} =
+L_{uv}
++ 0.004L_{\mathrm{TTKCV}}
++ 0.002L_{\mathrm{TTKpers}},
+$$
+
+with `L_speed=L_grad=L_levelset=L_crit=0`.
+
+The question is whether repaired fixed-index TTK supervision remains MT-oriented without Candidate B's scalar scaffold at the largest expanded training scale.
+
+### XXI.2 Reconstruction anchors and file names
+
+| Artifact type | Path |
+|---|---|
+| Script | `scripts/run_candidateUV_plus_E2_tf_lowlambda_expanded2688_ttkcrit_refiner.py` |
+| Method name | `candidateUV_plus_E2_tf_lowlambda_expanded2688` |
+| Training TFRecord | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` |
+| Evaluation TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` |
+| Constraints NPZ | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| Model output dir | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/` |
+| Training/inference log | `logs/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688.log` |
+| Cheap eval output dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_eval/` |
+| Cheap eval report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_eval.md` |
+| Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_vti/` |
+| Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/` |
+| Topology report | `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_eval.md` |
+
+### XXI.3 Training and paired inference status
+
+Training and paired inference completed successfully. The final checkpoint and output arrays were:
+
+- final checkpoint: `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/cnn/cnn`
+- SR outputs: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataSR.npy`
+- GT outputs: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataGT.npy`
+- LR inputs: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataIN.npy`
+- sample indices: `data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/idx.npy`
+
+Validation status:
+
+| Output | Expected / observed |
+|---|---|
+| `idx.npy` | `(168,)`, exactly `0..167` |
+| `dataIN.npy` | `(168, 100, 100, 2)` |
+| `dataGT.npy` | `(168, 500, 500, 2)` |
+| `dataSR.npy` | `(168, 500, 500, 2)` |
+
+### XXI.4 Cheap scalar/domain evaluation
+
+The cheap scalar/domain evaluation completed and was healthy.
+
+| Metric | CNN | GAN | UV+E2-low-2688 |
+|---|---:|---:|---:|
+| PSNRuv (dB) | 31.1925 | 29.1380 | **32.5752** |
+| Speed MAE (m/s) | 0.6941 | 0.9026 | **0.5789** |
+| Speed RMSE (m/s) | 1.1078 | 1.3775 | **0.9773** |
+| WPD MAE (m^3/s^3) | 231.6709 | 310.7328 | **187.6210** |
+| WPD Wasserstein-1 | 45.2713 | 85.6191 | **21.2812** |
+| WPD bias abs (m^3/s^3) | 35.3439 | 78.7236 | **17.1101** |
+| Gradient MAE | 0.3491 | 0.3806 | **0.3181** |
+| Gradient W1 | 0.2329 | **0.0564** | 0.1694 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.2010 | **3.2223** |
+| PSD log-L2 | 0.8335 | **0.5139** | 0.8378 |
+| PSD slope abs Δ | **0.9150** | 0.9482 | 1.1206 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0082 | **0.0025** |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0243 | **0.0035** |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0096 | **0.0025** |
+| Exceedance abs Δ p90 | 0.0103 | 0.0123 | **0.0037** |
+| Component-count curve L1 | 115.5278 | 124.6567 | **97.1538** |
+
+Pairwise against CNN:
+
+| Metric | Improved / 168 | Worsened / 168 |
+|---|---:|---:|
+| PSNRuv | 168 | 0 |
+| Speed MAE | 168 | 0 |
+| Speed RMSE | 168 | 0 |
+| WPD MAE | 168 | 0 |
+| WPD W1 | 152 | 16 |
+| WPD bias abs | 143 | 25 |
+| Gradient MAE | 168 | 0 |
+| Gradient W1 | 159 | 9 |
+| Gradient kurtosis abs Δ | 80 | 88 |
+| Exceedance abs Δ s>5 | 121 | 47 |
+| Exceedance abs Δ s>10 | 132 | 36 |
+| Exceedance abs Δ s>15 | 141 | 27 |
+| Exceedance abs Δ p90 | 144 | 24 |
+| Component-count curve L1 | 154 | 14 |
+
+### XXI.5 TTK topology result
+
+The TTK topology pipeline completed and wrote the expected topology artifacts:
+
+- VTI files: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_vti/`
+- TTK outputs: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/`
+- distances: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/phase_c_final/phase_c_results.csv`
+- comparison: `ttk_runs_fixed/topology_finetuning/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology/candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_comparison.csv`
+- report: `docs/topology_finetuning_candidateUV_plus_E2_tf_lowlambda_expanded2688_topology_eval.md`
+
+The corrected report extraction confirmed the report header and method name correspond to `candidateUV_plus_E2_tf_lowlambda_expanded2688`.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 | -- | -- | -- | -- | -- |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | -- | -- | -- |
+| UV+E2-low-2688 | 25.0721 | **5.5940** | 160/168 | 104/168 | 2/168 | **166/168** | **18/20** |
+
+Mean deltas relative to CNN:
+
+| Metric | CNN | UV+E2-low-2688 | Δ | Direction |
+|---|---:|---:|---:|---|
+| PD distance | 27.4063 | 25.0721 | -2.3342 | better |
+| MT distance | 5.8678 | 5.5940 | -0.2738 | better |
+
+Original MT-GAN cases:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 2 |
+| MT winner changes to UV+E2-low-2688 | 18 |
+| MT winner changes to CNN | 0 |
+
+Winner distributions after adding UV+E2-low-2688:
+
+| Metric | CNN wins | GAN wins | UV+E2-low-2688 wins |
+|---|---:|---:|---:|
+| PD | 2 | 165 | 1 |
+| MT | 64 | 2 | 102 |
+
+### XXI.6 Final UV+E2-low scale ladder
+
+| Scale | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN cases recovered | MT winners after adding candidate |
+|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 672 | 25.2675 | 5.6645 | 161/168 | 103/168 | 2/168 | 162/168 | 16/20 | UV+E2 101 / CNN 63 / GAN 4 |
+| 1344 | 25.1566 | 5.6300 | 158/168 | 105/168 | 2/168 | 165/168 | 18/20 | UV+E2 104 / CNN 62 / GAN 2 |
+| 2688 | **25.0721** | **5.5940** | 160/168 | 104/168 | 2/168 | **166/168** | **18/20** | UV+E2 102 / CNN 64 / GAN 2 |
+
+### XXI.7 Interpretation
+
+1. UV+E2-low-2688 completes the UV+E2 scale ladder and confirms that repaired fixed-index TTK supervision remains MT-effective without Candidate B at the largest expanded training scale.
+2. Mean MT improves monotonically with training scale: `5.6645` at 672, `5.6300` at 1344, and `5.5940` at 2688.
+3. UV+E2-low-2688 is the strongest mean-MT native TensorFlow repaired-E2 result so far, improving over B+E2-low-2688 (`5.6774`) and C+E2-low-2688 (`5.6628`) on mean MT.
+4. The result remains descriptor-specific: Candidate C-2688 is much stronger on mean PD (`22.4944` vs UV+E2-low-2688 `25.0721`), while UV+E2-low-2688 is much stronger on mean MT (`5.5940` vs Candidate C-2688 `6.0803`).
+5. The UV+crit ladder is now complete. UV+crit remains PD-weak at all scales but gives an increasingly strong, still limited MT improvement as training scale increases.
+
+---
+
+# Part XXII — UV+crit scale ladder completion
+
+This part records the completed native TensorFlow/PhIRE UV+crit scale-up runs. These runs test Candidate C's high-speed local-maxima / critical-value proxy in isolation from Candidate B's scalar-speed, gradient, and level-set scaffold.
+
+## XXII.1 Objective and disabled losses
+
+The UV+crit objective at both 1344 and 2688 samples is:
+
+```text
+L_total = L_uv + 0.001 L_crit
+```
+
+Disabled terms:
+
+```text
+L_speed = 0
+L_grad = 0
+L_levelset = 0
+L_wpd = 0
+L_TTKCV = 0
+L_TTKpers = 0
+```
+
+This means the runs are not repaired-E2 runs and use no fixed-index TTK constraint NPZ. They use the standard native PhIRE `pretrain()` path with normalized vector `L_uv` and Candidate C's local-maxima proxy computed on denormalized scalar speed.
+
+## XXII.2 Reconstruction anchors
+
+| Scale | Artifact | Path |
+|---:|---|---|
+| 1344 | Script | `scripts/run_candidateUV_plus_crit_expanded1344_refiner.py` |
+| 1344 | Model directory | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded1344/` |
+| 1344 | Cheap eval dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_eval/` |
+| 1344 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology_vti/` |
+| 1344 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded1344_topology/` |
+| 1344 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_eval.md` |
+| 1344 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded1344_topology_eval.md` |
+| 2688 | Script | `scripts/run_candidateUV_plus_crit_expanded2688_refiner.py` |
+| 2688 | Model directory | `models_fixed/topology_finetuning/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Paired inference output dir | `data_out/wind_finetune_candidateUV_plus_crit_expanded2688/` |
+| 2688 | Cheap eval dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_eval/` |
+| 2688 | Topology VTI dir | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology_vti/` |
+| 2688 | Topology output base | `ttk_runs_fixed/topology_finetuning/candidateUV_plus_crit_expanded2688_topology/` |
+| 2688 | Cheap eval report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_eval.md` |
+| 2688 | Topology report | `docs/topology_finetuning_candidateUV_plus_crit_expanded2688_topology_eval.md` |
+
+For both scales, paired inference output validation confirmed the expected fixed-benchmark output structure:
+
+```text
+idx.npy:    (168,), exactly 0..167
+dataIN.npy: (168, 100, 100, 2)
+dataGT.npy: (168, 500, 500, 2)
+dataSR.npy: (168, 500, 500, 2)
+```
+
+## XXII.3 Cheap-evaluation summary
+
+| Metric | CNN | UV+crit-1344 | UV+crit-2688 | Interpretation |
+|---|---:|---:|---:|---|
+| PSNRuv | 31.1925 | 33.3888 | **33.6552** | improves strongly with scale |
+| Speed MAE | 0.6941 | 0.5218 | **0.5038** | improves strongly |
+| Speed RMSE | 1.1078 | 0.8902 | **0.8667** | improves strongly |
+| WPD MAE | 231.6709 | 170.1947 | **163.0417** | improves strongly |
+| WPD W1 | 45.2713 | 25.8500 | **21.8276** | improves strongly |
+| WPD bias abs | 35.3439 | 17.8387 | **14.0303** | improves strongly |
+| Gradient MAE | 0.3491 | 0.3229 | **0.3184** | improves |
+| Gradient W1 | 0.2329 | 0.2335 | **0.2295** | slight improvement at 2688 |
+| Gradient kurtosis abs Δ | 3.7004 | 4.6949 | 6.3798 | worsens |
+| PSD log-L2 | 0.8335 | 1.0568 | 1.0504 | worse than CNN |
+| PSD slope abs Δ | 0.9150 | 1.3842 | 1.3937 | worse than CNN |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0081 | 0.0077 | worse than CNN |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0082 | 0.0066 | roughly tied at 2688 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0020 | **0.0017** | improves |
+| Exceedance abs Δ p90 | 0.0103 | 0.0024 | **0.0022** | improves |
+| Component-count curve L1 | 115.5278 | 132.1756 | 133.6042 | worse than CNN |
+
+The cheap-evaluation pattern is consistent across UV+crit scales: direct fidelity and scalar magnitude metrics improve substantially, but topology-proxy metrics related to threshold-set organization remain poor. The component-count curve L1 remains worse than CNN at both 1344 and 2688.
+
+## XXII.4 True TTK topology summary
+
+Lower is better for both PD bottleneck distance and MT Wasserstein-type distance.
+
+| Method | PD mean ↓ | MT mean ↓ | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovered | MT winners after adding candidate |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| UV+crit-672 | 29.4764 | 5.9217 | 8/168 | 65/168 | 0/168 | 149/168 | 7/20 | UV+crit 58 / CNN 97 / GAN 13 |
+| UV+crit-1344 | 29.1410 | 5.7733 | 10/168 | 81/168 | 0/168 | 156/168 | 11/20 | UV+crit 76 / CNN 83 / GAN 9 |
+| UV+crit-2688 | 29.1143 | 5.6899 | 12/168 | 94/168 | 0/168 | 160/168 | 13/20 | UV+crit 90 / CNN 71 / GAN 7 |
+
+Original MT-GAN case outcomes for UV+crit-2688:
+
+| Outcome | Count |
+|---|---:|
+| MT winner stays GAN | 7 |
+| MT winner changes to UV+crit-2688 | 13 |
+| MT winner changes to CNN | 0 |
+
+Winner distributions after adding UV+crit-2688:
+
+| Metric | CNN wins | GAN wins | UV+crit-2688 wins |
+|---|---:|---:|---:|
+| PD | 2 | 166 | 0 |
+| MT | 71 | 7 | 90 |
+
+## XXII.5 Interpretation
+
+1. `L_crit` alone does **not** reproduce Candidate C's PD behavior. Across 672, 1344, and 2688 samples, UV+crit remains worse than CNN on mean PD and never beats GAN on PD.
+2. `L_crit` alone has a scale-dependent MT signal. Mean MT improves monotonically from `5.9217` to `5.7733` to `5.6899`, and MT<CNN improves from `65/168` to `81/168` to `94/168`.
+3. The MT signal is still weaker than repaired fixed-index TTK supervision. UV+E2-low-2688 reaches mean MT `5.5940` and recovers `18/20` MT-GAN cases, while UV+crit-2688 reaches mean MT `5.6899` and recovers `13/20`.
+4. The completed UV+crit ladder supports the ablation conclusion that Candidate C's PD gains depend on combining the Candidate B scalar-speed / gradient / level-set scaffold with `L_crit`. The local-maxima proxy alone mainly improves fidelity and gives only limited merge-tree benefit at larger scale.
+
+---
+
+# Part XXIII — Superlevel filtration robustness evaluation
+
+## XXIII.1 Scientific question
+
+The main repaired topology evaluations used TTK's default sublevel convention on scalar wind speed. Because several of the topology-inspired training terms were motivated in high-speed / superlevel language, a separate robustness audit was run to test whether the conclusions change when evaluating the superlevel topology of speed.
+
+The audit question was:
+
+> Are the Candidate C, repaired E2, UV+E2, and UV+crit conclusions stable if high-speed superlevel topology is evaluated directly?
+
+## XXIII.2 Method and artifact isolation
+
+Superlevel topology of speed `s` was evaluated as sublevel topology of `-s`.
+
+Implementation details:
+
+- the scalar array written to VTI was named `wind_speed`, but stored `-sqrt(u^2+v^2)`;
+- the same unmodified TTK command-line tools were used:
+  - `ttkPersistenceDiagramCmd`
+  - `ttkMergeTreeCmd`
+  - `ttkBottleneckDistance`
+  - `ttkMergeTreeDistanceMatrix`
+- no model was retrained;
+- no existing sublevel/default topology outputs were overwritten;
+- no candidate `data_out*/` or `models*/` artifacts were modified;
+- all outputs were isolated under:
+
+```text
+ttk_runs_fixed/superlevel_topology/
+```
+
+Final superlevel report:
+
+```text
+docs/superlevel_topology_robustness_eval.md
+```
+
+Combined output files:
+
+```text
+ttk_runs_fixed/superlevel_topology/superlevel_pd_mt_per_sample.csv
+ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method.csv
+ttk_runs_fixed/superlevel_topology/superlevel_winner_comparison.csv
+```
+
+## XXIII.3 Completed methods and validation status
+
+The superlevel audit completed for the following seven methods:
+
+| Method | Role |
+|---|---|
+| `cnn` | pretrained CNN baseline |
+| `gan` | pretrained GAN baseline |
+| `candidateC_expanded2688` | submitted Candidate C scale-up |
+| `candidateB_plus_E2_tf_lowlambda_expanded2688` | B+E2-low, no `L_crit` |
+| `candidateE2_tf_lowlambda_expanded2688` | C+E2-low |
+| `candidateUV_plus_E2_tf_lowlambda_expanded2688` | UV+E2-low |
+| `candidateUV_plus_crit_expanded2688` | UV+crit |
+
+Final checklist status:
+
+- every method had 168 per-sample distance rows;
+- every method had complete VTI/PD/MT outputs;
+- each method had `336` VTI files, `336` PD files, and `336` outputs for each MT port;
+- the winner CSV had 168 rows;
+- the run completed with all checks passed.
+
+## XXIII.4 Mean PD / MT by method under superlevel evaluation
+
+Lower is better for both PD bottleneck distance and MT Wasserstein-type distance.
+
+| Method | PD mean superlevel ↓ | MT mean superlevel ↓ | PD mean sublevel ↓ | MT mean sublevel ↓ | ΔPD (super - sub) | ΔMT (super - sub) |
+|---|---:|---:|---:|---:|---:|---:|
+| CNN baseline | 27.3762 | 5.3231 | 27.4063 | 5.8678 | -0.0301 | -0.5447 |
+| GAN baseline | 20.7168 | 7.8397 | 20.8641 | 8.3481 | -0.1473 | -0.5084 |
+| Candidate C-2688 | 22.4417 | 5.3578 | 22.4944 | 6.0803 | -0.0527 | -0.7225 |
+| B+E2-low-2688 | 24.1042 | 4.9998 | 23.9876 | 5.6774 | +0.1166 | -0.6776 |
+| C+E2-low-2688 | 24.3811 | 4.9796 | 24.2686 | 5.6628 | +0.1125 | -0.6832 |
+| UV+E2-low-2688 | 25.1923 | 4.9522 | 25.0721 | 5.5940 | +0.1202 | -0.6418 |
+| UV+crit-2688 | 29.0752 | 5.0875 | 29.1143 | 5.6899 | -0.0391 | -0.6024 |
+
+## XXIII.5 Superlevel wins relative to CNN and GAN
+
+| Method | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovered |
+|---|---:|---:|---:|---:|---:|
+| CNN baseline | -- | -- | -- | -- | -- |
+| GAN baseline | 166/168 | 23/168 | -- | -- | -- |
+| Candidate C-2688 | 168/168 | 72/168 | 19/168 | 151/168 | 14/23 |
+| B+E2-low-2688 | 165/168 | 110/168 | 6/168 | 165/168 | 23/23 |
+| C+E2-low-2688 | 164/168 | 112/168 | 5/168 | 166/168 | 23/23 |
+| UV+E2-low-2688 | 160/168 | 120/168 | 0/168 | 168/168 | 23/23 |
+| UV+crit-2688 | 13/168 | 104/168 | 0/168 | 157/168 | 13/23 |
+
+The superlevel MT-GAN baseline set contained 23 samples where GAN beat CNN on superlevel MT:
+
+```text
+[6, 8, 16, 17, 18, 19, 20, 22, 25, 62, 63, 65, 66, 70, 77, 79, 80, 82, 83, 88, 89, 90, 122]
+```
+
+## XXIII.6 Superlevel winner distributions
+
+### PD winner distribution
+
+| Method | PD wins |
+|---|---:|
+| GAN baseline | 149 |
+| Candidate C-2688 | 19 |
+
+### MT winner distribution
+
+| Method | MT wins |
+|---|---:|
+| UV+E2-low-2688 | 43 |
+| C+E2-low-2688 | 34 |
+| UV+crit-2688 | 31 |
+| B+E2-low-2688 | 30 |
+| CNN baseline | 27 |
+| Candidate C-2688 | 3 |
+
+## XXIII.7 Interpretation
+
+### Candidate C
+
+The change from sublevel to superlevel evaluation does **not** materially change the Candidate C ablation story.
+
+Candidate C-2688 remains the strongest fine-tuned CNN-family method for PD:
+
+- sublevel PD mean: `22.4944`;
+- superlevel PD mean: `22.4417`;
+- change: `-0.0527`, effectively negligible relative to the method gaps;
+- superlevel `PD < CNN`: `168/168`;
+- superlevel `PD beats GAN`: `19/168`;
+- superlevel PD winner distribution: Candidate C wins `19` samples, GAN wins `149`.
+
+Thus, the high-speed/superlevel interpretation of Candidate C is consistent with the original sublevel evaluation. Candidate C's PD gain is not an artifact of using the default sublevel filtration.
+
+For MT, Candidate C improves in absolute superlevel MT distance relative to its sublevel MT distance (`6.0803 -> 5.3578`), but it is still not the strongest MT method. Under superlevel MT, Candidate C is close to the CNN mean (`5.3578` vs CNN `5.3231`), beats CNN on `72/168` samples, and recovers `14/23` superlevel MT-GAN cases. This supports the same descriptor-specific interpretation as before: Candidate C is primarily PD-oriented, with only partial MT benefit.
+
+### Repaired E2 / fixed-index TTK supervision
+
+The repaired E2-family results become, if anything, **stronger** under the superlevel MT evaluation.
+
+All three native TF E2-family variants improve mean MT over CNN:
+
+- B+E2-low-2688: `4.9998` vs CNN `5.3231`;
+- C+E2-low-2688: `4.9796` vs CNN `5.3231`;
+- UV+E2-low-2688: `4.9522` vs CNN `5.3231`.
+
+They also recover all `23/23` cases where GAN beats CNN on superlevel MT. This is stronger than the sublevel MT-GAN recovery counts because the superlevel GAN-favored set is different (`23` samples rather than the earlier sublevel `20` samples), but the conclusion is stable: repaired TTK fixed-index supervision is strongly merge-tree-oriented.
+
+The PD behavior of the E2-family methods changes only slightly. Their superlevel PD means are about `+0.11` to `+0.12` worse than their sublevel PD means, but the qualitative conclusion is unchanged: E2 improves PD over CNN but does not replace Candidate C as the best PD-oriented fine-tuning objective.
+
+### UV+crit
+
+UV+crit-2688 remains PD-weak under superlevel evaluation:
+
+- superlevel PD mean: `29.0752`, worse than CNN's `27.3762`;
+- superlevel `PD < CNN`: `13/168`;
+- superlevel `PD beats GAN`: `0/168`.
+
+However, UV+crit keeps a real MT signal:
+
+- superlevel MT mean: `5.0875`, better than CNN's `5.3231`;
+- superlevel `MT < CNN`: `104/168`;
+- superlevel MT-GAN recovery: `13/23`.
+
+This is consistent with the sublevel conclusion that `L_crit` alone carries some tree/critical-value signal but does not reproduce Candidate C's PD improvement.
+
+### Final robustness conclusion
+
+The superlevel audit strengthens the main descriptor-specific story:
+
+1. **Candidate C remains the strongest PD-oriented fine-tuned CNN-family objective**, and this is stable under both sublevel and superlevel filtrations.
+2. **Repaired E2 fixed-index TTK supervision is the strongest MT-oriented signal**, especially under superlevel/high-speed evaluation.
+3. **UV+crit alone is not enough for PD**, but it has a modest MT signal.
+4. The sublevel-vs-superlevel convention does not undermine the submitted Candidate C result. It mainly clarifies the interpretation: Candidate C is robust for PD, while E2-family methods are better aligned with merge-tree structure.
+
+---
+---
+
+# Part XXIV — Candidate B-2688 anchor run, Candidate B factorial setup, and superlevel-extension debugging
+
+## XXIV.1 Purpose of this update
+
+This section records the follow-up experiments and infrastructure added after the repaired E2 and superlevel robustness analyses. The immediate scientific goal was to isolate the role of the Candidate B scaffold
+
+\[
+L_B = L_{uv} + 0.01L_{\mathrm{speed}} + 0.05L_{\mathrm{grad}} + 0.25L_{\mathrm{levelset}}
+\]
+
+in Candidate C's persistence-diagram improvement and merge-tree degradation. The practical goal was to make the next ablations reproducible by documenting the exact scripts, commands, output directories, and current status.
+
+The key new pieces are:
+
+1. a completed **Candidate B-2688** native PhIRE fine-tuning run;
+2. a completed Candidate B-2688 cheap/domain evaluation;
+3. a completed Candidate B-2688 default/sublevel TTK topology evaluation;
+4. a superlevel robustness extension that now includes UV-2688 and B-2688 in the method list, but whose first full run exposed a Docker path bug for the two newly added methods;
+5. a parameterized Candidate B factorial-ablation setup for `speed`, `grad`, `levelset`, and pairwise combinations.
+
+---
+
+## XXIV.2 Candidate B-2688 anchor run
+
+### Script
+
+The new Candidate B-2688 training/inference script is:
+
+```text
+scripts/run_candidateB_expanded2688_finetune.py
+```
+
+The script implements the missing 2688-scale Candidate B rung:
+
+\[
+L_B = L_{uv} + 0.01L_{\mathrm{speed}} + 0.05L_{\mathrm{grad}} + 0.25L_{\mathrm{levelset}}
+\]
+
+with:
+
+```text
+lambda_speed    = 0.01
+lambda_grad     = 0.05
+lambda_wpd      = 0.0
+lambda_levelset = 0.25
+lambda_crit     = 0.0
+lambda_TTKCV    = n/a
+lambda_TTKpers  = n/a
+```
+
+No repaired-E2 fixed-index losses are used. The training data is the same expanded 2688-sample TFRecord used by Candidate C-2688:
+
+```text
+example_data_topology_expanded_2688/wind_MR-HR.tfrecord
+```
+
+The fixed 168-sample evaluation benchmark remains:
+
+```text
+example_data_fixed/wind_MR-HR.tfrecord
+```
+
+### Output directories
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateB_expanded2688/
+data_out/wind_finetune_candidateB_expanded2688/
+logs/wind_finetune_candidateB_expanded2688.log
+logs/wind_finetune_candidateB_expanded2688_terminal.log
+```
+
+### Training + paired inference command
+
+Run from the repo root on Spark:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_candidateB_expanded2688_finetune.py \
+  2>&1 | tee logs/wind_finetune_candidateB_expanded2688_terminal.log
+```
+
+The script performs both fine-tuning and paired inference on the fixed 168-sample benchmark.
+
+### Post-run array validation command
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+d = Path("data_out/wind_finetune_candidateB_expanded2688")
+for f in ["idx.npy", "dataIN.npy", "dataGT.npy", "dataSR.npy"]:
+    p = d / f
+    print(f, "exists:", p.exists())
+    if p.exists():
+        a = np.load(p, mmap_mode="r")
+        print("  shape:", a.shape, "min:", float(np.nanmin(a)), "max:", float(np.nanmax(a)))
+
+idx = np.load(d / "idx.npy")
+print("idx exact ordered 0..167:", np.array_equal(idx, np.arange(168)))
+PY
+```
+
+Observed validation output:
+
+```text
+idx.npy exists: True
+  shape: (168,) min: 0.0 max: 167.0
+dataIN.npy exists: True
+  shape: (168, 100, 100, 2) min: -21.52134190559387 max: 26.934541473388673
+dataGT.npy exists: True
+  shape: (168, 500, 500, 2) min: -30.46762466430664 max: 30.812210083007812
+dataSR.npy exists: True
+  shape: (168, 500, 500, 2) min: -26.495317424345014 max: 28.44360796570778
+idx exact ordered 0..167: True
+```
+
+---
+
+## XXIV.3 Candidate B-2688 cheap/domain evaluation
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/evaluate_finetune_candidate.py \
+  --candidate-name candidateB_expanded2688 \
+  --candidate-dir  data_out/wind_finetune_candidateB_expanded2688 \
+  --cnn-dir        data_out_fixed/wind_mrhr_cnn \
+  --gan-dir        data_out_fixed/wind_mrhr_gan \
+  --merged-csv     ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir        ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval \
+  2>&1 | tee logs/evaluate_candidateB_expanded2688.log
+```
+
+### Output files
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/all_sample_metrics_candidateB_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/winner_counts_candidateB_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/pairwise_cnn_vs_candidateB_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_eval/adjacent_cluster_table_candidateB_expanded2688.csv
+docs/topology_finetuning_candidateB_expanded2688_eval.md
+```
+
+### Cheap/domain metric summary
+
+| Metric | Bicubic | CNN | GAN | Candidate B-2688 |
+|---|---:|---:|---:|---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | 33.5198 |
+| Speed MAE (m/s) | 0.5963 | 0.6941 | 0.9026 | 0.5141 |
+| Speed RMSE (m/s) | 1.0156 | 1.1078 | 1.3775 | 0.8763 |
+| WPD MAE (m³/s³) | 193.5403 | 231.6709 | 310.7328 | 164.5935 |
+| WPD Wasserstein-1 | 55.5103 | 45.2713 | 85.6191 | 26.6869 |
+| WPD bias abs (m³/s³) | 41.2244 | 35.3439 | 78.7236 | 19.6891 |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | 0.3124 |
+| Gradient W1 | 0.3282 | 0.2329 | 0.0564 | 0.1996 |
+| Gradient kurtosis abs Δ | 6.6163 | 3.7004 | 4.2010 | 2.9374 |
+| PSD log-L2 | 1.3625 | 0.8335 | 0.5139 | 0.9754 |
+| PSD slope abs Δ | 1.6684 | 0.9150 | 0.9482 | 1.3177 |
+| Exceedance abs Δ s>5 | 0.0095 | 0.0042 | 0.0082 | 0.0049 |
+| Exceedance abs Δ s>10 | 0.0085 | 0.0066 | 0.0243 | 0.0036 |
+| Exceedance abs Δ s>15 | 0.0074 | 0.0062 | 0.0096 | 0.0035 |
+| Exceedance abs Δ p90 | 0.0109 | 0.0103 | 0.0123 | 0.0051 |
+| Component-count curve L1 | 173.1855 | 115.5278 | 124.6567 | 112.3254 |
+
+Interpretation: Candidate B-2688 improves many fidelity and physical/domain metrics relative to CNN, including PSNR, scalar speed errors, WPD metrics, gradient metrics, high-threshold exceedance, and component-count curve L1. It worsens PSD metrics relative to CNN.
+
+---
+
+## XXIV.4 Candidate B-2688 default/sublevel TTK topology evaluation
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method     candidateB_expanded2688 \
+  --data-dir   data_out/wind_finetune_candidateB_expanded2688 \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology_vti \
+  --out-base   ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology \
+  --n-samples  168 \
+  --threads    1 \
+  --skip-viz \
+  2>&1 | tee logs/topology_candidateB_expanded2688.log
+```
+
+### Output files
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology_vti/
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/candidateB_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_expanded2688_topology/candidateB_expanded2688_topology_comparison.csv
+docs/topology_finetuning_candidateB_expanded2688_topology_eval.md
+```
+
+### True TTK topology result
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovery |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Candidate B-2688 | 22.7070 | 6.1612 | 166/168 | 40/168 | 18/168 | 144/168 | 8/20 |
+
+### Key comparison to UV and Candidate C
+
+| Method | Objective | PD mean | MT mean |
+|---|---|---:|---:|
+| UV-2688 | \(L_{uv}\) | 29.6121 | 6.0119 |
+| B-2688 | \(L_{uv}+L_{\mathrm{speed}}+L_{\mathrm{grad}}+L_{\mathrm{levelset}}\) | 22.7070 | 6.1612 |
+| UV+crit-2688 | \(L_{uv}+L_{\mathrm{crit}}\) | 29.1143 | 5.6899 |
+| C-2688 | \(B+L_{\mathrm{crit}}\) | 22.4944 | 6.0803 |
+
+Observed differences:
+
+```text
+UV -> B:
+  PD improves by 6.9051
+  MT worsens by 0.1493
+
+B -> C:
+  PD improves by 0.2126
+  MT improves by 0.0809, but C still remains worse than UV on MT
+
+UV -> C:
+  PD improves by 7.1177
+  MT worsens by 0.0684
+```
+
+Interpretation: the Candidate B scaffold accounts for most of Candidate C's PD improvement. The local-maxima term `L_crit` adds a small additional PD improvement and slightly mitigates the MT degradation relative to B, but it is not the main PD driver. The MT degradation appears primarily associated with the Candidate B scaffold.
+
+---
+
+## XXIV.5 Superlevel robustness extension with UV-2688 and B-2688
+
+### Updated script
+
+The superlevel robustness script is:
+
+```text
+scripts/run_superlevel_topology_robustness.py
+```
+
+The script evaluates superlevel topology of speed \(s\) as sublevel topology of \(-s\), using the same TTK commands as the default/sublevel topology pipeline. The VTI point-data array is still named `wind_speed`, but the stored scalar is `-sqrt(u^2+v^2)`.
+
+### Intended Phase A command
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_superlevel_topology_robustness.py --run \
+  --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateE2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \
+  --output-suffix _with_B_UV \
+  --threads 1 \
+  2>&1 | tee logs/superlevel_with_B_UV.log
+```
+
+### Intended new aggregate outputs
+
+```text
+docs/superlevel_topology_robustness_eval_with_B_UV.md
+ttk_runs_fixed/superlevel_topology/superlevel_pd_mt_per_sample_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_winner_comparison_with_B_UV.csv
+```
+
+### Exact-order pre-run check
+
+Before the Phase A run, all requested methods were checked to make sure their `idx.npy` files were exactly ordered `0..167`.
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+methods = {
+    "cnn": "data_out_fixed/wind_mrhr_cnn",
+    "gan": "data_out_fixed/wind_mrhr_gan",
+    "candidateC_expanded2688": "data_out/wind_finetune_candidateC_expanded2688",
+    "candidateB_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688",
+    "candidateE2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_crit_expanded2688": "data_out/wind_finetune_candidateUV_plus_crit_expanded2688",
+    "candidateUV_expanded2688": "data_out/wind_finetune_candidateUV_expanded2688",
+    "candidateB_expanded2688": "data_out/wind_finetune_candidateB_expanded2688",
+}
+
+ok = True
+for name, d in methods.items():
+    p = Path(d) / "idx.npy"
+    if not p.exists():
+        print(f"[MISSING] {name}: {p}")
+        ok = False
+        continue
+    idx = np.load(p)
+    exact = np.array_equal(idx, np.arange(168))
+    print(f"{name:55s} exact_order={exact}")
+    ok = ok and exact
+
+raise SystemExit(0 if ok else 1)
+PY
+```
+
+All methods returned `exact_order=True`.
+
+### First Phase A run status
+
+The first Phase A run did **not** complete for the two newly added methods. It completed/aggregated the already-existing methods but skipped/incompleted:
+
+```text
+candidateUV_expanded2688
+candidateB_expanded2688
+```
+
+The report written by this incomplete run is therefore useful only for the already-completed methods and should **not** be treated as the final `_with_B_UV` report.
+
+Observed report status:
+
+```text
+Methods completed:
+cnn, gan, candidateC_expanded2688,
+candidateB_plus_E2_tf_lowlambda_expanded2688,
+candidateE2_tf_lowlambda_expanded2688,
+candidateUV_plus_E2_tf_lowlambda_expanded2688,
+candidateUV_plus_crit_expanded2688
+
+Methods skipped/incomplete:
+candidateUV_expanded2688, candidateB_expanded2688
+```
+
+Observed PASS/FAIL checklist excerpt:
+
+```text
+[FAIL] candidateUV_expanded2688: VTI generation
+[FAIL] candidateUV_expanded2688: complete TTK outputs (VTI=0 PD=0 MT_p0=0 MT_p1=0 MT_p2=0, expect 336 each)
+[FAIL] candidateB_expanded2688: VTI generation
+[FAIL] candidateB_expanded2688: complete TTK outputs (VTI=0 PD=0 MT_p0=0 MT_p1=0 MT_p2=0, expect 336 each)
+```
+
+### Failure diagnosis
+
+The error log showed `FileNotFoundError` inside Docker for host-absolute paths such as:
+
+```text
+/home/adadhwal/PhIRE/data_out/wind_finetune_candidateUV_expanded2688/dataGT.npy
+/home/adadhwal/PhIRE/data_out/wind_finetune_candidateB_expanded2688/dataGT.npy
+```
+
+But the Docker invocation mounts the repo as:
+
+```text
+-v /home/adadhwal/PhIRE:/work -w /work
+```
+
+Therefore, inside Docker, the correct paths are repo-relative or `/work`-relative, for example:
+
+```text
+data_out/wind_finetune_candidateB_expanded2688/dataGT.npy
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/vti
+```
+
+### Diagnostic commands used
+
+Log grep:
+
+```bash
+cd ~/PhIRE
+
+grep -nE "candidateUV_expanded2688|candidateB_expanded2688|_vti-worker|Traceback|ModuleNotFoundError|FileNotFoundError|PermissionError|No such|error|warn|docker|failed" \
+  logs/superlevel_with_B_UV.log | head -300
+```
+
+Directory inspection:
+
+```bash
+cd ~/PhIRE
+
+find ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688 -maxdepth 4 -type f | head -20
+find ttk_runs_fixed/superlevel_topology/candidateB_expanded2688  -maxdepth 4 -type f | head -20
+
+ls -lah ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688 || true
+ls -lah ttk_runs_fixed/superlevel_topology/candidateB_expanded2688 || true
+```
+
+Manual worker test for B-2688:
+
+```bash
+cd ~/PhIRE
+
+mkdir -p ttk_runs_fixed/superlevel_topology/_debug_vti
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'python scripts/run_superlevel_topology_robustness.py --_vti-worker \
+  --input data_out/wind_finetune_candidateB_expanded2688/dataGT.npy \
+  --outdir ttk_runs_fixed/superlevel_topology/_debug_vti \
+  --label candidateB_expanded2688_GT \
+  --samples 0'
+```
+
+Observed output:
+
+```text
+[_vti-worker] wrote 1 VTI file(s) to ttk_runs_fixed/superlevel_topology/_debug_vti (label=candidateB_expanded2688_GT)
+```
+
+Manual worker test for UV-2688:
+
+```bash
+cd ~/PhIRE
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'python scripts/run_superlevel_topology_robustness.py --_vti-worker \
+  --input data_out/wind_finetune_candidateUV_expanded2688/dataGT.npy \
+  --outdir ttk_runs_fixed/superlevel_topology/_debug_vti \
+  --label candidateUV_expanded2688_GT \
+  --samples 0'
+```
+
+Observed output:
+
+```text
+[_vti-worker] wrote 1 VTI file(s) to ttk_runs_fixed/superlevel_topology/_debug_vti (label=candidateUV_expanded2688_GT)
+```
+
+Debug cleanup:
+
+```bash
+cd ~/PhIRE
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'rm -rf ttk_runs_fixed/superlevel_topology/_debug_vti'
+```
+
+### Current status and needed patch
+
+The VTI worker is functional. The failure is not due to the input arrays, Docker image, or VTK writing. The failure is that the full superlevel script passes host-absolute paths into Docker. The fix is to patch `scripts/run_superlevel_topology_robustness.py` so that paths passed inside Docker commands are repo-relative or `/work`-relative.
+
+Suggested helper:
+
+```python
+def _repo_rel(path: Path) -> str:
+    return str(Path(path).resolve().relative_to(REPO_ROOT.resolve()))
+```
+
+Use this helper for Docker-internal `--input`, `--outdir`, and any TTK command paths passed into `docker run`.
+
+After the patch, rerun:
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_superlevel_topology_robustness.py --run \
+  --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateE2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \
+  --output-suffix _with_B_UV \
+  --threads 1 \
+  2>&1 | tee logs/superlevel_with_B_UV_rerun.log
+```
+
+---
+
+## XXIV.6 Candidate B internal factorial ablation setup
+
+### Scripts
+
+Two new scripts were created for the Candidate B internal ablation:
+
+```text
+scripts/run_candidateB_factorial_expanded2688_finetune.py
+scripts/run_candidateB_factorial_expanded2688_batch.sh
+```
+
+The parameterized training script isolates which of Candidate B's three scalar-field terms drive PD improvement and which contribute to MT degradation.
+
+### Variants
+
+All variants keep \(L_{uv}\) and disable `L_crit`, `L_TTKCV`, and `L_TTKpers`.
+
+| Variant | Objective |
+|---|---|
+| `speed` | \(L_{uv}+0.01L_{\mathrm{speed}}\) |
+| `grad` | \(L_{uv}+0.05L_{\mathrm{grad}}\) |
+| `levelset` | \(L_{uv}+0.25L_{\mathrm{levelset}}\) |
+| `speed_grad` | \(L_{uv}+0.01L_{\mathrm{speed}}+0.05L_{\mathrm{grad}}\) |
+| `speed_levelset` | \(L_{uv}+0.01L_{\mathrm{speed}}+0.25L_{\mathrm{levelset}}\) |
+| `grad_levelset` | \(L_{uv}+0.05L_{\mathrm{grad}}+0.25L_{\mathrm{levelset}}\) |
+
+The full B endpoint already exists as:
+
+```text
+candidateB_expanded2688
+```
+
+and the UV endpoint already exists as:
+
+```text
+candidateUV_expanded2688
+```
+
+### Output naming
+
+Per variant:
+
+```text
+models_fixed/topology_finetuning/wind_finetune_candidateB_factorial_<variant>_expanded2688/
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/
+logs/wind_finetune_candidateB_factorial_<variant>_expanded2688.log
+```
+
+### Run one variant
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_candidateB_factorial_expanded2688_finetune.py --variant levelset
+```
+
+### Run all singletons
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --all-singletons \
+  2>&1 | tee logs/candidateB_factorial_singletons_expanded2688.log
+```
+
+Preferred singleton order:
+
+```text
+levelset
+speed
+grad
+```
+
+### Run one singleton through the batch driver
+
+Recommended first end-to-end test:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --variant levelset \
+  2>&1 | tee logs/candidateB_factorial_levelset_expanded2688_batch.log
+```
+
+### Run pairwise variants
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --all-pairs \
+  2>&1 | tee logs/candidateB_factorial_pairs_expanded2688.log
+```
+
+### Run all variants
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --all \
+  2>&1 | tee logs/candidateB_factorial_all_expanded2688.log
+```
+
+### TTK command for a completed factorial variant
+
+Replace `<variant>` with `levelset`, `speed`, `grad`, `speed_grad`, `speed_levelset`, or `grad_levelset`.
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method     candidateB_factorial_<variant>_expanded2688 \
+  --data-dir   data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688 \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology_vti \
+  --out-base   ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology \
+  --n-samples  168 \
+  --threads    1 \
+  --skip-viz \
+  2>&1 | tee logs/topology_candidateB_factorial_<variant>_expanded2688.log
+```
+
+### Current status
+
+The factorial scripts have been created and patched so that the post-inference `idx.npy` check requires exact order:
+
+```python
+np.array_equal(idx_vals, np.arange(N_EVAL))
+```
+
+instead of merely checking the sorted set. The factorial ablations have not yet been run as of this note. The recommended next run is the `levelset` singleton, because the soft high-speed level-set term is the most plausible individual driver of Candidate B's PD improvement and high-speed component/exceedance behavior.
+
+---
+
+## XXIV.7 Current interpretation after Candidate B-2688
+
+The Candidate B-2688 anchor sharpens the interpretation of Candidate C:
+
+1. Candidate B's scalar-field scaffold explains most of Candidate C's PD improvement.
+2. The high-speed local-maxima proxy `L_crit` adds only a small additional PD improvement at 2688.
+3. `L_crit` slightly mitigates Candidate B's MT degradation, but Candidate C still does not become MT-oriented.
+4. The main MT degradation appears associated with the Candidate B scaffold.
+5. The repaired E2 family remains the clearest MT-oriented direction.
+6. The next scientific question is which Candidate B term — speed, gradient, or soft high-speed level-set — drives the PD gain and which term causes or worsens the MT trade-off.
+
+The next required data are therefore the singleton Candidate B ablations:
+
+```text
+UV + speed
+UV + grad
+UV + levelset
+```
+
+followed, if useful, by the pairwise variants:
+
+```text
+UV + speed + grad
+UV + speed + levelset
+UV + grad + levelset
+```
+
+Only after these topology and cheap/domain metrics are accumulated should the results be interpreted jointly with fidelity, WPD, gradient, PSD, exceedance, and component-count behavior.
+
+---
+
+---
+
+# Part XXV — Completed superlevel robustness extension with UV-2688 and B-2688
+
+## XXV.1 Purpose of this update
+
+This section supersedes the pending/debugging status recorded in Part XXIV.5. The superlevel robustness extension with the matched UV control and full Candidate B scaffold has now been completed successfully.
+
+The goal was to extend the existing superlevel robustness evaluation to include:
+
+```text
+candidateUV_expanded2688
+candidateB_expanded2688
+```
+
+alongside the previously completed methods:
+
+```text
+cnn
+gan
+candidateC_expanded2688
+candidateB_plus_E2_tf_lowlambda_expanded2688
+candidateE2_tf_lowlambda_expanded2688
+candidateUV_plus_E2_tf_lowlambda_expanded2688
+candidateUV_plus_crit_expanded2688
+```
+
+The final completed evaluation used the same superlevel convention as before:
+
+```text
+superlevel topology of speed s = sublevel topology of -s
+```
+
+That is, the VTI scalar array is still named `wind_speed` for compatibility with the existing TTK command lines, but it stores:
+
+```text
+-sqrt(u^2 + v^2)
+```
+
+rather than positive speed.
+
+## XXV.2 Relevant files
+
+### Script
+
+```text
+scripts/run_superlevel_topology_robustness.py
+```
+
+This script now contains:
+
+1. the corrected real method name `candidateE2_tf_lowlambda_expanded2688` for the native TF C+E2-low-2688 run,
+2. `candidateUV_expanded2688` and `candidateB_expanded2688` in `DEFAULT_METHODS`,
+3. known sublevel means for UV-2688 and B-2688,
+4. a Docker path fix using repo-relative paths for all Docker-internal VTI and TTK commands.
+
+### Completed log
+
+```text
+logs/superlevel_with_B_UV_rerun_pathfix.log
+```
+
+### Final report
+
+```text
+docs/superlevel_topology_robustness_eval_with_B_UV.md
+```
+
+### Final aggregate CSV outputs
+
+```text
+ttk_runs_fixed/superlevel_topology/superlevel_pd_mt_per_sample_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method_with_B_UV.csv
+ttk_runs_fixed/superlevel_topology/superlevel_winner_comparison_with_B_UV.csv
+```
+
+### Per-method superlevel outputs for the newly added methods
+
+```text
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/vti/
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/topology/pd/
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/topology/mt/
+ttk_runs_fixed/superlevel_topology/candidateUV_expanded2688/topology/phase_c_final/phase_c_results.csv
+```
+
+```text
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/vti/
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/topology/pd/
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/topology/mt/
+ttk_runs_fixed/superlevel_topology/candidateB_expanded2688/topology/phase_c_final/phase_c_results.csv
+```
+
+## XXV.3 Reproducibility commands
+
+### Step 1 — exact-order input check
+
+Before rerunning the superlevel extension, verify that every method has `idx.npy` exactly ordered as `0..167`.
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+methods = {
+    "cnn": "data_out_fixed/wind_mrhr_cnn",
+    "gan": "data_out_fixed/wind_mrhr_gan",
+    "candidateC_expanded2688": "data_out/wind_finetune_candidateC_expanded2688",
+    "candidateB_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateB_plus_E2_tf_lowlambda_expanded2688",
+    "candidateE2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateE2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_E2_tf_lowlambda_expanded2688": "data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688",
+    "candidateUV_plus_crit_expanded2688": "data_out/wind_finetune_candidateUV_plus_crit_expanded2688",
+    "candidateUV_expanded2688": "data_out/wind_finetune_candidateUV_expanded2688",
+    "candidateB_expanded2688": "data_out/wind_finetune_candidateB_expanded2688",
+}
+
+ok = True
+for name, d in methods.items():
+    p = Path(d) / "idx.npy"
+    if not p.exists():
+        print(f"[MISSING] {name}: {p}")
+        ok = False
+        continue
+    idx = np.load(p)
+    exact = np.array_equal(idx, np.arange(168))
+    print(f"{name:55s} exact_order={exact}")
+    ok = ok and exact
+
+raise SystemExit(0 if ok else 1)
+PY
+```
+
+All methods returned `exact_order=True`.
+
+### Step 2 — clean up debug VTI directory, if present
+
+During the path debugging stage, one-sample debug VTIs may have been written under `_debug_vti`. Remove them using Docker, because Docker-created files may be root-owned.
+
+```bash
+cd ~/PhIRE
+
+docker run --rm -v "$PWD:/work" -w /work phire-ttk:latest bash -lc \
+'rm -rf ttk_runs_fixed/superlevel_topology/_debug_vti'
+```
+
+### Step 3 — run the completed Phase A superlevel extension
+
+```bash
+cd ~/PhIRE
+
+python3 scripts/run_superlevel_topology_robustness.py --run \
+  --methods cnn,gan,candidateC_expanded2688,candidateB_plus_E2_tf_lowlambda_expanded2688,candidateE2_tf_lowlambda_expanded2688,candidateUV_plus_E2_tf_lowlambda_expanded2688,candidateUV_plus_crit_expanded2688,candidateUV_expanded2688,candidateB_expanded2688 \
+  --output-suffix _with_B_UV \
+  --threads 1 \
+  2>&1 | tee logs/superlevel_with_B_UV_rerun_pathfix.log
+```
+
+This command writes a new suffixed report and new suffixed aggregate CSVs. It does not overwrite the earlier unsuffixed superlevel report/CSVs.
+
+### Step 4 — inspect the PASS/FAIL checklist
+
+```bash
+cd ~/PhIRE
+
+grep -nE "candidateUV_expanded2688|candidateB_expanded2688|PASS|FAIL|FINISHED|COMPLETE" \
+  logs/superlevel_with_B_UV_rerun_pathfix.log | tail -120
+```
+
+The completed run reported:
+
+```text
+[PASS] candidateUV_expanded2688: VTI generation
+[PASS] candidateUV_expanded2688: complete TTK outputs (VTI=336 PD=336 MT_p0=336 MT_p1=336 MT_p2=336, expect 336 each)
+[PASS] candidateUV_expanded2688: distance computation
+[PASS] candidateUV_expanded2688: phase_c_results.csv row count for method='candidateUV_expanded2688' == 168 (got 168)
+
+[PASS] candidateB_expanded2688: VTI generation
+[PASS] candidateB_expanded2688: complete TTK outputs (VTI=336 PD=336 MT_p0=336 MT_p1=336 MT_p2=336, expect 336 each)
+[PASS] candidateB_expanded2688: distance computation
+[PASS] candidateB_expanded2688: phase_c_results.csv row count for method='candidateB_expanded2688' == 168 (got 168)
+
+[PASS] Winner CSV row count == 168
+Superlevel topology robustness evaluation COMPLETE (all checks passed).
+```
+
+### Step 5 — inspect the final report
+
+```bash
+cd ~/PhIRE
+
+sed -n '1,260p' docs/superlevel_topology_robustness_eval_with_B_UV.md
+```
+
+### Step 6 — optionally print the completed summary table from CSV
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import pandas as pd
+
+p = "ttk_runs_fixed/superlevel_topology/superlevel_summary_by_method_with_B_UV.csv"
+df = pd.read_csv(p)
+
+cols = [
+    "method",
+    "pd_mean_superlevel",
+    "mt_mean_superlevel",
+    "pd_lt_cnn",
+    "mt_lt_cnn",
+    "pd_beats_gan",
+    "mt_beats_gan",
+    "mt_gan_recovered",
+    "mt_gan_total",
+    "pd_mean_sublevel_known",
+    "mt_mean_sublevel_known",
+]
+print(df[cols].to_string(index=False))
+PY
+```
+
+## XXV.4 Completed superlevel mean PD/MT table
+
+Lower is better for both PD and MT.
+
+| Method | PD mean (superlevel) | MT mean (superlevel) | PD mean (sublevel, known) | MT mean (sublevel, known) |
+|---|---:|---:|---:|---:|
+| cnn | 27.3762 | 5.3231 | 27.4063 | 5.8678 |
+| gan | 20.7168 | 7.8397 | 20.8641 | 8.3481 |
+| candidateC_expanded2688 | 22.4417 | 5.3578 | 22.4944 | 6.0803 |
+| candidateB_plus_E2_tf_lowlambda_expanded2688 | 24.1042 | 4.9998 | 23.9876 | 5.6774 |
+| candidateE2_tf_lowlambda_expanded2688 | 24.3811 | 4.9796 | 24.2686 | 5.6628 |
+| candidateUV_plus_E2_tf_lowlambda_expanded2688 | 25.1923 | 4.9522 | 25.0721 | 5.5940 |
+| candidateUV_plus_crit_expanded2688 | 29.0752 | 5.0875 | 29.1143 | 5.6899 |
+| candidateUV_expanded2688 | 29.6621 | 5.4230 | 29.6121 | 6.0119 |
+| candidateB_expanded2688 | 22.6909 | 5.8614 | 22.7070 | 6.1612 |
+
+## XXV.5 Completed superlevel win-count table
+
+| Method | PD < CNN | MT < CNN | PD beats GAN | MT beats GAN | MT-GAN recovered (/23) |
+|---|---:|---:|---:|---:|---:|
+| gan | 166/168 | 23/168 | -- | -- | -- |
+| candidateC_expanded2688 | 168/168 | 72/168 | 19/168 | 151/168 | 14 |
+| candidateB_plus_E2_tf_lowlambda_expanded2688 | 165/168 | 110/168 | 6/168 | 165/168 | 23 |
+| candidateE2_tf_lowlambda_expanded2688 | 164/168 | 112/168 | 5/168 | 166/168 | 23 |
+| candidateUV_plus_E2_tf_lowlambda_expanded2688 | 160/168 | 120/168 | 0/168 | 168/168 | 23 |
+| candidateUV_plus_crit_expanded2688 | 13/168 | 104/168 | 0/168 | 157/168 | 13 |
+| candidateUV_expanded2688 | 8/168 | 68/168 | 0/168 | 144/168 | 7 |
+| candidateB_expanded2688 | 164/168 | 42/168 | 15/168 | 137/168 | 8 |
+
+## XXV.6 Winner distributions
+
+### PD winner distribution
+
+| Method | Wins |
+|---|---:|
+| gan | 146 |
+| candidateC_expanded2688 | 14 |
+| candidateB_expanded2688 | 8 |
+
+### MT winner distribution
+
+| Method | Wins |
+|---|---:|
+| candidateUV_plus_E2_tf_lowlambda_expanded2688 | 43 |
+| candidateE2_tf_lowlambda_expanded2688 | 34 |
+| candidateB_plus_E2_tf_lowlambda_expanded2688 | 30 |
+| candidateUV_plus_crit_expanded2688 | 25 |
+| cnn | 25 |
+| candidateUV_expanded2688 | 8 |
+| candidateC_expanded2688 | 3 |
+
+## XXV.7 Interpretation of the completed superlevel extension
+
+The completed superlevel extension strengthens the same descriptor-specific story seen under the default/sublevel convention.
+
+### UV to B
+
+```text
+UV-2688 superlevel: PD 29.6621, MT 5.4230
+B-2688  superlevel: PD 22.6909, MT 5.8614
+```
+
+So the Candidate B scaffold gives a large PD improvement relative to UV, but worsens MT relative to UV.
+
+### B to C
+
+```text
+B-2688 superlevel: PD 22.6909, MT 5.8614, MT-GAN recovery 8/23
+C-2688 superlevel: PD 22.4417, MT 5.3578, MT-GAN recovery 14/23
+```
+
+This suggests that `L_crit` is still not the main PD driver, but it does add a useful high-speed/extrema signal and mitigates some of the MT degradation caused by the B scaffold.
+
+### E2 family
+
+The repaired E2-family variants remain the clearest MT-oriented methods under the superlevel convention:
+
+```text
+UV+E2-low-2688: MT 4.9522, MT-GAN recovery 23/23
+C+E2-low-2688 / candidateE2_tf_lowlambda_expanded2688: MT 4.9796, MT-GAN recovery 23/23
+B+E2-low-2688: MT 4.9998, MT-GAN recovery 23/23
+```
+
+This reinforces the interpretation that the B/C scaffold is PD-oriented, whereas the repaired fixed-index TTK terms are MT-oriented.
+
+## XXV.8 Final status before Phase B
+
+Phase A is now complete.
+
+The next step is Phase B: the Candidate B internal factorial ablation, beginning with the `levelset` singleton:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --variant levelset \
+  2>&1 | tee logs/candidateB_factorial_levelset_expanded2688_batch.log
+```
+
+This will test whether the soft high-speed level-set term alone is the main source of Candidate B's large PD improvement and/or MT degradation.
+
+---
+
+# Part XXVI — Phase B completed: Candidate B factorial ablation at 2688-sample scale
+
+## XXVI.1 Purpose of this update
+
+This section records the completed **Phase B Candidate B factorial ablation**. It supersedes the previous “Final status before Phase B” note in Part XXV.8.
+
+The purpose of Phase B was to decompose Candidate B:
+
+```text
+B = L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset
+```
+
+into singleton and pairwise objectives in order to identify which term or interaction was responsible for Candidate B's large persistence-diagram (PD) improvement and which terms contributed to the merge-tree (MT) degradation.
+
+The completed result is:
+
+> Candidate B's large PD improvement is primarily driven by `L_grad`. `L_speed` and `L_levelset` singleton losses do not substantially improve TTK PD. `L_levelset` becomes useful only when paired with `L_grad`, while `L_speed` can worsen MT when paired with `L_grad`.
+
+## XXVI.2 Evaluation convention
+
+All Phase B variants were trained from the pretrained PhIRE CNN checkpoint and evaluated on the fixed 168-sample benchmark. The model predicts normalized vector components `[u,v]`; scalar losses and topology evaluation denormalize `[u,v]` and use scalar speed:
+
+```text
+s(x,y) = sqrt(u(x,y)^2 + v(x,y)^2)
+```
+
+True topology metrics:
+
+```text
+PD distance = TTK bottleneck distance between persistence diagrams
+MT distance = TTK merge-tree Wasserstein-type distance
+```
+
+Lower is better for both PD and MT.
+
+The cheap evaluation reports include pointwise, physical, spectral, exceedance, and connected-component proxy metrics. These are useful diagnostics, but they are not substitutes for true TTK PD/MT. Phase B shows this clearly: speed-only and levelset-only improve many cheap metrics but remain near the UV control in true PD.
+
+SSIM was still unavailable in the cheap reports because `skimage` could not be imported in the active NumPy environment:
+
+```text
+ValueError('numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject')
+```
+
+This affects only SSIM reporting, not the SR arrays or TTK topology evaluation.
+
+## XXVI.3 Scripts used
+
+Training / cheap evaluation:
+
+```text
+scripts/run_candidateB_factorial_expanded2688_finetune.py
+scripts/run_candidateB_factorial_expanded2688_batch.sh
+```
+
+TTK topology pipeline:
+
+```text
+scripts/run_candidate_topology_pipeline.sh
+```
+
+All TTK runs were done with:
+
+```text
+--threads 1
+--skip-viz
+```
+
+The `--skip-viz` flag means Phase B produced VTI/VTU/CSV/Markdown outputs but did not generate new image-panel figure sets. Existing paper figure sets remain under:
+
+```text
+ttk_runs_fixed/figure_sets/
+```
+
+## XXVI.4 Variant definitions
+
+| Variant | Objective |
+|---|---|
+| `speed` | `L_uv + 0.01 L_speed` |
+| `grad` | `L_uv + 0.05 L_grad` |
+| `levelset` | `L_uv + 0.25 L_levelset` |
+| `speed_grad` | `L_uv + 0.01 L_speed + 0.05 L_grad` |
+| `speed_levelset` | `L_uv + 0.01 L_speed + 0.25 L_levelset` |
+| `grad_levelset` | `L_uv + 0.05 L_grad + 0.25 L_levelset` |
+| full `B-2688` | `L_uv + 0.01 L_speed + 0.05 L_grad + 0.25 L_levelset` |
+
+References:
+
+| Reference | Meaning |
+|---|---|
+| `UV-2688` | vector-only fine-tuning control, `L_uv` |
+| `B-2688` | full Candidate B scaffold |
+| `C-2688` | Candidate B plus `0.001 L_crit` |
+| CNN | pretrained PhIRE CNN baseline |
+| GAN | pretrained PhIRE GAN baseline |
+
+## XXVI.5 Artifact naming convention
+
+For each variant `<variant>`, the method name is:
+
+```text
+candidateB_factorial_<variant>_expanded2688
+```
+
+### Model output arrays
+
+```text
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/idx.npy
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/dataIN.npy
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/dataGT.npy
+data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688/dataSR.npy
+```
+
+Expected shapes:
+
+```text
+idx.npy    -> (168,)
+dataIN.npy -> (168, 100, 100, 2)
+dataGT.npy -> (168, 500, 500, 2)
+dataSR.npy -> (168, 500, 500, 2)
+```
+
+Checked `grad` output arrays:
+
+```text
+idx.npy    shape=(168,), min=0, max=167, exact 0..167=True
+dataIN.npy shape=(168,100,100,2), min=-21.5213, max=26.9345
+dataGT.npy shape=(168,500,500,2), min=-30.4676, max=30.8122
+dataSR.npy shape=(168,500,500,2), min=-26.8842, max=29.0971
+```
+
+### Cheap-evaluation outputs
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/all_sample_metrics_candidateB_factorial_<variant>_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/winner_counts_candidateB_factorial_<variant>_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/pairwise_cnn_vs_candidateB_factorial_<variant>_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_eval/adjacent_cluster_table_candidateB_factorial_<variant>_expanded2688.csv
+docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_eval.md
+```
+
+### TTK topology outputs
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology_vti/
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/pd/
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/mt/
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/phase_c_results.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/pd_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/mt_pairwise_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/phase_c_summary.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/phase_c_final/phase_c_summary.txt
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/candidateB_factorial_<variant>_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology/candidateB_factorial_<variant>_expanded2688_topology_comparison.csv
+docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_topology_eval.md
+```
+
+### Logs
+
+```text
+logs/candidateB_factorial_<variant>_expanded2688_batch.log
+logs/topology_candidateB_factorial_<variant>_expanded2688.log
+```
+
+## XXVI.6 Reproduction commands
+
+Train and cheap-evaluate one variant:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidateB_factorial_expanded2688_batch.sh --variant <variant> \
+  2>&1 | tee logs/candidateB_factorial_<variant>_expanded2688_batch.log
+```
+
+Run TTK topology:
+
+```bash
+cd ~/PhIRE
+
+bash scripts/run_candidate_topology_pipeline.sh \
+  --method     candidateB_factorial_<variant>_expanded2688 \
+  --data-dir   data_out/wind_finetune_candidateB_factorial_<variant>_expanded2688 \
+  --vti-dir    ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology_vti \
+  --out-base   ttk_runs_fixed/topology_finetuning/candidateB_factorial_<variant>_expanded2688_topology \
+  --n-samples  168 \
+  --threads    1 \
+  --skip-viz \
+  2>&1 | tee logs/topology_candidateB_factorial_<variant>_expanded2688.log
+```
+
+Extract topology summary:
+
+```bash
+cd ~/PhIRE
+
+grep -nA12 "Summary:" logs/topology_candidateB_factorial_<variant>_expanded2688.log | tail -30
+```
+
+Inspect reports:
+
+```bash
+cd ~/PhIRE
+
+sed -n '1,220p' docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_eval.md
+sed -n '1,220p' docs/topology_finetuning_candidateB_factorial_<variant>_expanded2688_topology_eval.md
+```
+
+Verify arrays before TTK:
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+variant = "grad"  # change as needed
+method_dir = Path(f"data_out/wind_finetune_candidateB_factorial_{variant}_expanded2688")
+expected = {
+    "idx.npy": (168,),
+    "dataIN.npy": (168, 100, 100, 2),
+    "dataGT.npy": (168, 500, 500, 2),
+    "dataSR.npy": (168, 500, 500, 2),
+}
+
+ok = True
+for fname, shape in expected.items():
+    p = method_dir / fname
+    if not p.exists():
+        print("[MISSING]", p)
+        ok = False
+        continue
+    arr = np.load(p, mmap_mode="r")
+    print(fname, "shape=", arr.shape, "min=", float(np.min(arr)), "max=", float(np.max(arr)))
+    if tuple(arr.shape) != shape:
+        print("  [BAD SHAPE] expected", shape)
+        ok = False
+    if not np.isfinite(np.asarray(arr)).all():
+        print("  [BAD VALUES] NaN/Inf found")
+        ok = False
+idx = np.load(method_dir / "idx.npy")
+print("idx exact 0..167:", np.array_equal(idx, np.arange(168)))
+ok = ok and np.array_equal(idx, np.arange(168))
+raise SystemExit(0 if ok else 1)
+PY
+```
+
+## XXVI.7 Completed Phase B topology results
+
+Lower is better for both PD and MT.
+
+| Method | PD mean | MT mean | PD < CNN | MT < CNN | PD < GAN | MT-GAN recovered | Notes |
+|---|---:|---:|---:|---:|---:|---:|---|
+| CNN baseline | 27.4063 | 5.8678 | — | — | — | — | pretrained CNN |
+| GAN baseline | 20.8641 | 8.3481 | 166/168 | 20/168 | — | — | pretrained GAN |
+| UV-2688 | 29.6121 | 6.0119 | not transcribed | 64/168 known | not transcribed | 5/20 known | vector-only control |
+| speed-only | 29.5783 | 5.9996 | 9/168 | 61/168 | 0/168 | 5/20 | `L_uv + 0.01 L_speed` |
+| levelset-only | 29.5953 | 6.0076 | see report | see report | see report | see report | `L_uv + 0.25 L_levelset`; report path below |
+| speed+levelset | 29.4363 | 5.9441 | 11/168 | 66/168 | 0/168 | 8/20 | no `L_grad`; still near UV in PD |
+| grad-only | 22.9326 | 6.0560 | 157/168 | 66/168 | 22/168 | 10/20 | dominant singleton |
+| speed+grad | 22.9706 | 6.2905 | 164/168 | 42/168 | 15/168 | 4/20 | adding speed to grad worsens MT |
+| grad+levelset | 22.6194 | 6.1996 | 164/168 | 41/168 | 17/168 | 7/20 | best B-factorial mean PD |
+| full B-2688 | 22.7070 | 6.1612 | 166/168 | 40/168 | 18/168 | 8/20 | full B scaffold |
+| C-2688 | 22.4944 | 6.0803 | 168/168 | 52/168 | 20/168 | 10/20 | full B + `L_crit` |
+
+Important note on `levelset-only`: the mean PD/MT values were extracted from the completed `phase_c_results.csv`; the authoritative per-sample topology-comparison counts should be read from:
+
+```text
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_topology_eval.md
+logs/topology_candidateB_factorial_levelset_expanded2688.log
+```
+
+An early quick summary compared candidate values against CNN/GAN mean thresholds and should not be used as the authoritative per-sample comparison count.
+
+### PD reduction relative to UV-2688
+
+| Method | PD mean | PD reduction vs UV | Fraction of full-B PD reduction |
+|---|---:|---:|---:|
+| UV-2688 | 29.6121 | 0.0000 | 0.0% |
+| speed-only | 29.5783 | 0.0338 | 0.5% |
+| levelset-only | 29.5953 | 0.0168 | 0.2% |
+| speed+levelset | 29.4363 | 0.1758 | 2.5% |
+| grad-only | 22.9326 | 6.6795 | 96.7% |
+| speed+grad | 22.9706 | 6.6415 | 96.2% |
+| grad+levelset | 22.6194 | 6.9927 | 101.3% |
+| full B-2688 | 22.7070 | 6.9051 | 100.0% |
+| C-2688 | 22.4944 | 7.1177 | 103.1% |
+
+This table is the strongest quantitative evidence from Phase B. It shows that `L_grad` alone reproduces approximately 96.7% of full Candidate B's mean PD improvement relative to UV.
+
+## XXVI.8 Cheap-evaluation summaries captured during Phase B
+
+### Levelset-only cheap evaluation
+
+Report:
+
+```text
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_eval.md
+```
+
+| Metric | CNN | Levelset-only |
+|---|---:|---:|
+| PSNRuv | 31.1925 | 33.7886 |
+| Speed MAE | 0.6941 | 0.4937 |
+| Speed RMSE | 1.1078 | 0.8542 |
+| WPD MAE | 231.6709 | 158.0550 |
+| WPD W1 | 45.2713 | 33.1943 |
+| WPD bias abs | 35.3439 | 23.2017 |
+| Gradient MAE | 0.3491 | 0.3240 |
+| Gradient W1 | 0.2329 | 0.2492 |
+| Gradient kurtosis abs Δ | 3.7004 | 5.2613 |
+| PSD log-L2 | 0.8335 | 1.1331 |
+| PSD slope abs Δ | 0.9150 | 1.4633 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0065 |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0045 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0043 |
+| Exceedance abs Δ p90 | 0.0103 | 0.0062 |
+| Component-count curve L1 | 115.5278 | 143.0357 |
+
+### Speed-only cheap evaluation
+
+Report:
+
+```text
+docs/topology_finetuning_candidateB_factorial_speed_expanded2688_eval.md
+```
+
+| Metric | CNN | Speed-only |
+|---|---:|---:|
+| PSNRuv | 31.1925 | 33.7894 |
+| Speed MAE | 0.6941 | 0.4943 |
+| Speed RMSE | 1.1078 | 0.8532 |
+| WPD MAE | 231.6709 | 158.3337 |
+| WPD W1 | 45.2713 | 35.8761 |
+| WPD bias abs | 35.3439 | 26.4431 |
+| Gradient MAE | 0.3491 | 0.3242 |
+| Gradient W1 | 0.2329 | 0.2491 |
+| Gradient kurtosis abs Δ | 3.7004 | 5.1312 |
+| PSD log-L2 | 0.8335 | 1.1311 |
+| PSD slope abs Δ | 0.9150 | 1.4548 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0066 |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0049 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0048 |
+| Exceedance abs Δ p90 | 0.0103 | 0.0070 |
+| Component-count curve L1 | 115.5278 | 142.1994 |
+
+### Grad-only cheap evaluation
+
+Report:
+
+```text
+docs/topology_finetuning_candidateB_factorial_grad_expanded2688_eval.md
+```
+
+| Metric | CNN | Grad-only |
+|---|---:|---:|
+| PSNRuv | 31.1925 | 33.3698 |
+| Speed MAE | 0.6941 | 0.5286 |
+| Speed RMSE | 1.1078 | 0.8963 |
+| WPD MAE | 231.6709 | 169.5510 |
+| WPD W1 | 45.2713 | 22.8114 |
+| WPD bias abs | 35.3439 | 17.5039 |
+| Gradient MAE | 0.3491 | 0.3088 |
+| Gradient W1 | 0.2329 | 0.1751 |
+| Gradient kurtosis abs Δ | 3.7004 | 2.5098 |
+| PSD log-L2 | 0.8335 | 0.8930 |
+| PSD slope abs Δ | 0.9150 | 1.3907 |
+| Exceedance abs Δ s>5 | 0.0042 | 0.0036 |
+| Exceedance abs Δ s>10 | 0.0066 | 0.0036 |
+| Exceedance abs Δ s>15 | 0.0062 | 0.0031 |
+| Exceedance abs Δ p90 | 0.0103 | 0.0041 |
+| Component-count curve L1 | 115.5278 | 97.1349 |
+
+Grad-only improved component-count curve L1 on 146/168 samples and improved gradient W1 on 154/168 samples.
+
+### Pairwise cheap-evaluation reports
+
+The pairwise cheap-evaluation reports were generated and should be inspected directly when needed:
+
+```text
+docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_eval.md
+```
+
+Corresponding per-sample metric CSVs:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_eval/all_sample_metrics_candidateB_factorial_speed_grad_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_eval/all_sample_metrics_candidateB_factorial_grad_levelset_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_eval/all_sample_metrics_candidateB_factorial_speed_levelset_expanded2688.csv
+```
+
+## XXVI.9 Per-variant topology notes and files
+
+### `speed`
+
+```text
+PD mean = 29.5783
+MT mean = 5.9996
+PD < CNN = 9/168
+MT < CNN = 61/168
+PD < GAN = 0/168
+MT-GAN recovery = 5/20
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_speed_expanded2688/
+docs/topology_finetuning_candidateB_factorial_speed_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_topology/candidateB_factorial_speed_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_expanded2688_topology/candidateB_factorial_speed_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_speed_expanded2688_batch.log
+logs/topology_candidateB_factorial_speed_expanded2688.log
+```
+
+### `levelset`
+
+```text
+PD mean = 29.5953
+MT mean = 6.0076
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_levelset_expanded2688/
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_levelset_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_topology/candidateB_factorial_levelset_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_levelset_expanded2688_topology/candidateB_factorial_levelset_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_levelset_expanded2688_batch.log
+logs/topology_candidateB_factorial_levelset_expanded2688.log
+```
+
+### `grad`
+
+```text
+PD mean = 22.9326
+MT mean = 6.0560
+PD < CNN = 157/168
+MT < CNN = 66/168
+PD < GAN = 22/168
+MT beats GAN = 154/168
+MT-GAN recovery = 10/20
+```
+
+Important changed MT-GAN cases recovered by grad-only:
+
+```text
+18, 25, 62, 63, 65, 68, 77, 79, 80, 82
+```
+
+Winner distribution after adding grad-only:
+
+```text
+PD winners: candidate=20, CNN=2, GAN=146
+MT winners: candidate=62, CNN=96, GAN=10
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_grad_expanded2688/
+docs/topology_finetuning_candidateB_factorial_grad_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_grad_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_topology/candidateB_factorial_grad_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_expanded2688_topology/candidateB_factorial_grad_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_grad_expanded2688_batch.log
+logs/topology_candidateB_factorial_grad_expanded2688.log
+```
+
+### `speed_grad`
+
+```text
+PD mean = 22.9706
+MT mean = 6.2905
+PD < CNN = 164/168
+MT < CNN = 42/168
+PD < GAN = 15/168
+MT beats GAN = 139/168
+MT-GAN recovery = 4/20
+```
+
+Recovered MT-GAN cases:
+
+```text
+6, 25, 77, 79
+```
+
+Winner distribution after adding speed+grad:
+
+```text
+PD winners: candidate=13, CNN=2, GAN=153
+MT winners: candidate=32, CNN=120, GAN=16
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_speed_grad_expanded2688/
+docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_grad_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_topology/candidateB_factorial_speed_grad_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_grad_expanded2688_topology/candidateB_factorial_speed_grad_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_speed_grad_expanded2688_batch.log
+logs/topology_candidateB_factorial_speed_grad_expanded2688.log
+```
+
+### `grad_levelset`
+
+```text
+PD mean = 22.6194
+MT mean = 6.1996
+PD < CNN = 164/168
+MT < CNN = 41/168
+PD < GAN = 17/168
+MT-GAN recovery = 7/20
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_grad_levelset_expanded2688/
+docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_grad_levelset_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_topology/candidateB_factorial_grad_levelset_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_grad_levelset_expanded2688_topology/candidateB_factorial_grad_levelset_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_grad_levelset_expanded2688_batch.log
+logs/topology_candidateB_factorial_grad_levelset_expanded2688.log
+```
+
+### `speed_levelset`
+
+```text
+PD mean = 29.4363
+MT mean = 5.9441
+PD < CNN = 11/168
+MT < CNN = 66/168
+PD < GAN = 0/168
+MT-GAN recovery = 8/20
+```
+
+Files:
+
+```text
+data_out/wind_finetune_candidateB_factorial_speed_levelset_expanded2688/
+docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_eval.md
+docs/topology_finetuning_candidateB_factorial_speed_levelset_expanded2688_topology_eval.md
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_topology/candidateB_factorial_speed_levelset_expanded2688_pd_mt_distances.csv
+ttk_runs_fixed/topology_finetuning/candidateB_factorial_speed_levelset_expanded2688_topology/candidateB_factorial_speed_levelset_expanded2688_topology_comparison.csv
+logs/candidateB_factorial_speed_levelset_expanded2688_batch.log
+logs/topology_candidateB_factorial_speed_levelset_expanded2688.log
+```
+
+## XXVI.10 Final Phase B interpretation
+
+1. **`L_grad` is the dominant PD driver.** It reduces mean PD from `29.6121` for UV-2688 to `22.9326`, reproducing about `96.7%` of full B's PD reduction.
+2. **`L_speed` and `L_levelset` do not explain the PD gain in isolation.** Speed-only, levelset-only, and speed+levelset all remain near UV in PD.
+3. **`L_levelset` is useful through interaction with `L_grad`.** Grad+levelset reaches `PD=22.6194`, slightly better than full B's `PD=22.7070`.
+4. **`L_speed` can hurt MT when combined with `L_grad`.** Grad-only has `MT=6.0560`; speed+grad worsens to `MT=6.2905`.
+5. **PD and MT respond differently.** Grad+levelset is best by mean PD among B-factorial variants, while grad-only has the cleanest MT behavior among the gradient-based B variants.
+
+Paper-ready wording:
+
+> A factorial ablation of Candidate B showed that its persistence-diagram improvement is primarily caused by gradient-magnitude supervision. Scalar-speed and soft high-speed level-set losses improved several fidelity and physical metrics in isolation, but their true TTK PD distances remained close to the vector-only control. In contrast, the gradient-only objective reduced mean PD from 29.6121 for UV-2688 to 22.9326, reproducing approximately 96.7% of full Candidate B's PD reduction. Adding the soft level-set term to the gradient loss further reduced mean PD to 22.6194, slightly outperforming full Candidate B in mean PD. However, these gains did not translate into mean merge-tree improvement, indicating that local gradient and threshold-region alignment improve persistence-diagram agreement without fully preserving merge-tree hierarchy.
+
+## XXVI.11 Status after Phase B
+
+Phase B is complete.
+
+Strongest compact B-style objectives:
+
+```text
+Best mean PD among B-factorial variants: grad+levelset
+Cleanest gradient-based MT behavior:    grad-only
+Best overall PD among this family:       C-2688
+Best MT-oriented direction overall:      repaired E2 family
+```
+
+Suggested future combinations:
+
+```text
+UV + grad + E2
+UV + grad + levelset + E2
+grad-only + L_crit
+grad+levelset + L_crit
+```
+# Part XXVII — Candidate F descriptor-recombination study at the expanded-2688 scale
+
+## XXVII.1 Purpose
+
+Candidate F was designed after the Candidate B factorial ablation separated the two strongest descriptor-specific training signals observed so far:
+
+- `L_grad` was the dominant persistence-diagram (PD) driver.
+- Repaired low-lambda E2 fixed-index supervision was the strongest merge-tree (MT) driver.
+
+The central experiment asks whether these signals can be combined directly without the full Candidate B or Candidate C scaffold:
+
+```text
+PD-oriented signal: L_grad
+MT-oriented signal: repaired E2 = L_TTKCV + L_TTKpers
+```
+
+Three variants were defined:
+
+| Variant | Objective |
+|---|---|
+| `grad_e2_low` | `L_uv + 0.05 L_grad + 0.004 L_TTKCV + 0.002 L_TTKpers` |
+| `grad_levelset_e2_low` | `L_uv + 0.05 L_grad + 0.25 L_levelset + 0.004 L_TTKCV + 0.002 L_TTKpers` |
+| `grad_crit` | `L_uv + 0.05 L_grad + 0.001 L_crit` |
+
+For both E2 variants:
+
+```text
+lambda_speed = 0
+lambda_crit = 0
+```
+
+For `grad_crit`:
+
+```text
+lambda_levelset = 0
+lambda_TTKCV = 0
+lambda_TTKpers = 0
+no E2 constraints are loaded or built
+```
+
+The recommended run order is:
+
+1. `grad_e2_low`
+2. `grad_levelset_e2_low`
+3. `grad_crit`
+
+---
+
+## XXVII.2 Implementation and workflow-safety audit
+
+Candidate F is implemented through:
+
+- `scripts/run_candidateF_expanded2688_finetune.py`
+- `scripts/run_candidateF_expanded2688_batch.sh`
+
+The final audited implementation includes the following safeguards:
+
+1. `--overwrite` and `--resume` were removed entirely.
+2. Collision protection is unconditional and cannot be bypassed.
+3. Dry runs and `--print-config` are artifact-free.
+4. The canonical training log is opened only after collision checks, preflight validation, E2 constraint validation, and the dry-run return gate.
+5. Execution is anchored to the repository root with `os.chdir(REPO_ROOT)`.
+6. The E2 constraint NPZ is loaded with `allow_pickle=False`.
+7. The NPZ hard-fails unless all of the following hold:
+   - stored `n_samples == 2688`,
+   - `sample_idx`, `sample_start`, and `sample_count` have shape `(2688,)`,
+   - `sample_idx` is exactly `{0, ..., 2687}`, each once,
+   - every sample has exactly 64 pairs,
+   - all starts are nonnegative,
+   - all pair-array lengths agree,
+   - every `sample_start + sample_count` remains within bounds,
+   - birth/death vertex IDs are within `[0, 25599]`,
+   - target values and persistence are finite,
+   - persistence values are nonnegative.
+8. The training TFRecord index set must exactly equal the NPZ index set.
+9. Candidate output `idx.npy` must be exactly ordered `0..167`.
+10. Candidate `dataIN.npy` and `dataGT.npy` must exactly match the fixed CNN benchmark arrays.
+11. TTK is never launched automatically; it remains a manual stage after cheap evaluation.
+
+The audited patch was committed as:
+
+```text
+c08e2d29
+```
+
+---
+
+## XXVII.3 Shared data and training configuration
+
+All Candidate F variants use:
+
+```text
+Training TFRecord:
+example_data_topology_expanded_2688/wind_MR-HR.tfrecord
+
+Evaluation TFRecord:
+example_data_fixed/wind_MR-HR.tfrecord
+
+Repaired E2 constraints:
+ttk_runs_fixed/topology_finetuning/
+candidateE2_fixed_lowlambda_expanded2688_constraints/
+ttk_pd_critical_pairs_gtvalues.npz
+
+Source checkpoint:
+models/wind_mr-hr/trained_cnn/cnn
+
+Training samples: 2688
+Evaluation samples: 168
+Epochs: 3
+Batch size: 4
+Learning rate: 1e-5
+```
+
+The normalized vector-field reconstruction term remains active with unit weight:
+
+```text
+lambda_uv = 1.0
+```
+
+All scalar and topology-derived terms operate on denormalized physical wind speed.
+
+---
+
+## XXVII.4 `grad_e2_low` preflight and environment validation
+
+The `grad_e2_low` dry run passed all safety and data checks:
+
+- no output-path collisions,
+- 2,688 records in the training TFRecord,
+- NPZ `n_samples = 2688`,
+- exact sample IDs `0..2687`,
+- exactly 64 pairs per sample,
+- 172,032 entries in each pair array,
+- valid pair-array bounds,
+- birth vertex IDs in `[0, 25599]`,
+- death vertex IDs in `[1, 25597]`,
+- finite target values,
+- nonnegative persistence,
+- exact TFRecord/NPZ index-set equality,
+- no dry-run artifacts created.
+
+The Python environment produced NumPy 2.x ABI warnings for optional packages such as `numexpr`, `bottleneck`, and `scikit-image`. A dedicated smoke test nevertheless confirmed:
+
+```text
+Candidate F graph built successfully
+pretrained CNN checkpoint restored successfully
+LR shape = (100, 100, 2)
+generator variables = 72
+cheap evaluator imported successfully
+```
+
+The ABI warnings did not prevent TensorFlow graph construction, checkpoint restoration, training, inference, cheap evaluation, or TTK. SSIM remained unavailable because `scikit-image` could not be imported under the current NumPy environment.
+
+---
+
+## XXVII.5 Completed `grad_e2_low` training and numerical behavior
+
+The first Candidate F variant completed successfully:
+
+```text
+grad_e2_low: TRAIN-OK, EVAL-OK
+```
+
+Final model:
+
+```text
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn
+```
+
+Inference outputs:
+
+```text
+data_out/wind_finetune_candidateF_grad_E2_low_expanded2688/
+```
+
+Post-inference validation passed:
+
+- `idx.npy`: `(168,)`, exactly ordered `0..167`,
+- `dataIN.npy`: `(168, 100, 100, 2)`,
+- `dataGT.npy`: `(168, 500, 500, 2)`,
+- `dataSR.npy`: `(168, 500, 500, 2)`,
+- all arrays finite,
+- candidate GT exactly equals the fixed CNN benchmark GT,
+- candidate input exactly equals the fixed CNN benchmark input.
+
+### Representative weighted-loss balance
+
+At iteration 2006:
+
+```text
+L_uv                         = 0.010571
+0.05 × L_grad                = 0.009151
+0.004 × L_TTKCV              = 0.010334
+0.002 × L_TTKpers            = 0.006137
+total_loss_with_ttk          = 0.036192
+```
+
+At iteration 2016:
+
+```text
+L_uv                         = 0.021363
+0.05 × L_grad                = 0.018406
+0.004 × L_TTKCV              = 0.025872
+0.002 × L_TTKpers            = 0.018597
+total_loss_with_ttk          = 0.084238
+```
+
+The E2 terms were influential but remained on the same order as the vector and gradient terms. No NaN, infinity, loss explosion, or training instability was observed.
+
+---
+
+## XXVII.6 `grad_e2_low` cheap-evaluation results
+
+### Summary metrics
+
+| Metric | Bicubic | CNN | GAN | Candidate F: grad+E2 |
+|---|---:|---:|---:|---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | **32.4949** |
+| Speed MAE (m/s) | 0.5963 | 0.6941 | 0.9026 | **0.5899** |
+| Speed RMSE (m/s) | 1.0156 | 1.1078 | 1.3775 | **0.9891** |
+| WPD MAE | 193.5403 | 231.6709 | 310.7328 | **190.6897** |
+| WPD Wasserstein-1 | 55.5103 | 45.2713 | 85.6191 | **24.7322** |
+| WPD absolute bias | 41.2244 | 35.3439 | 78.7236 | **22.6377** |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | **0.3125** |
+| Gradient W1 | 0.3282 | 0.2329 | **0.0564** | 0.1381 |
+| Gradient kurtosis absolute delta | 6.6163 | 3.7004 | 4.2010 | **3.2601** |
+| PSD log-L2 | 1.3625 | 0.8335 | **0.5139** | 0.8147 |
+| PSD slope absolute delta | 1.6684 | **0.9150** | 0.9482 | 1.1385 |
+| Exceedance absolute delta, `s>5` | 0.0095 | 0.0042 | 0.0082 | **0.0025** |
+| Exceedance absolute delta, `s>10` | 0.0085 | 0.0066 | 0.0243 | **0.0052** |
+| Exceedance absolute delta, `s>15` | 0.0074 | 0.0062 | 0.0096 | **0.0027** |
+| Exceedance absolute delta, p90 | 0.0109 | 0.0103 | 0.0123 | **0.0047** |
+| Component-count curve L1 | 173.1855 | 115.5278 | 124.6567 | **81.1815** |
+
+SSIM was not computed because of the existing NumPy/scikit-image binary incompatibility.
+
+### Pairwise improvement against CNN
+
+Candidate F improved over CNN on:
+
+```text
+PSNRuv:                    168/168
+Speed MAE:                 168/168
+Speed RMSE:                168/168
+WPD MAE:                   168/168
+WPD W1:                    156/168
+Gradient MAE:              168/168
+Gradient W1:               167/168
+Exceedance s>5:            123/168
+Exceedance s>10:           117/168
+Exceedance s>15:           143/168
+Exceedance p90:            141/168
+Component-count curve L1:  166/168
+```
+
+### Important regressions and caveats
+
+The main cheap-metric regression was:
+
+```text
+PSD slope absolute delta:
+CNN = 0.9150
+Candidate F = 1.1385
+improved on only 3/168 samples
+```
+
+Although the mean gradient-kurtosis error improved, Candidate F improved that metric on only 68/168 samples and worsened on 100/168. These results should remain visible in any balanced interpretation.
+
+### Scalar-speed plausibility
+
+```text
+GT maximum speed = 33.9885 m/s
+SR maximum speed = 39.4850 m/s
+SR/GT maximum ratio = 1.1617
+Speed MAE = 0.5899 m/s
+```
+
+The SR maximum was approximately 16.2% above the GT maximum, below the script's 1.25 warning threshold and substantially less extreme than the earlier failed candidate with an SR maximum near 44.6 m/s.
+
+---
+
+## XXVII.7 Completed true TTK topology results
+
+The manual one-thread TTK pipeline completed successfully for all 168 samples.
+
+### Mean topology distances
+
+Lower is better.
+
+| Method | PD mean | MT mean |
+|---|---:|---:|
+| CNN baseline | 27.4063 | 5.8678 |
+| GAN baseline | **20.8641** | 8.3481 |
+| Gradient-only factorial | 22.9326 | 6.0560 |
+| Gradient+levelset factorial | **22.6194** | 6.1996 |
+| UV+E2-low | 25.0721 | **5.5940** |
+| B+E2-low | 23.9876 | 5.6774 |
+| C+E2-low | 24.2686 | 5.6628 |
+| **Candidate F: grad+E2-low** | **23.8382** | **5.6566** |
+
+### Candidate F relative to major references
+
+Relative to CNN:
+
+```text
+PD improvement = 27.4063 - 23.8382 = 3.5681
+PD relative reduction ≈ 13.0%
+
+MT improvement = 5.8678 - 5.6566 = 0.2112
+MT relative reduction ≈ 3.6%
+```
+
+Relative to the gradient-only factorial:
+
+```text
+PD: Candidate F is 0.9056 worse
+MT: Candidate F is 0.3994 better
+```
+
+Relative to gradient+levelset:
+
+```text
+PD: Candidate F is 1.2188 worse
+MT: Candidate F is 0.5430 better
+```
+
+Relative to repaired native E2 combinations:
+
+```text
+vs UV+E2:
+  PD better by 1.2339
+  MT worse by 0.0626
+
+vs B+E2:
+  PD better by 0.1494
+  MT better by 0.0208
+
+vs C+E2:
+  PD better by 0.4304
+  MT better by 0.0062
+```
+
+Candidate F therefore improves both mean topology metrics relative to B+E2 and C+E2, while remaining slightly behind UV+E2 on mean MT.
+
+### Per-sample topology counts
+
+```text
+Candidate F PD < CNN: 166/168
+Candidate F MT < CNN: 98/168
+
+Candidate F PD < GAN: 8/168
+```
+
+The GAN remains better in mean PD, but Candidate F is much better in MT and in direct/physical fidelity.
+
+### Recovery of the historical MT-GAN cases
+
+Among the 20 samples on which GAN originally beat CNN in MT:
+
+```text
+Candidate F now wins: 19/20
+GAN still wins:        1/20
+CNN now wins:          0/20
+```
+
+This is important evidence that Candidate F recovers nearly all of the structural cases that previously favored GAN, without inheriting GAN's poor direct-fidelity and physical errors.
+
+---
+
+## XXVII.8 Scientific interpretation
+
+Candidate F `grad_e2_low` is the strongest balanced model produced so far.
+
+It is not the absolute winner on every descriptor:
+
+- GAN remains best in mean PD.
+- Gradient+levelset remains better than Candidate F in mean PD among the tested fine-tuned CNN variants.
+- UV+E2 remains slightly better in mean MT.
+
+However, Candidate F uniquely combines:
+
+1. a strong PD improvement relative to CNN,
+2. a genuine mean MT improvement relative to CNN,
+3. better mean PD and MT than B+E2 and C+E2,
+4. near-best E2-family MT behavior,
+5. substantially improved PSNR, speed, WPD, gradient, exceedance, and component-count metrics,
+6. recovery of 19/20 historical MT-GAN-win cases.
+
+The result supports the descriptor-recombination hypothesis:
+
+> Gradient-magnitude supervision provides the principal PD-oriented signal, while repaired low-lambda TTK fixed-index supervision provides the principal MT-oriented signal. Combining the two does not preserve the absolute best result of either isolated direction, but it produces a substantially better compromise: Candidate F improves mean PD and mean MT relative to the pretrained CNN while simultaneously improving nearly all direct-fidelity, physical, gradient, exceedance, and component-count measures.
+
+A more cautious paper-ready statement is:
+
+> Combining gradient-magnitude supervision with repaired low-weight TTK critical-pair constraints produced the strongest balanced result in our expanded-data study. The combined model reduced mean persistence-diagram distance from 27.4063 to 23.8382 and mean merge-tree distance from 5.8678 to 5.6566 relative to the pretrained CNN. It improved PD on 166 of 168 evaluation samples and MT on 98 of 168, while also improving PSNR, scalar-speed error, wind-power-distribution error, gradient error, exceedance behavior, and component-count curves. The combination did not outperform the GAN in mean PD or UV+E2 in mean MT, indicating a tradeoff rather than universal dominance, but it provided the strongest overall balance across topology, fidelity, and physical metrics.
+
+---
+
+## XXVII.9 Completed artifact index
+
+### Training and inference
+
+```text
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_E2_low_expanded2688/
+
+data_out/
+wind_finetune_candidateF_grad_E2_low_expanded2688/
+```
+
+### Cheap evaluation
+
+```text
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_eval/
+
+docs/
+topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md
+```
+
+### TTK topology
+
+```text
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology_vti/
+
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+
+docs/
+topology_finetuning_candidateF_grad_E2_low_expanded2688_topology_eval.md
+```
+
+### Main result files
+
+```text
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+candidateF_grad_E2_low_expanded2688_pd_mt_distances.csv
+
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+candidateF_grad_E2_low_expanded2688_topology_comparison.csv
+
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_topology/
+phase_c_final/phase_c_results.csv
+```
+
+### Logs
+
+```text
+logs/candidateF_grad_E2_low_expanded2688_batch.log
+logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log
+logs/topology_candidateF_grad_E2_low_expanded2688.log
+```
+
+---
+
+## XXVII.10 Completed second variant: `grad_levelset_e2_low`
+
+The second Candidate F variant used:
+
+```text
+lambda_uv       = 1.0
+lambda_speed    = 0.0
+lambda_grad     = 0.05
+lambda_levelset = 0.25
+lambda_crit     = 0.0
+lambda_TTKCV    = 0.004
+lambda_TTKpers  = 0.002
+```
+
+The dry run passed all collision, TFRecord, and NPZ checks. Three-epoch training, paired inference, cheap evaluation, and the one-thread TTK pipeline then completed successfully.
+
+### XXVII.10.1 Cheap-evaluation summary
+
+| Metric | CNN | Candidate F2 | Change from CNN |
+|---|---:|---:|---:|
+| PSNRuv | 31.1925 | **32.5762** | +1.3837 |
+| Speed MAE | 0.6941 | **0.5788** | -0.1153 |
+| Speed RMSE | 1.1078 | **0.9776** | -0.1301 |
+| WPD MAE | 231.6709 | **186.8230** | -44.8479 |
+| WPD W1 | 45.2713 | **20.1529** | -25.1184 |
+| WPD bias | 35.3439 | **17.4210** | -17.9229 |
+| Gradient MAE | 0.3491 | **0.3122** | -0.0369 |
+| Gradient W1 | 0.2329 | **0.1459** | -0.0871 |
+| Gradient kurtosis abs. delta | 3.7004 | **3.1483** | -0.5521 |
+| PSD log-L2 | 0.8335 | **0.8292** | -0.0044 |
+| PSD slope abs. delta | **0.9150** | 1.1478 | +0.2327 |
+| Exceedance `s>5` | 0.0042 | **0.0021** | -0.0021 |
+| Exceedance `s>10` | 0.0066 | **0.0035** | -0.0031 |
+| Exceedance `s>15` | 0.0062 | **0.0023** | -0.0039 |
+| Exceedance p90 | 0.0103 | **0.0038** | -0.0064 |
+| Component-count curve L1 | 115.5278 | **83.0784** | -32.4494 |
+
+Per-sample wins relative to CNN included:
+
+```text
+PSNRuv:                    168/168
+Speed MAE:                 168/168
+Speed RMSE:                168/168
+WPD MAE:                   168/168
+WPD W1:                    158/168
+WPD bias:                  151/168
+Gradient MAE:              168/168
+Gradient W1:               167/168
+Exceedance s>5:            132/168
+Exceedance s>10:           126/168
+Exceedance s>15:           143/168
+Exceedance p90:            150/168
+Component-count curve L1:  159/168
+```
+
+The main regression remained PSD slope error, which improved on only 2/168 samples. Mean gradient-kurtosis error improved, but its win count remained 68/168.
+
+Scalar range:
+
+```text
+GT maximum speed = 33.9885 m/s
+SR maximum speed = 39.0536 m/s
+SR/GT maximum ratio ≈ 1.1490
+Speed MAE = 0.5788 m/s
+```
+
+### XXVII.10.2 True topology results
+
+| Method | PD mean | MT mean |
+|---|---:|---:|
+| CNN | 27.4063 | 5.8678 |
+| GAN | 20.8641 | 8.3481 |
+| **Candidate F2** | **23.7481** | **5.6742** |
+
+Relative to CNN:
+
+```text
+PD improvement = 3.6582
+PD relative reduction ≈ 13.35%
+
+MT improvement = 0.1936
+MT relative reduction ≈ 3.30%
+```
+
+Other recorded counts:
+
+```text
+Candidate F2 PD < GAN: 12/168
+
+Among the 20 historical MT-GAN-win cases:
+Candidate F2 now wins: 16/20
+GAN still wins:        4/20
+CNN now wins:          0/20
+```
+
+The exact Candidate F2 `PD < CNN` and `MT < CNN` counts were not copied into these research notes during the run; the mean values and the reported counts above remain authoritative.
+
+### XXVII.10.3 F2 versus F1
+
+```text
+F1 PD = 23.8382
+F2 PD = 23.7481
+F2 improves PD by 0.0901
+
+F1 MT = 5.6566
+F2 MT = 5.6742
+F2 worsens MT by 0.0176
+```
+
+Adding the soft level-set term therefore improved direct fidelity, scalar-speed error, WPD metrics, exceedance behavior, and PD slightly, while slightly weakening MT, gradient W1, and component-count curve L1.
+
+---
+
+## XXVII.11 Completed third variant: `grad_crit`
+
+The final Candidate F variant used:
+
+```text
+lambda_uv       = 1.0
+lambda_speed    = 0.0
+lambda_grad     = 0.05
+lambda_levelset = 0.0
+lambda_crit     = 0.001
+lambda_TTKCV    = 0.0
+lambda_TTKpers  = 0.0
+requires_e2     = False
+constraints_npz = NONE
+```
+
+This was a clean control testing whether the local-maxima critical proxy adds information beyond gradient supervision without any repaired E2 terms.
+
+The dry run, training, paired inference, cheap evaluation, and TTK pipeline all completed successfully.
+
+### XXVII.11.1 Weighted-loss behavior
+
+Representative late-training values showed:
+
+```text
+L_uv:               approximately 0.007–0.024
+0.05 × L_grad:      approximately 0.006–0.025
+0.001 × L_crit:     approximately 0.0006–0.0041
+```
+
+The critical loss was active but appropriately smaller than the base vector and weighted-gradient terms.
+
+### XXVII.11.2 Cheap-evaluation summary
+
+| Metric | CNN | Candidate F3 | Change |
+|---|---:|---:|---:|
+| PSNRuv | 31.1925 | **33.3042** | +2.1117 |
+| Speed MAE | 0.6941 | **0.5326** | -0.1615 |
+| Speed RMSE | 1.1078 | **0.9026** | -0.2052 |
+| WPD MAE | 231.6709 | **174.1976** | -57.4733 |
+| WPD W1 | 45.2713 | **32.0205** | -13.2508 |
+| WPD bias | 35.3439 | **28.3295** | -7.0144 |
+| Gradient MAE | 0.3491 | **0.3087** | -0.0404 |
+| Gradient W1 | 0.2329 | **0.1755** | -0.0574 |
+| Gradient kurtosis abs. delta | 3.7004 | **2.5256** | -1.1748 |
+| PSD log-L2 | **0.8335** | 0.9029 | +0.0693 |
+| PSD slope abs. delta | **0.9150** | 1.6221 | +0.7071 |
+| Exceedance `s>5` | **0.0042** | 0.0063 | +0.0020 |
+| Exceedance `s>10` | **0.0066** | 0.0086 | +0.0021 |
+| Exceedance `s>15` | 0.0062 | **0.0033** | -0.0030 |
+| Exceedance p90 | 0.0103 | **0.0046** | -0.0057 |
+| Component-count curve L1 | 115.5278 | **96.7510** | -18.7768 |
+
+Per-sample wins relative to CNN:
+
+```text
+PSNRuv:                    168/168
+Speed MAE:                 168/168
+Speed RMSE:                168/168
+WPD MAE:                   168/168
+WPD W1:                    150/168
+WPD bias:                  133/168
+Gradient MAE:              168/168
+Gradient W1:               154/168
+Gradient kurtosis:         103/168
+Exceedance s>5:             38/168
+Exceedance s>10:            77/168
+Exceedance s>15:           130/168
+Exceedance p90:            135/168
+Component-count curve L1:  150/168
+```
+
+Candidate F3 produced the best direct-fidelity, speed-error, WPD MAE, gradient MAE, and gradient-kurtosis means among the Candidate F variants. Its low-threshold exceedance, PSD, and component-count behavior were weaker than the E2-based variants.
+
+Scalar range:
+
+```text
+GT maximum speed = 33.9885 m/s
+SR maximum speed = 36.6417 m/s
+SR/GT maximum ratio ≈ 1.0781
+Speed MAE = 0.5326 m/s
+```
+
+### XXVII.11.3 True topology results
+
+| Method | PD mean | MT mean |
+|---|---:|---:|
+| CNN | 27.4063 | **5.8678** |
+| GAN | **20.8641** | 8.3481 |
+| **Candidate F3** | **22.0179** | 5.9840 |
+
+Relative to CNN:
+
+```text
+PD improvement = 5.3884
+PD relative reduction ≈ 19.66%
+
+MT regression = 0.1162
+MT relative increase ≈ 1.98%
+```
+
+Per-sample topology counts:
+
+```text
+Candidate F3 PD < CNN: 168/168
+Candidate F3 MT < CNN: 61/168
+Candidate F3 PD < GAN: 35/168
+```
+
+Among the 20 historical MT-GAN-win cases:
+
+```text
+Candidate F3 now wins: 12/20
+GAN still wins:        8/20
+CNN now wins:          0/20
+```
+
+### XXVII.11.4 F3 versus gradient-only
+
+| Variant | PD mean | MT mean |
+|---|---:|---:|
+| Gradient only | 22.9326 | 6.0560 |
+| **Gradient + critical proxy** | **22.0179** | **5.9840** |
+
+Adding `L_crit` improved PD by `0.9147` and MT by `0.0720` relative to gradient-only. The critical proxy was therefore not redundant, even though mean MT remained worse than CNN.
+
+---
+
+## XXVII.12 Final Candidate F comparison
+
+| Method | Objective summary | PD mean | MT mean | Main strength |
+|---|---|---:|---:|---|
+| CNN | pretrained baseline | 27.4063 | 5.8678 | reference |
+| GAN | adversarial baseline | **20.8641** | 8.3481 | strongest PD |
+| Gradient only | `L_uv + 0.05L_grad` | 22.9326 | 6.0560 | strong PD |
+| **F1: grad+E2** | gradient + repaired E2 | 23.8382 | **5.6566** | best Candidate F MT |
+| **F2: grad+levelset+E2** | F1 + soft level-set | 23.7481 | 5.6742 | preferred overall balance |
+| **F3: grad+crit** | gradient + local-maxima proxy | **22.0179** | 5.9840 | best Candidate F PD/fidelity |
+
+### Direct and physical metrics
+
+| Metric | F1 | F2 | F3 |
+|---|---:|---:|---:|
+| PSNRuv | 32.4949 | 32.5762 | **33.3042** |
+| Speed MAE | 0.5899 | 0.5788 | **0.5326** |
+| Speed RMSE | 0.9891 | 0.9776 | **0.9026** |
+| WPD MAE | 190.6897 | 186.8230 | **174.1976** |
+| WPD W1 | 24.7322 | **20.1529** | 32.0205 |
+| WPD bias | 22.6377 | **17.4210** | 28.3295 |
+| Gradient MAE | 0.3125 | 0.3122 | **0.3087** |
+| Gradient W1 | **0.1381** | 0.1459 | 0.1755 |
+| Component-count L1 | **81.1815** | 83.0784 | 96.7510 |
+
+### Descriptor-specific interpretation
+
+```text
+Gradient + critical proxy:
+  strongest Candidate F PD and direct fidelity
+  improves on gradient-only
+  mean MT remains worse than CNN
+  weak low-threshold exceedance and PSD behavior
+
+Gradient + repaired E2:
+  strongest Candidate F MT
+  recovers 19/20 historical MT-GAN-win cases
+  weaker PD than grad+crit
+
+Gradient + level-set + repaired E2:
+  slightly better PD than grad+E2
+  slightly worse MT than grad+E2
+  strongest WPD and exceedance behavior
+  preferred overall multi-metric balance
+```
+
+These terms capture complementary, not interchangeable, aspects of scalar-field structure.
+
+---
+
+## XXVII.13 Final scientific conclusion
+
+> The completed Candidate F study revealed a descriptor-specific separation between persistence-diagram and merge-tree behavior. Combining gradient-magnitude supervision with a local-maxima critical-value proxy produced the strongest fine-tuned-CNN persistence-diagram result, reducing mean PD from 27.4063 to 22.0179, but mean MT increased from 5.8678 to 5.9840. In contrast, combining gradient supervision with repaired low-weight TTK critical-pair constraints produced smaller PD improvements but genuine MT improvements, with the gradient-plus-E2 variant reaching mean MT 5.6566 and recovering 19 of the 20 historical MT cases that had favored the GAN over the CNN. Adding soft level-set supervision shifted this compromise slightly toward PD, scalar fidelity, WPD, and exceedance accuracy while retaining an improved mean MT of 5.6742. The results indicate that local extrema, threshold-region supervision, and TTK-selected persistence-pair values encode complementary aspects of scalar-field topology rather than interchangeable loss signals.
+
+Final task-dependent ranking:
+
+```text
+Best Candidate F PD and direct fidelity:
+  grad + crit
+  PD = 22.0179
+  MT = 5.9840
+
+Best Candidate F MT:
+  grad + E2
+  PD = 23.8382
+  MT = 5.6566
+
+Preferred overall multi-metric balance:
+  grad + levelset + E2
+  PD = 23.7481
+  MT = 5.6742
+```
+
+This should be presented as a tradeoff, not universal dominance.
+
+---
+
+## XXVII.14 Completed artifact index
+
+### Candidate F2
+
+```text
+Model:
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/cnn/cnn
+
+Inference:
+data_out/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/
+
+Cheap evaluation:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_levelset_E2_low_expanded2688_eval/
+
+Cheap report:
+docs/topology_finetuning_candidateF_grad_levelset_E2_low_expanded2688_eval.md
+
+TTK outputs:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_levelset_E2_low_expanded2688_topology/
+
+Topology report:
+docs/topology_finetuning_candidateF_grad_levelset_E2_low_expanded2688_topology_eval.md
+
+Logs:
+logs/candidateF_grad_levelset_E2_low_expanded2688_batch.log
+logs/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688.log
+logs/topology_candidateF_grad_levelset_E2_low_expanded2688.log
+```
+
+### Candidate F3
+
+```text
+Model:
+models_fixed/topology_finetuning/
+wind_finetune_candidateF_grad_crit_expanded2688/cnn/cnn
+
+Inference:
+data_out/wind_finetune_candidateF_grad_crit_expanded2688/
+
+Cheap evaluation:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_crit_expanded2688_eval/
+
+Cheap report:
+docs/topology_finetuning_candidateF_grad_crit_expanded2688_eval.md
+
+TTK outputs:
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_crit_expanded2688_topology/
+
+Topology report:
+docs/topology_finetuning_candidateF_grad_crit_expanded2688_topology_eval.md
+
+Logs:
+logs/candidateF_grad_crit_expanded2688_batch.log
+logs/wind_finetune_candidateF_grad_crit_expanded2688.log
+logs/topology_candidateF_grad_crit_expanded2688.log
+```
+
+---
+
+## XXVII.15 Final Candidate F status
+
+```text
+grad_e2_low:
+  training complete
+  cheap evaluation complete
+  TTK complete
+  PD = 23.8382
+  MT = 5.6566
+
+grad_levelset_e2_low:
+  training complete
+  cheap evaluation complete
+  TTK complete
+  PD = 23.7481
+  MT = 5.6742
+
+grad_crit:
+  training complete
+  cheap evaluation complete
+  TTK complete
+  PD = 22.0179
+  MT = 5.9840
+```
+
+The Candidate F experiment series is complete.
+
+---

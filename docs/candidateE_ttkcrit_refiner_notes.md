@@ -1,141 +1,68 @@
 # Candidate E TTK Critical-Pair Refiner Notes
 
-**Updated:** 2026-05-20 (E1-parser-fix)
+**Generated:** 2026-05-20T13:48:02
 
 Candidate E = Candidate C losses + Candidate B level-set loss + TTK critical-pair losses (Kissi-style).
 
----
-
-## Status
-
-Real data not yet available in this environment. Both scripts abort cleanly
-with actionable error messages:
-
-- `extract_ttk_pd_critical_pairs.py` — aborts (exit 1) when `candidateD_topology/pd/GT/` is missing/empty.
-- `run_candidateE_ttkcrit_refiner.py` — aborts (exit 1) when:
-  - NPZ is missing required key `sample_idx` (old format — regenerate NPZ).
-  - NPZ has fewer than 168 samples (without `--allow-partial-constraints`).
-  - `data_out_fixed/wind_mrhr_cnn/dataSR.npy` is missing.
-
-**Pre-conditions before training:**
-
-1. Run TTK pipeline on CNN-baseline or Candidate C output to produce 168 GT PD VTU files.
-2. Run extraction (requires 168 samples):
-   ```
-   python3 scripts/extract_ttk_pd_critical_pairs.py \
-     --pd-dir ttk_runs_fixed/topology_finetuning/candidateD_topology/pd/GT \
-     --out-dir ttk_runs_fixed/topology_finetuning/candidateE_constraints \
-     --patch 160 --persistence-frac 0.01 --top-k 64 --expected-samples 168
-   ```
-3. Ensure `data_out_fixed/wind_mrhr_cnn/` has `dataSR.npy` and `dataGT.npy`.
-4. Run diagnostic (no training):
-   ```
-   python3 scripts/run_candidateE_ttkcrit_refiner.py \
-     --diagnostic-only \
-     --data-dir data_out_fixed/wind_mrhr_cnn \
-     --constraints ttk_runs_fixed/topology_finetuning/candidateE_constraints/ttk_pd_critical_pairs.npz \
-     --lambda-ttkcv 0.0 --lambda-ttkpers 0.0
-   ```
-
----
-
-## Fixes Applied (E1-fix)
-
-### A. extract_ttk_pd_critical_pairs.py
-
-- Removed silent archive fallback; added `--allow-archive-fallback` (CI only, default off).
-- Aborts with clear message when `--pd-dir` has zero VTU files.
-- Parses `sample_idx` from filenames using regex `_s(\d+)_` (e.g. `candidateD_GT_s113_...`).
-- Stores `sample_idx` array in NPZ; sorts results by numeric sample index.
-- `--expected-samples 168` guard; `--allow-partial` to override.
-- Writes human-readable CSV with columns: `sample_idx`, `sample_name`, `pair_id`, `pair_type`, `birth_vid`, `death_vid`, `birth_y`, `birth_x`, `death_y`, `death_x`, `birth_val`, `death_val`, `persistence`.
-- Full output validation: finite values, vertex IDs in `[0, patch*patch)`, `y`/`x` in `[0, patch)`, `pair_type != -1`.
-- Prints per-sample stats and examples for samples 6, 18, 25, 80, 162 if present.
-
-### C. extract_ttk_pd_critical_pairs.py (E1-parser-fix)
-
-- Adds VTK Python reader path (`_try_vtk_reader`): prefers `import vtk` when available;
-  falls back to manual binary parser.
-- Fixes `nblk > 1` binary-parsing bug: old code assumed 24-char header (nblk=1, UInt32)
-  always. For nblk=2 the header is 28 chars; reading data from `off+24` landed inside the
-  header and caused `zlib.Error -3 "unknown compression method"` on ~48/168 Spark files.
-  Fix: decode `nblk` from first 24 chars, compute `full_hdr_chars = ((3+nblk)*hint+2)//3*4`,
-  read full header, start data at `off+full_hdr_chars`.
-- Adds `_header_int_size()`: reads `header_type` from VTK XML to handle both UInt32 (hint=4)
-  and UInt64 (hint=8) variants.
-- Debug-quality error messages: first-4-bytes hex, array name, file path in all exceptions.
-- Raw docstring `r"""..."""` to suppress `SyntaxWarning` from `_s(\d+)_` pattern.
-
-### B. run_candidateE_ttkcrit_refiner.py
-
-- `--constraints` is now required; aborts if file missing or invalid.
-- `TTKConstraints.__init__` validates required NPZ keys; aborts with clear message if missing.
-- `constraints.n_samples < 168` guard with `--allow-partial-constraints` override.
-- `TTKConstraints.get(sample_idx)` uses dict lookup (sample_idx → row); no modulo fallback.
-- Uses `idx.npy` for actual sample id during training when available.
-- `lambda_ttkcv` and `lambda_ttkpers` default to `0.0` (calibrate from diagnostic).
-- Added `L_levelset`: sigmoid soft exceedance at 5/10/15 m/s with `k=10`.
-- NaN/inf abort on every loss term at every training step.
-- Added `--dry-run` (5-step epoch, no output save) and `--max-pairs-per-sample`.
-
----
-
-## Loss Structure
+## Configuration
 
 ```
-L_total = L_uv
-        + lambda_speed    * L_speed         (default 0.01)
-        + lambda_grad     * L_grad          (default 0.05)
-        + lambda_crit     * L_crit          (default 0.001; Candidate C pool-3 maxima proxy)
-        + lambda_levelset * L_levelset      (default 0.25; sigmoid 5/10/15 m/s)
-        + lambda_ttkcv    * L_ttkcv         (default 0.0; calibrate from diagnostic)
-        + lambda_ttkpers  * L_ttkpers       (default 0.0; calibrate from diagnostic)
+  data_dir                       = data_out_fixed/wind_mrhr_cnn
+  constraints                    = ttk_runs_fixed/topology_finetuning/candidateE2_constraints/ttk_pd_critical_pairs_gtvalues.npz
+  out_dir                        = /home/adadhwal/PhIRE/data_out/wind_finetune_pilot_candidateE
+  model_dir                      = /home/adadhwal/PhIRE/models_fixed/topology_finetuning/wind_finetune_pilot_candidateE
+  log_path                       = /home/adadhwal/PhIRE/logs/wind_finetune_pilot_candidateE.log
+  report_path                    = /home/adadhwal/PhIRE/docs/candidateE_ttkcrit_refiner_notes.md
+  epochs                         = 3
+  lr                             = 0.0001
+  lambda_speed                   = 0.01
+  lambda_grad                    = 0.05
+  lambda_crit                    = 0.001
+  lambda_levelset                = 0.25
+  lambda_ttkcv                   = 0.04
+  lambda_ttkpers                 = 0.02
+  residual_scale                 = 0.1
+  seed                           = 42
+  max_pairs_per_sample           = 0
+  allow_partial_constraints      = False
+  diagnostic_only                = False
+  dry_run                        = True
 ```
 
----
+## Diagnostic Loss Breakdown
+
+- Real data          : YES
+- Real constraints   : YES
+- Constraint samples : 168
+- First sample id    : 0
+- Pairs used         : 64
+
+| Term | Raw value | λ | Weighted |
+|------|-----------|---|----------|
+| L_uv      | 1.119733 | 1.0 | 1.119733 |
+| L_speed   | 1.647115 | 0.01 | 0.016471 |
+| L_grad    | 0.631257 | 0.05 | 0.031563 |
+| L_crit    | 9.610543 | 0.001 | 0.009611 |
+| L_levelset| 0.036278 | 0.25 | 0.009069 |
+| L_ttkcv   | 1.395823 | 0.04 | 0.055833 |
+| L_ttkpers | 2.865361 | 0.02 | 0.057307 |
+
+L_ttkcv / L_uv   = **1.2466×**
+L_ttkpers / L_uv = **2.5590×**
+TTK loss time    = 0.39 ms
+L_ttkcv → model  = **YES**
 
 ## Persistence Sign Convention
 
 TTK stores `persistence = |death_scalar - birth_scalar|` (unsigned).
+The extraction script stores `death_val = birth_val + persistence_raw`,
+which gives `|death_val - birth_val| = persistence_raw`.
+Both `L_ttkcv` and `L_ttkpers` are direction-agnostic:
+`L_ttkpers` penalises `|sr_death - sr_birth| vs gt_persistence`.
 
-The extraction script stores:
-- `birth_val` = scalar at birth vertex
-- `death_val` = `birth_val + persistence_raw`
-- `persistence` = `|death_val - birth_val|`
+## Training Loss History
 
-Both TTK loss functions are direction-agnostic:
+| Epoch | L_uv | L_speed | L_grad | L_crit | L_levelset | L_ttkcv | L_ttkpers | L_total |
+|-------|------|---------|--------|--------|------------|---------|-----------|--------|
+| 1 | 1.20168 | 1.75312 | 0.69673 | 10.85547 | 0.03603 | 1.49146 | 2.35060 | 1.38058 |
 
-- **L_ttkcv**: `0.5 * (MSE(sr[birth_yx], birth_val) + MSE(sr[death_yx], death_val))`
-- **L_ttkpers**: `MSE(|sr[death] - sr[birth]|, gt_persistence)`
-
-The ordering of birth and death vertices depends on the TTK filtration direction
-and is not assumed. The unsigned convention matches how TTK stores data in VTU files.
-
----
-
-## Abort Behavior Verified
-
-| Scenario | Script | Exit |
-|---|---|---|
-| Real 168 GT VTU missing | extraction | 1 (clear error) |
-| Archive fallback without flag | extraction | 1 (clear error) |
-| NPZ missing `sample_idx` key | refiner | 1 (ValueError) |
-| NPZ has 8 < 168 samples | refiner | 1 (without --allow-partial-constraints) |
-| dataSR.npy missing | refiner | 1 (clear error) |
-
-## Known Failure Mode (Fixed in E1-parser-fix)
-
-On Spark, ~48/168 VTU files failed with:
-
-```
-Error -3 while decompressing data: unknown compression method
-```
-
-Root cause: DataArrays with `nblk > 1` compressed blocks have a larger VTK ZLib header.
-For `nblk=2` (UInt32): header is 20 bytes → 28 b64 chars with `=` padding at position 27.
-The old code always assumed a 24-char header, so it read data starting at `off+24`, which
-was inside the 28-char header. `base64.b64decode` stopped at the `=` and returned only 2
-bytes; `zlib.decompress(2 bytes)` → Error -3.
-
-Fix: decode `nblk` from the first 24 chars, then compute `full_hdr_chars` from `nblk`
-before reading any data. Backward-compatible: for `nblk=1`, `full_hdr_chars = 24` (same as before).

@@ -1,7 +1,7 @@
 # Candidate D/Dpd and E/E2 Topology-Alignment Audit
 
 **Date:** 2026-07-05
-**Branch:** `claude/audit-phire-wind-magnitude-sfqdw`
+**Branch:** `codex/audit-phire-wind-magnitude-sfqdw`
 **Scope:** Code-level audit of Candidate D/Dpd (differentiable PD-Wasserstein
 residual refiner) and Candidate E/E2 (TTK critical-pair residual refiner),
 requested to explain why neither improved the final TTK PD/MT metrics.

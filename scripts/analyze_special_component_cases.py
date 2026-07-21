@@ -260,7 +260,7 @@ def _load_physics_csv(path: Path) -> Optional[Dict[int, Dict[str, str]]]:
                 if m not in by_method:
                     continue
                 try:
-                    v = float(by_method[m].get(col, "nan"))
+                    v = abs(float(by_method[m].get(col, "nan")))
                     if not math.isnan(v):
                         vals[m] = v
                 except (ValueError, TypeError):
@@ -318,7 +318,12 @@ def _build_dynamic_groups(
             votes.count("GAN") > max(votes.count("CNN"), votes.count("BICUBIC"), 0)
             if votes else False
         )
-        if "gan_majority_mt_rejects_gan" in gtxt or (majority_gan and mt != "GAN"):
+        gtxt_l = gtxt.lower()
+        if (
+            "gan_majority_mt_rejects_gan" in gtxt_l
+            or ("gan_metric_majority" in gtxt_l and mt != "GAN")
+            or (majority_gan and mt != "GAN")
+        ):
             gm.append(sid)
 
     return [

@@ -2,7 +2,7 @@
 
 ## 0. Run mode
 
-**AUDIT MODE (`--audit-allow-missing`).** This is a permissive inventory pass: the unified table below intentionally includes empty cells for any method/metric with no source artifact in this checkout. Do not treat it as authoritative -- see section 9.
+**STRICT MODE (`--strict-primary`): PASSED.** Every primary method met the completeness/validation criteria (168 cheap rows with sample_idx exactly 0..167, finite nonnegative PD/MT for the 18 learned/baseline-with-topology methods, PD/MT mean reproduction within 0.0001). The tables below are fully authoritative -- no placeholder rows.
 
 ## 1. Scope and primary/secondary method distinction
 
@@ -15,7 +15,7 @@ See `ttk_runs_fixed/unified_candidate_evaluation/method_inventory.csv`, `docs/un
 ## 3. Exact table dimensions
 
 - `unified_primary_per_sample_long.csv`: 19 methods x 168 samples = 3192 rows, one row per (method_id, sample_idx), no duplicates.
-- Of these 19 primary methods, **2 have real per-sample data** in this repository checkout (cnn, gan), and **17 have zero real data** (bicubic, uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, candidate_b, candidate_c, uv_crit, uv_e2, b_e2, c_e2, f1_grad_e2, f2_grad_levelset_e2, f3_grad_crit).
+- Of these 19 primary methods, **19 have real per-sample data** in this repository checkout (bicubic, cnn, gan, uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, candidate_b, candidate_c, uv_crit, uv_e2, b_e2, c_e2, f1_grad_e2, f2_grad_levelset_e2, f3_grad_crit), and **0 have zero real data** (none).
 
 ## 4. Metric families and representations
 
@@ -24,20 +24,20 @@ See `column_mapping.csv`. Families: `vector_uv` (psnruv), `scalar_speed` (ssim_s
 ## 5. Validation results
 
 - Topology PD/MT distance columns are resolved per-file via `resolve_topology_distance_columns()` (generic `pd_distance`/`mt_distance`, exact `pd_distance_<method>`/`mt_distance_<method>`, or a unique `pd_distance_*`/`mt_distance_*` prefix match) rather than assumed to be the generic name -- a topology CSV whose distance columns cannot be unambiguously resolved hard-fails the whole run immediately rather than silently reporting `row_count_topology=168` with unpopulated distances. See `topology_pd_source_column`/`topology_mt_source_column`/`topology_schema_status` in `method_inventory.csv`.
-- Topology-mean reproduction: **2 PASS**, **0 FAIL**, **16 NO_DATA** out of 18 primary methods with an expected value.
+- Topology-mean reproduction: **18 PASS**, **0 FAIL**, **0 NO_DATA** out of 18 primary methods with an expected value.
 - Cheap-metric completeness (168 rows, sample_idx exactly 0..167, no duplicates): checked for every primary method with any discovered source (baseline-harvested, legacy-combined, or a resolved candidate all_sample_metrics CSV).
 - Join (cheap metrics <-> true topology, one-to-one on sample_idx): every per-sample record is a single merged dict keyed by sample_idx, so a missing cheap or topology value for a given sample_idx shows up directly as a non-finite cell rather than a silent row-count mismatch.
 
 ## 6. Baseline duplicate-consistency audit
 
-Discovered 0 candidate `all_sample_metrics_*.csv` file(s) under `ttk_runs_fixed/topology_finetuning/*_eval/`. Every discovered file was checked for bicubic/cnn/gan rows; every baseline method present in more than one file had its rows compared pairwise, metric by metric, against a 1e-06 tolerance (would hard-fail the whole run on disagreement):
-  - **bicubic**: 0 source(s) with data; canonical source (required metrics) = `(none found)`; ssim_availability=`n/a`, canonical ssim source = `(none -- all-NaN)`.
-  - **cnn**: 0 source(s) with data; canonical source (required metrics) = `(none found)`; ssim_availability=`n/a`, canonical ssim source = `(none -- all-NaN)`.
-  - **gan**: 0 source(s) with data; canonical source (required metrics) = `(none found)`; ssim_availability=`n/a`, canonical ssim source = `(none -- all-NaN)`.
+Discovered 41 candidate `all_sample_metrics_*.csv` file(s) under `ttk_runs_fixed/topology_finetuning/*_eval/`. Every discovered file was checked for bicubic/cnn/gan rows; every baseline method present in more than one file had its rows compared pairwise, metric by metric, against a 1e-06 tolerance (would hard-fail the whole run on disagreement):
+  - **bicubic**: 41 source(s) with data; canonical source (required metrics) = `/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv`; ssim_availability=`unavailable`, canonical ssim source = `(none -- all-NaN)`.
+  - **cnn**: 41 source(s) with data; canonical source (required metrics) = `/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv`; ssim_availability=`unavailable`, canonical ssim source = `(none -- all-NaN)`.
+  - **gan**: 41 source(s) with data; canonical source (required metrics) = `/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateB_eval/all_sample_metrics_candidateB.csv`; ssim_availability=`unavailable`, canonical ssim source = `(none -- all-NaN)`.
 
 Canonical cnn/gan rows were additionally cross-checked against the older `ttk_runs_fixed/combined/psnr_topology_physics_merged.csv` pipeline for overlapping columns (tolerance 0.001):
-  - **cnn**: skipped (harvested candidate-eval rows not found for this method in this checkout).
-  - **gan**: skipped (harvested candidate-eval rows not found for this method in this checkout).
+  - **cnn**: worst overlapping-column disagreement `wpd_mae` = 1.705e-13; ssim_status=`availability_mismatch`.
+  - **gan**: worst overlapping-column disagreement `wpd_mae` = 1.705e-13; ssim_status=`availability_mismatch`.
 
 The independent `ttk_runs_fixed/combined/phase_c_results.csv` PD/MT cross-check remains as before:
   - **cnn**: max |Δpd| = 0.000e+00, max |Δmt| = 0.000e+00 across 168 cross-checked samples.
@@ -49,31 +49,31 @@ The independent `ttk_runs_fixed/combined/phase_c_results.csv` PD/MT cross-check 
 |---|---:|---:|---|---:|---:|---|
 | cnn | 27.4063 | 27.4063 | True | 5.8678 | 5.8678 | True |
 | gan | 20.8641 | 20.8641 | True | 8.3481 | 8.3481 | True |
-| uv | n/a | 29.6121 | NO_DATA | n/a | 6.0119 | NO_DATA |
-| speed_only | n/a | 29.5783 | NO_DATA | n/a | 5.9996 | NO_DATA |
-| levelset_only | n/a | 29.5953 | NO_DATA | n/a | 6.0076 | NO_DATA |
-| speed_levelset | n/a | 29.4363 | NO_DATA | n/a | 5.9441 | NO_DATA |
-| grad_only | n/a | 22.9326 | NO_DATA | n/a | 6.056 | NO_DATA |
-| speed_grad | n/a | 22.9706 | NO_DATA | n/a | 6.2905 | NO_DATA |
-| grad_levelset | n/a | 22.6194 | NO_DATA | n/a | 6.1996 | NO_DATA |
-| candidate_b | n/a | 22.707 | NO_DATA | n/a | 6.1612 | NO_DATA |
-| candidate_c | n/a | 22.4944 | NO_DATA | n/a | 6.0803 | NO_DATA |
-| uv_crit | n/a | 29.1143 | NO_DATA | n/a | 5.6899 | NO_DATA |
-| uv_e2 | n/a | 25.0721 | NO_DATA | n/a | 5.594 | NO_DATA |
-| b_e2 | n/a | 23.9876 | NO_DATA | n/a | 5.6774 | NO_DATA |
-| c_e2 | n/a | 24.2686 | NO_DATA | n/a | 5.6628 | NO_DATA |
-| f1_grad_e2 | n/a | 23.8382 | NO_DATA | n/a | 5.6566 | NO_DATA |
-| f2_grad_levelset_e2 | n/a | 23.7481 | NO_DATA | n/a | 5.6742 | NO_DATA |
-| f3_grad_crit | n/a | 22.0179 | NO_DATA | n/a | 5.984 | NO_DATA |
+| uv | 29.6121 | 29.6121 | True | 6.0119 | 6.0119 | True |
+| speed_only | 29.5783 | 29.5783 | True | 5.9996 | 5.9996 | True |
+| levelset_only | 29.5953 | 29.5953 | True | 6.0076 | 6.0076 | True |
+| speed_levelset | 29.4363 | 29.4363 | True | 5.9441 | 5.9441 | True |
+| grad_only | 22.9326 | 22.9326 | True | 6.0560 | 6.056 | True |
+| speed_grad | 22.9706 | 22.9706 | True | 6.2905 | 6.2905 | True |
+| grad_levelset | 22.6194 | 22.6194 | True | 6.1996 | 6.1996 | True |
+| candidate_b | 22.7070 | 22.707 | True | 6.1612 | 6.1612 | True |
+| candidate_c | 22.4944 | 22.4944 | True | 6.0803 | 6.0803 | True |
+| uv_crit | 29.1143 | 29.1143 | True | 5.6899 | 5.6899 | True |
+| uv_e2 | 25.0721 | 25.0721 | True | 5.5940 | 5.594 | True |
+| b_e2 | 23.9876 | 23.9876 | True | 5.6774 | 5.6774 | True |
+| c_e2 | 24.2686 | 24.2686 | True | 5.6628 | 5.6628 | True |
+| f1_grad_e2 | 23.8382 | 23.8382 | True | 5.6566 | 5.6566 | True |
+| f2_grad_levelset_e2 | 23.7481 | 23.7481 | True | 5.6742 | 5.6742 | True |
+| f3_grad_crit | 22.0179 | 22.0179 | True | 5.9840 | 5.984 | True |
 
 ## 8. Missingness, especially SSIM
 
 Every (method, metric) cell in `unified_primary_missingness.csv` is classified into exactly one of three `missing_reason` categories: `no_source_artifact` (no file provides this metric for this method at all), `unavailable_global_dependency` (SSIM specifically, 0/168 finite -- consistent with the documented NumPy/scikit-image ABI incompatibility, not a data-quality bug), or `partial_source_coverage` (1..167/168 finite -- inconsistent coverage, always treated as a strict-mode failure since it indicates a real problem rather than a known benign gap).
 
 - SSIM (`ssim_speed`) is in `OPTIONAL_CHEAP_METRIC_COLUMNS`: strict mode accepts either full (168/168) or fully-unavailable (0/168) coverage, and hard-fails only on partial coverage.
-  - Fully available (168/168): ['cnn', 'gan']
-  - Globally unavailable, accepted (0/168, `unavailable_global_dependency`): none
-  - No source at all for this method (`no_source_artifact`): ['bicubic', 'uv', 'speed_only', 'levelset_only', 'speed_levelset', 'grad_only', 'speed_grad', 'grad_levelset', 'candidate_b', 'candidate_c', 'uv_crit', 'uv_e2', 'b_e2', 'c_e2', 'f1_grad_e2', 'f2_grad_levelset_e2', 'f3_grad_crit']
+  - Fully available (168/168): none
+  - Globally unavailable, accepted (0/168, `unavailable_global_dependency`): ['bicubic', 'cnn', 'gan', 'uv', 'speed_only', 'levelset_only', 'speed_levelset', 'grad_only', 'speed_grad', 'grad_levelset', 'candidate_b', 'candidate_c', 'uv_crit', 'uv_e2', 'b_e2', 'c_e2', 'f1_grad_e2', 'f2_grad_levelset_e2', 'f3_grad_crit']
+  - No source at all for this method (`no_source_artifact`): none
   - Partial coverage, would strict-fail (`partial_source_coverage`): none
 - SSIM is never filled, copied from a legacy row into a candidate row, or recomputed -- missing SSIM stays an empty cell in the unified table exactly as found in its source.
 - Pairwise-vs-CNN summaries report `n_valid=0` for SSIM (and every other metric) when the candidate/CNN intersection of finite samples is empty, rather than fabricating a comparison.
@@ -86,29 +86,29 @@ For every primary method, `idx.npy`/`dataIN.npy`/`dataGT.npy`/`dataSR.npy` under
 
 | method_id | idx_validation_status | input_alignment_status | gt_alignment_status | sr_shape_status | sr_finiteness_status |
 |---|---|---|---|---|---|
-| bicubic | not_applicable_no_idx_file | missing | missing | missing | missing |
-| cnn | missing | missing | missing | missing | missing |
-| gan | missing | missing | missing | missing | missing |
-| uv | missing | missing | missing | missing | missing |
-| speed_only | missing | missing | missing | missing | missing |
-| levelset_only | missing | missing | missing | missing | missing |
-| speed_levelset | missing | missing | missing | missing | missing |
-| grad_only | missing | missing | missing | missing | missing |
-| speed_grad | missing | missing | missing | missing | missing |
-| grad_levelset | missing | missing | missing | missing | missing |
-| candidate_b | missing | missing | missing | missing | missing |
-| candidate_c | missing | missing | missing | missing | missing |
-| uv_crit | missing | missing | missing | missing | missing |
-| uv_e2 | missing | missing | missing | missing | missing |
-| b_e2 | missing | missing | missing | missing | missing |
-| c_e2 | missing | missing | missing | missing | missing |
-| f1_grad_e2 | missing | missing | missing | missing | missing |
-| f2_grad_levelset_e2 | missing | missing | missing | missing | missing |
-| f3_grad_crit | missing | missing | missing | missing | missing |
+| bicubic | exact_0_167 | exact | exact | exact | all_finite |
+| cnn | exact_0_167 | exact | exact | exact | all_finite |
+| gan | exact_0_167 | exact | exact | exact | all_finite |
+| uv | exact_0_167 | exact | exact | exact | all_finite |
+| speed_only | exact_0_167 | exact | exact | exact | all_finite |
+| levelset_only | exact_0_167 | exact | exact | exact | all_finite |
+| speed_levelset | exact_0_167 | exact | exact | exact | all_finite |
+| grad_only | exact_0_167 | exact | exact | exact | all_finite |
+| speed_grad | exact_0_167 | exact | exact | exact | all_finite |
+| grad_levelset | exact_0_167 | exact | exact | exact | all_finite |
+| candidate_b | exact_0_167 | exact | exact | exact | all_finite |
+| candidate_c | exact_0_167 | exact | exact | exact | all_finite |
+| uv_crit | exact_0_167 | exact | exact | exact | all_finite |
+| uv_e2 | exact_0_167 | exact | exact | exact | all_finite |
+| b_e2 | exact_0_167 | exact | exact | exact | all_finite |
+| c_e2 | exact_0_167 | exact | exact | exact | all_finite |
+| f1_grad_e2 | exact_0_167 | exact | exact | exact | all_finite |
+| f2_grad_levelset_e2 | exact_0_167 | exact | exact | exact | all_finite |
+| f3_grad_crit | exact_0_167 | exact | exact | exact | all_finite |
 
 ## 9. Candidates that could not be included and why
 
-17 of 19 primary methods (bicubic, uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, candidate_b, candidate_c, uv_crit, uv_e2, b_e2, c_e2, f1_grad_e2, f2_grad_levelset_e2, f3_grad_crit) have **zero** real per-sample cheap-evaluation or true-topology artifacts anywhere in this git checkout. Root cause: this repository's `.gitignore` excludes `*.npy`, `*.npz`, `data_out/`, and `ttk_runs_fixed/topology_finetuning/*` (tracked exceptions are only `candidateE_constraints` and the cnn/gan `combined`/`phase_c_final` summary artifacts); large experiment outputs for the loss-ablation candidates are produced only on the separate training machine and were never committed.
+All primary methods have real data in this checkout.
 
 ## 10. No training or TTK was rerun
 
@@ -131,4 +131,4 @@ This script and this audit performed zero training runs, zero TTK invocations, a
 
 ## 12. Recommended next step
 
-Before any factorial-effect analysis, paired contrasts, correlations, or Pareto-front work can be performed on the full primary set, the 17 missing methods' cheap-evaluation and true-topology artifacts need to be synced from the training machine into this checkout (or this script re-run there with `--strict-primary`). Until then, any such analysis is only valid for the 2 methods with real data (cnn, gan).
+The primary set is complete and strict-validated in this run. Per the task instructions, no correlation, factorial-model, Pareto-front, or visualization-selection work was performed in this Phase-1 pass -- that is the recommended next step.

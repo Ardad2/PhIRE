@@ -1,0 +1,507 @@
+\documentclass[10pt,conference]{IEEEtran}
+
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{enumitem}
+\usepackage{placeins}
+
+\graphicspath{{figures/}}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
+
+% ── Helper macros ─────────────────────────────────────────────────────────────
+
+\newcommand{\figplaceholder}[1]{%
+\fbox{%
+\begin{minipage}[c][1.8in][c]{0.9\linewidth}
+\centering
+Placeholder / missing figure:\\[0.5em]
+\texttt{\detokenize{#1}}
+\end{minipage}}}
+
+\newcommand{\reportfigure}[4]{%
+\begin{figure*}[t]
+\centering
+\IfFileExists{figures/#1}{%
+    \includegraphics[width=#2]{figures/#1}
+}{%
+    \figplaceholder{figures/#1}
+}
+\caption{#3}
+\label{#4}
+\end{figure*}
+}
+
+\newcommand{\reporttable}[3]{%
+\begin{table*}[t]
+\centering
+\IfFileExists{figures/tables_tex/#1}{%
+    \resizebox{\textwidth}{!}{\input{figures/tables_tex/#1}}
+}{%
+    \fbox{%
+    \begin{minipage}[c][1.4in][c]{0.9\linewidth}
+    \centering
+    Placeholder / missing table:\\[0.5em]
+    \texttt{\detokenize{figures/tables_tex/#1}}
+    \end{minipage}}
+}
+\caption{#2}
+\label{#3}
+\end{table*}
+}
+
+% ── Title ─────────────────────────────────────────────────────────────────────
+
+\title{Component-Hierarchy and Merge-Tree Proxy Analysis\\
+for Wind-Field Super-Resolution}
+
+\author{
+\IEEEauthorblockN{Arjun Dadhwal}
+\IEEEauthorblockA{
+Department of Computer Science\\
+Tulane University\\
+}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+This report analyzes scalar wind-speed super-resolution outputs from bicubic
+interpolation, a CNN model, and a GAN model. The goal is to understand whether
+topology-based evaluators, especially merge trees, capture structural differences
+that are not explained by conventional pixelwise, distributional, or physics-domain
+metrics alone. Prior inspection showed that PSNR and SSIM consistently favor CNN
+outputs, while persistence diagrams strongly favor GAN outputs and merge trees
+select GAN in only a small subset of samples. To investigate this discrepancy, we
+compute superlevel-set component counts, area-filtered component statistics,
+exceedance curves, and branch-lifetime proxy statistics across the 168-sample
+evaluation set. The results suggest that GAN outputs often recover additional
+component complexity, but can also over-fragment the scalar field. CNN outputs are
+smoother and often closer in direct or aggregate physical error, but may suppress
+high-frequency structure. Importantly, adjacent-control cases show that merge-tree
+decisions are not fully explained by component counts or simple branch summaries,
+motivating future work on topology-aware losses for scientific super-resolution.
+\end{abstract}
+
+% ── 1. Introduction ───────────────────────────────────────────────────────────
+
+\section{Introduction}
+
+Scientific super-resolution models are often evaluated using direct error metrics
+such as PSNR, SSIM, MAE, and RMSE. These metrics are useful for measuring pointwise
+fidelity, but they may not fully capture whether reconstructed scalar fields preserve
+physically and topologically meaningful structure. This issue is especially important
+for wind-field super-resolution, where small-scale ridges, high-speed regions, and
+connected structures can matter for downstream interpretation.
+
+This project extends the evaluation of PhIRE-style wind-field super-resolution
+\cite{stengel2020adversarial} by comparing CNN, GAN, and bicubic outputs using both
+traditional metrics and topology-inspired descriptors. The initial motivation was the
+perception-distortion tradeoff \cite{blau2018perception}: GAN outputs may appear
+sharper and more realistic, while CNN outputs may be more pointwise accurate. However,
+for scientific fields, sharper structure is not automatically better. A sharper feature
+may correspond to a physically meaningful ridge, or it may be a hallucinated artifact.
+
+Earlier analysis showed that SSIM selected CNN for all 168 samples, while bottleneck
+persistence-diagram distance selected GAN for nearly all samples. Merge-tree distance
+was more selective, selecting GAN in 20 samples and CNN in the remaining 148. This
+report focuses on understanding what is special about those 20 merge-tree-GAN cases,
+whether simple component-count statistics explain them, and whether richer
+hierarchy-aware proxies provide better insight.
+
+% ── 2. Data and Compared Methods ─────────────────────────────────────────────
+
+\section{Data and Compared Methods}
+
+The evaluation set consists of 168 paired low-resolution and high-resolution
+wind-field samples. Each sample contains vector wind components $(u,v)$. All topology
+and component analyses in this report are computed on scalar wind-speed magnitude,
+\begin{equation}
+s(x,y) = \sqrt{u(x,y)^2 + v(x,y)^2}.
+\end{equation}
+
+We compare four fields per sample:
+\begin{enumerate}[leftmargin=*]
+    \item Ground truth high-resolution speed field, denoted GT.
+    \item Bicubic interpolation baseline.
+    \item CNN super-resolution output.
+    \item GAN super-resolution output.
+\end{enumerate}
+
+The bicubic baseline is included as a non-learned interpolation control. This is
+useful because it shows how much structure is already recoverable by smooth
+interpolation and how much additional behavior is introduced by learned super-resolution.
+
+\reportfigure
+{fig01_pipeline_placeholder.pdf}
+{0.95\textwidth}
+{Pipeline overview. The evaluation begins with low-resolution wind inputs and
+high-resolution ground truth fields. Bicubic, CNN, and GAN outputs are converted to
+scalar speed magnitude. The resulting scalar fields are evaluated using direct error
+metrics, physics/domain metrics, persistence diagrams, merge trees, component counts,
+and merge-tree proxy statistics. This is a placeholder figure to be drawn manually.}
+{fig:pipeline}
+
+% ── 3. Evaluation Metrics ────────────────────────────────────────────────────
+
+\section{Evaluation Metrics}
+
+The analysis combines several metric families.
+
+\subsection{Direct Metrics}
+Direct metrics compare reconstructed fields to GT pointwise. These include PSNR,
+SSIM, MAE, and RMSE. They generally reward smooth, conservative reconstructions and
+penalize high-frequency differences.
+
+\subsection{Physics and Domain Metrics}
+Physics/domain metrics summarize physically relevant scalar-field behavior. These
+include wind-power-density errors, gradient statistics, power spectral density
+statistics, Wasserstein distances, and exceedance/tail behavior. These metrics help
+distinguish whether a model preserves meaningful physical distributions, gradients,
+and high-speed events.
+
+\subsection{Topological Metrics}
+Two topology-based validators are considered:
+\begin{enumerate}[leftmargin=*]
+    \item Persistence diagrams, compared using bottleneck distance.
+    \item Merge trees, compared using a merge-tree distance.
+\end{enumerate}
+
+Persistence diagrams summarize the birth and death of topological features but
+discard much of the spatial and hierarchical organization. Merge trees retain more
+information about how superlevel-set components appear and merge as the threshold
+changes. This makes merge trees a useful candidate for identifying whether
+GAN-generated features are structurally meaningful or merely sharp artifacts.
+
+% ── 4. Selector-Level Summary ────────────────────────────────────────────────
+
+\section{Selector-Level Summary}
+
+Table~\ref{tab:selector_counts} summarizes the high-level winner counts over the
+168-sample evaluation set.
+
+\begin{table}[t]
+\centering
+\caption{All-sample winner counts across the 168-sample evaluation set.}
+\label{tab:selector_counts}
+\begin{tabular}{lccc}
+\toprule
+Selector / validator & CNN wins & GAN wins & Ties / unavailable \\
+\midrule
+PSNR$_{uv}$             & 168 & 0   & 0 \\
+SSIM                    & 168 & 0   & 0 \\
+Merge tree (MT)         & 148 & 20  & 0 \\
+Bottleneck PD           & 2   & 166 & 0 \\
+Physics group majority  & 168 & 0   & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This result motivates the rest of the report. Direct metrics and SSIM strongly favor
+CNN, while persistence diagrams overwhelmingly favor GAN. Merge trees are more
+selective: they usually favor CNN but select GAN in 20 cases. This suggests that
+merge trees may be capturing a different structural signal than either direct error
+metrics or persistence diagrams.
+
+\reportfigure
+{fig02_three_method_metric_summary.pdf}
+{0.95\textwidth}
+{Three-method metric winner summary for bicubic, CNN, and GAN. This figure compares
+which method wins across the metric suite. It provides a baseline view of how direct,
+distributional, tail, and physics-domain metrics distribute across the three
+reconstruction methods.}
+{fig:three_method_summary}
+
+% ── 5. Superlevel-Set Component Counts ───────────────────────────────────────
+
+\section{Superlevel-Set Component Counts}
+
+A simple way to probe topology is to count connected components in superlevel sets,
+\begin{equation}
+S_{\tau} = \{(x,y) : s(x,y) \geq \tau\}.
+\end{equation}
+For each threshold $\tau$, the number of connected components provides a coarse
+description of scalar-field structure. However, raw component counts do not capture
+how components are nested or how they merge across thresholds.
+
+The component-count analysis uses both fixed thresholds and percentile thresholds:
+\begin{equation}
+\tau \in \{5,10,15,p90,p95,p99\}.
+\end{equation}
+
+\reporttable
+{table_component_count_summary.tex}
+{Summary of superlevel-set component-count behavior across the 168-sample evaluation
+set. This table is generated from \texttt{component\_count\_summary.csv}.}
+{tab:component_count_summary}
+
+\reportfigure
+{fig03_component_count_threshold_heatmap.pdf}
+{0.75\textwidth}
+{Component-count winner counts by threshold. GAN tends to better match GT component
+counts at lower thresholds, while CNN often wins at higher or percentile-based
+thresholds.}
+{fig:component_heatmap}
+
+The component-count results reveal a useful but incomplete pattern. GAN frequently
+matches GT component counts at low thresholds, suggesting that it restores broad
+component complexity that CNN and bicubic interpolation smooth away. At higher
+thresholds, CNN often becomes closer to GT, suggesting that GAN may over-fragment
+high-speed regions or introduce excessive small-scale structure.
+
+% ── 6. Special Component-Count Cases ─────────────────────────────────────────
+
+\section{Special Component-Count Cases}
+
+The most important subset consists of the 20 samples where merge trees favor GAN.
+These cases test whether GAN is doing something structurally meaningful, or whether
+the merge-tree distance is being influenced by sharp but potentially misaligned texture.
+
+\reportfigure
+{fig04_mt_gan_signature_matrix.pdf}
+{0.8\textwidth}
+{Component-count winner signatures for the 20 MT-GAN cases. Each row is one MT-GAN
+sample, and each column is a threshold. The matrix shows whether bicubic, CNN, or GAN
+has the closest component count to GT at each threshold.}
+{fig:mt_gan_signature_matrix}
+
+The signature matrix shows that MT-GAN samples are not uniform. Some samples show
+strong GAN support across thresholds, while others only support GAN at low thresholds
+or show mixed behavior. Therefore, MT selecting GAN cannot be reduced to a single
+rule such as ``GAN has more components.''
+
+% ── 7. Adjacent Control Clusters ─────────────────────────────────────────────
+
+\section{Adjacent Control Clusters}
+
+Adjacent sample IDs are useful controls because they may correspond to nearby
+timesteps and visually similar wind-field regimes. If MT selects GAN for one sample
+but CNN for its neighbors, then the cause may be a subtle local or hierarchical
+difference rather than a large global change in field complexity.
+
+We inspect three adjacent clusters:
+\begin{itemize}[leftmargin=*]
+    \item Samples 10--13, where sample 12 is MT-GAN.
+    \item Samples 76--78, where sample 77 is MT-GAN.
+    \item Samples 90--93, where sample 92 is MT-GAN while nearby samples remain MT-CNN.
+\end{itemize}
+
+\reportfigure
+{fig05_adjacent_cluster_10_13_component_curves.pdf}
+{0.95\textwidth}
+{Adjacent cluster 10--13. Sample 12 is an MT-GAN case, while neighboring samples
+provide local controls.}
+{fig:cluster_10_13}
+
+\reportfigure
+{fig05_adjacent_cluster_76_78_component_curves.pdf}
+{0.95\textwidth}
+{Adjacent cluster 76--78. Sample 77 is an MT-GAN case, surrounded by neighboring
+control samples.}
+{fig:cluster_76_78}
+
+\reportfigure
+{fig05_adjacent_cluster_90_93_component_curves.pdf}
+{0.95\textwidth}
+{Adjacent cluster 90--93. Sample 92 is an MT-GAN case, while nearby samples are
+useful controls because several also have GAN-favoring domain metrics.}
+{fig:cluster_90_93}
+
+These adjacent clusters show that component-count curves alone do not fully explain
+MT decisions. Neighboring samples can have similar component-count behavior while MT
+selects different models. This suggests that MT is sensitive to information discarded
+by marginal component counts, such as spatial arrangement, branch nesting, or merge
+order.
+
+% ── 8. Rare Topology-CNN Controls ────────────────────────────────────────────
+
+\section{Rare Topology-CNN Controls}
+
+Samples 162 and 163 are rare cases where both bottleneck persistence diagrams and
+merge trees favor CNN. These are important negative controls because they show that
+topological descriptors do not automatically reward GAN sharpness.
+
+\reportfigure
+{fig08_rare_topology_cnn_controls_161_164.pdf}
+{0.95\textwidth}
+{Rare topology-CNN control neighborhood. Samples 162 and 163 are rare cases where
+both PD and MT favor CNN. Samples 161 and 164 provide adjacent context.}
+{fig:rare_topology_cnn}
+
+These controls help distinguish between two possibilities. If topology always preferred
+GAN, then topology would simply be rewarding sharper or noisier fields. Instead, the
+rare topology-CNN samples show that topological validators can reject GAN structure
+when it is not aligned with GT.
+
+% ── 9. Dense Component-Hierarchy Proxies ─────────────────────────────────────
+
+\section{Dense Component-Hierarchy Proxies}
+
+The six-threshold component-count analysis is informative but coarse. To better
+approximate merge-tree behavior, we compute dense threshold curves using 40
+GT-percentile thresholds from p1 to p99. We also repeat component counts after
+filtering out small components using minimum area thresholds:
+\begin{equation}
+a_{\min} \in \{1,5,10,25,50,100\}.
+\end{equation}
+
+This analysis helps separate meaningful components from small speckle-like fragments.
+If GAN only wins when $a_{\min}=1$, the improvement may be due to small noisy
+components. If GAN remains competitive at larger area filters, then its additional
+structure is more likely to be spatially meaningful.
+
+\reportfigure
+{fig09_dense_component_curves_representative_samples.pdf}
+{0.95\textwidth}
+{Dense area-filtered component-count curves for representative samples. These curves
+use 40 GT-percentile thresholds and a minimum component area of 10 pixels.}
+{fig:dense_component_curves}
+
+% ── 10. Branch-Lifetime Merge-Tree Proxies ───────────────────────────────────
+
+\section{Branch-Lifetime Merge-Tree Proxies}
+
+Component counts still do not encode the hierarchy of merges. Therefore, we compute
+branch-lifetime proxy statistics using a descending-threshold sweep. As the threshold
+decreases, new superlevel components are born near local maxima, grow, and merge into
+older components. When a younger component merges into an older component, we record
+a branch lifetime:
+\begin{equation}
+\mathrm{persistence} = s_{\mathrm{birth}} - s_{\mathrm{death}}.
+\end{equation}
+
+This is not an exact merge-tree distance, but it approximates several
+hierarchy-aware quantities:
+\begin{itemize}[leftmargin=*]
+    \item total branch count,
+    \item number of branches above persistence thresholds,
+    \item mean, median, and maximum persistence,
+    \item total persistence,
+    \item top-5 persistence sum,
+    \item persistence entropy.
+\end{itemize}
+
+\reporttable
+{table_merge_tree_proxy_summary.tex}
+{Method-level summary of merge-tree proxy errors. This table is generated from
+\texttt{merge\_tree\_proxy\_summary.csv}. Lower values indicate closer agreement with
+GT for the displayed proxy.}
+{tab:merge_tree_proxy_summary}
+
+\reportfigure
+{fig10_hierarchy_proxy_summary.pdf}
+{0.95\textwidth}
+{Hierarchy-proxy summary by case family. The top panel compares mean branch-count
+ratios relative to GT. The bottom panel shows GAN mean-persistence bias relative
+to GT.}
+{fig:hierarchy_proxy_summary}
+
+The branch-lifetime proxies suggest a more nuanced interpretation. GAN often restores
+component complexity, but it can also produce too many branches relative to GT. CNN
+tends to smooth structure and may under-produce branches, but it can still be closer
+to GT in branch-count error or aggregate persistence. This supports the idea that the
+CNN/GAN tradeoff is not simply pointwise accuracy versus visual sharpness; it also
+involves structural over-fragmentation versus structural smoothing.
+
+% ── 11. Interpretation ───────────────────────────────────────────────────────
+
+\section{Interpretation}
+
+The main finding is that merge-tree decisions cannot be fully explained by simple
+component counts or global branch summaries. The component-count analysis shows that
+GAN is often closer to GT at low thresholds, while CNN is often closer at high or
+percentile thresholds. The branch-proxy analysis suggests that GAN may over-fragment
+the field, producing many additional branch events. However, adjacent control clusters
+show that MT-GAN selections are not isolated by these marginal summaries alone.
+
+This leads to the following interpretation:
+\begin{quote}
+GAN outputs often recover additional topological complexity that CNN suppresses, but
+this added complexity is not always hierarchically or spatially aligned with GT.
+Merge trees appear to be sensitive to more than the number of components or branches;
+they may respond to where structures occur, how they merge, and how persistent
+structures are nested.
+\end{quote}
+
+This interpretation is important because it suggests why persistence diagrams and
+merge trees can disagree. Persistence diagrams summarize birth-death pairs while
+discarding much of the explicit spatial and hierarchical organization. Merge trees
+preserve more of this organization, making them more selective when evaluating
+GAN-generated structures.
+
+% ── 12. Implications for Topology-Aware Training ─────────────────────────────
+
+\section{Implications for Topology-Aware Training}
+
+The analysis motivates a topology-aware scientific super-resolution model. A useful
+training objective should not simply encourage sharper output. Instead, it should
+preserve meaningful multiscale structure while avoiding GAN-style over-fragmentation.
+
+A possible future objective is:
+\begin{equation}
+\mathcal{L}
+=
+\lambda_{\mathrm{pix}}\mathcal{L}_{\mathrm{pix}}
++
+\lambda_{\mathrm{phys}}\mathcal{L}_{\mathrm{phys}}
++
+\lambda_{\mathrm{topo}}\mathcal{L}_{\mathrm{topo}},
+\end{equation}
+where $\mathcal{L}_{\mathrm{pix}}$ preserves pointwise accuracy,
+$\mathcal{L}_{\mathrm{phys}}$ preserves physical/domain statistics, and
+$\mathcal{L}_{\mathrm{topo}}$ encourages structure-aware agreement with GT.
+
+Exact merge-tree distances may be difficult to differentiate directly. Therefore,
+the first practical step may be to use differentiable topology-inspired proxies, such
+as soft exceedance losses, soft component-area losses, persistence-inspired penalties,
+or learned merge-tree similarity models such as MTNN \cite{qin2024mtnn}. Exact PD
+and MT distances can remain post hoc evaluators.
+
+% ── 13. Limitations ──────────────────────────────────────────────────────────
+
+\section{Limitations}
+
+This report uses branch-lifetime and component-hierarchy proxies rather than exact
+merge-tree visualization or exact differentiable merge-tree losses. These proxies
+are useful for diagnosis, but they compress the full merge-tree structure. They do
+not fully encode branch matching, spatial embedding, or detailed merge order.
+
+The visual interpretation is also challenging. Wind-speed scalar fields contain many
+small-scale structures, and GAN outputs can appear visually plausible even when they
+are topologically over-fragmented. Therefore, the strongest evidence comes from
+combining multiple views: direct error maps, component-count curves, branch proxies,
+adjacent controls, and rare topology-CNN controls.
+
+% ── 14. Conclusion ───────────────────────────────────────────────────────────
+
+\section{Conclusion}
+
+This report extends the initial CNN/GAN comparison by adding bicubic interpolation,
+component-count analysis, adjacent controls, and merge-tree proxy statistics. The
+results show that GAN often restores component complexity but may also over-fragment
+the scalar field. CNN is more conservative and often better under direct and aggregate
+physical metrics, but it may suppress meaningful high-frequency structure. Merge trees
+are more selective than persistence diagrams and do not appear to follow component
+counts alone.
+
+The most important outcome is that topology-aware evaluation reveals structural
+behavior that conventional metrics do not fully capture. This motivates the next phase
+of the project: developing a topology-aware super-resolution model that balances
+CNN-like pointwise accuracy with better preservation of meaningful multiscale structure.
+
+\bibliographystyle{IEEEtran}
+\bibliography{main}
+
+\end{document}
