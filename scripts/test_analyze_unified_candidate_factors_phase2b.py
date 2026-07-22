@@ -42,15 +42,19 @@ check('2^2 coded matrix shape', fr22.coded_matrix.shape == (4, 4))
 check('2^2 subsets order', fr22.subsets == [(), ('a',), ('b',), ('a', 'b')])
 # y = [1, 2, 3, 8] for m00, m10, m01, m11 (one sample)
 y = np.array([[1.0], [2.0], [3.0], [8.0]])
-beta = m.compute_beta_matrix(fr22.coded_matrix, y)
+# NOTE: kept as beta22 (not the generic name `beta`) and never reassigned
+# again anywhere in this file, specifically so the later interaction-sign
+# check in section 4/5/6 cannot be silently checking a `beta` that section 3's
+# random-reconstruction loop reassigned out from under it.
+beta22 = m.compute_beta_matrix(fr22.coded_matrix, y)
 # beta_0 = mean = 3.5; beta_a = mean(y*coded_a) = (1*-1+2*1+3*-1+8*1)/4 = (−1+2−3+8)/4=6/4=1.5
 # beta_b = mean(y*coded_b) = (-1-2+3+8)/4 = 8/4=2.0
 # beta_ab = mean(y*coded_a*coded_b) = (1*1 + 2*-1 + 3*-1 + 8*1)/4 = (1-2-3+8)/4=4/4=1.0
-check('2^2 intercept beta_0', abs(beta[0, 0] - 3.5) < 1e-12)
-check('2^2 main effect a coefficient', abs(beta[1, 0] - 1.5) < 1e-12)
-check('2^2 main effect b coefficient', abs(beta[2, 0] - 2.0) < 1e-12)
-check('2^2 interaction ab coefficient', abs(beta[3, 0] - 1.0) < 1e-12)
-check('2^2 factorial_effect(a) = 2*beta_a = 3.0', abs(2 * beta[1, 0] - 3.0) < 1e-12)
+check('2^2 intercept beta_0', abs(beta22[0, 0] - 3.5) < 1e-12)
+check('2^2 main effect a coefficient', abs(beta22[1, 0] - 1.5) < 1e-12)
+check('2^2 main effect b coefficient', abs(beta22[2, 0] - 2.0) < 1e-12)
+check('2^2 interaction ab coefficient', abs(beta22[3, 0] - 1.0) < 1e-12)
+check('2^2 factorial_effect(a) = 2*beta_a = 3.0', abs(2 * beta22[1, 0] - 3.0) < 1e-12)
 
 print()
 print('=== 2. Correct 2^3 coefficients and effects (hand-computed) ===')
@@ -87,7 +91,8 @@ raw_higher = np.array([1.0, 2.0, 3.0])
 check('orient() with higher_is_better is identity', np.array_equal(m.orient(raw_higher, 'higher_is_better'), raw_higher))
 check('orient() with lower_is_better negates', np.array_equal(m.orient(raw_higher, 'lower_is_better'), -raw_higher))
 # interaction sign: y_11=8 much higher than additive prediction (1+ (2-1)+(3-1)=4) -> positive interaction
-check('interaction coefficient positive when 11-cell exceeds additive prediction (from test 1)', beta[3, 0] > 0)
+check('interaction coefficient positive when 11-cell exceeds additive prediction (from test 1, beta22)',
+      beta22[3, 0] > 0)
 
 print()
 print('=== 7. Missing one factorial cell -> hard fail ===')
@@ -176,14 +181,77 @@ check('all-NaN series -> mean/median/etc left empty (not fabricated zero)',
 
 print()
 print('=== 11. Targeted contrast direction (positive = comparison better than base) ===')
+# Exercises the ACTUAL production helper (compute_paired_contrast_point),
+# the same function run_targeted_contrasts() calls for every per-sample
+# point -- not a duplicate of its arithmetic.
 # lower_is_better metric: base=10, comparison=7 -> comparison is BETTER (lower) -> oriented_improvement > 0
-raw_delta = 7.0 - 10.0  # comparison - base = -3 (comparison lower)
-oriented = -raw_delta if True else raw_delta  # lower_is_better: oriented = -raw_delta
-check('lower_is_better, comparison better (lower) -> oriented_improvement positive', oriented > 0)
+raw_delta, oriented = m.compute_paired_contrast_point(10.0, 7.0, 'lower_is_better')
+check('compute_paired_contrast_point: raw_delta = comparison - base = -3.0', raw_delta == -3.0)
+check('compute_paired_contrast_point: lower_is_better, comparison better (lower) -> oriented positive',
+      oriented > 0 and oriented == 3.0)
 # higher_is_better metric: base=10, comparison=15 -> comparison is better (higher) -> oriented positive
-raw_delta2 = 15.0 - 10.0
-oriented2 = raw_delta2  # higher_is_better: oriented = raw_delta
-check('higher_is_better, comparison better (higher) -> oriented_improvement positive', oriented2 > 0)
+raw_delta2, oriented2 = m.compute_paired_contrast_point(10.0, 15.0, 'higher_is_better')
+check('compute_paired_contrast_point: raw_delta = comparison - base = 5.0', raw_delta2 == 5.0)
+check('compute_paired_contrast_point: higher_is_better, comparison better (higher) -> oriented positive',
+      oriented2 > 0 and oriented2 == 5.0)
+# comparison WORSE cases, both directions, to confirm sign flips correctly (not just always positive).
+raw_delta3, oriented3 = m.compute_paired_contrast_point(10.0, 14.0, 'lower_is_better')
+check('compute_paired_contrast_point: lower_is_better, comparison worse (higher) -> oriented negative',
+      oriented3 < 0)
+raw_delta4, oriented4 = m.compute_paired_contrast_point(10.0, 6.0, 'higher_is_better')
+check('compute_paired_contrast_point: higher_is_better, comparison worse (lower) -> oriented negative',
+      oriented4 < 0)
+# Cross-check against a real contrast spec + real long-table method metadata:
+# add_crit_to_uv should exist as a fully-specified, single-flag contrast.
+_add_crit_to_uv = next(s for s in m.TARGETED_CONTRASTS if s['contrast_id'] == 'add_crit_to_uv')
+check('add_crit_to_uv expected_flag_changes is exactly {crit: (False, True)}',
+      _add_crit_to_uv['expected_flag_changes'] == {'crit': (False, True)})
+
+print()
+print('=== 11b. verify_contrast_metadata (new strict targeted-contrast metadata gate) ===')
+
+
+def _meta(speed=False, grad=False, levelset=False, crit=False, e2=False):
+    return {'values': {'uses_speed': str(speed), 'uses_grad': str(grad), 'uses_levelset': str(levelset),
+                         'uses_crit': str(crit), 'uses_e2': str(e2)}}
+
+
+ok_spec = dict(contrast_id='t_ok', base_method='base', comparison_method='comp',
+                expected_flag_changes={'crit': (False, True)})
+ok_meta = {'base': _meta(grad=True), 'comp': _meta(grad=True, crit=True)}
+try:
+    m.verify_contrast_metadata(ok_spec, ok_meta)
+    check('verify_contrast_metadata: matching single-flag change -> no exception', True)
+except SystemExit:
+    check('verify_contrast_metadata: matching single-flag change -> no exception', False)
+
+bad_spec = dict(contrast_id='t_bad', base_method='base', comparison_method='comp',
+                  expected_flag_changes={'crit': (False, True)})
+bad_meta_extra_change = {'base': _meta(grad=True), 'comp': _meta(grad=False, crit=True)}  # grad ALSO changed
+try:
+    m.verify_contrast_metadata(bad_spec, bad_meta_extra_change)
+    check('verify_contrast_metadata: undeclared extra flag change -> SystemExit', False)
+except SystemExit as e:
+    check('verify_contrast_metadata: undeclared extra flag change -> SystemExit',
+          't_bad' in str(e) and 'grad' in str(e))
+
+bad_meta_wrong_direction = {'base': _meta(grad=True, crit=True), 'comp': _meta(grad=True, crit=False)}  # crit flipped the wrong way
+try:
+    m.verify_contrast_metadata(bad_spec, bad_meta_wrong_direction)
+    check('verify_contrast_metadata: declared flag changes the wrong direction -> SystemExit', False)
+except SystemExit as e:
+    check('verify_contrast_metadata: declared flag changes the wrong direction -> SystemExit', 't_bad' in str(e))
+
+# Cross-check every real contrast in TARGETED_CONTRASTS against the real long-table
+# method metadata (this is exactly what run_targeted_contrasts() does internally).
+_long_table = m.load_long_table()
+for _spec in m.TARGETED_CONTRASTS:
+    try:
+        m.verify_contrast_metadata(_spec, _long_table['method_meta'])
+        _ok = True
+    except SystemExit:
+        _ok = False
+    check(f"verify_contrast_metadata passes for real contrast {_spec['contrast_id']!r} against real long-table metadata", _ok)
 
 print()
 print('=== 12. Circular block-bootstrap index shape and wrapping ===')
