@@ -10,15 +10,15 @@ Factor levels are coded disabled=-1, enabled=+1. For a raw metric value y with d
 
 ## 3. Full B 2^3 design
 
-Cells (uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, candidate_b) span the complete `speed x grad x levelset` design; method metadata was verified to match the declared coding exactly for every cell before any statistic was computed. Seven effects were estimated: speed, grad, levelset, speed:grad, speed:levelset, grad:levelset, speed:grad:levelset. Every one of the 168 x 22 x 8 = 29,568 cell values was exactly reconstructed from its 8 saturated coefficients (max abs error <= 1e-12), and every effect's task-provided PD/MT sanity-check target was reproduced from the validated method means within 0.0001.
+Cells (uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, candidate_b) span the complete `speed x grad x levelset` design; method metadata was verified to match the declared coding exactly for every cell before any statistic was computed. Seven effects were estimated: speed, grad, levelset, speed:grad, speed:levelset, grad:levelset, speed:grad:levelset. `b_factorial_reconstruction_check.csv` has 29,568 rows (168 samples x 22 metrics x 8 cells); of these, 28,224 finite values were exactly reconstructed from their 8 saturated coefficients (max abs error <= 1e-12), and 1,344 are globally-unavailable SSIM entries retained as `no_data` rather than reconstructed or fabricated. Every effect's task-provided PD/MT sanity-check target was reproduced from the validated method means within 0.0001.
 
 ## 4. B-scaffold critical x E2 2^2 design
 
-Cells (candidate_b, candidate_c, b_e2, c_e2) hold the speed+grad+levelset scaffold fixed and vary only the critical-maxima proxy and repaired E2. Effects estimated: crit, e2, crit:e2. Same reconstruction gate, sanity-check reproduction, and bootstrap methodology as Analysis A.
+Cells (candidate_b, candidate_c, b_e2, c_e2) hold the speed+grad+levelset scaffold fixed and vary only the critical-maxima proxy and repaired E2. Effects estimated: crit, e2, crit:e2. `b_scaffold_crit_e2_reconstruction_check.csv` has 14,784 rows (168 x 22 x 4 cells); 14,112 finite values reconstructed within 1e-12, 672 SSIM entries retained as `no_data`. Same reconstruction gate, sanity-check reproduction, and bootstrap methodology as Analysis A.
 
 ## 5. Gradient-scaffold level-set x E2 2^2 design
 
-Cells (grad_only, grad_levelset, f1_grad_e2, f2_grad_levelset_e2) hold the gradient term fixed and vary level-set and repaired E2. Effects estimated: levelset, e2, levelset:e2. Same gates and methodology as Analyses A and B.
+Cells (grad_only, grad_levelset, f1_grad_e2, f2_grad_levelset_e2) hold the gradient term fixed and vary level-set and repaired E2. Effects estimated: levelset, e2, levelset:e2. `grad_scaffold_levelset_e2_reconstruction_check.csv` has 14,784 rows (168 x 22 x 4 cells); 14,112 finite values reconstructed within 1e-12, 672 SSIM entries retained as `no_data`. Same gates and methodology as Analyses A and B.
 
 ## 6. Targeted matched contrasts
 

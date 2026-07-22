@@ -18,7 +18,7 @@ or if an unexpected new file appears in either frozen output directory.
 
 Scope: (A) the complete Candidate-B 2^3 factorial (speed x grad x levelset),
 (B) critical-maxima-proxy x repaired-E2 2^2 on the B scaffold, (C) level-set
-x repaired-E2 2^2 on the grad scaffold, (D) 12 targeted matched-pair
+x repaired-E2 2^2 on the grad scaffold, (D) 15 targeted matched-pair
 contrasts (adding crit, adding E2, E2-vs-crit, scaffold-pruning). Explicitly
 OUT of scope (deferred to Phase 2C/2D): metric correlations, Pareto-front
 analysis, sample selection, visualization.
@@ -782,58 +782,59 @@ TARGETED_CONTRASTS = [
     # --- A. Adding the critical-maxima proxy (all single-term: only uses_crit differs) ---
     dict(contrast_id='add_crit_to_uv', contrast_family='add_critical_proxy',
           base_method='uv', comparison_method='uv_crit', added_or_changed_term='crit',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'crit': (False, True)},
           interpretation='Effect of adding the critical-maxima proxy (L_crit) to the vector-only UV control.'),
     dict(contrast_id='add_crit_to_b', contrast_family='add_critical_proxy',
           base_method='candidate_b', comparison_method='candidate_c', added_or_changed_term='crit',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'crit': (False, True)},
           interpretation='Effect of adding the critical-maxima proxy to the full Candidate B scaffold '
                           '(the original Candidate B -> Candidate C step).'),
     dict(contrast_id='add_crit_to_grad', contrast_family='add_critical_proxy',
           base_method='grad_only', comparison_method='f3_grad_crit', added_or_changed_term='crit',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'crit': (False, True)},
           interpretation='Effect of adding the critical-maxima proxy to the gradient-only objective.'),
     dict(contrast_id='add_crit_to_b_e2', contrast_family='add_critical_proxy',
           base_method='b_e2', comparison_method='c_e2', added_or_changed_term='crit',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'crit': (False, True)},
           interpretation='Effect of adding the critical-maxima proxy on top of the B+repaired-E2 objective.'),
 
     # --- B. Adding repaired E2 (all single-term: only uses_e2 differs) ---
     dict(contrast_id='add_e2_to_uv', contrast_family='add_repaired_e2',
           base_method='uv', comparison_method='uv_e2', added_or_changed_term='e2', single_term_contrast=True,
+          expected_flag_changes={'e2': (False, True)},
           interpretation='Effect of adding repaired low-lambda E2 to the vector-only UV control.'),
     dict(contrast_id='add_e2_to_b', contrast_family='add_repaired_e2',
           base_method='candidate_b', comparison_method='b_e2', added_or_changed_term='e2',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'e2': (False, True)},
           interpretation='Effect of adding repaired E2 to the full Candidate B scaffold.'),
     dict(contrast_id='add_e2_to_c', contrast_family='add_repaired_e2',
           base_method='candidate_c', comparison_method='c_e2', added_or_changed_term='e2',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'e2': (False, True)},
           interpretation='Effect of adding repaired E2 to Candidate C (B scaffold + critical proxy).'),
     dict(contrast_id='add_e2_to_grad', contrast_family='add_repaired_e2',
           base_method='grad_only', comparison_method='f1_grad_e2', added_or_changed_term='e2',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'e2': (False, True)},
           interpretation='Effect of adding repaired E2 to the gradient-only objective.'),
     dict(contrast_id='add_e2_to_grad_levelset', contrast_family='add_repaired_e2',
           base_method='grad_levelset', comparison_method='f2_grad_levelset_e2', added_or_changed_term='e2',
-          single_term_contrast=True,
+          single_term_contrast=True, expected_flag_changes={'e2': (False, True)},
           interpretation='Effect of adding repaired E2 to the gradient+level-set objective.'),
 
     # --- C. E2 versus critical proxy on a matched scaffold (both crit and e2
     #     flip simultaneously -- a substitution, not a single-term addition) ---
     dict(contrast_id='e2_vs_crit_uv', contrast_family='e2_vs_crit_matched_scaffold',
           base_method='uv_crit', comparison_method='uv_e2', added_or_changed_term='crit_replaced_by_e2',
-          single_term_contrast=False,
+          single_term_contrast=False, expected_flag_changes={'crit': (True, False), 'e2': (False, True)},
           interpretation='Substitution contrast on the UV scaffold: replaces the critical-maxima proxy with '
                           'repaired E2 (both uses_crit and uses_e2 flip simultaneously; not a single-term effect).'),
     dict(contrast_id='e2_vs_crit_b', contrast_family='e2_vs_crit_matched_scaffold',
           base_method='candidate_c', comparison_method='b_e2', added_or_changed_term='crit_replaced_by_e2',
-          single_term_contrast=False,
+          single_term_contrast=False, expected_flag_changes={'crit': (True, False), 'e2': (False, True)},
           interpretation='Substitution contrast on the full B scaffold: replaces the critical-maxima proxy '
                           'with repaired E2 (both uses_crit and uses_e2 flip simultaneously).'),
     dict(contrast_id='e2_vs_crit_grad', contrast_family='e2_vs_crit_matched_scaffold',
           base_method='f3_grad_crit', comparison_method='f1_grad_e2', added_or_changed_term='crit_replaced_by_e2',
-          single_term_contrast=False,
+          single_term_contrast=False, expected_flag_changes={'crit': (True, False), 'e2': (False, True)},
           interpretation='Substitution contrast on the gradient-only scaffold: replaces the critical-maxima '
                           'proxy with repaired E2 (both uses_crit and uses_e2 flip simultaneously).'),
 
@@ -841,7 +842,7 @@ TARGETED_CONTRASTS = [
     #     such regardless of how many flags literally differ) ---
     dict(contrast_id='remove_speed_from_b_e2', contrast_family='scaffold_pruning',
           base_method='b_e2', comparison_method='f2_grad_levelset_e2', added_or_changed_term='speed',
-          single_term_contrast=False,
+          single_term_contrast=False, expected_flag_changes={'speed': (True, False)},
           interpretation='Composite scaffold-pruning contrast (not a single-term causal effect, per the '
                           'requested labeling for this family): removes the speed-loss term from B+E2 while '
                           'keeping grad+levelset+E2. (Flag-level note: this particular pair differs only in '
@@ -849,16 +850,70 @@ TARGETED_CONTRASTS = [
     dict(contrast_id='remove_speed_levelset_from_b_e2', contrast_family='scaffold_pruning',
           base_method='b_e2', comparison_method='f1_grad_e2', added_or_changed_term='speed+levelset',
           single_term_contrast=False,
+          expected_flag_changes={'speed': (True, False), 'levelset': (True, False)},
           interpretation='Composite scaffold-pruning contrast: removes both the speed- and level-set-loss '
                           'terms from B+E2, keeping only grad+E2. Differs from base in two flags '
                           '(uses_speed and uses_levelset) -- not a single-term effect.'),
     dict(contrast_id='remove_speed_levelset_from_c', contrast_family='scaffold_pruning',
           base_method='candidate_c', comparison_method='f3_grad_crit', added_or_changed_term='speed+levelset',
           single_term_contrast=False,
+          expected_flag_changes={'speed': (True, False), 'levelset': (True, False)},
           interpretation='Composite scaffold-pruning contrast: removes both the speed- and level-set-loss '
                           'terms from Candidate C, keeping only grad+crit. Differs from base in two flags '
                           '(uses_speed and uses_levelset) -- not a single-term effect.'),
 ]
+
+
+ALL_USES_FLAGS = ('speed', 'grad', 'levelset', 'crit', 'e2')
+
+
+def verify_contrast_metadata(spec: dict, method_meta: dict) -> None:
+    """Hard-fails unless the base->comparison method-metadata flag changes
+    for this contrast exactly match spec['expected_flag_changes'], and every
+    other uses_* flag is unchanged between base and comparison."""
+    contrast_id = spec['contrast_id']
+    base, comp = spec['base_method'], spec['comparison_method']
+    expected_changes = spec['expected_flag_changes']
+
+    def flag(method_id, flag_name):
+        col = FACTOR_TO_USES_COLUMN[flag_name]
+        raw = method_meta[method_id]['values'].get(col, '')
+        if raw not in ('True', 'False'):
+            raise SystemExit(f'[hard-fail] Targeted contrast {contrast_id!r}: method {method_id!r} has '
+                              f'unparseable {col}={raw!r} in the long table.')
+        return raw == 'True'
+
+    observed_changes = {}
+    mismatches = []
+    for f in ALL_USES_FLAGS:
+        base_val = flag(base, f)
+        comp_val = flag(comp, f)
+        observed_changes[f] = (base_val, comp_val)
+        if f in expected_changes:
+            exp_before, exp_after = expected_changes[f]
+            if base_val != exp_before or comp_val != exp_after:
+                mismatches.append(f'{f}: expected {exp_before}->{exp_after}, observed {base_val}->{comp_val}')
+        else:
+            if base_val != comp_val:
+                mismatches.append(f'{f}: expected unchanged, observed {base_val}->{comp_val} '
+                                    '(not a declared expected_flag_changes entry for this contrast)')
+
+    if mismatches:
+        raise SystemExit(
+            f'[hard-fail] Targeted contrast {contrast_id!r} (base={base!r}, comparison={comp!r}) metadata '
+            f'validation failed. Expected flag changes: {expected_changes}. Observed flags: '
+            f'{observed_changes}. Mismatches:\n' + '\n'.join(f'  - {m}' for m in mismatches)
+        )
+
+
+def compute_paired_contrast_point(base_value: float, comparison_value: float, direction: str) -> tuple:
+    """The single production helper used for every per-sample targeted-
+    contrast point: returns (raw_delta, oriented_improvement) where
+    raw_delta = comparison - base and a positive oriented_improvement always
+    means the comparison method is better than the base method."""
+    raw_delta = comparison_value - base_value
+    oriented_improvement = raw_delta if direction == 'higher_is_better' else -raw_delta
+    return raw_delta, oriented_improvement
 
 
 def run_targeted_contrasts(metric_cols, metric_direction, metric_family, per_sample, method_meta):
@@ -872,6 +927,7 @@ def run_targeted_contrasts(metric_cols, metric_direction, metric_family, per_sam
             if method_id not in per_sample:
                 raise SystemExit(f"[hard-fail] Targeted contrast {spec['contrast_id']!r}: method "
                                   f'{method_id!r} not found in the long table.')
+        verify_contrast_metadata(spec, method_meta)
         for metric in metric_cols:
             direction = metric_direction[metric]
             family = metric_family.get(metric, '')
@@ -885,8 +941,7 @@ def run_targeted_contrasts(metric_cols, metric_direction, metric_family, per_sam
             for si in range(N_EVAL):
                 if si in common:
                     bv, cv = base_vals[si], comp_vals[si]
-                    raw_delta = cv - bv
-                    oriented_improvement = raw_delta if direction == 'higher_is_better' else -raw_delta
+                    raw_delta, oriented_improvement = compute_paired_contrast_point(bv, cv, direction)
                     per_sample_rows.append(dict(
                         contrast_id=spec['contrast_id'], contrast_family=spec['contrast_family'],
                         base_method=base, comparison_method=comp, sample_idx=si, metric=metric,
@@ -1316,6 +1371,12 @@ def main() -> int:
     # -------------------------------------------------------------------
     # Prior-phase immutability postflight
     # -------------------------------------------------------------------
+    # Re-run the exact same existence/no-unexpected-extra-CSV gate used in
+    # preflight, so a protected file that went missing or an unexpected new
+    # protected-looking CSV that appeared DURING this run's execution (not
+    # just a checksum change on an existing file) is also caught before we
+    # trust the "after" checksums at all.
+    require_protected_files()
     checksums_after = checksum_all(all_protected)
     immut_rows = []
     changed = []
@@ -1391,6 +1452,15 @@ def write_phase2b_doc(design_results, contrasts_result, validation_rows, combine
                 signs.append('includes_zero')
         return len(set(signs)) == 1
 
+    def reconstruction_counts(res):
+        """Derives (total_rows, finite_reconstructed_count, no_data_count)
+        directly from the generated reconstruction rows -- never hardcoded."""
+        rows = res['reconstruction_rows']
+        total = len(rows)
+        finite = sum(1 for r in rows if r['status'] == 'PASS')
+        no_data = sum(1 for r in rows if r['status'] == 'no_data')
+        return total, finite, no_data
+
     pd_grad_a = effect_row(res_a, 'grad', 'pd_distance')
     mt_e2_b = effect_row(res_b, 'e2', 'mt_distance')
 
@@ -1430,26 +1500,36 @@ def write_phase2b_doc(design_results, contrasts_result, validation_rows, combine
     lines.append('')
     lines.append('## 3. Full B 2^3 design')
     lines.append('')
+    total_a, finite_a, no_data_a = reconstruction_counts(res_a)
     lines.append('Cells (uv, speed_only, levelset_only, speed_levelset, grad_only, speed_grad, grad_levelset, '
                  'candidate_b) span the complete `speed x grad x levelset` design; method metadata was verified '
                  'to match the declared coding exactly for every cell before any statistic was computed. Seven '
                  'effects were estimated: speed, grad, levelset, speed:grad, speed:levelset, grad:levelset, '
-                 'speed:grad:levelset. Every one of the 168 x 22 x 8 = 29,568 cell values was exactly '
-                 f'reconstructed from its 8 saturated coefficients (max abs error <= {RECONSTRUCTION_TOLERANCE:g}), '
-                 'and every effect\'s task-provided PD/MT sanity-check target was reproduced from the validated '
-                 f'method means within {SANITY_TOLERANCE:g}.')
+                 f'speed:grad:levelset. `b_factorial_reconstruction_check.csv` has {total_a:,} rows (168 samples '
+                 f'x 22 metrics x 8 cells); of these, {finite_a:,} finite values were exactly reconstructed from '
+                 f'their 8 saturated coefficients (max abs error <= {RECONSTRUCTION_TOLERANCE:g}), and {no_data_a:,} '
+                 'are globally-unavailable SSIM entries retained as `no_data` rather than reconstructed or '
+                 'fabricated. Every effect\'s task-provided PD/MT sanity-check target was reproduced from the '
+                 f'validated method means within {SANITY_TOLERANCE:g}.')
     lines.append('')
     lines.append('## 4. B-scaffold critical x E2 2^2 design')
     lines.append('')
+    total_b, finite_b, no_data_b = reconstruction_counts(res_b)
     lines.append('Cells (candidate_b, candidate_c, b_e2, c_e2) hold the speed+grad+levelset scaffold fixed and '
                  'vary only the critical-maxima proxy and repaired E2. Effects estimated: crit, e2, crit:e2. '
-                 'Same reconstruction gate, sanity-check reproduction, and bootstrap methodology as Analysis A.')
+                 f'`b_scaffold_crit_e2_reconstruction_check.csv` has {total_b:,} rows (168 x 22 x 4 cells); '
+                 f'{finite_b:,} finite values reconstructed within {RECONSTRUCTION_TOLERANCE:g}, {no_data_b:,} SSIM '
+                 'entries retained as `no_data`. Same reconstruction gate, sanity-check reproduction, and '
+                 'bootstrap methodology as Analysis A.')
     lines.append('')
     lines.append('## 5. Gradient-scaffold level-set x E2 2^2 design')
     lines.append('')
+    total_c, finite_c, no_data_c = reconstruction_counts(res_c)
     lines.append('Cells (grad_only, grad_levelset, f1_grad_e2, f2_grad_levelset_e2) hold the gradient term fixed '
-                 'and vary level-set and repaired E2. Effects estimated: levelset, e2, levelset:e2. Same gates '
-                 'and methodology as Analyses A and B.')
+                 'and vary level-set and repaired E2. Effects estimated: levelset, e2, levelset:e2. '
+                 f'`grad_scaffold_levelset_e2_reconstruction_check.csv` has {total_c:,} rows (168 x 22 x 4 cells); '
+                 f'{finite_c:,} finite values reconstructed within {RECONSTRUCTION_TOLERANCE:g}, {no_data_c:,} SSIM '
+                 'entries retained as `no_data`. Same gates and methodology as Analyses A and B.')
     lines.append('')
     lines.append('## 6. Targeted matched contrasts')
     lines.append('')
