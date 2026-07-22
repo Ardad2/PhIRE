@@ -30,7 +30,7 @@ Every sample-level factorial effect and every targeted contrast reports four 95%
 
 ## 8. Multiple-testing correction
 
-`phase2b_multiple_testing_adjusted.csv` has 616 rows (every effect/contrast x metric combination across all four analyses); 588 carry a valid exact sign-test p-value and 0 carry a valid Wilcoxon p-value (SciPy was not importable in this environment, so every Wilcoxon field is empty and the run completed without it, as required). Holm step-down correction was applied three ways: once globally across every valid comparison, once within each metric across all effects/contrasts, and once within each analysis family. No binary "significant" field was created, and the adjusted values retain the temporal-independence caveat from section 7 even after correction.
+`phase2b_multiple_testing_adjusted.csv` has 616 rows (every effect/contrast x metric combination across all four analyses); 588 carry a valid exact sign-test p-value and 588 carry a valid Wilcoxon p-value (SciPy was available). Holm step-down correction was applied three ways: once globally across every valid comparison, once within each metric across all effects/contrasts, and once within each analysis family. No binary "significant" field was created, and the adjusted values retain the temporal-independence caveat from section 7 even after correction.
 
 ## 9. PD and MT findings
 
@@ -84,3 +84,4 @@ Metric-correlation analysis, Pareto-front analysis, sample-level selection, and 
 - `ttk_runs_fixed/unified_candidate_analysis/phase2b/prior_phase_immutability_check.csv`
 - `docs/unified_candidate_analysis_phase2b.md` (this file)
 - `logs/unified_candidate_analysis_phase2b.log`
+
