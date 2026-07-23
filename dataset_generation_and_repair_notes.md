@@ -1,5 +1,9 @@
 # Dataset Generation and Repair Notes
 
+**Last consolidated update:** July 22, 2026  
+**Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C complete, validated on Spark, archived, and checksum-verified. Phase 2D has not yet begun.
+
+
 ## Purpose
 
 This document records the recovered provenance of the original 168-sample wind-field dataset, the later repair/correction work, and the exact reconstruction procedure used to verify that the recovered generation path is correct. It is meant to serve three purposes:
@@ -10805,5 +10809,968 @@ grad_crit:
 ```
 
 The Candidate F experiment series is complete.
+
+---
+
+# Part XXVIII — Unified benchmark construction and analysis through Phase 2C
+
+## XXVIII.1 Purpose of this consolidated update
+
+This section absorbs the project-level record that was previously maintained in
+`phire_project_record_through_phase2a_2026-07-21.md` and extends it through the
+authoritative completion of Phases 2A, 2B, and 2C on Spark.
+
+The earlier portions of this document remain the command-level provenance,
+repair, and reconstruction record. This new part connects those repaired data
+artifacts to the final 19-method benchmark and to the downstream statistical
+analyses.
+
+The scientific workflow is now:
+
+```text
+NREL WIND Toolkit provenance
+  -> historical-generation reconstruction
+  -> corrected MR/HR benchmark
+  -> fixed CNN/GAN and candidate inference arrays
+  -> cheap scalar/vector/domain metrics
+  -> TTK PD and MT distances
+  -> Phase 1 unified per-sample table
+  -> Phase 2A descriptive and paired analysis
+  -> Phase 2B factorial and targeted-contrast analysis
+  -> Phase 2C metric-relationship and Pareto analysis
+  -> Phase 2D sample archetypes and figures (not yet begun)
+```
+
+The final benchmark and Phases 1-2C are read-only, archived, and checksum
+protected.
+
+---
+
+## XXVIII.2 Scientific objective and evaluation representation
+
+The project evaluates whether topology-inspired and topology-derived losses can
+improve wind-field super-resolution beyond what conventional pointwise metrics
+capture.
+
+All learned candidates begin with the pretrained PhIRE CNN and predict
+normalized vector components. Physical components are recovered by
+
+\[
+u_{\mathrm{phys}}=\sigma_u u_{\mathrm{norm}}+\mu_u,\qquad
+v_{\mathrm{phys}}=\sigma_v v_{\mathrm{norm}}+\mu_v,
+\]
+
+and scalar wind speed is
+
+\[
+s(x,y)=\sqrt{u(x,y)^2+v(x,y)^2}.
+\]
+
+The unified benchmark contains the following metric families:
+
+- vector-field fidelity: `psnruv`;
+- scalar-speed fidelity: `ssim_speed`, `speed_mae`, `speed_rmse`;
+- wind-power distribution: `wpd_mae`, `wpd_w1`, `wpd_bias_abs`;
+- gradient distribution: `grad_mae`, `grad_w1`,
+  `grad_kurtosis_abs_delta`;
+- spectral behavior: `psd_log_l2`, `psd_slope_abs_delta`;
+- threshold geometry: `exceed_abs_t5`, `exceed_abs_t10`,
+  `exceed_abs_t15`, `exceed_abs_p90`, `comp_curve_l1`,
+  `comp_abs_t5`, `comp_abs_t10`, `comp_abs_t15`;
+- topology: `pd_distance`, `mt_distance`.
+
+Higher is better only for PSNR and SSIM. Lower is better for all error and
+distance metrics. Every paired analysis uses an oriented improvement convention
+under which positive always means better.
+
+SSIM remained globally unavailable in the authoritative Spark runs because of
+the known NumPy/scikit-image ABI incompatibility. This was handled explicitly:
+each method had exactly `0/168` finite SSIM values, no values were imputed, and
+SSIM was excluded from analyses that require numeric values.
+
+---
+
+## XXVIII.3 Authoritative 19-method benchmark
+
+### Baselines
+
+1. `bicubic`
+2. `cnn`
+3. `gan`
+
+### Candidate-B factorial and full objectives
+
+4. `uv`
+5. `speed_only`
+6. `levelset_only`
+7. `speed_levelset`
+8. `grad_only`
+9. `speed_grad`
+10. `grad_levelset`
+11. `candidate_b`
+12. `candidate_c`
+
+### Targeted critical-proxy and repaired-E2 variants
+
+13. `uv_crit`
+14. `uv_e2`
+15. `b_e2`
+16. `c_e2`
+
+### Candidate-F recombinations
+
+17. `f1_grad_e2`
+18. `f2_grad_levelset_e2`
+19. `f3_grad_crit`
+
+The 16 learned primary method IDs map to the following internal artifact names:
+
+| Method ID | Internal artifact name |
+|---|---|
+| `uv` | `candidateUV_expanded2688` |
+| `speed_only` | `candidateB_factorial_speed_expanded2688` |
+| `levelset_only` | `candidateB_factorial_levelset_expanded2688` |
+| `speed_levelset` | `candidateB_factorial_speed_levelset_expanded2688` |
+| `grad_only` | `candidateB_factorial_grad_expanded2688` |
+| `speed_grad` | `candidateB_factorial_speed_grad_expanded2688` |
+| `grad_levelset` | `candidateB_factorial_grad_levelset_expanded2688` |
+| `candidate_b` | `candidateB_expanded2688` |
+| `candidate_c` | `candidateC_expanded2688` |
+| `uv_crit` | `candidateUV_plus_crit_expanded2688` |
+| `uv_e2` | `candidateUV_plus_E2_tf_lowlambda_expanded2688` |
+| `b_e2` | `candidateB_plus_E2_tf_lowlambda_expanded2688` |
+| `c_e2` | `candidateE2_tf_lowlambda_expanded2688` |
+| `f1_grad_e2` | `candidateF_grad_E2_low_expanded2688` |
+| `f2_grad_levelset_e2` | `candidateF_grad_levelset_E2_low_expanded2688` |
+| `f3_grad_crit` | `candidateF_grad_crit_expanded2688` |
+
+### Authoritative mean topology distances
+
+| Method | PD mean | MT mean |
+|---|---:|---:|
+| CNN | 27.4063 | 5.8678 |
+| GAN | 20.8641 | 8.3481 |
+| UV | 29.6121 | 6.0119 |
+| Speed only | 29.5783 | 5.9996 |
+| Level-set only | 29.5953 | 6.0076 |
+| Speed + level-set | 29.4363 | 5.9441 |
+| Gradient only | 22.9326 | 6.0560 |
+| Speed + gradient | 22.9706 | 6.2905 |
+| Gradient + level-set | 22.6194 | 6.1996 |
+| Candidate B | 22.7070 | 6.1612 |
+| Candidate C | 22.4944 | 6.0803 |
+| UV + critical proxy | 29.1143 | 5.6899 |
+| UV + repaired E2 | 25.0721 | 5.5940 |
+| Candidate B + repaired E2 | 23.9876 | 5.6774 |
+| Candidate C + repaired E2 | 24.2686 | 5.6628 |
+| F1: gradient + repaired E2 | 23.8382 | 5.6566 |
+| F2: gradient + level-set + repaired E2 | 23.7481 | 5.6742 |
+| F3: gradient + critical proxy | 22.0179 | 5.9840 |
+
+Bicubic has complete cheap/domain metrics but no PD or MT entry.
+
+---
+
+# Part XXIX — Phase 1: unified per-sample evaluation and Spark audit
+
+## XXIX.1 Objective
+
+Phase 1 created one authoritative table with one row for every
+method-by-sample pair:
+
+\[
+19\text{ methods}\times168\text{ samples}=3192\text{ rows}.
+\]
+
+The long table is the sole numeric source of truth for Phases 2A-2C.
+
+## XXIX.2 Builder development and important fixes
+
+The unified builder is:
+
+```text
+scripts/build_unified_candidate_evaluation.py
+```
+
+Key development commits were:
+
+- `dfac9744`: initial manifest, inventory, long-table, and strict/audit modes;
+- `09a22402`: repeated bicubic/CNN/GAN harvesting and baseline
+  cross-source checks;
+- `7d7a6bd5`: optional-but-audited SSIM handling and raw-array validation;
+- `887ced2e`: strict per-source baseline coverage, deterministic per-metric
+  baseline resolution, and non-lossy index validation;
+- `749c8987`: method-suffixed topology-column resolver.
+
+The final topology parser resolves columns in this order:
+
+1. generic `pd_distance` / `mt_distance`;
+2. exact method-suffixed columns;
+3. a unique prefix match.
+
+It hard-fails on missing or ambiguous columns, mismatched PD/MT suffixes,
+partial rows, invalid `pos_idx`, nonfinite values, or negative distances.
+
+## XXIX.3 Raw-array validation
+
+For every primary learned method, Phase 1 validated:
+
+```text
+idx.npy     -> exactly 0..167
+dataIN.npy  -> exact equality with canonical CNN input
+dataGT.npy  -> exact equality with canonical CNN GT
+dataSR.npy  -> shape (168, 500, 500, 2)
+dataSR.npy  -> all values finite
+```
+
+Canonical references were memory-mapped from:
+
+```text
+data_out_fixed/wind_mrhr_cnn/
+```
+
+Comparisons were chunked to limit memory use.
+
+## XXIX.4 First strict-run failure and repair
+
+The first Spark strict run failed for all 16 learned candidates with a message
+that PD and MT were not finite/nonnegative. The files existed and contained
+168 valid rows, but their headers were method-suffixed, for example:
+
+```text
+pd_distance_candidateF_grad_E2_low_expanded2688
+mt_distance_candidateF_grad_E2_low_expanded2688
+```
+
+The parser was looking only for unsuffixed names. Commit `749c8987` fixed this
+schema mismatch. A dedicated smoke test then reproduced all known PD/MT means
+for all 16 learned candidates before the authoritative rerun.
+
+## XXIX.5 Authoritative strict result
+
+The final Spark run completed with:
+
+```text
+STRICT AUDIT EXIT STATUS: 0
+```
+
+All 19 strict checks passed.
+
+The final outputs under
+
+```text
+ttk_runs_fixed/unified_candidate_evaluation/
+```
+
+were:
+
+| File | Rows / shape |
+|---|---:|
+| `method_inventory.csv` | 43 rows |
+| `column_mapping.csv` | 80 rows |
+| `unified_primary_per_sample_long.csv` | 3,192 rows |
+| `unified_primary_method_summary.csv` | 418 rows |
+| `unified_primary_topology_validation.csv` | 18 rows |
+| `unified_primary_pairwise_vs_cnn.csv` | 396 rows |
+| `unified_primary_missingness.csv` | 418 rows |
+| `unified_primary_wide.csv` | 168 rows × 419 columns |
+
+Topology validation reported:
+
+```text
+PASS = 18
+NO_DATA = 0
+FAIL = 0
+```
+
+The builder discovered 41 repeated cheap-evaluation sources. Required
+bicubic/CNN/GAN metrics agreed across those sources within the configured
+tolerance. SSIM availability mismatches were recorded as availability states,
+not converted into numeric zero.
+
+## XXIX.6 Preservation
+
+Phase 1 was frozen as:
+
+```text
+unified_candidate_evaluation_phase1_2026-07-21.tar.gz
+unified_candidate_evaluation_phase1_checksums.sha256
+unified_candidate_evaluation_phase1_archive.sha256
+```
+
+Every checksummed file returned `OK`, and the archive checksum also returned
+`OK`.
+
+---
+
+# Part XXX — Phase 2A: descriptive and paired multi-metric analysis
+
+## XXX.1 Purpose
+
+Phase 2A answered:
+
+- what each metric's distribution looks like for every method;
+- how every method compares with CNN on the same 168 samples;
+- how often a method wins, ties, or loses;
+- how much benchmark-sample variability is present;
+- whether the Phase-1 summary and pairwise tables can be reproduced
+  independently.
+
+The analysis script is:
+
+```text
+scripts/analyze_unified_candidate_metrics_phase2a.py
+```
+
+## XXX.2 Validation and output dimensions
+
+The authoritative Spark run reported:
+
+```text
+PHASE 2A EXIT STATUS: 0
+1027/1027 validation checks PASS
+3564/3564 Phase-1 pairwise-field comparisons PASS
+12/12 protected Phase-1 files unchanged
+```
+
+It produced:
+
+- 418 method-by-metric coverage rows;
+- 418 method-by-metric descriptive-summary rows;
+- 396 method-by-metric paired-comparison rows;
+- 376 rows with 168 valid paired observations;
+- 20 empty rows consisting of the 18 non-CNN SSIM comparisons plus bicubic
+  PD and MT;
+- 396 adjusted-testing rows.
+
+The paired analysis includes:
+
+- raw and oriented deltas;
+- paired sample bootstrap intervals;
+- win/tie/loss counts and rates;
+- paired effect size \(d_z\);
+- exact two-sided sign tests;
+- Wilcoxon signed-rank tests when SciPy is available;
+- Holm correction globally and within each metric.
+
+The ordinary bootstrap, sign test, and Wilcoxon test treat the hourly fields
+as independent. Because the 168 samples are consecutive in time, the report
+explicitly treats the inferential outputs as benchmark-level descriptive
+summaries and warns that they may be anti-conservative under temporal
+dependence.
+
+## XXX.3 Topology tradeoff quadrants
+
+The Phase-2A topology quadrants were:
+
+```text
+improves_both:          5
+improves_pd_only:       7
+improves_mt_only:       1
+improves_neither:       4
+cnn_reference:          1
+topology_unavailable:   1
+```
+
+Methods improving both mean PD and mean MT relative to CNN:
+
+```text
+b_e2
+c_e2
+f1_grad_e2
+f2_grad_levelset_e2
+uv_e2
+```
+
+The single `improves_mt_only` method was `uv_crit`. Bicubic was the
+topology-unavailable method.
+
+## XXX.4 Outputs
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2a/
+  phase2a_validation.csv
+  metric_coverage.csv
+  method_descriptive_summary.csv
+  paired_vs_cnn_detailed.csv
+  paired_vs_cnn_adjusted.csv
+  method_mean_improvement_matrix.csv
+  method_win_rate_matrix.csv
+  topology_tradeoff_summary.csv
+  topology_tradeoff_summary_sorted.csv
+  phase1_pairwise_reproduction.csv
+  phase1_immutability_check.csv
+```
+
+Report and script:
+
+```text
+docs/unified_candidate_analysis_phase2a.md
+logs/unified_candidate_analysis_phase2a.log
+scripts/analyze_unified_candidate_metrics_phase2a.py
+```
+
+## XXX.5 Implementation commits and preservation
+
+Phase-2A implementation commits:
+
+```text
+ffbd21f9  initial Phase-2A implementation
+acc68544  protected-file, relative-path, topology-coverage, and temporal-caveat hardening
+```
+
+Phase 2A was frozen and verified as:
+
+```text
+unified_candidate_analysis_phase2a_2026-07-21.tar.gz
+unified_candidate_analysis_phase2a_checksums.sha256
+unified_candidate_analysis_phase2a_archive.sha256
+```
+
+---
+
+# Part XXXI — Phase 2B: factorial effects and targeted loss contrasts
+
+## XXXI.1 Designs
+
+Phase 2B analyzed three complete factorial designs and 15 matched contrasts.
+
+### A. Candidate-B \(2^3\) factorial
+
+Factors:
+
+```text
+speed × gradient × level-set
+```
+
+Cells:
+
+```text
+uv
+speed_only
+levelset_only
+speed_levelset
+grad_only
+speed_grad
+grad_levelset
+candidate_b
+```
+
+Effects:
+
+```text
+speed
+grad
+levelset
+speed:grad
+speed:levelset
+grad:levelset
+speed:grad:levelset
+```
+
+### B. Candidate-B-scaffold \(2^2\)
+
+Factors:
+
+```text
+critical proxy × repaired E2
+```
+
+Cells:
+
+```text
+candidate_b
+candidate_c
+b_e2
+c_e2
+```
+
+### C. Gradient-scaffold \(2^2\)
+
+Factors:
+
+```text
+level-set × repaired E2
+```
+
+Cells:
+
+```text
+grad_only
+grad_levelset
+f1_grad_e2
+f2_grad_levelset_e2
+```
+
+### D. Fifteen targeted contrasts
+
+The targeted families were:
+
+- add critical proxy: 4 contrasts;
+- add repaired E2: 5 contrasts;
+- repaired E2 versus critical proxy: 3 contrasts;
+- composite scaffold pruning/minimality: 3 contrasts.
+
+Strict metadata validation verified that every contrast changed exactly the
+intended `uses_*` flags and no others.
+
+## XXXI.2 Factorial-effect convention
+
+Factors were coded as disabled \(=-1\), enabled \(=+1\). For each nonempty
+factor subset \(J\),
+
+\[
+\beta_J = \operatorname{mean}\left(y\prod_{j\in J}x_j\right)
+\]
+
+and the reported standard factorial effect was
+
+\[
+\text{effect}_J=2\beta_J.
+\]
+
+Metric orientation makes positive effects improvements.
+
+All saturated designs reconstructed every available cell within \(10^{-12}\).
+SSIM entries remained `no_data`.
+
+## XXXI.3 Authoritative topology factorial effects
+
+### Candidate-B \(2^3\): oriented PD effects
+
+| Effect | Oriented PD effect |
+|---|---:|
+| speed | +0.0168 |
+| gradient | +6.7481 |
+| level-set | +0.1839 |
+| speed:gradient | -0.0796 |
+| speed:level-set | +0.0189 |
+| gradient:level-set | +0.1045 |
+| speed:gradient:level-set | -0.0437 |
+
+### Candidate-B \(2^3\): oriented MT effects
+
+| Effect | Oriented MT effect |
+|---|---:|
+| speed | -0.030075 |
+| gradient | -0.186025 |
+| level-set | +0.011375 |
+| speed:gradient | -0.067975 |
+| speed:level-set | +0.081025 |
+| gradient:level-set | -0.018525 |
+| speed:gradient:level-set | +0.055425 |
+
+### Candidate-B scaffold: critical proxy × repaired E2
+
+| Effect | Oriented PD | Oriented MT |
+|---|---:|---:|
+| critical proxy | -0.0342 | +0.04775 |
+| repaired E2 | -1.5274 | +0.45065 |
+| critical:E2 | -0.2468 | -0.03315 |
+
+### Gradient scaffold: level-set × repaired E2
+
+| Effect | Oriented PD | Oriented MT |
+|---|---:|---:|
+| level-set | +0.20165 | -0.0806 |
+| repaired E2 | -1.01715 | +0.4624 |
+| level-set:E2 | -0.11155 | +0.0630 |
+
+## XXXI.4 Scientific interpretation
+
+Within the realized trained candidates:
+
+- gradient is by far the dominant PD-improving term;
+- repaired E2 is the dominant MT-improving term;
+- the critical proxy is weaker and context dependent;
+- level-set acts mainly as a modulation/interaction term;
+- speed has negligible independent PD effect and can worsen MT in
+  gradient-containing combinations;
+- PD and MT improvements are therefore descriptor specific rather than a
+  single generic "topology improvement."
+
+These are factorial contrasts among models trained once. They should not be
+presented as universal causal effects across retraining seeds.
+
+## XXXI.5 Temporal sensitivity and testing
+
+Each sample-level effect and contrast received:
+
+- ordinary paired bootstrap CI;
+- circular moving-block bootstrap CIs with block lengths 6, 12, and 24 hours;
+- sign test;
+- Wilcoxon signed-rank test on Spark;
+- Holm correction globally, within metric, and within analysis family.
+
+The authoritative run reported:
+
+```text
+417/417 base validation checks PASS
+616 combined effect/contrast-by-metric rows
+588 valid sign-test p-values
+588 valid Wilcoxon p-values
+26/26 prior Phase-1/2A files unchanged
+```
+
+Reconstruction counts were:
+
+```text
+B 2^3:
+  29,568 table rows
+  28,224 finite values reconstructed
+  1,344 SSIM no_data rows
+
+Each 2^2:
+  14,784 table rows
+  14,112 finite values reconstructed
+  672 SSIM no_data rows
+```
+
+## XXXI.6 Outputs, implementation commits, and preservation
+
+Phase-2B implementation commits:
+
+```text
+00afc40d  initial Phase-2B factorial/contrast implementation
+3e043acd  metadata, reconstruction-report, tests, and postflight hardening
+```
+
+Primary outputs:
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2b/
+  phase2b_validation.csv
+  prior_phase_immutability_check.csv
+  b_factorial_*.csv
+  b_scaffold_crit_e2_*.csv
+  grad_scaffold_levelset_e2_*.csv
+  targeted_contrast_*.csv
+  phase2b_multiple_testing_adjusted.csv
+  topology_factorial_and_contrast_summary.csv
+```
+
+Phase 2B was archived and verified as:
+
+```text
+unified_candidate_analysis_phase2b_2026-07-22.tar.gz
+unified_candidate_analysis_phase2b_checksums.sha256
+unified_candidate_analysis_phase2b_archive.sha256
+```
+
+---
+
+# Part XXXII — Phase 2C: metric relationships and Pareto tradeoffs
+
+## XXXII.1 Why a pooled correlation was not used
+
+A raw correlation across all 3,192 long-table rows would mix:
+
+- between-method differences;
+- within-method sample difficulty;
+- within-sample cross-method ranking differences.
+
+Phase 2C therefore analyzed four separate levels:
+
+1. correlations across method means;
+2. correlations across samples within each method;
+3. correlations across methods within each sample;
+4. pair-specific two-way-centered residual correlations after removing
+   additive method and sample main effects.
+
+Pearson and Spearman correlations were implemented directly with NumPy.
+Spearman uses average ranks for ties.
+
+## XXXII.2 Output dimensions and validation
+
+The authoritative Spark run reported:
+
+```text
+PHASE 2C EXIT STATUS: 0
+978/978 validation checks PASS
+54/54 protected Phase-1/2A/2B files unchanged
+```
+
+Correlation dimensions:
+
+```text
+method-level metric pairs:             210
+within-method rows:                  3,990
+samplewise cross-method rows:       35,280
+two-way residual metric pairs:         210
+focal topology bootstrap rows:         540
+```
+
+The residual analysis uses pair-specific common rectangles:
+
+- 171 non-topology/non-topology pairs use all 19 methods;
+- 38 mixed topology/non-topology pairs use the same 18 topology-bearing
+  methods for both metrics;
+- the PD/MT pair uses 18 methods.
+
+The maximum observed residual margin after centering was approximately
+
+\[
+1.24\times10^{-13},
+\]
+
+far below the \(10^{-9}\) validation tolerance.
+
+## XXXII.3 PD/MT relationship across analysis levels
+
+| Analysis level | Pearson | Spearman | Interpretation |
+|---|---:|---:|---|
+| Across 18 method means | -0.3725 | -0.4283 | methods favored by PD are not consistently favored by MT |
+| Within-method median across 168 fields | +0.3883 | +0.2991 | within a fixed method, harder fields often affect both descriptors similarly |
+| Within-sample median across 18 methods | -0.2623 | -0.1538 | for a fixed field, PD and MT often rank methods differently |
+| Two-way-centered residual | +0.0526 | +0.1027 | little association remains after additive method/sample effects are removed |
+
+Direct pairwise preference analysis across the 153 method pairs produced:
+
+```text
+mean descriptor agreement rate:     0.4384
+mean descriptor disagreement rate:  0.5616
+```
+
+The per-sample aggregation produced the same mean agreement/disagreement
+rates. Any tie in either descriptor is classified separately as
+`tie_or_undefined`; in the authoritative benchmark no PD/MT preference ties
+occurred.
+
+`topology_rank_by_method.csv` ranks each method's own PD and MT means. The
+signed gap is
+
+```text
+pd_rank - mt_rank
+```
+
+so a positive gap means MT favors the method more strongly than PD, and a
+negative gap means PD favors it more strongly.
+
+## XXXII.4 Focal topology correlation bootstrap
+
+Fifteen focal pairs were analyzed:
+
+- PD versus seven compact non-topology representatives;
+- MT versus those same seven;
+- PD versus MT.
+
+For every topology-bearing method and both Pearson and Spearman correlation,
+the analysis produced:
+
+- observed correlation;
+- iid 95% CI;
+- circular block-6 CI;
+- circular block-12 CI;
+- circular block-24 CI;
+- interval-sign classification.
+
+The final wide output contains:
+
+\[
+18\times15\times2=540
+\]
+
+rows, with 2,000 resamples per scheme.
+
+## XXXII.5 Pareto objective sets
+
+Six objective sets were used:
+
+1. `topology_only` — PD and MT;
+2. `fidelity_physics_compact` — 7 fidelity/physics objectives;
+3. `fidelity_topology` — 4 objectives;
+4. `physics_topology` — 7 objectives;
+5. `cross_family_compact` — 9 objectives;
+6. `all_available_non_ssim` — all 21 available metrics, explicitly labeled
+   a sensitivity analysis.
+
+No weighted aggregate score or total ranking was produced.
+
+### Deterministic topology-only front
+
+The required topology-only Pareto front was reproduced exactly:
+
+```text
+gan
+f3_grad_crit
+f2_grad_levelset_e2
+f1_grad_e2
+uv_e2
+```
+
+This is a tradeoff set, not an ordering. It spans stronger PD at the GAN/F3
+end and stronger MT at the F1/F2/UV+E2 end.
+
+The other deterministic front sizes were:
+
+```text
+fidelity_physics_compact: 17 of 19
+fidelity_topology:        14 of 18
+physics_topology:         14 of 18
+cross_family_compact:     17 of 18
+all_available_non_ssim:   18 of 18
+```
+
+The increasingly large fronts demonstrate that many-objective Pareto analysis
+rapidly becomes non-discriminating. The 21-objective front is therefore only
+a sensitivity analysis.
+
+## XXXII.6 Pareto bootstrap stability
+
+Each objective set was recomputed under:
+
+- iid resampling;
+- circular block length 6;
+- circular block length 12;
+- circular block length 24;
+
+with 10,000 resamples per scheme. The same resampled sample indices were used
+for every method and every objective within a replicate.
+
+For `topology_only` under iid resampling:
+
+```text
+always on front:
+  gan
+  f2_grad_levelset_e2
+  f3_grad_crit
+
+deterministic-front membership rates:
+  f1_grad_e2  = 0.719
+  uv_e2       = 0.986
+```
+
+Front-membership frequency is a descriptive resampling-stability diagnostic,
+not a posterior probability.
+
+## XXXII.7 Outputs
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2c/
+  phase2c_validation.csv
+  method_mean_oriented_values.csv
+  method_level_metric_correlations.csv
+  method_level_oriented_pearson_matrix.csv
+  method_level_oriented_spearman_matrix.csv
+  within_method_metric_correlations.csv
+  within_method_correlation_summary.csv
+  samplewise_cross_method_correlations.csv
+  samplewise_correlation_summary.csv
+  two_way_residual_correlations.csv
+  two_way_residual_pearson_matrix.csv
+  two_way_residual_spearman_matrix.csv
+  focal_topology_correlation_bootstrap.csv
+  focal_topology_relationship_summary.csv
+  topology_rank_by_method.csv
+  topology_pairwise_preference_agreement.csv
+  topology_sample_preference_agreement.csv
+  topology_descriptor_disagreement_summary.csv
+  pareto_objective_manifest.csv
+  pareto_front_membership.csv
+  pareto_dominance_edges.csv
+  pareto_layers.csv
+  topology_pareto_sanity_check.csv
+  pareto_bootstrap_stability.csv
+  pareto_bootstrap_front_size.csv
+  metric_relationship_summary.csv
+  topology_relationship_and_pareto_summary.csv
+  prior_phase_immutability_check.csv
+```
+
+## XXXII.8 Implementation commits and preservation
+
+Phase-2C implementation commits:
+
+```text
+0a9010b4  initial Phase-2C relationship and Pareto implementation
+96000139  common-rectangle residual, rank, preference, and focal-bootstrap correction
+```
+
+Phase 2C was frozen and verified as:
+
+```text
+unified_candidate_analysis_phase2c_2026-07-22.tar.gz
+unified_candidate_analysis_phase2c_checksums.sha256
+unified_candidate_analysis_phase2c_archive.sha256
+```
+
+All 28 CSVs, the report, and the analysis/test scripts returned `OK`; the
+archive checksum also returned `OK`.
+
+---
+
+# Part XXXIII — Consolidated scientific conclusions and current status
+
+## XXXIII.1 Evidence-supported conclusions
+
+The completed benchmark and Phases 1-2C support the following:
+
+1. Gradient supervision is the dominant driver of persistence-diagram
+   improvement within the realized factorial.
+2. Repaired TTK critical-pair supervision is the dominant driver of
+   merge-tree improvement.
+3. The local-maxima critical proxy is a secondary PD enhancer and a
+   context-dependent MT term; it is not a substitute for repaired E2.
+4. Level-set supervision acts mainly through interactions rather than as a
+   strong independent topology driver.
+5. Speed supervision is not an independent topology driver and can worsen
+   MT in gradient-containing combinations.
+6. PD and MT respond to different structural signals.
+7. GAN has the strongest mean PD but very weak mean MT.
+8. UV+E2 has the strongest mean MT among the primary methods.
+9. F1/F2 provide strong PD-MT compromises.
+10. F3 gives the strongest learned-candidate mean PD but does not improve
+    mean MT relative to CNN.
+11. The PD/MT relationship changes sign across analysis levels; those levels
+    answer different questions and should not be collapsed.
+12. Multi-objective Pareto fronts depend strongly on the chosen objective
+    set and do not define one universally best method.
+
+## XXXIII.2 Claims that remain unsupported
+
+The current work does not establish:
+
+- robustness across independent training seeds;
+- universal causal effects of a loss term;
+- a universally optimal method;
+- calibrated population-level p-values under the temporal dependence of the
+  hourly fields;
+- interchangeability of PD and MT;
+- a meaningful all-metric scalar score.
+
+## XXXIII.3 Immutable project state
+
+```text
+Phase 1:
+  complete
+  authoritative
+  archived
+  checksum-verified
+
+Phase 2A:
+  complete
+  authoritative
+  archived
+  checksum-verified
+
+Phase 2B:
+  complete
+  authoritative
+  archived
+  checksum-verified
+
+Phase 2C:
+  complete
+  authoritative
+  archived
+  checksum-verified
+
+Phase 2D:
+  not yet begun
+```
+
+The next stage is algorithmic sample-archetype selection and
+publication-quality figure generation. It should treat all Phase-1 through
+Phase-2C artifacts as read-only.
 
 ---
