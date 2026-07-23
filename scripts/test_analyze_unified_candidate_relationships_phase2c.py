@@ -183,45 +183,160 @@ specs_8 = {}
 for mid, eff in method_effect.items():
     specs_8[mid] = {'z': eff + sample_effect}
 per_sample_8 = make_synthetic_per_sample(specs_8)
-use_methods_8, R8, margins_8 = m.compute_two_way_residual(per_sample_8, ['ma', 'mb', 'mc'], ['ma', 'mb', 'mc'],
-                                                              'z', 'higher_is_better')
-check('two-way residual row margin ~0', margins_8['row_margin_max_abs'] < 1e-9)
-check('two-way residual col margin ~0', margins_8['col_margin_max_abs'] < 1e-9)
-check('two-way residual grand margin ~0', margins_8['grand_margin_abs'] < 1e-9)
+R8, mmargin_8, smargin_8, gmargin_8 = m.compute_two_way_residual_matrix(
+    per_sample_8, ['ma', 'mb', 'mc'], 'z', 'higher_is_better')
+check('two-way residual method (row) margin ~0', mmargin_8 < 1e-9)
+check('two-way residual sample (col) margin ~0', smargin_8 < 1e-9)
+check('two-way residual grand margin ~0', gmargin_8 < 1e-9)
 # Since z = method_effect + sample_effect (purely additive, no interaction),
 # the residual should be exactly (numerically) zero everywhere.
 check('purely-additive synthetic signal -> residual ~0 everywhere', np.max(np.abs(R8)) < 1e-9)
 
 print()
-print('=== 9. PD/MT pairwise and per-sample preference agreement ===')
-n_agree = m.N_EVAL
-pd_a = np.linspace(0, 1, n_agree)
+print('=== 8b. Pair-specific common-rectangle centering (bug demo + fix) ===')
+# Metric A is defined for 4 methods; metric B is only defined for 3 of them
+# (mirrors bicubic-style total absence, e.g. PD/MT). The bug being fixed:
+# centering A over all 4 methods and THEN subsetting the residual down to the
+# 3 common methods leaves nonzero margins, because the row/column means used
+# for centering were computed over the wrong (too-large) rectangle.
+methods4 = ['m1', 'm2', 'm3', 'm4']
+common3 = ['m1', 'm2', 'm3']
+rng4 = np.random.default_rng(777)
+interaction = rng4.normal(size=(3, m.N_EVAL))
+method_effect_a = np.array([1.0, 2.0, -1.0])
+method_effect_b = np.array([0.5, -0.5, 2.0])
+sample_effect_a = rng4.normal(size=m.N_EVAL) * 0.1
+sample_effect_b = rng4.normal(size=m.N_EVAL) * 0.1
+k = -3.0
+Z_a_common = method_effect_a[:, None] + sample_effect_a[None, :] + interaction
+Z_b_common = method_effect_b[:, None] + sample_effect_b[None, :] + k * interaction
+Z_a_4th = np.full(m.N_EVAL, 9.0)  # method m4 has metric A but not metric B
+
+specs_res = {}
+for i, mid in enumerate(common3):
+    specs_res[mid] = {'aM2': Z_a_common[i], 'bM2': Z_b_common[i]}
+specs_res['m4'] = {'aM2': Z_a_4th, 'bM2': None}
+per_sample_res = make_synthetic_per_sample(specs_res)
+
+# BUGGY approach (what the old code effectively did): center metric A over
+# all 4 methods, then subset the residual rows down to the 3 common methods.
+# NOTE: the per-method (row) margin of the subset is unaffected by row
+# subsetting (each row's own mean was already subtracted exactly), so the
+# bug specifically shows up as a nonzero PER-SAMPLE (column) margin once a
+# row is dropped -- the column means baked into the full-4-method residual
+# no longer match the 3-method subset they are being applied to.
+R_a_full, _, _, _ = m.compute_two_way_residual_matrix(per_sample_res, methods4, 'aM2', 'higher_is_better')
+R_a_subset_after = R_a_full[:3, :]
+row_margin_after_subset = float(np.max(np.abs(R_a_subset_after.mean(axis=1))))
+sample_margin_after_subset = float(np.max(np.abs(R_a_subset_after.mean(axis=0))))
+check('row (per-method) margin is unaffected by post-hoc row subsetting (each row was already exactly demeaned)',
+      row_margin_after_subset < 1e-9)
+check('centering over 4 then subsetting to 3 produces a NONzero per-sample (column) margin '
+      '(demonstrates the bug: the baked-in column means no longer match the 3-method subset)',
+      sample_margin_after_subset > 1e-3)
+
+# CORRECT approach: pair-specific centering, both metrics over the SAME
+# common 3 methods, computed directly on that rectangle.
+R_a, mmargin_a, smargin_a, gmargin_a = m.compute_two_way_residual_matrix(
+    per_sample_res, common3, 'aM2', 'higher_is_better')
+R_b, mmargin_b, smargin_b, gmargin_b = m.compute_two_way_residual_matrix(
+    per_sample_res, common3, 'bM2', 'higher_is_better')
+check('pair-specific centering over the common 3 methods: metric A margins ~0',
+      mmargin_a < 1e-9 and smargin_a < 1e-9 and gmargin_a < 1e-9)
+check('pair-specific centering over the common 3 methods: metric B margins ~0',
+      mmargin_b < 1e-9 and smargin_b < 1e-9 and gmargin_b < 1e-9)
+resid_corr = m.pearson_r(R_a.reshape(-1), R_b.reshape(-1))
+check('pair-specific residual correlation is strongly negative as designed (shared interaction term, k=-3)',
+      resid_corr < -0.9)
+
+print()
+print('=== 9. PD/MT pairwise and per-sample preference classification ===')
+n_ev = m.N_EVAL
+pd_a = np.linspace(0, 1, n_ev)
 pd_b = pd_a + 1.0  # a always has smaller (better) pd
-mt_a = np.linspace(0, 1, n_agree)
+mt_a = np.linspace(0, 1, n_ev)
 mt_b = mt_a + 1.0  # a always has smaller (better) mt too -> full agreement
 per_sample_9a = make_synthetic_per_sample({
     'ta': {'pd_distance': pd_a, 'mt_distance': mt_a},
     'tb': {'pd_distance': pd_b, 'mt_distance': mt_b},
 })
 pref_rows_agree = m.topology_pairwise_preference_agreement(per_sample_9a, ['ta', 'tb'])
-check('fully-agreeing PD/MT synthetic case -> agreement_rate == 1.0',
-      abs(pref_rows_agree[0]['agreement_rate'] - 1.0) < 1e-12)
+check('same non-tied preference every field -> descriptor_agreement_rate == 1.0',
+      abs(pref_rows_agree[0]['descriptor_agreement_rate'] - 1.0) < 1e-12)
+check('same non-tied preference every field -> descriptor_disagreement_rate == 0.0',
+      abs(pref_rows_agree[0]['descriptor_disagreement_rate'] - 0.0) < 1e-12)
+check('same non-tied preference every field -> descriptor_tie_or_undefined_count == 0',
+      pref_rows_agree[0]['descriptor_tie_or_undefined_count'] == 0)
 
 per_sample_9b = make_synthetic_per_sample({
     'ta': {'pd_distance': pd_a, 'mt_distance': mt_b},  # a better on PD, worse on MT
     'tb': {'pd_distance': pd_b, 'mt_distance': mt_a},
 })
 pref_rows_disagree = m.topology_pairwise_preference_agreement(per_sample_9b, ['ta', 'tb'])
-check('fully-disagreeing PD/MT synthetic case -> agreement_rate == 0.0',
-      abs(pref_rows_disagree[0]['agreement_rate'] - 0.0) < 1e-12)
-check('preference counts sum to N_EVAL', pref_rows_agree[0]['pd_pref_a'] + pref_rows_agree[0]['pd_pref_b'] +
-      pref_rows_agree[0]['pd_tie'] == m.N_EVAL)
+check('opposite non-tied preference every field -> descriptor_disagreement_rate == 1.0',
+      abs(pref_rows_disagree[0]['descriptor_disagreement_rate'] - 1.0) < 1e-12)
+check('opposite non-tied preference every field -> descriptor_agreement_rate == 0.0',
+      abs(pref_rows_disagree[0]['descriptor_agreement_rate'] - 0.0) < 1e-12)
 
-sample_pref_rows = m.topology_sample_preference_agreement(per_sample_9a, ['ta', 'tb'])
-check('sample-level preference agreement rows sum to n_pairs=1 (C(2,2)=1)',
-      all(r['n_pairs'] == 1 for r in sample_pref_rows))
+# PD tie only (MT non-tied): must land in tie_or_undefined, NOT disagreement,
+# even though PD itself has no preference to compare.
+pd_tied = np.zeros(n_ev)  # ta == tb on PD -> tie every field
+per_sample_9c = make_synthetic_per_sample({
+    'ta': {'pd_distance': pd_tied, 'mt_distance': mt_a},
+    'tb': {'pd_distance': pd_tied, 'mt_distance': mt_b},
+})
+pref_rows_pd_tie = m.topology_pairwise_preference_agreement(per_sample_9c, ['ta', 'tb'])
+check('PD tie only -> all fields classified tie_or_undefined (not disagreement)',
+      pref_rows_pd_tie[0]['descriptor_tie_or_undefined_count'] == n_ev
+      and pref_rows_pd_tie[0]['descriptor_disagreement_count'] == 0
+      and pref_rows_pd_tie[0]['descriptor_agreement_count'] == 0)
+check('PD tie only -> pd_tie_count == N_EVAL', pref_rows_pd_tie[0]['pd_tie_count'] == n_ev)
+
+# MT tie only (PD non-tied): same requirement, other descriptor tied.
+mt_tied = np.zeros(n_ev)
+per_sample_9d = make_synthetic_per_sample({
+    'ta': {'pd_distance': pd_a, 'mt_distance': mt_tied},
+    'tb': {'pd_distance': pd_b, 'mt_distance': mt_tied},
+})
+pref_rows_mt_tie = m.topology_pairwise_preference_agreement(per_sample_9d, ['ta', 'tb'])
+check('MT tie only -> all fields classified tie_or_undefined (not disagreement)',
+      pref_rows_mt_tie[0]['descriptor_tie_or_undefined_count'] == n_ev
+      and pref_rows_mt_tie[0]['descriptor_disagreement_count'] == 0
+      and pref_rows_mt_tie[0]['descriptor_agreement_count'] == 0)
+check('MT tie only -> mt_tie_count == N_EVAL', pref_rows_mt_tie[0]['mt_tie_count'] == n_ev)
+
+# Both descriptors tied: must land in tie_or_undefined, NOT agreement.
+per_sample_9e = make_synthetic_per_sample({
+    'ta': {'pd_distance': pd_tied, 'mt_distance': mt_tied},
+    'tb': {'pd_distance': pd_tied, 'mt_distance': mt_tied},
+})
+pref_rows_both_tie = m.topology_pairwise_preference_agreement(per_sample_9e, ['ta', 'tb'])
+check('both descriptors tied -> all fields classified tie_or_undefined (NOT agreement)',
+      pref_rows_both_tie[0]['descriptor_tie_or_undefined_count'] == n_ev
+      and pref_rows_both_tie[0]['descriptor_agreement_count'] == 0)
+
+check('preference counts sum to N_EVAL',
+      pref_rows_agree[0]['pd_prefers_a_count'] + pref_rows_agree[0]['pd_prefers_b_count'] +
+      pref_rows_agree[0]['pd_tie_count'] == m.N_EVAL)
+for rows in (pref_rows_agree, pref_rows_disagree, pref_rows_pd_tie, pref_rows_mt_tie, pref_rows_both_tie):
+    r = rows[0]
+    check('three-way classification counts sum to N_EVAL',
+          r['descriptor_agreement_count'] + r['descriptor_disagreement_count'] +
+          r['descriptor_tie_or_undefined_count'] == m.N_EVAL)
+
+# Per-sample aggregation, plus the cross-reference to samplewise_cross_method_correlations.
+samplewise_rows_9, _ = m.samplewise_cross_method_correlations(
+    per_sample_9a, ['ta', 'tb'], ['ta', 'tb'], ['pd_distance', 'mt_distance'],
+    {'pd_distance': 'lower_is_better', 'mt_distance': 'lower_is_better'})
+sample_pref_rows = m.topology_sample_preference_agreement(per_sample_9a, ['ta', 'tb'], samplewise_rows_9)
+check('sample-level rows use method_pair_count == C(2,2) == 1',
+      all(r['method_pair_count'] == 1 for r in sample_pref_rows))
 check('sample-level fully-agreeing case: every sample agreement_rate == 1.0',
       all(abs(r['agreement_rate'] - 1.0) < 1e-12 for r in sample_pref_rows))
+pd_mt_lookup_9 = {r['sample_idx']: (r['oriented_pearson'], r['oriented_spearman']) for r in samplewise_rows_9}
+check('sample-level pd_mt_cross_method_pearson/spearman exactly match samplewise_cross_method_correlations',
+      all((r['pd_mt_cross_method_pearson'], r['pd_mt_cross_method_spearman']) ==
+          pd_mt_lookup_9[r['sample_idx']] for r in sample_pref_rows))
 
 print()
 print('=== 10. Pareto dominance edges (hand case) ===')
@@ -409,6 +524,82 @@ check('Phase-1 protected files == 12', len(m.PHASE1_PROTECTED_FILES) == 12)
 check('Phase-2A protected files == 14', len(m.PHASE2A_PROTECTED_FILES) == 14)
 check('Phase-2B protected files == 28', len(m.PHASE2B_PROTECTED_FILES) == 28)
 check('All protected files == 54', len(m.ALL_PROTECTED_FILES) == 54)
+
+print()
+print('=== 23. topology_rank_by_method: hand-computed method-mean ranks with ties ===')
+means_rank_test = {
+    'ma': dict(raw={'pd_distance': 1.0, 'mt_distance': 5.0}, oriented={}),
+    'mb': dict(raw={'pd_distance': 2.0, 'mt_distance': 2.0}, oriented={}),
+    'mc': dict(raw={'pd_distance': 2.0, 'mt_distance': 2.0}, oriented={}),  # tied with mb on both
+    'md': dict(raw={'pd_distance': 4.0, 'mt_distance': 1.0}, oriented={}),
+}
+rank_rows_test = m.topology_rank_by_method(means_rank_test, ['ma', 'mb', 'mc', 'md'],
+                                              {'ma': 'Method A'})
+check('topology_rank_by_method returns exactly len(topology_methods) rows', len(rank_rows_test) == 4)
+by_id = {r['method_id']: r for r in rank_rows_test}
+check('display_name is looked up (present) or empty (absent) rather than erroring',
+      by_id['ma']['display_name'] == 'Method A' and by_id['mb']['display_name'] == '')
+# pd ascending: ma=1(rank1), mb=2,mc=2 (tie -> average rank 2.5 each), md=4(rank4)
+check('pd rank for ma (smallest distance) is 1', abs(by_id['ma']['pd_rank'] - 1.0) < 1e-9)
+check('pd tie ranks (mb, mc) average to 2.5', abs(by_id['mb']['pd_rank'] - 2.5) < 1e-9
+      and abs(by_id['mc']['pd_rank'] - 2.5) < 1e-9)
+check('pd rank for md (largest distance) is 4', abs(by_id['md']['pd_rank'] - 4.0) < 1e-9)
+# mt ascending: md=1(rank1), mb=2,mc=2(tie->2.5), ma=5(rank4)
+check('mt rank for md (smallest distance) is 1', abs(by_id['md']['mt_rank'] - 1.0) < 1e-9)
+check('mt tie ranks (mb, mc) average to 2.5', abs(by_id['mb']['mt_rank'] - 2.5) < 1e-9
+      and abs(by_id['mc']['mt_rank'] - 2.5) < 1e-9)
+check('mt rank for ma (largest distance) is 4', abs(by_id['ma']['mt_rank'] - 4.0) < 1e-9)
+check('signed_rank_gap = pd_rank - mt_rank for ma (1 - 4 = -3, PD favors ma much more)',
+      abs(by_id['ma']['signed_rank_gap'] - (-3.0)) < 1e-9)
+check('signed_rank_gap for md (4 - 1 = 3, MT favors md much more)',
+      abs(by_id['md']['signed_rank_gap'] - 3.0) < 1e-9)
+check('absolute_rank_gap is abs(signed_rank_gap) for every row',
+      all(abs(r['absolute_rank_gap'] - abs(r['signed_rank_gap'])) < 1e-9 for r in rank_rows_test))
+check('pd_mean/mt_mean pass through the raw method means unchanged',
+      abs(by_id['ma']['pd_mean'] - 1.0) < 1e-12 and abs(by_id['ma']['mt_mean'] - 5.0) < 1e-12)
+
+print()
+print('=== 24. Focal bootstrap wide-form: row shape, CI reproduction, interval signs ===')
+rng5 = np.random.default_rng(2024)
+focal_specs = {'tm': {fm: rng5.normal(size=m.N_EVAL) for fm in m.FOCAL_METRICS}}
+per_sample_focal = make_synthetic_per_sample(focal_specs)
+directions_focal = {fm: ('higher_is_better' if fm == 'psnruv' else 'lower_is_better') for fm in m.FOCAL_METRICS}
+focal_rows_test = m.focal_topology_correlation_bootstrap(per_sample_focal, ['tm'], directions_focal)
+check('wide-form row count scales as 1 method x 15 pairs x 2 types == 30', len(focal_rows_test) == 30)
+
+check('_interval_sign: low > 0 -> positive', m._interval_sign(0.1, 0.5) == 'positive')
+check('_interval_sign: high < 0 -> negative', m._interval_sign(-0.5, -0.1) == 'negative')
+check('_interval_sign: straddles zero -> includes_zero', m._interval_sign(-0.1, 0.1) == 'includes_zero')
+check('_interval_sign: low == 0 (boundary) -> includes_zero, not positive',
+      m._interval_sign(0.0, 0.5) == 'includes_zero')
+check('_interval_sign: high == 0 (boundary) -> includes_zero, not negative',
+      m._interval_sign(-0.5, 0.0) == 'includes_zero')
+
+for r in focal_rows_test:
+    signs = {r['iid_sign'], r['block6_sign'], r['block12_sign'], r['block24_sign']}
+    expected_agree = (len(signs) == 1 and '' not in signs)
+    check(f"all_interval_signs_agree correct for {r['metric_a']}/{r['metric_b']}/{r['correlation_type']}",
+          r['all_interval_signs_agree'] == expected_agree)
+    for scheme in m.BOOTSTRAP_SCHEME_NAMES:
+        lo, hi = r[f'{scheme}_ci95_low'], r[f'{scheme}_ci95_high']
+        check(f"{scheme}_sign matches _interval_sign(lo, hi) for {r['metric_a']}/{r['metric_b']}",
+              r[f'{scheme}_sign'] == m._interval_sign(lo, hi))
+
+row_check = next(r for r in focal_rows_test
+                  if r['metric_a'] == 'pd_distance' and r['metric_b'] == 'psnruv'
+                  and r['correlation_type'] == 'pearson')
+ox_check = m.orient(np.array([per_sample_focal['tm'][si]['pd_distance'] for si in range(m.N_EVAL)]),
+                      'lower_is_better')
+oy_check = m.orient(np.array([per_sample_focal['tm'][si]['psnruv'] for si in range(m.N_EVAL)]),
+                      'higher_is_better')
+ci_direct = m.correlation_bootstrap_cis(ox_check, oy_check, 'pearson')
+check('wide-form observed_correlation matches a direct pearson_r call',
+      abs(row_check['observed_correlation'] - m.pearson_r(ox_check, oy_check)) < 1e-12)
+for scheme in m.BOOTSTRAP_SCHEME_NAMES:
+    lo_direct, hi_direct = ci_direct[scheme]
+    check(f'wide-form {scheme} CI reproduces a direct correlation_bootstrap_cis() call exactly',
+          abs(row_check[f'{scheme}_ci95_low'] - lo_direct) < 1e-12
+          and abs(row_check[f'{scheme}_ci95_high'] - hi_direct) < 1e-12)
 
 print()
 if failures:

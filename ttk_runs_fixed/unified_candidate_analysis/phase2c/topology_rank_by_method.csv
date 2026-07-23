@@ -1,37 +1,19 @@
-method_id,metric,mean_rank,n_samples
-b_e2,pd_distance,8.642857142857142,168
-c_e2,pd_distance,10.06547619047619,168
-candidate_b,pd_distance,5.5773809523809526,168
-candidate_c,pd_distance,5.005952380952381,168
-cnn,pd_distance,13.06547619047619,168
-f1_grad_e2,pd_distance,8.0,168
-f2_grad_levelset_e2,pd_distance,7.130952380952381,168
-f3_grad_crit,pd_distance,3.1964285714285716,168
-gan,pd_distance,1.9880952380952381,168
-grad_levelset,pd_distance,5.089285714285714,168
-grad_only,pd_distance,5.613095238095238,168
-levelset_only,pd_distance,16.970238095238095,168
-speed_grad,pd_distance,6.273809523809524,168
-speed_levelset,pd_distance,14.928571428571429,168
-speed_only,pd_distance,16.535714285714285,168
-uv,pd_distance,17.285714285714285,168
-uv_crit,pd_distance,13.976190476190476,168
-uv_e2,pd_distance,11.654761904761905,168
-b_e2,mt_distance,6.392857142857143,168
-c_e2,mt_distance,6.065476190476191,168
-candidate_b,mt_distance,12.071428571428571,168
-candidate_c,mt_distance,11.160714285714286,168
-cnn,mt_distance,7.898809523809524,168
-f1_grad_e2,mt_distance,5.958333333333333,168
-f2_grad_levelset_e2,mt_distance,6.0773809523809526,168
-f3_grad_crit,mt_distance,10.148809523809524,168
-gan,mt_distance,16.541666666666668,168
-grad_levelset,mt_distance,12.702380952380953,168
-grad_only,mt_distance,10.208333333333334,168
-levelset_only,mt_distance,10.613095238095237,168
-speed_grad,mt_distance,13.511904761904763,168
-speed_levelset,mt_distance,9.202380952380953,168
-speed_only,mt_distance,10.672619047619047,168
-uv,mt_distance,10.738095238095237,168
-uv_crit,mt_distance,5.898809523809524,168
-uv_e2,mt_distance,5.136904761904762,168
+method_id,display_name,pd_mean,mt_mean,pd_rank,mt_rank,absolute_rank_gap,signed_rank_gap
+b_e2,Candidate B + repaired E2,23.98758167822223,5.677425131911323,10.0,5.0,5.0,5.0
+c_e2,Candidate C + repaired E2,24.26859932750987,5.662811040878296,11.0,3.0,8.0,8.0
+candidate_b,Candidate B (full scalar-field proxy scaffold),22.706997671157218,6.161181682632083,5.0,15.0,10.0,-10.0
+candidate_c,Candidate C (Candidate B + local-maxima proxy),22.494387345643283,6.080286664622171,3.0,14.0,11.0,-11.0
+cnn,CNN baseline (pretrained),27.406283078086055,5.867795200574966,13.0,7.0,6.0,6.0
+f1_grad_e2,Candidate F: grad + repaired E2-low,23.838249287609386,5.656570005984533,9.0,2.0,7.0,7.0
+f2_grad_levelset_e2,Candidate F: grad + level-set + repaired E2-low,23.748107956316563,5.674229775156293,8.0,4.0,4.0,4.0
+f3_grad_crit,Candidate F: grad + critical-maxima proxy,22.01788444732943,5.984007384095873,2.0,9.0,7.0,-7.0
+gan,GAN baseline (pretrained),20.864090023128004,8.348149540878477,1.0,18.0,17.0,-17.0
+grad_levelset,B-factorial: gradient + level-set,22.619358912166298,6.19958542074476,4.0,16.0,12.0,-12.0
+grad_only,B-factorial: gradient only,22.932626906638195,6.055993423575447,6.0,13.0,7.0,-7.0
+levelset_only,B-factorial: level-set only,29.595268286940343,6.007606157234737,17.0,11.0,6.0,6.0
+speed_grad,B-factorial: speed + gradient,22.970622717354583,6.290474925722394,7.0,17.0,10.0,-10.0
+speed_levelset,B-factorial: speed + level-set,29.436290755840098,5.944104677154904,15.0,8.0,7.0,7.0
+speed_only,B-factorial: speed only,29.578276619692105,5.999594864391145,16.0,10.0,6.0,6.0
+uv,Candidate UV (vector-only control),29.612120109960593,6.011865703832536,18.0,12.0,6.0,6.0
+uv_crit,UV + critical-maxima proxy,29.11433340244734,5.689883058979397,14.0,6.0,8.0,8.0
+uv_e2,UV + repaired E2,25.072073820293586,5.593966117927006,12.0,1.0,11.0,11.0

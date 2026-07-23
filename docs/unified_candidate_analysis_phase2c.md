@@ -30,23 +30,27 @@ For each of the 19 methods independently, metric-pair correlations are computed 
 
 For each of the 168 samples independently, metric-pair correlations are computed across the methods evaluated on that sample. This answers: **"for a fixed field, do different metrics rank the 19 (or 18, for PD/MT pairs) methods similarly?"** PD/MT-involving pairs use exactly the 18 topology-bearing methods; all other pairs use all 19 methods -- these counts are enforced exactly, never partially. `samplewise_correlation_summary.csv` aggregates across the 168 samples.
 
-**PD/MT per sample:** median oriented Pearson r = -0.2623, median oriented Spearman rho = -0.1538 across 168 samples. For a fixed field, PD and MT agree on how they rank the methods at a rate reflected by this median association; see Section 8 for the direct preference-agreement rates, which are a more literal reading of "agree/disagree."
+**PD/MT per sample:** median oriented Pearson r = -0.2623, median oriented Spearman rho = -0.1538 across 168 samples. This is a rank-association coefficient, not a literal agreement rate -- see Section 8 for the literal per-field PD/MT preference-agreement rate, which is a distinct quantity computed from explicit pairwise preferences rather than from a correlation coefficient.
 
 ## 7. Analysis D -- two-way-centered residual relationships (two_way_centered_residual)
 
-For each metric, the method main effect and sample main effect are removed by additive demeaning: `residual[m,s] = z[m,s] - mean_over_samples(z[m,*]) - mean_over_methods(z[*,s]) + grand_mean(z)`. By construction every row mean, column mean, and the grand mean of the residual matrix is numerically zero (verified to within 1e-09; see `phase2c_validation.csv`). Correlating the residuals of two metrics (pooled over the common method x sample cells) answers: **"once the obvious method-level and sample-level main effects are removed, do two metrics still move together?"** This is explicitly **additive demeaning, not a fitted causal mixed-effects model** -- no variance components, random effects, or significance testing are involved, and no causal claim is intended or supported.
+For every metric PAIR, both metrics are two-way centered on the exact same common-rectangle method set (the 18 topology-bearing methods if either metric is PD or MT, else all 19 methods), by additive demeaning: `residual[m,s] = z[m,s] - mean_over_samples(z[m,*]) - mean_over_methods(z[*,s]) + grand_mean(z)`. Centering is deliberately pair-specific: each metric is re-centered on the common rectangle for that particular pair, rather than centered once on its own maximal method set and then subset down afterward -- subsetting a residual matrix AFTER centering does not preserve the zero-margin property, since the row/column means used would have been computed over the wrong (too-large) rectangle. By construction every row-mean (method) margin, column-mean (sample) margin, and grand mean of each pair-specific residual matrix is numerically zero (verified to within 1e-09 for every pair and every side; see `phase2c_validation.csv`). Correlating the two pair-specific residual matrices (flattened over the shared method x sample cells) answers: **"once the obvious method-level and sample-level main effects are removed, do two metrics still move together?"** This is explicitly **additive demeaning, not a fitted causal mixed-effects model** -- no variance components, random effects, or significance testing are involved, and no causal claim is intended or supported.
 
-**PD/MT two-way-residual association:** Pearson r = 0.0526, Spearman rho = 0.1027 (n_cells=3024).
+Because both metrics in a pair are always centered over the same rectangle, the 171 non-topology/non-topology pairs (19-method rectangle) and the 1 PD/MT pair (18-method rectangle, which was already correctly computed on a shared rectangle before this patch) are numerically unaffected by this correction. Only the 38 mixed topology/non-topology pairs -- where the non-topology metric previously had its residual computed over 19 methods and then silently subset down to 18 -- have legitimately changed.
+
+**PD/MT two-way-residual association:** Pearson r = 0.0526, Spearman rho = 0.1027 (n_cells=3024, n_common_methods=18). This value is unchanged by the pair-specific centering patch, since PD and MT were already centered on the same 18-method rectangle.
 
 ## 8. PD/MT direct disagreement analysis
 
 Beyond correlation, Phase 2C directly quantifies how often PD (persistence-diagram distance) and MT (merge-tree distance) *disagree about which of two methods is better*, at both a per-method-pair level (aggregated over the 168 fields, `topology_pairwise_preference_agreement.csv`) and a per-field level (aggregated over the C(18,2)=153 topology-bearing method pairs, `topology_sample_preference_agreement.csv`). PD and MT are both legitimate, differently-scoped topological descriptors (PD captures persistence-pair geometry, MT captures merge-tree structure); disagreement between them is evidence of genuinely different geometric sensitivity, and is not evidence that either descriptor is invalid.
 
+`topology_rank_by_method.csv` reports, for each of the 18 topology-bearing methods, the RANK of that method's own PD and MT MEANS among the 18 method means (ascending raw-distance order, average ranks for exact ties) -- this is explicitly not an average of 168 per-field ranks. `signed_rank_gap = pd_rank - mt_rank`: a positive gap means MT favors the method more strongly than PD does (the method's MT rank is better than its PD rank); a negative gap means PD favors the method more strongly than MT does.
+
 - **between_method_means** (n=18): oriented_pearson=-0.3725, oriented_spearman=-0.4283
 - **within_method_across_samples_median** (n=18): median_oriented_pearson=0.3883, median_oriented_spearman=0.2991
 - **within_sample_across_methods_median** (n=168): median_oriented_pearson=-0.2623, median_oriented_spearman=-0.1538
-- **pairwise_preference_agreement** (n=153): mean_agreement_rate=0.4384, median_agreement_rate=0.4464
-- **sample_preference_agreement** (n=168): mean_agreement_rate=0.4384, median_agreement_rate=0.4542
+- **pairwise_preference_agreement** (n=153): mean_descriptor_agreement_rate=0.4384, mean_descriptor_disagreement_rate=0.5616
+- **sample_preference_agreement** (n=168): mean_agreement_rate=0.4384, mean_disagreement_rate=0.5616
 
 ## 9. Pareto front definition
 
@@ -108,7 +112,7 @@ This phase performs no sample selection and generates no figures. Both remain de
 
 ## 18. Validation summary
 
-970 total validation checks were run; 970 passed and 0 failed (a run with any failure hard-fails before this document is written, so `n_fail` is always 0 in a completed report). See `phase2c_validation.csv` for the full check list.
+978 total validation checks were run; 978 passed and 0 failed (a run with any failure hard-fails before this document is written, so `n_fail` is always 0 in a completed report). See `phase2c_validation.csv` for the full check list.
 
 ## 19. Generated files
 
