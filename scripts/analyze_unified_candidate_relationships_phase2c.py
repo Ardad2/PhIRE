@@ -783,53 +783,65 @@ def samplewise_correlation_summary(summary_acc, non_ssim):
 # =============================================================================
 # ANALYSIS D -- two-way-centered residual relationships (additive demeaning,
 # NOT a fitted mixed-effects model). interpretation_level=two_way_centered_residual
+#
+# Pair-specific common-rectangle centering: for every metric pair, BOTH
+# oriented method-by-sample matrices are built and independently two-way
+# centered over the SAME common method set (18 topology-bearing methods if
+# either metric is PD or MT, else all 19 methods). This is deliberately NOT
+# "center each metric once over its own maximal method set, then subset a
+# 19-method residual down to 18 rows" -- subsetting a residual matrix AFTER
+# centering does not preserve the zero-margin property, since the row/column
+# means used for centering were computed over the wrong (too-large)
+# rectangle. Centering must happen on the final common rectangle itself.
 # =============================================================================
 
-def compute_two_way_residual(per_sample, methods, topology_methods, metric, direction):
-    use_methods = topology_methods if metric in TOPOLOGY_METRICS else methods
-    n_m = len(use_methods)
+def compute_two_way_residual_matrix(per_sample, common_methods, metric, direction):
+    """Two-way-center metric's oriented values over exactly common_methods x
+    N_EVAL samples. Returns (R, method_margin_max_abs, sample_margin_max_abs,
+    grand_margin_abs), where method_margin is the row (per-method) mean of R
+    and sample_margin is the column (per-sample) mean of R -- both should be
+    ~0 by construction for any rectangle with no missing cells."""
+    n_m = len(common_methods)
     Z = np.empty((n_m, N_EVAL))
-    for i, mid in enumerate(use_methods):
+    for i, mid in enumerate(common_methods):
         for si in range(N_EVAL):
             Z[i, si] = orient(per_sample[mid][si][metric], direction)
     row_mean = Z.mean(axis=1, keepdims=True)
     col_mean = Z.mean(axis=0, keepdims=True)
     grand_mean = Z.mean()
     R = Z - row_mean - col_mean + grand_mean
-    margins = dict(
-        row_margin_max_abs=float(np.max(np.abs(R.mean(axis=1)))),
-        col_margin_max_abs=float(np.max(np.abs(R.mean(axis=0)))),
-        grand_margin_abs=float(abs(R.mean())),
-    )
-    return use_methods, R, margins
+    method_margin_max_abs = float(np.max(np.abs(R.mean(axis=1))))
+    sample_margin_max_abs = float(np.max(np.abs(R.mean(axis=0))))
+    grand_margin_abs = float(abs(R.mean()))
+    return R, method_margin_max_abs, sample_margin_max_abs, grand_margin_abs
 
 
-def two_way_residual_correlations(per_sample, methods, topology_methods, non_ssim, metric_direction):
-    residuals = {}
-    margin_rows = []
-    for metric in non_ssim:
-        use_methods, R, margins = compute_two_way_residual(per_sample, methods, topology_methods, metric,
-                                                              metric_direction[metric])
-        residuals[metric] = (use_methods, R)
-        margin_rows.append(dict(metric=metric, n_methods=len(use_methods), **margins))
-
+def two_way_residual_correlations(per_sample, methods, topology_methods, non_ssim, metric_family,
+                                     metric_direction):
     rows = []
+    margin_rows = []
     pearson_matrix = {a: {b: (1.0 if b == a else None) for b in non_ssim} for a in non_ssim}
     spearman_matrix = {a: {b: (1.0 if b == a else None) for b in non_ssim} for a in non_ssim}
     for a, b in itertools.combinations(non_ssim, 2):
-        methods_a, Ra = residuals[a]
-        methods_b, Rb = residuals[b]
-        set_b = set(methods_b)
-        common = [m for m in methods_a if m in set_b]
-        idx_a = [methods_a.index(m) for m in common]
-        idx_b = [methods_b.index(m) for m in common]
-        flat_a = Ra[idx_a, :].reshape(-1)
-        flat_b = Rb[idx_b, :].reshape(-1)
+        common = topology_methods if (a in TOPOLOGY_METRICS or b in TOPOLOGY_METRICS) else methods
+        Ra, mmargin_a, smargin_a, gmargin_a = compute_two_way_residual_matrix(
+            per_sample, common, a, metric_direction[a])
+        Rb, mmargin_b, smargin_b, gmargin_b = compute_two_way_residual_matrix(
+            per_sample, common, b, metric_direction[b])
+        margin_rows.append(dict(metric=a, paired_with=b, row_margin_max_abs=mmargin_a,
+                                   col_margin_max_abs=smargin_a, grand_margin_abs=gmargin_a))
+        margin_rows.append(dict(metric=b, paired_with=a, row_margin_max_abs=mmargin_b,
+                                   col_margin_max_abs=smargin_b, grand_margin_abs=gmargin_b))
+        flat_a = Ra.reshape(-1)
+        flat_b = Rb.reshape(-1)
         p = pearson_r(flat_a, flat_b)
         s = spearman_r(flat_a, flat_b)
         rows.append(dict(
-            metric_a=a, metric_b=b, n_common_methods=len(common), n_cells=flat_a.shape[0],
-            pearson=nfmt(p), spearman=nfmt(s),
+            metric_a=a, metric_b=b, family_a=metric_family[a], family_b=metric_family[b],
+            n_common_methods=len(common), n_samples=N_EVAL, n_cells=flat_a.shape[0],
+            oriented_residual_pearson=nfmt(p), oriented_residual_spearman=nfmt(s),
+            max_abs_method_margin_mean_a=mmargin_a, max_abs_sample_margin_mean_a=smargin_a,
+            max_abs_method_margin_mean_b=mmargin_b, max_abs_sample_margin_mean_b=smargin_b,
             interpretation_level='two_way_centered_residual',
         ))
         pearson_matrix[a][b] = pearson_matrix[b][a] = p
@@ -852,7 +864,26 @@ assert len(FOCAL_PAIRS) == 15
 BOOTSTRAP_SCHEME_NAMES = ['iid', 'block6', 'block12', 'block24']
 
 
+def _interval_sign(lo, hi):
+    """positive when low > 0; negative when high < 0; includes_zero otherwise
+    (including the boundary cases low == 0 or high == 0). Returns '' if
+    either bound is undefined."""
+    if lo == '' or hi == '' or lo is None or hi is None:
+        return ''
+    lo_f, hi_f = float(lo), float(hi)
+    if lo_f > 0:
+        return 'positive'
+    if hi_f < 0:
+        return 'negative'
+    return 'includes_zero'
+
+
 def focal_topology_correlation_bootstrap(per_sample, topology_methods, metric_direction):
+    """One row per (method x focal pair x correlation type): 18 x 15 x 2 =
+    540 rows. All four schemes' CIs live on the same row (wide form), each
+    computed by the same correlation_bootstrap_cis() call used previously --
+    no change to the underlying bootstrap computation, only to how the
+    results are laid out."""
     rows = []
     for mid in topology_methods:
         for a, b in FOCAL_PAIRS:
@@ -865,45 +896,44 @@ def focal_topology_correlation_bootstrap(per_sample, topology_methods, metric_di
             ci_p = correlation_bootstrap_cis(ox, oy, 'pearson')
             ci_s = correlation_bootstrap_cis(ox, oy, 'spearman')
             for corr_type, point, ci in (('pearson', point_p, ci_p), ('spearman', point_s, ci_s)):
+                row = dict(method_id=mid, metric_a=a, metric_b=b, correlation_type=corr_type,
+                             observed_correlation=nfmt(point))
+                signs_seen = set()
                 for scheme in BOOTSTRAP_SCHEME_NAMES:
                     lo, hi = ci[scheme]
-                    rows.append(dict(
-                        method_id=mid, metric_a=a, metric_b=b, correlation_type=corr_type,
-                        bootstrap_scheme=scheme, n_resamples=CORR_BOOTSTRAP_N,
-                        point_estimate=nfmt(point), ci95_low=nfmt(lo), ci95_high=nfmt(hi),
-                        interpretation_level='within_method_across_samples',
-                    ))
+                    row[f'{scheme}_ci95_low'] = nfmt(lo)
+                    row[f'{scheme}_ci95_high'] = nfmt(hi)
+                    sign = _interval_sign(lo, hi)
+                    row[f'{scheme}_sign'] = sign
+                    signs_seen.add(sign)
+                row['all_interval_signs_agree'] = (len(signs_seen) == 1 and '' not in signs_seen)
+                rows.append(row)
     return rows
 
 
 def focal_topology_relationship_summary(focal_rows):
     from collections import defaultdict
-    point_acc = defaultdict(list)
-    ci_excl = defaultdict(lambda: defaultdict(int))
+    acc = defaultdict(list)
     for r in focal_rows:
-        key = (r['metric_a'], r['metric_b'], r['correlation_type'])
-        if r['bootstrap_scheme'] == 'iid' and r['point_estimate'] != '':
-            point_acc[key].append(float(r['point_estimate']))
-        lo, hi = r['ci95_low'], r['ci95_high']
-        if lo != '' and hi != '' and not (float(lo) <= 0 <= float(hi)):
-            ci_excl[key][r['bootstrap_scheme']] += 1
+        acc[(r['metric_a'], r['metric_b'], r['correlation_type'])].append(r)
 
     rows = []
     for a, b in FOCAL_PAIRS:
         for ctype in ('pearson', 'spearman'):
-            key = (a, b, ctype)
-            vals = point_acc.get(key, [])
+            entries = acc.get((a, b, ctype), [])
+            vals = [float(e['observed_correlation']) for e in entries if e['observed_correlation'] != '']
             stats = _dispersion_stats(vals)
-            excl = ci_excl.get(key, {})
+            excl = {scheme: sum(1 for e in entries if e[f'{scheme}_sign'] in ('positive', 'negative'))
+                    for scheme in BOOTSTRAP_SCHEME_NAMES}
             rows.append(dict(
-                metric_a=a, metric_b=b, correlation_type=ctype, n_methods=len(vals),
+                metric_a=a, metric_b=b, correlation_type=ctype, n_methods=len(entries),
                 median=stats['median'], q25=stats['q25'], q75=stats['q75'],
                 min=stats['min'], max=stats['max'],
                 n_positive=stats['n_positive'], n_negative=stats['n_negative'],
-                n_ci_excludes_zero_iid=excl.get('iid', 0),
-                n_ci_excludes_zero_block6=excl.get('block6', 0),
-                n_ci_excludes_zero_block12=excl.get('block12', 0),
-                n_ci_excludes_zero_block24=excl.get('block24', 0),
+                n_ci_excludes_zero_iid=excl['iid'],
+                n_ci_excludes_zero_block6=excl['block6'],
+                n_ci_excludes_zero_block12=excl['block12'],
+                n_ci_excludes_zero_block24=excl['block24'],
                 interpretation_level='within_method_across_samples',
             ))
     return rows
@@ -922,33 +952,49 @@ def pref(v1, v2):
     return 'a' if v1 < v2 else 'b'
 
 
-def topology_rank_by_method(per_sample, topology_methods):
-    pd_ranks = {m: [] for m in topology_methods}
-    mt_ranks = {m: [] for m in topology_methods}
-    for si in range(N_EVAL):
-        pd_vals = np.array([per_sample[m][si]['pd_distance'] for m in topology_methods])
-        mt_vals = np.array([per_sample[m][si]['mt_distance'] for m in topology_methods])
-        pd_r = rankdata_avg(pd_vals)
-        mt_r = rankdata_avg(mt_vals)
-        for i, m in enumerate(topology_methods):
-            pd_ranks[m].append(pd_r[i])
-            mt_ranks[m].append(mt_r[i])
+def topology_rank_by_method(means, topology_methods, display_name_by_method):
+    """Rank the 18 topology-bearing METHOD MEANS (not an average of 168
+    per-sample ranks) in ascending raw-distance order -- rank 1 = smallest
+    (best) mean PD/MT distance, with average ranks for exact ties.
+
+    signed_rank_gap = pd_rank - mt_rank: positive means MT favors the method
+    more strongly than PD (its MT rank is better/lower than its PD rank);
+    negative means PD favors the method more strongly than MT."""
+    pd_means = np.array([means[m]['raw']['pd_distance'] for m in topology_methods])
+    mt_means = np.array([means[m]['raw']['mt_distance'] for m in topology_methods])
+    pd_ranks = rankdata_avg(pd_means)
+    mt_ranks = rankdata_avg(mt_means)
     rows = []
-    for m in topology_methods:
-        rows.append(dict(method_id=m, metric='pd_distance', mean_rank=float(np.mean(pd_ranks[m])),
-                          n_samples=N_EVAL))
-    for m in topology_methods:
-        rows.append(dict(method_id=m, metric='mt_distance', mean_rank=float(np.mean(mt_ranks[m])),
-                          n_samples=N_EVAL))
+    for i, m in enumerate(topology_methods):
+        signed_gap = float(pd_ranks[i] - mt_ranks[i])
+        rows.append(dict(
+            method_id=m, display_name=display_name_by_method.get(m, ''),
+            pd_mean=float(pd_means[i]), mt_mean=float(mt_means[i]),
+            pd_rank=float(pd_ranks[i]), mt_rank=float(mt_ranks[i]),
+            absolute_rank_gap=abs(signed_gap), signed_rank_gap=signed_gap,
+        ))
     return rows
 
 
 def topology_pairwise_preference_agreement(per_sample, topology_methods):
+    """Per method pair, classify every one of the 168 fields into exactly one
+    of three mutually-exclusive categories:
+
+      descriptor_agreement:      both PD and MT are non-tied and prefer the
+                                  same method;
+      descriptor_disagreement:   both PD and MT are non-tied and prefer
+                                  opposite methods;
+      descriptor_tie_or_undefined: either descriptor is tied (a tie in
+                                  either descriptor is NOT evidence of
+                                  agreement, and a tie in only one descriptor
+                                  is NOT evidence of disagreement -- both are
+                                  classified as tie/undefined).
+    """
     rows = []
     for m1, m2 in itertools.combinations(topology_methods, 2):
         n_pd_a = n_pd_b = n_pd_tie = 0
         n_mt_a = n_mt_b = n_mt_tie = 0
-        n_agree = n_agree_tie = n_disagree = 0
+        n_agree = n_disagree = n_tie_or_undef = 0
         for si in range(N_EVAL):
             pd_pref = pref(per_sample[m1][si]['pd_distance'], per_sample[m2][si]['pd_distance'])
             mt_pref = pref(per_sample[m1][si]['mt_distance'], per_sample[m2][si]['mt_distance'])
@@ -964,74 +1010,92 @@ def topology_pairwise_preference_agreement(per_sample, topology_methods):
                 n_mt_b += 1
             else:
                 n_mt_tie += 1
-            if pd_pref == mt_pref:
-                if pd_pref == 'tie':
-                    n_agree_tie += 1
-                else:
-                    n_agree += 1
+            if pd_pref == 'tie' or mt_pref == 'tie':
+                n_tie_or_undef += 1
+            elif pd_pref == mt_pref:
+                n_agree += 1
             else:
                 n_disagree += 1
         rows.append(dict(
             method_a=m1, method_b=m2, n_samples=N_EVAL,
-            pd_pref_a=n_pd_a, pd_pref_b=n_pd_b, pd_tie=n_pd_tie,
-            mt_pref_a=n_mt_a, mt_pref_b=n_mt_b, mt_tie=n_mt_tie,
-            n_agree_nontie=n_agree, n_agree_tie=n_agree_tie, n_disagree=n_disagree,
-            agreement_rate=(n_agree + n_agree_tie) / N_EVAL,
+            pd_prefers_a_count=n_pd_a, pd_prefers_b_count=n_pd_b, pd_tie_count=n_pd_tie,
+            mt_prefers_a_count=n_mt_a, mt_prefers_b_count=n_mt_b, mt_tie_count=n_mt_tie,
+            descriptor_agreement_count=n_agree, descriptor_disagreement_count=n_disagree,
+            descriptor_tie_or_undefined_count=n_tie_or_undef,
+            descriptor_agreement_rate=n_agree / N_EVAL,
+            descriptor_disagreement_rate=n_disagree / N_EVAL,
         ))
     return rows
 
 
-def topology_sample_preference_agreement(per_sample, topology_methods):
+def topology_sample_preference_agreement(per_sample, topology_methods, samplewise_rows):
+    """Per field, aggregate the same three-way classification over all
+    C(18,2)=153 topology-bearing method pairs, and cross-reference the
+    field's PD/MT cross-method correlation (must match
+    samplewise_cross_method_correlations.csv exactly for that field)."""
     pairs = list(itertools.combinations(topology_methods, 2))
     n_pairs = len(pairs)
+    pd_mt_lookup = {}
+    for r in samplewise_rows:
+        if {r['metric_a'], r['metric_b']} == {'pd_distance', 'mt_distance'}:
+            pd_mt_lookup[r['sample_idx']] = (r['oriented_pearson'], r['oriented_spearman'])
     rows = []
     for si in range(N_EVAL):
-        n_agree = n_agree_tie = n_disagree = 0
+        n_agree = n_disagree = n_tie_or_undef = 0
         for m1, m2 in pairs:
             pd_pref = pref(per_sample[m1][si]['pd_distance'], per_sample[m2][si]['pd_distance'])
             mt_pref = pref(per_sample[m1][si]['mt_distance'], per_sample[m2][si]['mt_distance'])
-            if pd_pref == mt_pref:
-                if pd_pref == 'tie':
-                    n_agree_tie += 1
-                else:
-                    n_agree += 1
+            if pd_pref == 'tie' or mt_pref == 'tie':
+                n_tie_or_undef += 1
+            elif pd_pref == mt_pref:
+                n_agree += 1
             else:
                 n_disagree += 1
+        pearson_v, spearman_v = pd_mt_lookup.get(si, ('', ''))
         rows.append(dict(
-            sample_idx=si, n_pairs=n_pairs, n_agree_nontie=n_agree, n_agree_tie=n_agree_tie,
-            n_disagree=n_disagree, agreement_rate=(n_agree + n_agree_tie) / n_pairs,
+            sample_idx=si, method_pair_count=n_pairs, agreement_count=n_agree,
+            disagreement_count=n_disagree, tie_or_undefined_count=n_tie_or_undef,
+            agreement_rate=n_agree / n_pairs, disagreement_rate=n_disagree / n_pairs,
+            pd_mt_cross_method_pearson=pearson_v, pd_mt_cross_method_spearman=spearman_v,
         ))
     return rows
 
 
 def topology_descriptor_disagreement_summary(method_level_pd_mt, within_pd_mt, samplewise_pd_mt,
                                                 pairwise_rows, sample_rows):
-    pairwise_rates = np.array([r['agreement_rate'] for r in pairwise_rows])
-    sample_rates = np.array([r['agreement_rate'] for r in sample_rows])
-    note = ('PD (persistence diagram) and MT (merge tree) are distinct, legitimate topological '
-            'descriptors; disagreement between them reflects genuinely different geometric '
-            'sensitivity, not that one descriptor is invalid.')
+    pairwise_agree_rates = np.array([r['descriptor_agreement_rate'] for r in pairwise_rows])
+    pairwise_disagree_rates = np.array([r['descriptor_disagreement_rate'] for r in pairwise_rows])
+    sample_agree_rates = np.array([r['agreement_rate'] for r in sample_rows])
+    sample_disagree_rates = np.array([r['disagreement_rate'] for r in sample_rows])
+    corr_note = ('This row reports a correlation / rank-association coefficient (Pearson or Spearman), '
+                 'NOT a literal preference-agreement rate. PD (persistence diagram) and MT (merge tree) '
+                 'are distinct, legitimate topological descriptors; a weak or negative association here '
+                 'reflects genuinely different geometric sensitivity, not that one descriptor is invalid.')
+    rate_note = ('This row reports a literal pairwise-preference agreement/disagreement RATE (fraction of '
+                 'cases where PD and MT pick the same, non-tied, better method), NOT a correlation '
+                 'coefficient. Cases where either descriptor is tied are excluded from both the agreement '
+                 'and disagreement counts (see descriptor_tie_or_undefined_count).')
     rows = [
         dict(level='between_method_means', n_units=method_level_pd_mt['n_common_methods'],
              value_a_label='oriented_pearson', value_a=method_level_pd_mt['oriented_pearson'],
              value_b_label='oriented_spearman', value_b=method_level_pd_mt['oriented_spearman'],
-             note=note),
+             note=corr_note),
         dict(level='within_method_across_samples_median', n_units=within_pd_mt['n_methods_available'],
              value_a_label='median_oriented_pearson', value_a=within_pd_mt['pearson_median'],
              value_b_label='median_oriented_spearman', value_b=within_pd_mt['spearman_median'],
-             note=note),
+             note=corr_note),
         dict(level='within_sample_across_methods_median', n_units=samplewise_pd_mt['n_samples'],
              value_a_label='median_oriented_pearson', value_a=samplewise_pd_mt['pearson_median'],
              value_b_label='median_oriented_spearman', value_b=samplewise_pd_mt['spearman_median'],
-             note=note),
+             note=corr_note),
         dict(level='pairwise_preference_agreement', n_units=len(pairwise_rows),
-             value_a_label='mean_agreement_rate', value_a=float(pairwise_rates.mean()),
-             value_b_label='median_agreement_rate', value_b=float(np.median(pairwise_rates)),
-             note=note),
+             value_a_label='mean_descriptor_agreement_rate', value_a=float(pairwise_agree_rates.mean()),
+             value_b_label='mean_descriptor_disagreement_rate', value_b=float(pairwise_disagree_rates.mean()),
+             note=rate_note),
         dict(level='sample_preference_agreement', n_units=len(sample_rows),
-             value_a_label='mean_agreement_rate', value_a=float(sample_rates.mean()),
-             value_b_label='median_agreement_rate', value_b=float(np.median(sample_rates)),
-             note=note),
+             value_a_label='mean_agreement_rate', value_a=float(sample_agree_rates.mean()),
+             value_b_label='mean_disagreement_rate', value_b=float(sample_disagree_rates.mean()),
+             note=rate_note),
     ]
     return rows
 
@@ -1261,7 +1325,7 @@ def metric_relationship_summary(non_ssim, method_level_rows, within_summary_rows
         ml = method_level_map[(a, b)]['oriented_pearson']
         wm = within_map[(a, b)]['pearson_median']
         sw = samplewise_map[(a, b)]['pearson_median']
-        rs = residual_map[(a, b)]['pearson']
+        rs = residual_map[(a, b)]['oriented_residual_pearson']
         vals = [ml, wm, sw, rs]
         all_defined = all(v != '' for v in vals)
         consistent = False
@@ -1282,8 +1346,9 @@ def metric_relationship_summary(non_ssim, method_level_rows, within_summary_rows
 
 def topology_relationship_and_pareto_summary(topology_rank_rows, front_membership_rows,
                                                 bootstrap_membership_rows, topology_methods):
-    pd_rank = {r['method_id']: r['mean_rank'] for r in topology_rank_rows if r['metric'] == 'pd_distance'}
-    mt_rank = {r['method_id']: r['mean_rank'] for r in topology_rank_rows if r['metric'] == 'mt_distance'}
+    pd_rank = {r['method_id']: r['pd_rank'] for r in topology_rank_rows}
+    mt_rank = {r['method_id']: r['mt_rank'] for r in topology_rank_rows}
+    signed_gap = {r['method_id']: r['signed_rank_gap'] for r in topology_rank_rows}
     on_front = {r['method_id']: r['on_front'] for r in front_membership_rows
                 if r['objective_set'] == 'topology_only'}
     boot_rate = {}
@@ -1294,13 +1359,14 @@ def topology_relationship_and_pareto_summary(topology_rank_rows, front_membershi
     for m in topology_methods:
         rates = boot_rate.get(m, {})
         rows.append(dict(
-            method_id=m, pd_mean_rank=pd_rank[m], mt_mean_rank=mt_rank[m],
+            method_id=m, pd_rank=pd_rank[m], mt_rank=mt_rank[m], signed_rank_gap=signed_gap[m],
             on_topology_only_deterministic_front=on_front.get(m, False),
             topology_only_bootstrap_rate_iid=rates.get('iid', ''),
             topology_only_bootstrap_rate_block6=rates.get('block6', ''),
             topology_only_bootstrap_rate_block12=rates.get('block12', ''),
             topology_only_bootstrap_rate_block24=rates.get('block24', ''),
-            note='Not a ranked leaderboard; Pareto front membership depends on the chosen objective set.',
+            note='Not a ranked leaderboard; Pareto front membership depends on the chosen objective set. '
+                 'pd_rank/mt_rank are ranks of the METHOD-MEAN distances (not averages of per-sample ranks).',
         ))
     return rows
 
@@ -1315,7 +1381,8 @@ def run_additional_validation(non_ssim, method_level_rows, pearson_matrix_a, spe
                                  pearson_matrix_d, spearman_matrix_d, pairwise_pref_rows, sample_pref_rows,
                                  front_membership_rows, dominance_edge_rows, sanity_checks,
                                  bootstrap_membership_rows, bootstrap_front_size_rows,
-                                 objective_sets, methods, topology_methods):
+                                 objective_sets, methods, topology_methods, rank_rows, means, focal_rows,
+                                 per_sample, metric_direction):
     checks = []
     failures = []
 
@@ -1349,7 +1416,8 @@ def run_additional_validation(non_ssim, method_level_rows, pearson_matrix_a, spe
                  'within_method_metric_correlations')
     check_bounds(samplewise_rows, ['raw_pearson', 'raw_spearman', 'oriented_pearson', 'oriented_spearman'],
                  'samplewise_cross_method_correlations')
-    check_bounds(residual_rows, ['pearson', 'spearman'], 'two_way_residual_correlations')
+    check_bounds(residual_rows, ['oriented_residual_pearson', 'oriented_residual_spearman'],
+                 'two_way_residual_correlations')
 
     def check_matrix(matrix, label):
         bad_sym = 0
@@ -1389,20 +1457,91 @@ def run_additional_validation(non_ssim, method_level_rows, pearson_matrix_a, spe
     bad_margin = [r for r in residual_margin_rows
                   if r['row_margin_max_abs'] > MARGIN_TOLERANCE or r['col_margin_max_abs'] > MARGIN_TOLERANCE
                   or r['grand_margin_abs'] > MARGIN_TOLERANCE]
-    add('two_way_residual_margins_zero', len(bad_margin) == 0, notes=str([r['metric'] for r in bad_margin]))
+    add('two_way_residual_margins_zero_pair_specific', len(bad_margin) == 0,
+        notes=str([(r['metric'], r['paired_with']) for r in bad_margin]))
+
+    bad_rect = [r for r in residual_rows
+                if r['n_common_methods'] != (18 if (r['metric_a'] in TOPOLOGY_METRICS
+                                                      or r['metric_b'] in TOPOLOGY_METRICS) else 19)
+                or r['n_samples'] != N_EVAL]
+    add('two_way_residual_uses_common_rectangular_method_set', len(bad_rect) == 0,
+        notes=f'n_bad={len(bad_rect)}')
 
     bad_pref = [r for r in pairwise_pref_rows
-                if (r['n_agree_nontie'] + r['n_agree_tie'] + r['n_disagree']) != N_EVAL
-                or (r['pd_pref_a'] + r['pd_pref_b'] + r['pd_tie']) != N_EVAL
-                or (r['mt_pref_a'] + r['mt_pref_b'] + r['mt_tie']) != N_EVAL]
+                if (r['descriptor_agreement_count'] + r['descriptor_disagreement_count'] +
+                    r['descriptor_tie_or_undefined_count']) != N_EVAL
+                or (r['pd_prefers_a_count'] + r['pd_prefers_b_count'] + r['pd_tie_count']) != N_EVAL
+                or (r['mt_prefers_a_count'] + r['mt_prefers_b_count'] + r['mt_tie_count']) != N_EVAL]
     add('topology_pairwise_preference_counts_sum_168', len(bad_pref) == 0, notes=f'n_bad={len(bad_pref)}')
 
     expected_pairs = len(list(itertools.combinations(topology_methods, 2)))
     bad_sample_pref = [r for r in sample_pref_rows
-                        if (r['n_agree_nontie'] + r['n_agree_tie'] + r['n_disagree']) != expected_pairs
-                        or r['n_pairs'] != expected_pairs]
+                        if (r['agreement_count'] + r['disagreement_count'] + r['tie_or_undefined_count'])
+                        != expected_pairs
+                        or r['method_pair_count'] != expected_pairs]
     add('topology_sample_preference_counts_sum_153', len(bad_sample_pref) == 0,
         notes=f'expected={expected_pairs} n_bad={len(bad_sample_pref)}')
+
+    pd_mt_lookup = {}
+    for r in samplewise_rows:
+        if {r['metric_a'], r['metric_b']} == {'pd_distance', 'mt_distance'}:
+            pd_mt_lookup[r['sample_idx']] = (r['oriented_pearson'], r['oriented_spearman'])
+    bad_corr_match = sum(
+        1 for r in sample_pref_rows
+        if (r['pd_mt_cross_method_pearson'], r['pd_mt_cross_method_spearman'])
+        != pd_mt_lookup.get(r['sample_idx'], ('', ''))
+    )
+    add('sample_preference_pd_mt_correlation_matches_samplewise_table', bad_corr_match == 0,
+        notes=f'n_bad={bad_corr_match}')
+
+    add('topology_rank_by_method_has_18_rows', len(rank_rows) == 18, notes=f'n_rows={len(rank_rows)}')
+    pd_means_check = np.array([means[r['method_id']]['raw']['pd_distance'] for r in rank_rows])
+    mt_means_check = np.array([means[r['method_id']]['raw']['mt_distance'] for r in rank_rows])
+    expected_pd_ranks = rankdata_avg(pd_means_check)
+    expected_mt_ranks = rankdata_avg(mt_means_check)
+    bad_rank = 0
+    for i, r in enumerate(rank_rows):
+        if abs(r['pd_rank'] - expected_pd_ranks[i]) > 1e-9 or abs(r['mt_rank'] - expected_mt_ranks[i]) > 1e-9:
+            bad_rank += 1
+        signed = r['pd_rank'] - r['mt_rank']
+        if abs(r['signed_rank_gap'] - signed) > 1e-9 or abs(r['absolute_rank_gap'] - abs(signed)) > 1e-9:
+            bad_rank += 1
+        if abs(r['pd_mean'] - means[r['method_id']]['raw']['pd_distance']) > 1e-9:
+            bad_rank += 1
+    add('topology_rank_by_method_ranks_the_method_means', bad_rank == 0, notes=f'n_bad={bad_rank}')
+    add('topology_rank_gap_internally_consistent', bad_rank == 0, notes=f'n_bad={bad_rank}')
+
+    add('focal_topology_bootstrap_has_540_rows', len(focal_rows) == 18 * 15 * 2,
+        notes=f'n_rows={len(focal_rows)}')
+    bad_focal_point = 0
+    bad_focal_sign = 0
+    for r in focal_rows:
+        mid = r['method_id']
+        xs = np.array([per_sample[mid][si][r['metric_a']] for si in range(N_EVAL)])
+        ys = np.array([per_sample[mid][si][r['metric_b']] for si in range(N_EVAL)])
+        ox = orient(xs, metric_direction[r['metric_a']])
+        oy = orient(ys, metric_direction[r['metric_b']])
+        expected_point = pearson_r(ox, oy) if r['correlation_type'] == 'pearson' else spearman_r(ox, oy)
+        observed = r['observed_correlation']
+        if (expected_point is None) != (observed == ''):
+            bad_focal_point += 1
+        elif expected_point is not None and abs(float(observed) - expected_point) > 1e-9:
+            bad_focal_point += 1
+        signs_seen = set()
+        for scheme in BOOTSTRAP_SCHEME_NAMES:
+            lo, hi = r[f'{scheme}_ci95_low'], r[f'{scheme}_ci95_high']
+            expected_sign = ('' if lo == '' or hi == '' else
+                              'positive' if float(lo) > 0 else 'negative' if float(hi) < 0 else 'includes_zero')
+            if r[f'{scheme}_sign'] != expected_sign:
+                bad_focal_sign += 1
+            signs_seen.add(r[f'{scheme}_sign'])
+        expected_agree = (len(signs_seen) == 1 and '' not in signs_seen)
+        if r['all_interval_signs_agree'] != expected_agree:
+            bad_focal_sign += 1
+    add('focal_topology_bootstrap_observed_correlation_matches_raw_data', bad_focal_point == 0,
+        notes=f'n_bad={bad_focal_point}')
+    add('focal_topology_bootstrap_interval_sign_fields_correct', bad_focal_sign == 0,
+        notes=f'n_bad={bad_focal_sign}')
 
     dominated_lookup = {}
     for r in dominance_edge_rows:
@@ -1492,6 +1631,8 @@ def main() -> int:
     assert len(methods) == N_METHODS
     assert len(topology_methods) == N_METHODS - 1
     assert len(non_ssim) == 21
+    display_name_by_method = {mid: long_table['method_meta'][mid]['values'].get('display_name', '')
+                                for mid in methods}
 
     # -------------------------------------------------------------------
     # Analysis A -- method-mean relationships
@@ -1549,14 +1690,23 @@ def main() -> int:
     # Analysis D -- two-way-centered residual relationships
     # -------------------------------------------------------------------
     residual_rows, residual_margin_rows, pearson_matrix_d, spearman_matrix_d = two_way_residual_correlations(
-        per_sample, methods, topology_methods, non_ssim, metric_direction)
+        per_sample, methods, topology_methods, non_ssim, metric_family, metric_direction)
     write_csv(OUT_DIR / 'two_way_residual_correlations.csv',
-               ['metric_a', 'metric_b', 'n_common_methods', 'n_cells', 'pearson', 'spearman',
-                'interpretation_level'], residual_rows)
+               ['metric_a', 'metric_b', 'family_a', 'family_b', 'n_common_methods', 'n_samples', 'n_cells',
+                'oriented_residual_pearson', 'oriented_residual_spearman', 'max_abs_method_margin_mean_a',
+                'max_abs_sample_margin_mean_a', 'max_abs_method_margin_mean_b',
+                'max_abs_sample_margin_mean_b', 'interpretation_level'], residual_rows)
     write_matrix_csv(OUT_DIR / 'two_way_residual_pearson_matrix.csv', non_ssim, pearson_matrix_d)
     write_matrix_csv(OUT_DIR / 'two_way_residual_spearman_matrix.csv', non_ssim, spearman_matrix_d)
-    log(f'[analysis-D] {len(residual_rows)} two-way-centered-residual metric-pair correlations; '
-        f'max row/col/grand margin = '
+    n_pure_topology_pairs = sum(1 for r in residual_rows
+                                  if r['metric_a'] in TOPOLOGY_METRICS and r['metric_b'] in TOPOLOGY_METRICS)
+    n_mixed_pairs = sum(1 for r in residual_rows
+                          if (r['metric_a'] in TOPOLOGY_METRICS) != (r['metric_b'] in TOPOLOGY_METRICS))
+    n_pure_nontopology_pairs = len(residual_rows) - n_pure_topology_pairs - n_mixed_pairs
+    log(f'[analysis-D] {len(residual_rows)} pair-specific common-rectangle two-way-centered-residual '
+        f'correlations ({n_pure_nontopology_pairs} non-topology/non-topology pairs on 19 methods, '
+        f'{n_pure_topology_pairs} PD/MT pair on 18 methods, {n_mixed_pairs} topology/non-topology '
+        f'pairs on 18 methods); max row/col/grand margin = '
         f'{max(r["row_margin_max_abs"] for r in residual_margin_rows):.3e} / '
         f'{max(r["col_margin_max_abs"] for r in residual_margin_rows):.3e} / '
         f'{max(r["grand_margin_abs"] for r in residual_margin_rows):.3e}.')
@@ -1566,8 +1716,11 @@ def main() -> int:
     # -------------------------------------------------------------------
     focal_rows = focal_topology_correlation_bootstrap(per_sample, topology_methods, metric_direction)
     write_csv(OUT_DIR / 'focal_topology_correlation_bootstrap.csv',
-               ['method_id', 'metric_a', 'metric_b', 'correlation_type', 'bootstrap_scheme', 'n_resamples',
-                'point_estimate', 'ci95_low', 'ci95_high', 'interpretation_level'], focal_rows)
+               ['method_id', 'metric_a', 'metric_b', 'correlation_type', 'observed_correlation',
+                'iid_ci95_low', 'iid_ci95_high', 'block6_ci95_low', 'block6_ci95_high',
+                'block12_ci95_low', 'block12_ci95_high', 'block24_ci95_low', 'block24_ci95_high',
+                'iid_sign', 'block6_sign', 'block12_sign', 'block24_sign', 'all_interval_signs_agree'],
+               focal_rows)
     focal_summary_rows = focal_topology_relationship_summary(focal_rows)
     write_csv(OUT_DIR / 'focal_topology_relationship_summary.csv',
                ['metric_a', 'metric_b', 'correlation_type', 'n_methods', 'median', 'q25', 'q75', 'min', 'max',
@@ -1575,23 +1728,29 @@ def main() -> int:
                 'n_ci_excludes_zero_block12', 'n_ci_excludes_zero_block24', 'interpretation_level'],
                focal_summary_rows)
     log(f'[analysis-E] {len(focal_rows)} focal-topology bootstrap rows '
-        f'(18 methods x 15 pairs x 2 correlation types x 4 schemes = {18 * 15 * 2 * 4}), '
-        f'{CORR_BOOTSTRAP_N} resamples/scheme.')
+        f'(18 methods x 15 pairs x 2 correlation types = {18 * 15 * 2}, wide form with all 4 schemes '
+        f'per row), {CORR_BOOTSTRAP_N} resamples/scheme.')
 
     # -------------------------------------------------------------------
     # Analysis F -- direct PD/MT disagreement
     # -------------------------------------------------------------------
-    rank_rows = topology_rank_by_method(per_sample, topology_methods)
-    write_csv(OUT_DIR / 'topology_rank_by_method.csv', ['method_id', 'metric', 'mean_rank', 'n_samples'],
-               rank_rows)
+    rank_rows = topology_rank_by_method(means, topology_methods, display_name_by_method)
+    write_csv(OUT_DIR / 'topology_rank_by_method.csv',
+               ['method_id', 'display_name', 'pd_mean', 'mt_mean', 'pd_rank', 'mt_rank', 'absolute_rank_gap',
+                'signed_rank_gap'], rank_rows)
     pairwise_pref_rows = topology_pairwise_preference_agreement(per_sample, topology_methods)
     write_csv(OUT_DIR / 'topology_pairwise_preference_agreement.csv',
-               ['method_a', 'method_b', 'n_samples', 'pd_pref_a', 'pd_pref_b', 'pd_tie', 'mt_pref_a',
-                'mt_pref_b', 'mt_tie', 'n_agree_nontie', 'n_agree_tie', 'n_disagree', 'agreement_rate'],
+               ['method_a', 'method_b', 'n_samples', 'pd_prefers_a_count', 'pd_prefers_b_count',
+                'pd_tie_count', 'mt_prefers_a_count', 'mt_prefers_b_count', 'mt_tie_count',
+                'descriptor_agreement_count', 'descriptor_disagreement_count',
+                'descriptor_tie_or_undefined_count', 'descriptor_agreement_rate',
+                'descriptor_disagreement_rate'],
                pairwise_pref_rows)
-    sample_pref_rows = topology_sample_preference_agreement(per_sample, topology_methods)
+    sample_pref_rows = topology_sample_preference_agreement(per_sample, topology_methods, samplewise_rows)
     write_csv(OUT_DIR / 'topology_sample_preference_agreement.csv',
-               ['sample_idx', 'n_pairs', 'n_agree_nontie', 'n_agree_tie', 'n_disagree', 'agreement_rate'],
+               ['sample_idx', 'method_pair_count', 'agreement_count', 'disagreement_count',
+                'tie_or_undefined_count', 'agreement_rate', 'disagreement_rate',
+                'pd_mt_cross_method_pearson', 'pd_mt_cross_method_spearman'],
                sample_pref_rows)
     method_level_pd_mt = _find_pair_row(method_level_rows, 'pd_distance', 'mt_distance')
     within_pd_mt = _find_pair_row(within_summary_rows, 'pd_distance', 'mt_distance')
@@ -1655,7 +1814,7 @@ def main() -> int:
                                                                         bootstrap_membership_rows,
                                                                         topology_methods)
     write_csv(OUT_DIR / 'topology_relationship_and_pareto_summary.csv',
-               ['method_id', 'pd_mean_rank', 'mt_mean_rank', 'on_topology_only_deterministic_front',
+               ['method_id', 'pd_rank', 'mt_rank', 'signed_rank_gap', 'on_topology_only_deterministic_front',
                 'topology_only_bootstrap_rate_iid', 'topology_only_bootstrap_rate_block6',
                 'topology_only_bootstrap_rate_block12', 'topology_only_bootstrap_rate_block24', 'note'],
                topo_rel_pareto_rows)
@@ -1667,7 +1826,8 @@ def main() -> int:
         non_ssim, method_level_rows, pearson_matrix_a, spearman_matrix_a, within_rows, samplewise_rows,
         residual_rows, residual_margin_rows, pearson_matrix_d, spearman_matrix_d, pairwise_pref_rows,
         sample_pref_rows, front_membership_rows, dominance_edge_rows, sanity_checks, bootstrap_membership_rows,
-        bootstrap_front_size_rows, objective_sets, methods, topology_methods)
+        bootstrap_front_size_rows, objective_sets, methods, topology_methods, rank_rows, means, focal_rows,
+        per_sample, metric_direction)
     if additional_failures:
         log('')
         log('[ADDITIONAL VALIDATION FAILURE]')
@@ -1688,7 +1848,8 @@ def main() -> int:
     write_phase2c_doc(non_ssim, methods, topology_methods, method_level_rows, within_summary_rows,
                         samplewise_summary_rows, residual_rows, method_level_pd_mt, within_pd_mt,
                         samplewise_pd_mt, descriptor_summary_rows, objective_sets, front_by_set,
-                        bootstrap_membership_rows, all_validation_rows)
+                        bootstrap_membership_rows, all_validation_rows, rank_rows,
+                        n_pure_nontopology_pairs, n_pure_topology_pairs, n_mixed_pairs)
 
     # -------------------------------------------------------------------
     # Prior-phase immutability postflight
@@ -1743,7 +1904,8 @@ def _fmt(v, nd=4):
 def write_phase2c_doc(non_ssim, methods, topology_methods, method_level_rows, within_summary_rows,
                         samplewise_summary_rows, residual_rows, method_level_pd_mt, within_pd_mt,
                         samplewise_pd_mt, descriptor_summary_rows, objective_sets, front_by_set,
-                        bootstrap_membership_rows, all_validation_rows):
+                        bootstrap_membership_rows, all_validation_rows, rank_rows,
+                        n_pure_nontopology_pairs, n_pure_topology_pairs, n_mixed_pairs):
     lines = []
     a = lines.append
 
@@ -1840,26 +2002,43 @@ def write_phase2c_doc(non_ssim, methods, topology_methods, method_level_rows, wi
     a('')
     a(f'**PD/MT per sample:** median oriented Pearson r = {_fmt(samplewise_pd_mt["pearson_median"])}, '
       f'median oriented Spearman rho = {_fmt(samplewise_pd_mt["spearman_median"])} across '
-      f'{samplewise_pd_mt["n_samples"]} samples. For a fixed field, PD and MT agree on how they rank the '
-      f'methods at a rate reflected by this median association; see Section 8 for the direct '
-      f'preference-agreement rates, which are a more literal reading of "agree/disagree."')
+      f'{samplewise_pd_mt["n_samples"]} samples. This is a rank-association coefficient, not a literal '
+      f'agreement rate -- see Section 8 for the literal per-field PD/MT preference-agreement rate, which '
+      f'is a distinct quantity computed from explicit pairwise preferences rather than from a correlation '
+      f'coefficient.')
     a('')
 
     a('## 7. Analysis D -- two-way-centered residual relationships (two_way_centered_residual)')
     a('')
-    a('For each metric, the method main effect and sample main effect are removed by additive demeaning: '
-      '`residual[m,s] = z[m,s] - mean_over_samples(z[m,*]) - mean_over_methods(z[*,s]) + grand_mean(z)`. '
-      'By construction every row mean, column mean, and the grand mean of the residual matrix is '
-      f'numerically zero (verified to within {MARGIN_TOLERANCE:.0e}; see `phase2c_validation.csv`). '
-      'Correlating the residuals of two metrics (pooled over the common method x sample cells) answers: '
+    a('For every metric PAIR, both metrics are two-way centered on the exact same common-rectangle method '
+      'set (the 18 topology-bearing methods if either metric is PD or MT, else all 19 methods), by additive '
+      'demeaning: `residual[m,s] = z[m,s] - mean_over_samples(z[m,*]) - mean_over_methods(z[*,s]) + '
+      'grand_mean(z)`. Centering is deliberately pair-specific: each metric is re-centered on the common '
+      'rectangle for that particular pair, rather than centered once on its own maximal method set and then '
+      'subset down afterward -- subsetting a residual matrix AFTER centering does not preserve the '
+      'zero-margin property, since the row/column means used would have been computed over the wrong '
+      '(too-large) rectangle. By construction every row-mean (method) margin, column-mean (sample) margin, '
+      f'and grand mean of each pair-specific residual matrix is numerically zero (verified to within '
+      f'{MARGIN_TOLERANCE:.0e} for every pair and every side; see `phase2c_validation.csv`). Correlating the '
+      'two pair-specific residual matrices (flattened over the shared method x sample cells) answers: '
       '**"once the obvious method-level and sample-level main effects are removed, do two metrics still '
       'move together?"** This is explicitly **additive demeaning, not a fitted causal mixed-effects model** '
       '-- no variance components, random effects, or significance testing are involved, and no causal claim '
       'is intended or supported.')
     a('')
+    a(f'Because both metrics in a pair are always centered over the same rectangle, the '
+      f'{n_pure_nontopology_pairs} non-topology/non-topology pairs (19-method rectangle) and the '
+      f'{n_pure_topology_pairs} PD/MT pair (18-method rectangle, which was already correctly computed on a '
+      f'shared rectangle before this patch) are numerically unaffected by this correction. Only the '
+      f'{n_mixed_pairs} mixed topology/non-topology pairs -- where the non-topology metric previously had '
+      f'its residual computed over 19 methods and then silently subset down to 18 -- have legitimately '
+      f'changed.')
+    a('')
     pd_mt_resid = _find_pair_row(residual_rows, 'pd_distance', 'mt_distance')
-    a(f'**PD/MT two-way-residual association:** Pearson r = {_fmt(pd_mt_resid["pearson"])}, '
-      f'Spearman rho = {_fmt(pd_mt_resid["spearman"])} (n_cells={pd_mt_resid["n_cells"]}).')
+    a(f'**PD/MT two-way-residual association:** Pearson r = {_fmt(pd_mt_resid["oriented_residual_pearson"])}, '
+      f'Spearman rho = {_fmt(pd_mt_resid["oriented_residual_spearman"])} (n_cells={pd_mt_resid["n_cells"]}, '
+      f'n_common_methods={pd_mt_resid["n_common_methods"]}). This value is unchanged by the pair-specific '
+      f'centering patch, since PD and MT were already centered on the same 18-method rectangle.')
     a('')
 
     a('## 8. PD/MT direct disagreement analysis')
@@ -1872,6 +2051,13 @@ def write_phase2c_doc(non_ssim, methods, topology_methods, method_level_rows, wi
       'topological descriptors (PD captures persistence-pair geometry, MT captures merge-tree structure); '
       'disagreement between them is evidence of genuinely different geometric sensitivity, and is not '
       'evidence that either descriptor is invalid.')
+    a('')
+    a('`topology_rank_by_method.csv` reports, for each of the 18 topology-bearing methods, the RANK of that '
+      'method\'s own PD and MT MEANS among the 18 method means (ascending raw-distance order, average ranks '
+      'for exact ties) -- this is explicitly not an average of 168 per-field ranks. '
+      '`signed_rank_gap = pd_rank - mt_rank`: a positive gap means MT favors the method more strongly than '
+      'PD does (the method\'s MT rank is better than its PD rank); a negative gap means PD favors the '
+      'method more strongly than MT does.')
     a('')
     for row in descriptor_summary_rows:
         a(f'- **{row["level"]}** (n={row["n_units"]}): {row["value_a_label"]}={_fmt(row["value_a"])}, '

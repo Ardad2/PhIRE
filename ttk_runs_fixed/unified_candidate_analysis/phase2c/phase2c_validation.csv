@@ -961,9 +961,17 @@ matrix_diagonal_one[two_way_residual_spearman],,,,PASS,n_bad_diag=0
 method_level_pairwise_matrix_agreement,,,,PASS,n_mismatch=0
 within_method_n_samples_valid,,,,PASS,n_bad=0
 samplewise_n_methods_valid,,,,PASS,n_bad=0
-two_way_residual_margins_zero,,,,PASS,[]
+two_way_residual_margins_zero_pair_specific,,,,PASS,[]
+two_way_residual_uses_common_rectangular_method_set,,,,PASS,n_bad=0
 topology_pairwise_preference_counts_sum_168,,,,PASS,n_bad=0
 topology_sample_preference_counts_sum_153,,,,PASS,expected=153 n_bad=0
+sample_preference_pd_mt_correlation_matches_samplewise_table,,,,PASS,n_bad=0
+topology_rank_by_method_has_18_rows,,,,PASS,n_rows=18
+topology_rank_by_method_ranks_the_method_means,,,,PASS,n_bad=0
+topology_rank_gap_internally_consistent,,,,PASS,n_bad=0
+focal_topology_bootstrap_has_540_rows,,,,PASS,n_rows=540
+focal_topology_bootstrap_observed_correlation_matches_raw_data,,,,PASS,n_bad=0
+focal_topology_bootstrap_interval_sign_fields_correct,,,,PASS,n_bad=0
 pareto_front_edge_agreement,,,,PASS,n_mismatch=0
 topology_pareto_sanity_all_pass,,,,PASS,[]
 pareto_bootstrap_rates_and_counts_in_range,,,,PASS,n_bad=0
