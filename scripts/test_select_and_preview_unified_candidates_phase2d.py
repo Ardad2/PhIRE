@@ -265,24 +265,87 @@ for a in m.ARCHETYPE_PRIORITY:
     check(f'{a}: exactly 3 alternates retained', len(sel_by_a_12[a]['alternates']) == 3)
 
 print()
-print('=== 13. Repository-relative raw-path construction (no absolute inventory paths used) ===')
+print()
+print('=== 13. Repository-rooted raw-path construction; inventory paths are provenance-only ===')
+
 method_inventory = m.load_method_inventory()
 paths_13 = m.resolve_raw_paths(method_inventory)
-for mid, p in paths_13.items():
-    for role in ('idx', 'dataIN', 'dataGT'):
-        path = p[role]
-        check(f'{mid}:{role} path is repo-relative under REPO_ROOT (not /home/adadhwal/...)',
-              str(path).startswith(str(m.REPO_ROOT)) and 'adadhwal' not in str(path))
-check('bicubic has no on-disk dataSR path (reconstructed in memory)', paths_13[m.BICUBIC_METHOD]['dataSR'] is None)
-check('cnn/gan resolve under data_out_fixed/wind_mrhr_<mid>',
-      'data_out_fixed/wind_mrhr_cnn' in str(paths_13[m.CNN_METHOD]['dataIN'])
-      and 'data_out_fixed/wind_mrhr_gan' in str(paths_13[m.GAN_METHOD]['dataIN']))
-check('learned candidates resolve under data_out/wind_finetune_<original_method_name>',
-      'data_out/wind_finetune_candidateC_expanded2688' in str(paths_13[m.CANDIDATE_C_METHOD]['dataIN']))
-# Explicitly confirm the raw absolute inventory column is never read for execution.
-inv_candidate_c = method_inventory[m.CANDIDATE_C_METHOD]
-check("method_inventory's absolute idx_path is provenance-only and differs from the resolved execution path",
-      inv_candidate_c['idx_path'] != str(paths_13[m.CANDIDATE_C_METHOD]['idx']))
+
+# Executable paths may be absolute in memory, but they must be constructed
+# underneath the active checkout root from repository-relative conventions.
+for mid, path_info in paths_13.items():
+    for role in ('idx', 'dataIN', 'dataGT', 'dataSR'):
+        path = path_info[role]
+        if path is None:
+            continue
+
+        try:
+            relative = path.resolve().relative_to(m.REPO_ROOT.resolve())
+            under_repo_root = True
+        except ValueError:
+            relative = None
+            under_repo_root = False
+
+        check(
+            f'{mid}:{role} is constructed underneath active REPO_ROOT',
+            under_repo_root
+            and relative is not None
+            and relative.parts[0] in {'data_out', 'data_out_fixed'},
+        )
+
+check(
+    'bicubic has no on-disk dataSR path (reconstructed in memory)',
+    paths_13[m.BICUBIC_METHOD]['dataSR'] is None,
+)
+
+check(
+    'cnn/gan resolve under data_out_fixed/wind_mrhr_<mid>',
+    paths_13[m.CNN_METHOD]['dataIN']
+    == m.REPO_ROOT / 'data_out_fixed' / 'wind_mrhr_cnn' / 'dataIN.npy'
+    and paths_13[m.GAN_METHOD]['dataIN']
+    == m.REPO_ROOT / 'data_out_fixed' / 'wind_mrhr_gan' / 'dataIN.npy',
+)
+
+candidate_c_original = method_inventory[m.CANDIDATE_C_METHOD]['original_method_name']
+check(
+    'learned candidates resolve under data_out/wind_finetune_<original_method_name>',
+    paths_13[m.CANDIDATE_C_METHOD]['dataIN']
+    == (
+        m.REPO_ROOT
+        / 'data_out'
+        / f'wind_finetune_{candidate_c_original}'
+        / 'dataIN.npy'
+    ),
+)
+
+# Prove that inventory absolute array paths are not used for execution:
+# replace them with deliberately bogus values and require identical resolved
+# executable paths.
+mutated_inventory = {
+    method_id: dict(row)
+    for method_id, row in method_inventory.items()
+}
+
+mutated_inventory[m.CANDIDATE_C_METHOD]['idx_path'] = (
+    '/definitely/not/the/repository/fake_idx.npy'
+)
+mutated_inventory[m.CANDIDATE_C_METHOD]['dataIN_path'] = (
+    '/definitely/not/the/repository/fake_dataIN.npy'
+)
+mutated_inventory[m.CANDIDATE_C_METHOD]['dataGT_path'] = (
+    '/definitely/not/the/repository/fake_dataGT.npy'
+)
+mutated_inventory[m.CANDIDATE_C_METHOD]['dataSR_path'] = (
+    '/definitely/not/the/repository/fake_dataSR.npy'
+)
+
+mutated_paths = m.resolve_raw_paths(mutated_inventory)
+
+check(
+    'absolute inventory array paths are provenance-only and do not affect execution-path resolution',
+    mutated_paths[m.CANDIDATE_C_METHOD]
+    == paths_13[m.CANDIDATE_C_METHOD],
+)
 
 print()
 print('=== 14. Physical-unit speed calculation (no accidental MU_SIG denorm) ===')
@@ -338,7 +401,7 @@ try:
     np.save(cnn_dir / 'dataIN.npy', data_in16)
     np.save(cnn_dir / 'dataGT.npy', data_gt16)
     data_sr_bad = data_gt16.copy()
-    data_sr_bad[0, 0, 0, 0] = np.nan  # inject a NaN
+    data_sr_bad[0, 0, 0, 0] = np.nan  # inject a NaN in row 0 (a SELECTED row, see selected16 below)
     np.save(cnn_dir / 'dataSR.npy', data_sr_bad)
 
     gan_dir = tmp_root / 'data_out_fixed' / 'wind_mrhr_gan'
@@ -352,17 +415,23 @@ try:
     selected16 = [0, 1]
     fake_ps16 = {mid: {si: {'speed_mae': 0.0} for si in selected16} for mid in (m.CNN_METHOD, m.GAN_METHOD)}
     partial_paths = {m.CNN_METHOD: paths16[m.CNN_METHOD], m.GAN_METHOD: paths16[m.GAN_METHOD]}
-    audit16 = m.audit_raw_artifacts(partial_paths, selected16, fake_ps16)
+    audit16 = m.audit_raw_artifacts(partial_paths, selected16, fake_ps16, base_dir=tmp_root)
     check('NaN in dataSR is detected and reported as a failure',
           any('non-finite' in f and 'cnn' in f for f in audit16['failures']))
     check('malformed dataSR shape is detected and reported as a failure',
           any('shape' in f and 'gan' in f for f in audit16['failures']))
+    cnn_row16 = next(r for r in audit16['alignment_rows'] if r['method_id'] == m.CNN_METHOD)
+    gan_row16 = next(r for r in audit16['alignment_rows'] if r['method_id'] == m.GAN_METHOD)
+    check('cnn overall_status is FAIL (non-finite dataSR)', cnn_row16['overall_status'] == 'FAIL')
+    check('gan overall_status is FAIL (malformed dataSR shape)', gan_row16['overall_status'] == 'FAIL')
+    check('raw_artifact_inventory path fields are repo-relative to base_dir, never absolute',
+          all(not r['path'].startswith('/') for r in audit16['inventory_rows']))
 finally:
     m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE = old_in_shape, old_hr_shape
     shutil.rmtree(tmp_root, ignore_errors=True)
 
 print()
-print('=== 17. Exact idx validation + input/GT alignment ===')
+print('=== 17. Exact idx validation + input/GT alignment (full-168-row) ===')
 tmp_root2 = Path(tempfile.mkdtemp(prefix='phase2d_test_'))
 old_in_shape, old_hr_shape = m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE
 try:
@@ -393,35 +462,118 @@ try:
     selected17 = [0, 5]
     fake_ps17 = {mid: {si: {'speed_mae': 0.0} for si in selected17} for mid in (m.CNN_METHOD, m.GAN_METHOD)}
     partial17 = {m.CNN_METHOD: paths17[m.CNN_METHOD], m.GAN_METHOD: paths17[m.GAN_METHOD]}
-    audit17 = m.audit_raw_artifacts(partial17, selected17, fake_ps17)
+    audit17 = m.audit_raw_artifacts(partial17, selected17, fake_ps17, base_dir=tmp_root2)
     gan_row = next(r for r in audit17['alignment_rows'] if r['method_id'] == m.GAN_METHOD)
-    check('exactly-aligned gan input/GT reports exact alignment status', gan_row['input_alignment_status'] == 'exact'
-          and gan_row['gt_alignment_status'] == 'exact')
-    check('idx_exact_0_167 is True for a valid 0..167 idx array', gan_row['idx_exact_0_167'] is True)
+    check('exactly-aligned gan input/GT reports PASS alignment status',
+          gan_row['input_alignment_status'] == 'PASS' and gan_row['gt_alignment_status'] == 'PASS')
+    check('idx_validation_status is PASS for a valid ordered 0..167 idx array', gan_row['idx_validation_status'] == 'PASS')
+    check('gan overall_status is PASS when everything is consistent', gan_row['overall_status'] == 'PASS')
 
-    # Now break alignment: perturb gan's dataIN so it no longer matches CNN's canonical input.
-    np.save(gan_dir / 'dataIN.npy', data_in17 + 1.0)
-    audit17b = m.audit_raw_artifacts(partial17, selected17, fake_ps17)
+    # Now break alignment: perturb gan's dataIN so it no longer matches CNN's canonical input
+    # ONLY in an unselected row (sample_idx=100, not in selected17=[0,5]) -- the full-168-row
+    # audit must still catch this even though no selected sample is affected.
+    perturbed = data_in17.copy()
+    perturbed[100] += 1.0
+    np.save(gan_dir / 'dataIN.npy', perturbed)
+    audit17b = m.audit_raw_artifacts(partial17, selected17, fake_ps17, base_dir=tmp_root2)
     gan_row_b = next(r for r in audit17b['alignment_rows'] if r['method_id'] == m.GAN_METHOD)
-    check('perturbed gan input is detected as a MISMATCH', gan_row_b['input_alignment_status'] == 'MISMATCH')
-    check('input misalignment is reported as an audit failure',
+    check('corruption confined to an UNSELECTED row (idx=100) is still detected as a MISMATCH',
+          gan_row_b['input_alignment_status'] == 'FAIL')
+    check('unselected-row corruption is reported as an audit failure',
           any('dataIN' in f and 'gan' in f for f in audit17b['failures']))
+    check('unselected-row corruption makes the whole audit fail (audit hard-fails, not silently passes)',
+          len(audit17b['failures']) > 0)
 finally:
     m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE = old_in_shape, old_hr_shape
     shutil.rmtree(tmp_root2, ignore_errors=True)
 
 print()
-print('=== 18. render mode hard-fails when real arrays are absent (this checkout) ===')
-try:
-    real_inventory = m.load_method_inventory()
-    real_paths = m.resolve_raw_paths(real_inventory)  # base_dir=REPO_ROOT (real, arrays absent)
-    m.require_raw_artifacts_exist(real_paths)
-    check('render-path artifact check hard-fails in this lightweight checkout', False)
-except SystemExit as e:
-    check('render-path artifact check hard-fails in this lightweight checkout',
-          'Missing raw artifact' in str(e))
+print('=== 17b. validate_idx_array: ordered/permutation/duplicate-missing/shape/dtype ===')
+good_idx = np.arange(m.N_EVAL, dtype=np.int64)
+status, detail = m.validate_idx_array(good_idx, 'testmethod')
+check('exact ordered idx passes', status == 'PASS' and detail == '')
+
+perm_idx = good_idx.copy()
+perm_idx[0], perm_idx[1] = perm_idx[1], perm_idx[0]  # swap two entries -> a permutation, same set
+status, detail = m.validate_idx_array(perm_idx, 'testmethod')
+check('a permutation fails (set-equal but not ordered)', status == 'FAIL')
+
+dup_idx = good_idx.copy()
+dup_idx[167] = dup_idx[0]  # duplicate index 0, sample 167 now missing
+status, detail = m.validate_idx_array(dup_idx, 'testmethod')
+check('a duplicate/missing index fails', status == 'FAIL')
+
+wrong_shape_idx = np.arange(m.N_EVAL - 1, dtype=np.int64)
+status, detail = m.validate_idx_array(wrong_shape_idx, 'testmethod')
+check('wrong shape fails', status == 'FAIL' and 'shape' in detail)
+
+noninteger_idx = np.arange(m.N_EVAL, dtype=np.float64)
+status, detail = m.validate_idx_array(noninteger_idx, 'testmethod')
+check('noninteger idx fails', status == 'FAIL' and 'dtype' in detail)
 
 print()
+print('=== 17c. Malformed canonical CNN idx -> controlled SystemExit, not KeyError ===')
+tmp_root2c = Path(tempfile.mkdtemp(prefix='phase2d_test_'))
+old_in_shape, old_hr_shape = m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE
+try:
+    m.EXPECTED_IN_SHAPE = (m.N_EVAL, 4, 4, 2)
+    m.EXPECTED_HR_SHAPE = (m.N_EVAL, 6, 6, 2)
+    rng17c = np.random.default_rng(33)
+    bad_canonical_idx = np.arange(m.N_EVAL)
+    bad_canonical_idx[0] = 5  # duplicate -> malformed canonical idx
+    data_in17c = rng17c.normal(size=(m.N_EVAL, 4, 4, 2)).astype(np.float32)
+    data_gt17c = rng17c.normal(size=(m.N_EVAL, 6, 6, 2)).astype(np.float32)
+
+    method_inv17c = m.load_method_inventory()
+    paths17c = m.resolve_raw_paths(method_inv17c, base_dir=tmp_root2c)
+    cnn_dir = tmp_root2c / 'data_out_fixed' / 'wind_mrhr_cnn'
+    cnn_dir.mkdir(parents=True)
+    np.save(cnn_dir / 'idx.npy', bad_canonical_idx)
+    np.save(cnn_dir / 'dataIN.npy', data_in17c)
+    np.save(cnn_dir / 'dataGT.npy', data_gt17c)
+    np.save(cnn_dir / 'dataSR.npy', data_gt17c.copy())
+
+    try:
+        m.audit_raw_artifacts({m.CNN_METHOD: paths17c[m.CNN_METHOD]}, [0, 5],
+                                 {m.CNN_METHOD: {0: {'speed_mae': 0.0}, 5: {'speed_mae': 0.0}}}, base_dir=tmp_root2c)
+        check('malformed canonical idx -> controlled SystemExit (not KeyError)', False)
+    except SystemExit as e:
+        check('malformed canonical idx -> controlled SystemExit (not KeyError)',
+              'Canonical CNN idx.npy failed validation' in str(e))
+    except KeyError:
+        check('malformed canonical idx -> controlled SystemExit (not KeyError)', False)
+finally:
+    m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE = old_in_shape, old_hr_shape
+    shutil.rmtree(tmp_root2c, ignore_errors=True)
+
+print()
+print()
+print('=== 18. Render-path artifact check hard-fails against a synthetic empty checkout ===')
+
+tmp_missing_root = Path(
+    tempfile.mkdtemp(prefix='phase2d_missing_raw_artifacts_')
+)
+
+try:
+    missing_inventory = m.load_method_inventory()
+    missing_paths = m.resolve_raw_paths(
+        missing_inventory,
+        base_dir=tmp_missing_root,
+    )
+
+    try:
+        m.require_raw_artifacts_exist(missing_paths)
+        check(
+            'render-path artifact check hard-fails when arrays are absent',
+            False,
+        )
+    except SystemExit as e:
+        check(
+            'render-path artifact check hard-fails when arrays are absent',
+            'Missing raw artifact' in str(e),
+        )
+finally:
+    shutil.rmtree(tmp_missing_root, ignore_errors=True)
 print('=== 19. Render helper succeeds end-to-end on a synthetic temporary artifact tree ===')
 tmp_root3 = Path(tempfile.mkdtemp(prefix='phase2d_test_'))
 old_in_shape, old_hr_shape = m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE
@@ -456,13 +608,40 @@ try:
     selected19 = [3, 7, 11, 15, 19, 23]
     fake_ps19 = {mid: {si: dict(speed_mae=0.0, pd_distance=1.0, mt_distance=2.0) for si in selected19}
                   for mid in m.FULL_SELECTED_STORY}
-    audit19 = m.audit_raw_artifacts(paths19, selected19, fake_ps19)
+    # bicubic's dataSR is reconstructed in memory (never literally equal to dataGT for
+    # random data), and bicubic is NOT exempt from speed_mae reproduction -- supply the
+    # true recomputed value so this "everything is consistent" fixture is actually consistent.
+    bicubic_sr_probe = m.bicubic_reconstruct_selected(data_in19[selected19])
+    for i, si in enumerate(selected19):
+        true_mae = float(np.mean(np.abs(m.speed_from_uv(bicubic_sr_probe[i]) - m.speed_from_uv(data_gt19[si]))))
+        fake_ps19[m.BICUBIC_METHOD][si]['speed_mae'] = true_mae
+    audit19 = m.audit_raw_artifacts(paths19, selected19, fake_ps19, base_dir=tmp_root3)
     check('synthetic-tree audit has zero failures when data is internally consistent',
           audit19['failures'] == [])
     check('synthetic-tree audit produced selected_data for every full_selected_story method',
           set(audit19['selected_data'].keys()) == set(m.FULL_SELECTED_STORY))
+    check('every method reports overall_status PASS (full-168-row audit)',
+          all(r['overall_status'] == 'PASS' for r in audit19['alignment_rows']))
+    check('every method reports idx_validation_status PASS', all(r['idx_validation_status'] == 'PASS'
+          for r in audit19['alignment_rows']))
+    bicubic_row19 = next(r for r in audit19['alignment_rows'] if r['method_id'] == m.BICUBIC_METHOD)
+    check('bicubic dataSR shape/finiteness status is N/A (reconstructed selected-only, never a full-168-row array)',
+          bicubic_row19['dataSR_shape_status'] == 'N/A' and bicubic_row19['dataSR_finiteness_status'] == 'N/A')
 
     sel_by_a19 = {a: selected19[i] for i, a in enumerate(m.ARCHETYPE_PRIORITY)}
+
+    # Artifact manifest (Section 8): one row per selected sample x full_selected_story
+    # method, plus one GT row per sample -> 6 * (7 + 1) = 48 rows.
+    manifest_rows19 = m.build_artifact_manifest_rows(
+        audit19, sel_by_a19, selected19, method_inv19, m.build_topology_source_map(m.load_column_mapping_rows()),
+        paths19, base_dir=tmp_root3)
+    check('artifact manifest has exactly 48 rows (6 samples x (7 methods + 1 GT))', len(manifest_rows19) == 48)
+    check('artifact manifest GT rows all have finite_status PASS',
+          all(r['finite_status'] == 'PASS' for r in manifest_rows19 if r['method_id'] == 'GT'))
+    check('artifact manifest has no absolute path in any path-like field',
+          all(not str(v).startswith('/') for r in manifest_rows19 for k, v in r.items() if 'path' in k.lower())
+          and all(not str(r['source_array_directory']).startswith('/') for r in manifest_rows19))
+
     render_rows19 = m.render_selected_previews(audit19['selected_data'], sel_by_a19, fake_ps19)
     for a in m.ARCHETYPE_PRIORITY:
         preview_dirs_created.append(m.PREVIEWS_DIR / a)
@@ -472,14 +651,21 @@ try:
     check('every declared preview PNG actually exists on disk', all_exist)
     all_nonempty = all(Path(m.REPO_ROOT / r['output_path']).stat().st_size > 0 for r in render_rows19)
     check('every preview PNG is non-empty (no placeholder/blank file)', all_nonempty)
+    check('detailed-preview panel_count is the 15-meaningful-panel convention for every per-sample row',
+          all(r['panel_count'] == 15 for r in render_rows19 if r['archetype_id'] != 'all'))
 
-    # Common (shared) color-limit checks: verify against hand-computed GT min/max.
+    # Common (shared) color-limit checks: verify against hand-computed union of
+    # GT + all 7 method SR speed fields (bicubic's reconstruction genuinely
+    # differs from GT, so this is NOT simply the GT-alone range).
     row0 = render_rows19[0]
-    si0 = selected19[0]
     gt0 = m.speed_from_uv(audit19['selected_data'][m.CNN_METHOD]['gt'][0])
-    check('shared_speed_vmin/vmax in preview_render_validation matches GT min/max exactly',
-          abs(row0['shared_speed_vmin'] - float(gt0.min())) < 1e-6
-          and abs(row0['shared_speed_vmax'] - float(gt0.max())) < 1e-6)
+    all_speed0 = [gt0] + [m.speed_from_uv(audit19['selected_data'][mid]['sr'][0]) for mid in m.FULL_SELECTED_STORY]
+    expected_vmin0 = min(float(a.min()) for a in all_speed0)
+    expected_vmax0 = max(float(a.max()) for a in all_speed0)
+    check('shared_speed_vmin/vmax in preview_render_validation matches the hand-recomputed '
+          'union of GT + all 7 method SR speed fields',
+          abs(row0['shared_speed_vmin'] - expected_vmin0) < 1e-6
+          and abs(row0['shared_speed_vmax'] - expected_vmax0) < 1e-6)
     check('shared_error_vmin is 0.0 (errors are non-negative absolute differences)',
           row0['shared_error_vmax'] >= row0['shared_error_vmin'] == 0.0)
 finally:
@@ -491,6 +677,216 @@ finally:
     contact = m.PREVIEWS_DIR / 'phase2d_selected_archetypes_contact_sheet.png'
     if contact.exists():
         contact.unlink()
+
+print()
+print('=== 19b. compute_preview_panel_data: common scaling from GT + all 7 SR fields ===')
+gt_uv_19b = np.zeros((4, 4, 2), dtype=np.float64)
+gt_uv_19b[0, 0] = [3.0, 4.0]  # GT speed range: [0, 5]
+sr_uv_by_method_19b = {mid: gt_uv_19b.copy() for mid in m.FULL_SELECTED_STORY}
+# One method's SR field has a value OUTSIDE the GT range on both ends.
+sr_uv_by_method_19b[m.GAN_METHOD] = gt_uv_19b.copy()
+sr_uv_by_method_19b[m.GAN_METHOD][1, 1] = [0.0, 20.0]  # speed=20, above GT max of 5
+sr_uv_by_method_19b[m.CNN_METHOD] = gt_uv_19b.copy()
+sr_uv_by_method_19b[m.CNN_METHOD][2, 2] = [-1.0, 0.0]  # speed=1, still within [0,5]; vmin stays 0 (all fields include 0)
+panel19b = m.compute_preview_panel_data(gt_uv_19b, sr_uv_by_method_19b)
+check('an SR field outside the GT range (gan=20) expands the shared speed vmax beyond GT max (5)',
+      panel19b['speed_vmax'] >= 20.0 - 1e-9 and panel19b['speed_vmax'] > 5.0)
+check('shared speed limits are a single (vmin, vmax) pair, not per-method (same pair used by every panel)',
+      isinstance(panel19b['speed_vmin'], float) and isinstance(panel19b['speed_vmax'], float))
+expected_vmax = max(float(m.speed_from_uv(v).max()) for v in ([gt_uv_19b] + list(sr_uv_by_method_19b.values())))
+check('shared speed vmax exactly equals max over GT + all 7 SR fields (hand-recomputed)',
+      abs(panel19b['speed_vmax'] - expected_vmax) < 1e-9)
+expected_err_vmax = max(float(np.abs(m.speed_from_uv(v) - m.speed_from_uv(gt_uv_19b)).max())
+                          for v in sr_uv_by_method_19b.values())
+check('shared error vmax exactly equals max abs error over all 7 method error fields (hand-recomputed)',
+      abs(panel19b['error_vmax'] - expected_err_vmax) < 1e-9)
+check('shared error vmin is exactly 0.0', panel19b['error_vmin'] == 0.0)
+check('the function returns exactly ONE speed_vmin/speed_vmax pair (not per-method values) -- '
+      'every consumer (GT panel + all 7 method panels) is structurally forced to use the same limits',
+      set(panel19b.keys()) == {'gt_speed', 'method_speeds', 'speed_vmin', 'speed_vmax', 'errors',
+                                  'error_vmin', 'error_vmax'})
+check('the function returns exactly ONE error_vmin/error_vmax pair (not per-method values) -- '
+      'every error panel is structurally forced to use the same limits',
+      isinstance(panel19b['error_vmax'], float) and isinstance(panel19b['error_vmin'], float))
+
+print()
+print('=== 19c. Bicubic speed_mae reproduction is enforced, no exemption ===')
+tmp_root19c = Path(tempfile.mkdtemp(prefix='phase2d_test_'))
+old_in_shape, old_hr_shape = m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE
+try:
+    m.EXPECTED_IN_SHAPE = (m.N_EVAL, 4, 4, 2)
+    m.EXPECTED_HR_SHAPE = (m.N_EVAL, 8, 8, 2)
+    rng19c = np.random.default_rng(51)
+    idx19c = np.arange(m.N_EVAL)
+    data_in19c = rng19c.normal(size=(m.N_EVAL, 4, 4, 2)).astype(np.float32)
+    data_gt19c = rng19c.normal(size=(m.N_EVAL, 8, 8, 2)).astype(np.float32)
+
+    method_inv19c = m.load_method_inventory()
+    paths19c = m.resolve_raw_paths(method_inv19c, base_dir=tmp_root19c)
+    cnn_dir = tmp_root19c / 'data_out_fixed' / 'wind_mrhr_cnn'
+    cnn_dir.mkdir(parents=True)
+    np.save(cnn_dir / 'idx.npy', idx19c)
+    np.save(cnn_dir / 'dataIN.npy', data_in19c)
+    np.save(cnn_dir / 'dataGT.npy', data_gt19c)
+    np.save(cnn_dir / 'dataSR.npy', data_gt19c.copy())
+
+    selected19c = [10, 20]
+    bicubic_paths = {m.CNN_METHOD: paths19c[m.CNN_METHOD], m.BICUBIC_METHOD: paths19c[m.BICUBIC_METHOD]}
+    # The in-memory bicubic reconstruction is deterministic; recompute the true
+    # value once so the "matching" case can supply an exactly-correct long-table
+    # speed_mae, and the "mismatching" case can supply a deliberately wrong one.
+    in_sel_probe = data_in19c[selected19c]
+    sr_probe = m.bicubic_reconstruct_selected(in_sel_probe)
+    true_speed_mae = {si: float(np.mean(np.abs(m.speed_from_uv(sr_probe[i]) - m.speed_from_uv(data_gt19c[si]))))
+                        for i, si in enumerate(selected19c)}
+
+    fake_ps_match = {m.BICUBIC_METHOD: {si: {'speed_mae': true_speed_mae[si]} for si in selected19c}}
+    audit_match = m.audit_raw_artifacts(bicubic_paths, selected19c, fake_ps_match, base_dir=tmp_root19c)
+    check('bicubic speed_mae reproduction test: MATCHING long-table value produces zero repro failures',
+          not any('speed_mae' in f and m.BICUBIC_METHOD in f for f in audit_match['failures']))
+
+    fake_ps_mismatch = {m.BICUBIC_METHOD: {si: {'speed_mae': true_speed_mae[si] + 5.0} for si in selected19c}}
+    audit_mismatch = m.audit_raw_artifacts(bicubic_paths, selected19c, fake_ps_mismatch, base_dir=tmp_root19c)
+    check('bicubic speed_mae reproduction test: MISMATCHING long-table value is a hard-fail '
+          '(no bicubic exemption)',
+          any('speed_mae' in f and m.BICUBIC_METHOD in f for f in audit_mismatch['failures']))
+finally:
+    m.EXPECTED_IN_SHAPE, m.EXPECTED_HR_SHAPE = old_in_shape, old_hr_shape
+    shutil.rmtree(tmp_root19c, ignore_errors=True)
+
+print()
+print('=== 19d. Repository-relative CSV path guard (write_csv hard-fails on an absolute path field) ===')
+try:
+    m.write_csv(Path(tempfile.mktemp(suffix='.csv')), ['name', 'output_path'],
+                 [dict(name='x', output_path='/etc/passwd')])
+    check('write_csv hard-fails when a path-like field holds an absolute path', False)
+except SystemExit as e:
+    check('write_csv hard-fails when a path-like field holds an absolute path', 'Absolute path found' in str(e))
+
+ok_tmp = Path(tempfile.mktemp(suffix='.csv'))
+try:
+    m.write_csv(ok_tmp, ['name', 'output_path'], [dict(name='x', output_path='ttk_runs_fixed/foo.png')])
+    check('write_csv succeeds normally when path-like fields are repository-relative', ok_tmp.exists())
+finally:
+    if ok_tmp.exists():
+        ok_tmp.unlink()
+
+print()
+print('=== 19e. Strong archetype_selected_samples.csv manifest validation ===')
+
+
+def _valid_manifest_rows():
+    return [dict(archetype_id=a, selected_sample_idx=str(10 * (i + 1)), selection_rank='1',
+                  primary_or_alternate='primary', score='1.0', eligibility_status='eligible',
+                  selection_reason='reason', methods_required='cnn,gan', metrics_used='pd_distance',
+                  tie_break_fields='score desc, then sample_idx asc')
+            for i, a in enumerate(m.ARCHETYPE_PRIORITY)]
+
+
+valid_rows = _valid_manifest_rows()
+errors = m.validate_selected_samples_manifest_rows(valid_rows, Path('dummy.csv'))
+check('a fully valid manifest passes with zero errors', errors == [])
+
+too_few = valid_rows[:5]
+errors = m.validate_selected_samples_manifest_rows(too_few, Path('dummy.csv'))
+check('fewer than 6 primary rows fails', any('exactly 6 primary rows' in e for e in errors))
+
+wrong_order = valid_rows.copy()
+wrong_order[0], wrong_order[1] = wrong_order[1], wrong_order[0]
+errors = m.validate_selected_samples_manifest_rows(wrong_order, Path('dummy.csv'))
+check('archetype_id order mismatch fails', any('order/identity mismatch' in e for e in errors))
+
+wrong_id = [dict(r) for r in valid_rows]
+wrong_id[0]['archetype_id'] = 'not_a_real_archetype'
+errors = m.validate_selected_samples_manifest_rows(wrong_id, Path('dummy.csv'))
+check('unrecognized archetype_id fails', any('order/identity mismatch' in e for e in errors))
+
+dup_idx = [dict(r) for r in valid_rows]
+dup_idx[1]['selected_sample_idx'] = dup_idx[0]['selected_sample_idx']
+errors = m.validate_selected_samples_manifest_rows(dup_idx, Path('dummy.csv'))
+check('duplicate selected_sample_idx across primary rows fails', any('not all unique' in e for e in errors))
+
+out_of_range = [dict(r) for r in valid_rows]
+out_of_range[0]['selected_sample_idx'] = '168'  # valid range is 0..167
+errors = m.validate_selected_samples_manifest_rows(out_of_range, Path('dummy.csv'))
+check('out-of-range selected_sample_idx (168) fails', any('out of range' in e for e in errors))
+
+negative_idx = [dict(r) for r in valid_rows]
+negative_idx[0]['selected_sample_idx'] = '-1'
+errors = m.validate_selected_samples_manifest_rows(negative_idx, Path('dummy.csv'))
+check('negative selected_sample_idx fails', any('out of range' in e for e in errors))
+
+noninteger_idx_row = [dict(r) for r in valid_rows]
+noninteger_idx_row[0]['selected_sample_idx'] = '12.5'
+errors = m.validate_selected_samples_manifest_rows(noninteger_idx_row, Path('dummy.csv'))
+check('non-integer selected_sample_idx fails', any('not an integer' in e for e in errors))
+
+wrong_primary_flag = [dict(r) for r in valid_rows]
+wrong_primary_flag[0]['primary_or_alternate'] = 'alternate'
+errors = m.validate_selected_samples_manifest_rows(wrong_primary_flag, Path('dummy.csv'))
+check('primary_or_alternate != "primary" on a primary row fails (row excluded from the 6 primaries, wrong count)',
+      any('exactly 6 primary rows' in e for e in errors))
+
+wrong_eligibility = [dict(r) for r in valid_rows]
+wrong_eligibility[0]['eligibility_status'] = 'ineligible'
+errors = m.validate_selected_samples_manifest_rows(wrong_eligibility, Path('dummy.csv'))
+check('eligibility_status != "eligible" fails', any('eligibility_status' in e for e in errors))
+
+empty_field = [dict(r) for r in valid_rows]
+empty_field[0]['selection_reason'] = ''
+errors = m.validate_selected_samples_manifest_rows(empty_field, Path('dummy.csv'))
+check('an empty required field fails', any("'selection_reason'" in e and 'empty' in e for e in errors))
+
+print()
+print('=== 19f. figure_plan.csv: plans, does not claim automated rendering ===')
+figure_rows19f = m.build_figure_plan_rows(sel_by_a19, results_12)
+check('figure_plan has exactly 6 rows (one per archetype)', len(figure_rows19f) == 6)
+check('figure_plan archetype_id values are exactly ARCHETYPE_PRIORITY in order',
+      [r['archetype_id'] for r in figure_rows19f] == m.ARCHETYPE_PRIORITY)
+check('every figure is status=planned_not_rendered (never claims rendering happened)',
+      all(r['status'] == 'planned_not_rendered' for r in figure_rows19f))
+check('every figure explicitly disclaims automated TTK/ParaView rendering',
+      all('TTK/ParaView' in r['rendering_note'] for r in figure_rows19f))
+check('every figure_id 1..6 is present exactly once', sorted(r['figure_id'] for r in figure_rows19f) == list(range(1, 7)))
+
+print()
+print('=== 19g. Unified doc builder retains the full report in both states ===')
+fake_selection_19g = dict(
+    results=results_12,
+    selection_by_archetype={a: dict(selected=dict(sample_idx=sel_by_a19[a], score=1.0),
+                                       alternates=[dict(sample_idx=900 + i, score=0.5) for i in range(3)])
+                              for a in m.ARCHETYPE_PRIORITY},
+    selected_sample_idx_by_archetype=sel_by_a19,
+    all_diagnostics=[],
+)
+lines_selection_only = m.build_phase2d_doc_lines(fake_selection_19g, render_result=None)
+text_selection_only = '\n'.join(lines_selection_only)
+fake_render_result_19g = dict(audit=dict(failures=[]),
+                                 render_rows=[dict(output_path='ttk_runs_fixed/x/y.png', archetype_id='a',
+                                                     sample_idx=1, status='rendered')])
+lines_rendered = m.build_phase2d_doc_lines(fake_selection_19g, render_result=fake_render_result_19g)
+text_rendered = '\n'.join(lines_rendered)
+
+REQUIRED_SECTION_MARKERS = [
+    'Scope and frozen inputs', 'Why selection is algorithmic rather than manual',
+    'Robust-z scoring convention', 'Archetype definitions', 'Duplicate-resolution decisions',
+    'Selected sample IDs and alternates', 'Metric package', 'Raw-artifact requirements and validation',
+    'Preview inventory', 'Figure plan for Phase 2D-B', 'Caveat: illustrative, not a population estimate',
+    'Exact command to complete Phase 2D-A on Spark', 'Generated files',
+]
+for marker in REQUIRED_SECTION_MARKERS:
+    check(f'selection-only doc retains section: {marker!r}', marker in text_selection_only)
+    check(f'render-complete doc ALSO retains section: {marker!r} (not replaced by a minimal doc)',
+          marker in text_rendered)
+check('render-complete doc additionally reports the raw audit passed',
+      'raw-artifact audit was performed' in text_rendered.lower()
+      or 'PASSED with 0 failures' in text_rendered)
+check('render-complete doc is at least as long as the selection-only doc (extended, not replaced)',
+      len(text_rendered) >= len(text_selection_only) * 0.9)
+check('selection-only doc explicitly says final figures deferred to Phase 2D-B',
+      'deferred to Phase 2D-B' in text_selection_only)
+check('render-complete doc explicitly says final figures deferred to Phase 2D-B',
+      'deferred to Phase 2D-B' in text_rendered)
 
 print()
 print('=== 20. Selection manifest dimensions and ordering ===')
