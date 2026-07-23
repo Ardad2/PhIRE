@@ -11,7 +11,7 @@ This document reflects a `--selection-only` run in a lightweight checkout. It re
 
 ## 2. Why selection is algorithmic rather than manual
 
-Every archetype is defined by an explicit eligibility rule and a closed-form score computed from the frozen Phase-1 long table and Phase-2C relationship tables. No sample was chosen by looking at an image: raw wind-field arrays are not available to (and are never read by) the selection stage, so the chosen samples cannot reflect appearance-based cherry-picking even in principle. The same script run twice on the same frozen inputs produces byte-identical output.
+Every archetype is defined by an explicit eligibility rule and a closed-form score computed from the frozen Phase-1 long table and Phase-2C relationship tables. No sample was chosen by looking at an image: sample selection is computed entirely from the frozen CSV inputs, before any raw wind-field array is ever read, so the chosen samples cannot reflect appearance-based cherry-picking even in principle. The same script run twice on the same frozen inputs produces byte-identical selection output.
 
 ## 3. Robust-z scoring convention
 
@@ -85,25 +85,29 @@ See `selection/archetype_score_table.csv` for the full table (rank, sample_idx, 
 - **candidate_c_continuity**: selected sample_idx=**30** (score=1.4228); alternates: 134 (score=1.2916), 107 (score=1.0878), 155 (score=1.0315)
 - **global_descriptor_agreement**: selected sample_idx=**19** (score=2.7107); alternates: 20 (score=2.4124), 45 (score=2.2208), 79 (score=2.1532)
 
-## 8. Raw-array and topology-artifact validation
+## 8. Metric package
 
-Topology CSVs (plain text, git-tracked) were read directly and cross-checked: the independently recomputed PD/MT method means from the raw `*_pd_mt_distances.csv` / `phase_c_results.csv` sources match both the Phase-1 long table and Phase-1 `unified_primary_topology_validation.csv` within tolerance for every topology-bearing `full_selected_story` method (see `selection_validation.csv`).
+Archetype scoring draws on four Phase-1 per-sample metrics: `pd_distance` and `mt_distance` (persistence-diagram / merge-tree topological distances, used by every archetype), plus `psnruv` and `speed_mae` (used only by `f2_balanced_vs_cnn` and `candidate_c_continuity`). These are 4 of the 22 metrics recorded in the Phase-1 long table (`unified_primary_per_sample_long.csv`); all 22, for every selected sample and `full_selected_story` method, are recorded in `selected_sample_method_values.csv` regardless of whether they drove selection.
 
-Raw `.npy` array auditing (idx/dataIN/dataGT/dataSR existence, shape, alignment, finiteness) was **not** performed in this run, because `data_out/` and `data_out_fixed/` are gitignored and absent from this lightweight checkout by design. `selection/raw_artifact_requirements.csv` enumerates the exact repository-relative paths, expected shapes, and resolution convention required to complete this audit on a machine where those directories are present.
+## 9. Raw-artifact requirements and validation
 
-## 9. Preview inventory
+Topology CSVs (plain text, git-tracked) were read directly and cross-checked: the independently recomputed PD/MT method means from the raw `*_pd_mt_distances.csv` / `phase_c_results.csv` sources match both the Phase-1 long table and Phase-1 `unified_primary_topology_validation.csv` within tolerance for every topology-bearing `full_selected_story` method (see `selection_validation.csv`). `selection/raw_artifact_requirements.csv` enumerates the exact repository-relative paths, expected shapes, and resolution convention for every method's idx/dataIN/dataGT/dataSR array.
+
+Raw `.npy` array auditing (idx validation, full-168-row dataIN/dataGT/dataSR shape and finiteness, full-168-row dataIN/dataGT alignment against the canonical CNN arrays, and per-selected-sample speed_mae reproduction with no method exempted) was **not** performed in this run, because `data_out/` and `data_out_fixed/` are gitignored and absent from this lightweight checkout by design.
+
+## 10. Preview inventory
 
 **No preview PNGs were generated in this run.** `selection/preview_plan.csv` records what will be rendered (one combined speed+error review PNG per selected sample, plus one contact sheet), each currently `status=pending_raw_artifacts`.
 
-## 10. Figure plan for Phase 2D-B
+## 11. Figure plan for Phase 2D-B
 
-Phase 2D-A produces only review-only audit previews, never final publication figures. `selection/preview_method_manifest.csv` records the three method groups (`baseline_story`, `descriptor_tradeoff_story`, `full_selected_story`) that Phase 2D-B's final figures will draw from. Final rendering remains explicitly deferred to Phase 2D-B.
+Phase 2D-A produces only review-only audit previews, never final publication figures. `selection/preview_method_manifest.csv` records the three method groups (`baseline_story`, `descriptor_tradeoff_story`, `full_selected_story`) and `selection/figure_plan.csv` plans (does not render) the six Phase-2D-B figures, one per archetype, each `status=planned_not_rendered`. No automated TTK/ParaView rendering exists anywhere in this pipeline. Final figure production remains explicitly deferred to Phase 2D-B.
 
-## 11. Caveat: illustrative, not a population estimate
+## 12. Caveat: illustrative, not a population estimate
 
-The six selected samples are drawn from this fixed 168-sample benchmark using a fixed, designed set of 19 candidate methods. They are illustrative examples chosen to make specific, pre-registered archetypes concrete -- they are not a random sample, and no population-level or generalization claim should be inferred from any single selected field.
+The six selected samples are drawn from this fixed 168-sample benchmark using a fixed, designed set of 19 candidate methods. They are illustrative examples chosen to make specific, pre-registered archetypes concrete -- they are not a random sample, and no population-level or generalization claim should be inferred from any single selected field. These are review-only audit previews, not final publication figures; final figure production remains explicitly deferred to Phase 2D-B.
 
-## 12. Exact command to complete Phase 2D-A on Spark
+## 13. Exact command to complete Phase 2D-A on Spark
 
 ```
 python3 scripts/select_and_preview_unified_candidates_phase2d.py --full
@@ -111,7 +115,7 @@ python3 scripts/select_and_preview_unified_candidates_phase2d.py --full
 
 This reads the already-written `selection/archetype_selected_samples.csv` (unchanged from this run, since selection is purely CSV-driven and deterministic), performs the full raw-artifact audit against the real `data_out/`/`data_out_fixed/` arrays, and -- only if every audit check passes -- renders the review-only preview PNGs. `--render-previews` alone performs the same audit-and-render step without re-running selection, provided `selection/archetype_selected_samples.csv` already exists.
 
-## 13. Generated files
+## 14. Generated files
 
 Selection-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/`):
 - `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/archetype_score_table.csv`
@@ -124,6 +128,7 @@ Selection-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2d/sele
 - `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/preview_method_manifest.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/preview_plan.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/raw_artifact_requirements.csv`
+- `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/figure_plan.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/selection_validation.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/prior_phase_immutability_check.csv`
 - `docs/unified_candidate_analysis_phase2d.md` (this file)
