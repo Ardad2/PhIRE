@@ -1,0 +1,5 @@
+figure_id,archetype_id,sample_idx,method_id,display_label,pd_distance,mt_distance,psnruv,speed_mae,grad_mae,wpd_mae,source_field_path,source_gt_path,source_topology_path,zoom_y0,zoom_y1,zoom_x0,zoom_x1
+2,gan_pd_vs_cnn_mt_conflict,34,GT,Ground Truth,,,,,,,data_out_fixed/wind_mrhr_cnn/dataGT.npy,data_out_fixed/wind_mrhr_cnn/dataGT.npy,,,,,
+2,gan_pd_vs_cnn_mt_conflict,34,bicubic,Bicubic,,,33.84469294016152,0.7471490695243925,0.48039379326106596,293.26842680730687,(reconstructed_in_memory),data_out_fixed/wind_mrhr_cnn/dataGT.npy,,,,,
+2,gan_pd_vs_cnn_mt_conflict,34,cnn,CNN,37.356416104450325,6.323113918304443,33.07202844590628,0.8552781637068935,0.43822392624925327,347.54078346380805,data_out_fixed/wind_mrhr_cnn/dataSR.npy,data_out_fixed/wind_mrhr_cnn/dataGT.npy,ttk_runs_fixed/combined/phase_c_results.csv,,,,
+2,gan_pd_vs_cnn_mt_conflict,34,gan,GAN,28.907547601520903,19.445999145507812,31.370556204226762,1.0702193109602118,0.4598569887331148,479.98099986073925,data_out_fixed/wind_mrhr_gan/dataSR.npy,data_out_fixed/wind_mrhr_cnn/dataGT.npy,ttk_runs_fixed/combined/phase_c_results.csv,,,,
