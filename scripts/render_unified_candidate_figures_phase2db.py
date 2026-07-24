@@ -1921,7 +1921,15 @@ PNG_MIN_HEIGHT_PX = 300
 
 def inspect_png(path):
     """Opens the PNG and measures real width/height/dpi/size. Never assumes
-    success from the file merely existing."""
+    success from the file merely existing.
+
+    Restricted to formats=['PNG']: every panel this script writes is a real
+    PNG, so there is never a reason to let Pillow guess across its full
+    plugin registry. Image.open() without a `formats` filter lazily
+    registers and probes every installed image plugin on the first call in
+    a process; for corrupt or unrecognizable bytes this scan has been
+    observed to be slow in some environments. Restricting to PNG keeps
+    corrupt-file detection fast and deterministic everywhere."""
     p = Path(path)
     if not p.exists() or p.stat().st_size == 0:
         return dict(width_px='', height_px='', dpi_x='', dpi_y='',
@@ -1929,9 +1937,9 @@ def inspect_png(path):
                      validation_status='FAIL_missing_or_empty')
     from PIL import Image, UnidentifiedImageError
     try:
-        with Image.open(p) as img:
+        with Image.open(p, formats=['PNG']) as img:
             img.verify()
-        with Image.open(p) as img:
+        with Image.open(p, formats=['PNG']) as img:
             width_px, height_px = img.size
             dpi = img.info.get('dpi', (0, 0))
             dpi_x, dpi_y = (dpi[0], dpi[1]) if dpi and dpi[0] else (0, 0)
