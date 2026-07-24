@@ -327,7 +327,31 @@ def nfmt(v):
     return '' if v is None else v
 
 
+def _rel_posix(path: Path, base_dir) -> str:
+    return Path(path).resolve().relative_to(Path(base_dir).resolve()).as_posix()
+
+
+def _require_no_absolute_csv_paths(path: Path, fieldnames: list, rows: list) -> None:
+    """Every path written to a Phase-2D CSV must be repository-relative POSIX
+    text; absolute paths may appear only in console diagnostics, never in a
+    generated scientific artifact. Applies to every field whose name
+    contains 'path' (case-insensitive) -- e.g. `path`, `output_path`,
+    `expected_repo_relative_path`, `topology_csv_path`, `source_file`."""
+    path_like_fields = [f for f in fieldnames if 'path' in f.lower()]
+    if not path_like_fields:
+        return
+    for row in rows:
+        for f in path_like_fields:
+            v = row.get(f, '')
+            if isinstance(v, str) and v.startswith('/'):
+                raise SystemExit(
+                    f'[hard-fail] Absolute path found in generated CSV field {f!r} of {path}: {v!r}. '
+                    f'All generated-artifact path fields must be repository-relative POSIX text.'
+                )
+
+
 def write_csv(path: Path, fieldnames: list, rows: list) -> None:
+    _require_no_absolute_csv_paths(path, fieldnames, rows)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open('w', newline='') as fh:
         w = csv.DictWriter(fh, fieldnames=fieldnames)
@@ -1177,6 +1201,48 @@ def build_raw_artifact_requirements_rows(method_inventory):
     return rows
 
 
+# One planned Phase-2D-B figure per archetype, mapped to whichever existing
+# method group (baseline_story / descriptor_tradeoff_story / full_selected_story)
+# actually contains that archetype's primary methods. Planning only -- no
+# automated TTK/ParaView rendering exists anywhere in this pipeline.
+FIGURE_METHOD_GROUP_BY_ARCHETYPE = {
+    'global_descriptor_disagreement': 'full_selected_story',
+    'gan_pd_vs_cnn_mt_conflict': 'baseline_story',
+    'f3_pd_vs_uv_e2_mt_tradeoff': 'descriptor_tradeoff_story',
+    'f2_balanced_vs_cnn': 'descriptor_tradeoff_story',
+    'candidate_c_continuity': 'baseline_story',
+    'global_descriptor_agreement': 'full_selected_story',
+}
+METHOD_GROUPS_BY_NAME = {
+    'baseline_story': BASELINE_STORY,
+    'descriptor_tradeoff_story': DESCRIPTOR_TRADEOFF_STORY,
+    'full_selected_story': FULL_SELECTED_STORY,
+}
+assert set(FIGURE_METHOD_GROUP_BY_ARCHETYPE) == set(ARCHETYPE_PRIORITY)
+
+
+def build_figure_plan_rows(selected_sample_idx_by_archetype, results):
+    """Plans (does not render) the six Phase-2D-B figures, one per
+    archetype. Rendering itself is out of scope for Phase 2D-A and is never
+    claimed here."""
+    rows = []
+    for i, archetype_id in enumerate(ARCHETYPE_PRIORITY, start=1):
+        si = selected_sample_idx_by_archetype[archetype_id]
+        r = results[archetype_id]
+        group_name = FIGURE_METHOD_GROUP_BY_ARCHETYPE[archetype_id]
+        methods = METHOD_GROUPS_BY_NAME[group_name]
+        rows.append(dict(
+            figure_id=i, figure_title=f'Phase 2D-B figure {i}: {r["narrative_scope"]}',
+            archetype_id=archetype_id, selected_sample_idx=si, method_group=group_name,
+            methods_included='GT,' + ','.join(methods), narrative_scope=r['narrative_scope'],
+            status='planned_not_rendered',
+            rendering_note='Figure planning only -- no automated TTK/ParaView rendering exists in this '
+                             'pipeline; final publication-quality figure production is manual and explicitly '
+                             'deferred to Phase 2D-B.',
+        ))
+    return rows
+
+
 def run_selection(long_table, metric_direction, phase1_refs, phase2a_refs, phase2b_refs, phase2c_refs,
                     immutability_ledgers, topology_source_map, method_inventory):
     per_sample = long_table['per_sample']
@@ -1267,6 +1333,11 @@ def run_selection(long_table, metric_direction, phase1_refs, phase2a_refs, phase
     write_csv(SELECTION_DIR / 'raw_artifact_requirements.csv',
                ['method_id', 'original_method_name', 'array_role', 'expected_repo_relative_path',
                 'expected_shape', 'expected_dtype', 'resolution_convention', 'notes'], raw_req_rows)
+
+    figure_plan_rows = build_figure_plan_rows(selected_sample_idx_by_archetype, results)
+    write_csv(SELECTION_DIR / 'figure_plan.csv',
+               ['figure_id', 'figure_title', 'archetype_id', 'selected_sample_idx', 'method_group',
+                'methods_included', 'narrative_scope', 'status', 'rendering_note'], figure_plan_rows)
 
     all_validation_rows = base_checks + extra_checks
     write_csv(SELECTION_DIR / 'selection_validation.csv',
@@ -1375,37 +1446,100 @@ def _idx_position_map(idx_array: np.ndarray) -> dict:
     return {int(v): i for i, v in enumerate(np.asarray(idx_array).ravel())}
 
 
+def validate_idx_array(idx_arr: np.ndarray, mid: str):
+    """Exact hard-fail idx-array gate. Never uses set equality (which would
+    silently accept a reordered/permuted idx array as if it were sorted).
+    Returns (status, detail) where status is 'PASS' or 'FAIL' and detail is
+    a human-readable explanation (empty on PASS)."""
+    if tuple(idx_arr.shape) != (N_EVAL,):
+        return 'FAIL', f'{mid}: idx.npy shape {tuple(idx_arr.shape)} != expected ({N_EVAL},)'
+    if not np.issubdtype(idx_arr.dtype, np.integer):
+        return 'FAIL', f'{mid}: idx.npy dtype {idx_arr.dtype} is not an integer dtype'
+    if not np.array_equal(idx_arr, np.arange(N_EVAL, dtype=idx_arr.dtype)):
+        return 'FAIL', (f'{mid}: idx.npy is not exactly [0, 1, ..., {N_EVAL - 1}] in order '
+                          f'(a permutation, duplicate, or missing index was detected)')
+    return 'PASS', ''
+
+
+# Bounded-memory chunk size (rows) for full-168-row raw-array audits.
+CHUNK_SIZE = 16
+
+
+def _chunk_ranges(n: int, chunk_size: int = CHUNK_SIZE):
+    for start in range(0, n, chunk_size):
+        yield start, min(start + chunk_size, n)
+
+
+def _full_array_shape_finite_aligned(arr_mmap, expected_shape, canonical_mmap=None, chunk_size=CHUNK_SIZE):
+    """Validates an ENTIRE memory-mapped raw array (all N_EVAL rows, never
+    only a selected subset) in bounded-memory chunks: exact shape, all-rows
+    finiteness, and (when canonical_mmap is given) exact row-for-row equality
+    against the canonical CNN array. Returns (shape_ok, finite_ok,
+    aligned_ok), where aligned_ok is None iff canonical_mmap is None (no
+    alignment check requested, e.g. dataSR, which differs per method by
+    design)."""
+    shape_ok = tuple(arr_mmap.shape) == expected_shape
+    if not shape_ok:
+        return False, False, (None if canonical_mmap is None else False)
+    finite_ok = True
+    aligned_ok = None if canonical_mmap is None else True
+    for start, end in _chunk_ranges(arr_mmap.shape[0], chunk_size):
+        chunk = np.asarray(arr_mmap[start:end])
+        if not np.isfinite(chunk).all():
+            finite_ok = False
+        if canonical_mmap is not None:
+            canon_chunk = np.asarray(canonical_mmap[start:end])
+            if not np.array_equal(chunk, canon_chunk):
+                aligned_ok = False
+    return shape_ok, finite_ok, aligned_ok
+
+
+RAW_ALIGNMENT_FIELDS = [
+    'method_id', 'idx_validation_status', 'dataIN_shape_status', 'dataIN_finiteness_status',
+    'input_alignment_status', 'dataGT_shape_status', 'dataGT_finiteness_status', 'gt_alignment_status',
+    'dataSR_shape_status', 'dataSR_finiteness_status', 'overall_status',
+]
+
+
 # =============================================================================
-# Raw-artifact audit (--render-previews / --full only). Uses NumPy memory
-# mapping and loads only the selected samples' rows into memory wherever
-# possible.
+# Raw-artifact audit (--render-previews / --full only). Validates the FULL
+# N_EVAL-row array for every method (idx ordering, shape, finiteness, and --
+# for dataIN/dataGT -- exact alignment against the canonical CNN arrays)
+# using bounded-memory chunked reads over NumPy memory maps, so corruption in
+# any row (selected or not) is caught. Only after a method's full-array
+# audit passes are its selected-sample rows extracted into memory for
+# per-sample statistics, metric reproduction, and preview rendering.
 # =============================================================================
 
-def audit_raw_artifacts(paths_by_method, selected_sample_idxs, per_sample):
+def audit_raw_artifacts(paths_by_method, selected_sample_idxs, per_sample, base_dir=None):
+    base_dir = base_dir or REPO_ROOT
     inventory_rows = []
     alignment_rows = []
     stats_rows = []
     repro_rows = []
     failures = []
-    selected_data = {}  # method_id -> dict(gt=array, sr=array, idx_positions=list)
+    selected_data = {}  # method_id -> dict(gt=array, sr=array)
 
     def add_fail(msg):
         failures.append(msg)
 
     canonical = paths_by_method[CNN_METHOD]
     canonical_idx = np.load(canonical['idx'])
+    canonical_idx_status, canonical_idx_detail = validate_idx_array(canonical_idx, CNN_METHOD)
+    if canonical_idx_status != 'PASS':
+        # Malformed canonical data must produce a controlled SystemExit here,
+        # not a KeyError further down when every other method's selected-row
+        # positions are resolved against this array.
+        raise SystemExit(f'[hard-fail] Canonical CNN idx.npy failed validation: {canonical_idx_detail}')
     canonical_pos = _idx_position_map(canonical_idx)
     canonical_in = np.load(canonical['dataIN'], mmap_mode='r')
     canonical_gt = np.load(canonical['dataGT'], mmap_mode='r')
-    canonical_positions = [canonical_pos[si] for si in selected_sample_idxs]
-    canonical_in_sel = np.asarray(canonical_in[canonical_positions])
-    canonical_gt_sel = np.asarray(canonical_gt[canonical_positions])
 
     for mid, p in paths_by_method.items():
         for role in ('idx', 'dataIN', 'dataGT', 'dataSR'):
             path = p[role]
             if path is None:
-                inventory_rows.append(dict(method_id=mid, array_role=role, path='(reconstructed in memory)',
+                inventory_rows.append(dict(method_id=mid, array_role=role, path='(reconstructed_in_memory)',
                                               exists=True, shape='', dtype='', size_bytes=''))
                 continue
             exists = path.exists()
@@ -1415,97 +1549,118 @@ def audit_raw_artifacts(paths_by_method, selected_sample_idxs, per_sample):
                 shape = str(arr.shape)
                 dtype = str(arr.dtype)
                 size_bytes = path.stat().st_size
-            inventory_rows.append(dict(method_id=mid, array_role=role, path=str(path), exists=exists,
-                                          shape=shape, dtype=dtype, size_bytes=size_bytes))
+            inventory_rows.append(dict(method_id=mid, array_role=role, path=_rel_posix(path, base_dir),
+                                          exists=exists, shape=shape, dtype=dtype, size_bytes=size_bytes))
 
         idx_arr = np.load(p['idx'])
-        idx_exact = set(int(v) for v in idx_arr.ravel()) == set(range(N_EVAL)) and idx_arr.size == N_EVAL
-        pos_map = _idx_position_map(idx_arr)
-        positions = None
-        if all(si in pos_map for si in selected_sample_idxs):
-            positions = [pos_map[si] for si in selected_sample_idxs]
+        idx_status, idx_detail = validate_idx_array(idx_arr, mid)
+        if idx_status != 'PASS':
+            add_fail(idx_detail)
 
         data_in = np.load(p['dataIN'], mmap_mode='r')
         data_gt = np.load(p['dataGT'], mmap_mode='r')
-        in_shape_ok = tuple(data_in.shape) == EXPECTED_IN_SHAPE
-        gt_shape_ok = tuple(data_gt.shape) == EXPECTED_HR_SHAPE
 
-        if positions is None:
-            add_fail(f'{mid}: one or more selected sample indices not present in idx.npy')
-            sr_shape_ok = False
-            sr_sel = None
+        in_shape_ok, in_finite_ok, in_aligned_ok = _full_array_shape_finite_aligned(
+            data_in, EXPECTED_IN_SHAPE, canonical_mmap=(None if mid == CNN_METHOD else canonical_in))
+        gt_shape_ok, gt_finite_ok, gt_aligned_ok = _full_array_shape_finite_aligned(
+            data_gt, EXPECTED_HR_SHAPE, canonical_mmap=(None if mid == CNN_METHOD else canonical_gt))
+
+        if not in_shape_ok:
+            add_fail(f'{mid}: dataIN shape {tuple(data_in.shape)} != expected {EXPECTED_IN_SHAPE} '
+                       f'(checked over all {N_EVAL} rows)')
+        if not in_finite_ok:
+            add_fail(f'{mid}: dataIN contains non-finite value(s) somewhere in the full {N_EVAL}-row array')
+        if in_aligned_ok is False:
+            add_fail(f'{mid}: dataIN does not exactly match canonical CNN dataIN over the full {N_EVAL}-row array')
+        if not gt_shape_ok:
+            add_fail(f'{mid}: dataGT shape {tuple(data_gt.shape)} != expected {EXPECTED_HR_SHAPE} '
+                       f'(checked over all {N_EVAL} rows)')
+        if not gt_finite_ok:
+            add_fail(f'{mid}: dataGT contains non-finite value(s) somewhere in the full {N_EVAL}-row array')
+        if gt_aligned_ok is False:
+            add_fail(f'{mid}: dataGT does not exactly match canonical CNN dataGT over the full {N_EVAL}-row array')
+
+        if p['reconstructed']:
+            # Bicubic has no saved on-disk dataSR: only the selected fields are
+            # ever reconstructed in memory (never all 168 rows), so a full-array
+            # audit does not apply.
+            sr_shape_status = sr_finite_status = 'N/A'
         else:
-            in_sel = np.asarray(data_in[positions])
-            gt_sel = np.asarray(data_gt[positions])
-            input_aligned = bool(np.array_equal(in_sel, canonical_in_sel))
-            gt_aligned = bool(np.array_equal(gt_sel, canonical_gt_sel))
-
-            if p['reconstructed']:
-                sr_sel = bicubic_reconstruct_selected(in_sel)
-            else:
-                data_sr = np.load(p['dataSR'], mmap_mode='r')
-                sr_shape_full_ok = tuple(data_sr.shape) == EXPECTED_HR_SHAPE
-                if not sr_shape_full_ok:
-                    add_fail(f'{mid}: dataSR shape {data_sr.shape} != expected {EXPECTED_HR_SHAPE}')
-                sr_sel = np.asarray(data_sr[positions])
-            sr_shape_ok = tuple(sr_sel.shape) == (len(selected_sample_idxs),) + EXPECTED_HR_SHAPE[1:]
-
-            gt_finite = bool(np.isfinite(gt_sel).all())
-            sr_finite = bool(np.isfinite(sr_sel).all())
-            if not gt_finite:
-                add_fail(f'{mid}: selected-sample dataGT contains non-finite values')
-            if not sr_finite:
-                add_fail(f'{mid}: selected-sample dataSR contains non-finite values')
-            if not in_shape_ok:
-                add_fail(f'{mid}: dataIN shape {data_in.shape} != expected {EXPECTED_IN_SHAPE}')
-            if not gt_shape_ok:
-                add_fail(f'{mid}: dataGT shape {data_gt.shape} != expected {EXPECTED_HR_SHAPE}')
+            data_sr = np.load(p['dataSR'], mmap_mode='r')
+            sr_shape_ok, sr_finite_ok, _ = _full_array_shape_finite_aligned(data_sr, EXPECTED_HR_SHAPE)
             if not sr_shape_ok:
-                add_fail(f'{mid}: reconstructed/loaded dataSR selected-sample shape mismatch')
-            if mid != CNN_METHOD and not input_aligned:
-                add_fail(f'{mid}: dataIN selected-sample values do not exactly match canonical CNN dataIN')
-            if mid != CNN_METHOD and not gt_aligned:
-                add_fail(f'{mid}: dataGT selected-sample values do not exactly match canonical CNN dataGT')
+                add_fail(f'{mid}: dataSR shape {tuple(data_sr.shape)} != expected {EXPECTED_HR_SHAPE} '
+                           f'(checked over all {N_EVAL} rows)')
+            if not sr_finite_ok:
+                add_fail(f'{mid}: dataSR contains non-finite value(s) somewhere in the full {N_EVAL}-row array')
+            sr_shape_status = 'PASS' if sr_shape_ok else 'FAIL'
+            sr_finite_status = 'PASS' if sr_finite_ok else 'FAIL'
 
-            alignment_rows.append(dict(
-                method_id=mid, idx_exact_0_167=idx_exact,
-                input_alignment_status=('exact' if (mid == CNN_METHOD or input_aligned) else 'MISMATCH'),
-                gt_alignment_status=('exact' if (mid == CNN_METHOD or gt_aligned) else 'MISMATCH'),
-                dataIN_shape_status=('exact' if in_shape_ok else 'MISMATCH'),
-                dataGT_shape_status=('exact' if gt_shape_ok else 'MISMATCH'),
-                dataSR_shape_status=('exact' if sr_shape_ok else 'MISMATCH'),
-                dataGT_finite=gt_finite, dataSR_finite=sr_finite,
+        in_alignment_status = 'PASS' if (mid == CNN_METHOD or in_aligned_ok) else 'FAIL'
+        gt_alignment_status = 'PASS' if (mid == CNN_METHOD or gt_aligned_ok) else 'FAIL'
+        status_fields = [
+            idx_status, ('PASS' if in_shape_ok else 'FAIL'), ('PASS' if in_finite_ok else 'FAIL'),
+            in_alignment_status, ('PASS' if gt_shape_ok else 'FAIL'), ('PASS' if gt_finite_ok else 'FAIL'),
+            gt_alignment_status, sr_shape_status, sr_finite_status,
+        ]
+        overall_status = 'PASS' if all(s in ('PASS', 'N/A') for s in status_fields) else 'FAIL'
+
+        alignment_rows.append(dict(
+            method_id=mid, idx_validation_status=idx_status,
+            dataIN_shape_status=('PASS' if in_shape_ok else 'FAIL'),
+            dataIN_finiteness_status=('PASS' if in_finite_ok else 'FAIL'),
+            input_alignment_status=in_alignment_status,
+            dataGT_shape_status=('PASS' if gt_shape_ok else 'FAIL'),
+            dataGT_finiteness_status=('PASS' if gt_finite_ok else 'FAIL'),
+            gt_alignment_status=gt_alignment_status,
+            dataSR_shape_status=sr_shape_status, dataSR_finiteness_status=sr_finite_status,
+            overall_status=overall_status,
+        ))
+
+        if overall_status != 'PASS':
+            # The full-array audit already failed for this method (recorded
+            # above); skip selected-row extraction rather than risk operating
+            # on malformed, misaligned, or non-finite data.
+            continue
+
+        pos_map = canonical_pos if mid == CNN_METHOD else _idx_position_map(idx_arr)
+        positions = [pos_map[si] for si in selected_sample_idxs]
+        in_sel = np.asarray(data_in[positions])
+        gt_sel = np.asarray(data_gt[positions])
+
+        if p['reconstructed']:
+            sr_sel = bicubic_reconstruct_selected(in_sel)
+        else:
+            data_sr = np.load(p['dataSR'], mmap_mode='r')
+            sr_sel = np.asarray(data_sr[positions])
+
+        for i, si in enumerate(selected_sample_idxs):
+            speed_gt = speed_from_uv(gt_sel[i])
+            speed_sr = speed_from_uv(sr_sel[i])
+            stats_rows.append(dict(
+                method_id=mid, sample_idx=si,
+                gt_speed_min=float(speed_gt.min()), gt_speed_max=float(speed_gt.max()),
+                gt_speed_mean=float(speed_gt.mean()),
+                sr_speed_min=float(speed_sr.min()), sr_speed_max=float(speed_sr.max()),
+                sr_speed_mean=float(speed_sr.mean()),
             ))
+            recomputed_speed_mae = float(np.mean(np.abs(speed_sr - speed_gt)))
+            lt_speed_mae = per_sample.get(mid, {}).get(si, {}).get('speed_mae', float('nan'))
+            diff = abs(recomputed_speed_mae - lt_speed_mae) if math.isfinite(lt_speed_mae) else float('nan')
+            within_tol = math.isfinite(diff) and diff <= 1e-3
+            repro_rows.append(dict(
+                method_id=mid, sample_idx=si, recomputed_speed_mae=recomputed_speed_mae,
+                long_table_speed_mae=nfmt(lt_speed_mae if math.isfinite(lt_speed_mae) else None),
+                abs_diff=nfmt(diff if math.isfinite(diff) else None), within_tolerance=within_tol,
+            ))
+            # No method (including bicubic) is exempt: whenever the Phase-1
+            # long-table speed_mae is finite, the in-memory recomputation must
+            # match it within tolerance.
+            if math.isfinite(lt_speed_mae) and not within_tol:
+                add_fail(f'{mid} sample={si}: recomputed speed_mae {recomputed_speed_mae:.6f} does not '
+                          f'match long-table value {lt_speed_mae!r} within tolerance')
 
-            if not (gt_shape_ok and sr_shape_ok):
-                # Shapes are already malformed; skip per-sample stats/reproduction rather than
-                # risk crashing on a broadcast mismatch. The shape failure is already recorded.
-                continue
-
-            for i, si in enumerate(selected_sample_idxs):
-                speed_gt = speed_from_uv(gt_sel[i])
-                speed_sr = speed_from_uv(sr_sel[i])
-                stats_rows.append(dict(
-                    method_id=mid, sample_idx=si,
-                    gt_speed_min=float(speed_gt.min()), gt_speed_max=float(speed_gt.max()),
-                    gt_speed_mean=float(speed_gt.mean()),
-                    sr_speed_min=float(speed_sr.min()), sr_speed_max=float(speed_sr.max()),
-                    sr_speed_mean=float(speed_sr.mean()),
-                ))
-                recomputed_speed_mae = float(np.mean(np.abs(speed_sr - speed_gt)))
-                lt_speed_mae = per_sample.get(mid, {}).get(si, {}).get('speed_mae', float('nan'))
-                diff = abs(recomputed_speed_mae - lt_speed_mae) if math.isfinite(lt_speed_mae) else float('nan')
-                within_tol = math.isfinite(diff) and diff <= 1e-3
-                repro_rows.append(dict(
-                    method_id=mid, sample_idx=si, recomputed_speed_mae=recomputed_speed_mae,
-                    long_table_speed_mae=nfmt(lt_speed_mae if math.isfinite(lt_speed_mae) else None),
-                    abs_diff=nfmt(diff if math.isfinite(diff) else None), within_tolerance=within_tol,
-                ))
-                if mid != BICUBIC_METHOD and not within_tol:
-                    add_fail(f'{mid} sample={si}: recomputed speed_mae {recomputed_speed_mae:.6f} does not '
-                              f'match long-table value {lt_speed_mae!r} within tolerance')
-
-            selected_data[mid] = dict(gt=gt_sel, sr=sr_sel)
+        selected_data[mid] = dict(gt=gt_sel, sr=sr_sel)
 
     return dict(
         inventory_rows=inventory_rows, alignment_rows=alignment_rows, stats_rows=stats_rows,
@@ -1517,6 +1672,34 @@ def audit_raw_artifacts(paths_by_method, selected_sample_idxs, per_sample):
 # Review-only preview rendering (--render-previews / --full only). Never
 # writes placeholder/blank images; only called after the raw audit passes.
 # =============================================================================
+
+# Meaningful panel count for the detailed per-sample review preview:
+# GT speed + 7 method speed panels + 7 method error panels = 15. The figure
+# actually allocates 16 axes (2 rows x 8 cols); the bottom-left axis under
+# GT is intentionally blank (there is no "GT error" panel) and is turned
+# off. preview_plan.csv and preview_render_validation.csv both report the
+# same 15-meaningful-panel convention.
+DETAILED_PREVIEW_PANEL_COUNT = 1 + len(FULL_SELECTED_STORY) + len(FULL_SELECTED_STORY)
+
+
+def compute_preview_panel_data(gt_uv, sr_uv_by_method):
+    """Pure (no matplotlib) computation shared by the per-sample review
+    preview and each contact-sheet row. The shared speed vmin/vmax are
+    derived from GT + every displayed method's SR speed field (not GT
+    alone), and that single (vmin, vmax) pair is the one applied to every
+    speed panel -- GT and all seven methods alike. The shared error vmax is
+    likewise one value (0..max) applied to every error panel."""
+    gt_speed = speed_from_uv(gt_uv)
+    method_speeds = {mid: speed_from_uv(uv) for mid, uv in sr_uv_by_method.items()}
+    all_speed_arrays = [gt_speed] + list(method_speeds.values())
+    speed_vmin = float(min(float(a.min()) for a in all_speed_arrays))
+    speed_vmax = float(max(float(a.max()) for a in all_speed_arrays))
+    errors = {mid: np.abs(method_speeds[mid] - gt_speed) for mid in method_speeds}
+    error_vmin = 0.0
+    error_vmax = float(max(float(e.max()) for e in errors.values())) if errors else 0.0
+    return dict(gt_speed=gt_speed, method_speeds=method_speeds, speed_vmin=speed_vmin, speed_vmax=speed_vmax,
+                errors=errors, error_vmin=error_vmin, error_vmax=error_vmax)
+
 
 def render_selected_previews(selected_data, selected_sample_idx_by_archetype, per_sample):
     import matplotlib
@@ -1538,15 +1721,13 @@ def render_selected_previews(selected_data, selected_sample_idx_by_archetype, pe
         pos = ordered_selected.index(si)
 
         gt_uv = selected_data[CNN_METHOD]['gt'][pos]
-        gt_speed = speed_from_uv(gt_uv)
-        method_speeds = {}
-        for mid in panel_methods:
-            sr_uv = selected_data[mid]['sr'][pos]
-            method_speeds[mid] = speed_from_uv(sr_uv)
-
-        vmin, vmax = float(gt_speed.min()), float(gt_speed.max())
-        errors = {mid: np.abs(method_speeds[mid] - gt_speed) for mid in panel_methods}
-        err_max = max(float(e.max()) for e in errors.values())
+        sr_uv_by_method = {mid: selected_data[mid]['sr'][pos] for mid in panel_methods}
+        panel = compute_preview_panel_data(gt_uv, sr_uv_by_method)
+        gt_speed = panel['gt_speed']
+        method_speeds = panel['method_speeds']
+        errors = panel['errors']
+        vmin, vmax = panel['speed_vmin'], panel['speed_vmax']
+        err_max = panel['error_vmax']
 
         n_cols = 1 + len(panel_methods)
         fig, axes = plt.subplots(2, n_cols, figsize=(2.4 * n_cols, 5.2), dpi=150)
@@ -1558,7 +1739,7 @@ def render_selected_previews(selected_data, selected_sample_idx_by_archetype, pe
         ax.set_title('GT', fontsize=8)
         ax.set_xticks([])
         ax.set_yticks([])
-        axes[1, 0].axis('off')
+        axes[1, 0].axis('off')  # no "GT error" panel; the 16th axis is intentionally blank
 
         for j, mid in enumerate(panel_methods, start=1):
             ax = axes[0, j]
@@ -1584,8 +1765,8 @@ def render_selected_previews(selected_data, selected_sample_idx_by_archetype, pe
         plt.close(fig)
         render_rows.append(dict(
             archetype_id=archetype_id, sample_idx=si, output_path=str(out_path.relative_to(REPO_ROOT)),
-            panel_count=n_cols * 2, shared_speed_vmin=vmin, shared_speed_vmax=vmax,
-            shared_error_vmin=0.0, shared_error_vmax=err_max, status='rendered',
+            panel_count=DETAILED_PREVIEW_PANEL_COUNT, shared_speed_vmin=vmin, shared_speed_vmax=vmax,
+            shared_error_vmin=panel['error_vmin'], shared_error_vmax=err_max, status='rendered',
         ))
         log(f'[write] {out_path}')
 
@@ -1599,16 +1780,17 @@ def render_selected_previews(selected_data, selected_sample_idx_by_archetype, pe
         si = selected_sample_idx_by_archetype[archetype_id]
         pos = ordered_selected.index(si)
         gt_uv = selected_data[CNN_METHOD]['gt'][pos]
-        gt_speed = speed_from_uv(gt_uv)
-        vmin, vmax = float(gt_speed.min()), float(gt_speed.max())
-        axes[r, 0].imshow(gt_speed, cmap='viridis', vmin=vmin, vmax=vmax, origin='lower', aspect='equal')
+        sr_uv_by_method = {mid: selected_data[mid]['sr'][pos] for mid in panel_methods}
+        # Same common-speed-limit rule applied per row: GT + all 7 method SR fields.
+        panel = compute_preview_panel_data(gt_uv, sr_uv_by_method)
+        vmin, vmax = panel['speed_vmin'], panel['speed_vmax']
+        axes[r, 0].imshow(panel['gt_speed'], cmap='viridis', vmin=vmin, vmax=vmax, origin='lower', aspect='equal')
         axes[r, 0].set_ylabel(f'{archetype_id}\nidx={si}', fontsize=6)
         axes[r, 0].set_xticks([])
         axes[r, 0].set_yticks([])
         for c, mid in enumerate(panel_methods, start=1):
-            sr_uv = selected_data[mid]['sr'][pos]
-            speed = speed_from_uv(sr_uv)
-            axes[r, c].imshow(speed, cmap='viridis', vmin=vmin, vmax=vmax, origin='lower', aspect='equal')
+            axes[r, c].imshow(panel['method_speeds'][mid], cmap='viridis', vmin=vmin, vmax=vmax,
+                                origin='lower', aspect='equal')
             axes[r, c].set_xticks([])
             axes[r, c].set_yticks([])
             if r == 0:
@@ -1626,7 +1808,75 @@ def render_selected_previews(selected_data, selected_sample_idx_by_archetype, pe
     return render_rows
 
 
-def run_render(selected_sample_idx_by_archetype, per_sample, method_inventory):
+ARTIFACT_MANIFEST_FIELDS = [
+    'archetype_id', 'sample_idx', 'method_id', 'original_method_name', 'array_role',
+    'source_array_directory', 'source_file', 'sample_position', 'shape', 'dtype', 'finite_status',
+    'input_alignment_status', 'gt_alignment_status', 'topology_csv_path', 'topology_pd_column',
+    'topology_mt_column', 'topology_row_found_status',
+]
+
+
+def build_artifact_manifest_rows(audit, selected_sample_idx_by_archetype, ordered_selected, method_inventory,
+                                    topology_source_map, paths_by_method, base_dir=None):
+    """One row per selected sample x full_selected_story method, plus one GT
+    row per selected sample. Produced only after the Spark raw audit has
+    passed (audit['selected_data'] is populated for every method at that
+    point). All paths are repository-relative POSIX text."""
+    base_dir = base_dir or REPO_ROOT
+    archetype_by_sample = {si: a for a, si in selected_sample_idx_by_archetype.items()}
+    alignment_by_method = {r['method_id']: r for r in audit['alignment_rows']}
+    topo_rows_by_method = {mid: read_topology_pd_mt_for_method(mid, topology_source_map)
+                             for mid in topology_source_map}
+    rows = []
+    for pos, si in enumerate(ordered_selected):
+        archetype_id = archetype_by_sample.get(si, '')
+
+        gt_field = audit['selected_data'][CNN_METHOD]['gt'][pos]
+        cnn_dir = paths_by_method[CNN_METHOD]['dir']
+        rows.append(dict(
+            archetype_id=archetype_id, sample_idx=si, method_id='GT', original_method_name='ground_truth',
+            array_role='dataGT', source_array_directory=_rel_posix(cnn_dir, base_dir), source_file='dataGT.npy',
+            sample_position=si, shape=str(tuple(gt_field.shape)), dtype=str(gt_field.dtype),
+            finite_status=('PASS' if np.isfinite(gt_field).all() else 'FAIL'),
+            input_alignment_status='N/A', gt_alignment_status='PASS',
+            topology_csv_path='', topology_pd_column='', topology_mt_column='',
+            topology_row_found_status='not_applicable',
+        ))
+
+        for mid in FULL_SELECTED_STORY:
+            inv = method_inventory.get(mid, {})
+            original = inv.get('original_method_name', mid)
+            p = paths_by_method[mid]
+            sr_field = audit['selected_data'][mid]['sr'][pos]
+            align = alignment_by_method.get(mid, {})
+            if mid == BICUBIC_METHOD:
+                source_dir, source_file = '(reconstructed_in_memory)', '(reconstructed_in_memory)'
+            else:
+                source_dir, source_file = _rel_posix(p['dir'], base_dir), 'dataSR.npy'
+            if mid in topology_source_map:
+                entry = topology_source_map[mid]
+                # Topology CSVs are always real, git-tracked provenance files
+                # rooted at REPO_ROOT, independent of `base_dir` (which may
+                # point at a synthetic array tree in tests).
+                topo_path = _rel_posix(entry['path'], REPO_ROOT)
+                found = 'found' if si in topo_rows_by_method[mid] else 'missing'
+                pd_col, mt_col = entry['pd_column'], entry['mt_column']
+            else:
+                topo_path, pd_col, mt_col, found = '', '', '', 'not_applicable'
+            rows.append(dict(
+                archetype_id=archetype_id, sample_idx=si, method_id=mid, original_method_name=original,
+                array_role='dataSR', source_array_directory=source_dir, source_file=source_file,
+                sample_position=si, shape=str(tuple(sr_field.shape)), dtype=str(sr_field.dtype),
+                finite_status=('PASS' if np.isfinite(sr_field).all() else 'FAIL'),
+                input_alignment_status=align.get('input_alignment_status', ''),
+                gt_alignment_status=align.get('gt_alignment_status', ''),
+                topology_csv_path=topo_path, topology_pd_column=pd_col, topology_mt_column=mt_col,
+                topology_row_found_status=found,
+            ))
+    return rows
+
+
+def run_render(selected_sample_idx_by_archetype, per_sample, method_inventory, topology_source_map):
     paths_by_method = resolve_raw_paths(method_inventory)
     require_raw_artifacts_exist(paths_by_method)
 
@@ -1636,10 +1886,7 @@ def run_render(selected_sample_idx_by_archetype, per_sample, method_inventory):
     write_csv(PREVIEW_AUDIT_DIR / 'raw_artifact_inventory.csv',
                ['method_id', 'array_role', 'path', 'exists', 'shape', 'dtype', 'size_bytes'],
                audit['inventory_rows'])
-    write_csv(PREVIEW_AUDIT_DIR / 'raw_alignment_validation.csv',
-               ['method_id', 'idx_exact_0_167', 'input_alignment_status', 'gt_alignment_status',
-                'dataIN_shape_status', 'dataGT_shape_status', 'dataSR_shape_status', 'dataGT_finite',
-                'dataSR_finite'], audit['alignment_rows'])
+    write_csv(PREVIEW_AUDIT_DIR / 'raw_alignment_validation.csv', RAW_ALIGNMENT_FIELDS, audit['alignment_rows'])
     write_csv(PREVIEW_AUDIT_DIR / 'selected_sample_array_statistics.csv',
                ['method_id', 'sample_idx', 'gt_speed_min', 'gt_speed_max', 'gt_speed_mean', 'sr_speed_min',
                 'sr_speed_max', 'sr_speed_mean'], audit['stats_rows'])
@@ -1651,6 +1898,7 @@ def run_render(selected_sample_idx_by_archetype, per_sample, method_inventory):
         write_csv(PREVIEW_AUDIT_DIR / 'preview_render_validation.csv',
                    ['archetype_id', 'sample_idx', 'output_path', 'panel_count', 'shared_speed_vmin',
                     'shared_speed_vmax', 'shared_error_vmin', 'shared_error_vmax', 'status'], [])
+        write_csv(PREVIEW_AUDIT_DIR / 'selected_sample_artifact_manifest.csv', ARTIFACT_MANIFEST_FIELDS, [])
         log('[RAW-ARTIFACT AUDIT FAILURE]')
         for f in audit['failures']:
             log(f'  - {f}')
@@ -1659,14 +1907,68 @@ def run_render(selected_sample_idx_by_archetype, per_sample, method_inventory):
     log(f'[audit] All raw-artifact checks PASSED for {len(paths_by_method)} methods x '
         f'{len(ordered_selected)} selected samples.')
 
+    manifest_rows = build_artifact_manifest_rows(audit, selected_sample_idx_by_archetype, ordered_selected,
+                                                    method_inventory, topology_source_map, paths_by_method)
+    write_csv(PREVIEW_AUDIT_DIR / 'selected_sample_artifact_manifest.csv', ARTIFACT_MANIFEST_FIELDS, manifest_rows)
+
     render_rows = render_selected_previews(audit['selected_data'], selected_sample_idx_by_archetype, per_sample)
     write_csv(PREVIEW_AUDIT_DIR / 'preview_render_validation.csv',
                ['archetype_id', 'sample_idx', 'output_path', 'panel_count', 'shared_speed_vmin',
                 'shared_speed_vmax', 'shared_error_vmin', 'shared_error_vmax', 'status'], render_rows)
-    return dict(audit=audit, render_rows=render_rows)
+    return dict(audit=audit, render_rows=render_rows, manifest_rows=manifest_rows)
 
 
 SPARK_COMMAND = 'python3 scripts/select_and_preview_unified_candidates_phase2d.py --full'
+
+
+def validate_selected_samples_manifest_rows(all_rows, path):
+    """Strong validation of archetype_selected_samples.csv before it is used
+    to drive --render-previews. Returns the list of errors found (empty if
+    valid). Never raises; the caller decides whether/how to hard-fail."""
+    errors = []
+    missing_cols = [f for f in ARCHETYPE_SELECTED_FIELDS if all_rows and f not in all_rows[0]]
+    if missing_cols:
+        return [f'missing required column(s): {missing_cols}']
+
+    primary_rows = [r for r in all_rows if r.get('primary_or_alternate') == 'primary']
+    if len(primary_rows) != 6:
+        errors.append(f'expected exactly 6 primary rows, found {len(primary_rows)}')
+
+    primary_ids_in_order = [r.get('archetype_id', '') for r in primary_rows]
+    if primary_ids_in_order != ARCHETYPE_PRIORITY:
+        errors.append(f'primary-row archetype_id order/identity mismatch: expected {ARCHETYPE_PRIORITY}, '
+                        f'got {primary_ids_in_order}')
+
+    seen_archetypes = set()
+    selected_idxs = []
+    for r in primary_rows:
+        aid = r.get('archetype_id', '(missing)')
+        if aid in seen_archetypes:
+            errors.append(f'{aid}: duplicate primary row for this archetype_id')
+        seen_archetypes.add(aid)
+
+        raw_idx = r.get('selected_sample_idx', '')
+        try:
+            si = int(str(raw_idx).strip())
+        except (TypeError, ValueError):
+            errors.append(f'{aid}: selected_sample_idx {raw_idx!r} is not an integer')
+        else:
+            if not (0 <= si <= N_EVAL - 1):
+                errors.append(f'{aid}: selected_sample_idx {si} is out of range [0, {N_EVAL - 1}]')
+            selected_idxs.append(si)
+
+        if r.get('primary_or_alternate') != 'primary':
+            errors.append(f'{aid}: primary_or_alternate != "primary" (got {r.get("primary_or_alternate")!r})')
+        if r.get('eligibility_status') != 'eligible':
+            errors.append(f'{aid}: eligibility_status != "eligible" (got {r.get("eligibility_status")!r})')
+        for f in ARCHETYPE_SELECTED_FIELDS:
+            if str(r.get(f, '')).strip() == '':
+                errors.append(f'{aid}: required field {f!r} is empty')
+
+    if len(set(selected_idxs)) != len(selected_idxs):
+        errors.append(f'selected_sample_idx values across the 6 primary rows are not all unique: {selected_idxs}')
+
+    return errors
 
 
 def read_selected_samples_manifest():
@@ -1677,11 +1979,15 @@ def read_selected_samples_manifest():
             f'manifest written by --selection-only (or by an earlier stage of --full) to already be present. '
             f'Run `python3 scripts/select_and_preview_unified_candidates_phase2d.py --selection-only` first.'
         )
-    rows = {r['archetype_id']: r for r in read_csv_dicts(path) if r['primary_or_alternate'] == 'primary'}
-    missing = [a for a in ARCHETYPE_PRIORITY if a not in rows]
-    if missing:
-        raise SystemExit(f'[hard-fail] Selection manifest {path} is missing primary rows for: {missing}')
-    return {a: int(rows[a]['selected_sample_idx']) for a in ARCHETYPE_PRIORITY}
+    all_rows = read_csv_dicts(path)
+    errors = validate_selected_samples_manifest_rows(all_rows, path)
+    if errors:
+        raise SystemExit(
+            f'[hard-fail] {path} failed manifest validation ({len(errors)} issue(s)) before use in '
+            f'--render-previews:\n' + '\n'.join(f'  - {e}' for e in errors)
+        )
+    primary_rows = {r['archetype_id']: r for r in all_rows if r['primary_or_alternate'] == 'primary'}
+    return {a: int(primary_rows[a]['selected_sample_idx']) for a in ARCHETYPE_PRIORITY}
 
 
 def _write_doc(lines):
@@ -1690,34 +1996,55 @@ def _write_doc(lines):
     log(f'[write] {DOC_PATH}')
 
 
-def write_phase2d_doc_selection_only(selection):
+def build_phase2d_doc_lines(selection, render_result=None):
+    """Single shared report builder (state parameter: render_result is None
+    in the --selection-only state, populated in the render-complete state).
+    A successful render extends this report with actual audit/preview
+    results; it never replaces it with a shorter, minimal document -- every
+    section below is present in both states."""
     lines = []
     a = lines.append
-    sel_by_a = selection['selected_sample_idx_by_archetype']
     results = selection['results']
+    is_rendered = render_result is not None
 
     a('# Phase 2D-A: Deterministic Archetype Selection and Raw-Artifact Preview Plan')
     a('')
     a('```')
-    a('Phase 2D-A selection stage complete.')
-    a('Raw-array audit and preview rendering pending authoritative Spark run.')
+    if is_rendered:
+        a('Phase 2D-A complete.')
+        a('Selection, raw audit, and review-preview generation all passed.')
+    else:
+        a('Phase 2D-A selection stage complete.')
+        a('Raw-array audit and preview rendering pending authoritative Spark run.')
     a('```')
     a('')
+
     a('## 1. Scope and frozen inputs')
     a('')
-    a('This document reflects a `--selection-only` run in a lightweight checkout. It reads exclusively the '
-      '86 frozen Phase-1/2A/2B/2C CSV and Markdown artifacts (checksummed before and after this stage) and '
-      'the plain-text raw topology CSVs (`*_pd_mt_distances.csv`, `phase_c_results.csv`) that are ordinary '
-      'git-tracked files, not gitignored raw arrays. It never touches `data_out/` or `data_out_fixed/`.')
+    if is_rendered:
+        a('This document reflects a completed raw-artifact audit and preview render (`--full`, or '
+          '`--render-previews` following an earlier `--selection-only`). It reads the 86 frozen '
+          'Phase-1/2A/2B/2C CSV and Markdown artifacts (checksummed before and after this stage), the '
+          'plain-text raw topology CSVs (`*_pd_mt_distances.csv`, `phase_c_results.csv`), and -- for this '
+          'stage only -- the raw `data_out/`/`data_out_fixed/` Spark arrays required to audit and preview '
+          'the six selected samples.')
+    else:
+        a('This document reflects a `--selection-only` run in a lightweight checkout. It reads exclusively the '
+          '86 frozen Phase-1/2A/2B/2C CSV and Markdown artifacts (checksummed before and after this stage) and '
+          'the plain-text raw topology CSVs (`*_pd_mt_distances.csv`, `phase_c_results.csv`) that are ordinary '
+          'git-tracked files, not gitignored raw arrays. It never touches `data_out/` or `data_out_fixed/`.')
     a('')
+
     a('## 2. Why selection is algorithmic rather than manual')
     a('')
     a('Every archetype is defined by an explicit eligibility rule and a closed-form score computed from the '
       'frozen Phase-1 long table and Phase-2C relationship tables. No sample was chosen by looking at an '
-      'image: raw wind-field arrays are not available to (and are never read by) the selection stage, so the '
-      'chosen samples cannot reflect appearance-based cherry-picking even in principle. The same script run '
-      'twice on the same frozen inputs produces byte-identical output.')
+      'image: sample selection is computed entirely from the frozen CSV inputs, before any raw wind-field '
+      'array is ever read, so the chosen samples cannot reflect appearance-based cherry-picking even in '
+      'principle. The same script run twice on the same frozen inputs produces byte-identical selection '
+      'output.')
     a('')
+
     a('## 3. Robust-z scoring convention')
     a('')
     a('`robust_z(x) = (x - median(x)) / (1.4826 * MAD(x))`, computed over the eligible-sample population for '
@@ -1727,6 +2054,7 @@ def write_phase2d_doc_selection_only(selection):
       '`event_type=robust_z_fallback`, for any such occurrence in this run). Scores are used ONLY to select '
       'samples deterministically -- they are never a method ranking.')
     a('')
+
     a('## 4. Archetype definitions')
     a('')
     for archetype_id in ARCHETYPE_PRIORITY:
@@ -1768,114 +2096,137 @@ def write_phase2d_doc_selection_only(selection):
           f'alternates: {alt_str}')
     a('')
 
-    a('## 8. Raw-array and topology-artifact validation')
+    a('## 8. Metric package')
+    a('')
+    a('Archetype scoring draws on four Phase-1 per-sample metrics: `pd_distance` and `mt_distance` '
+      '(persistence-diagram / merge-tree topological distances, used by every archetype), plus `psnruv` and '
+      '`speed_mae` (used only by `f2_balanced_vs_cnn` and `candidate_c_continuity`). These are 4 of the 22 '
+      'metrics recorded in the Phase-1 long table (`unified_primary_per_sample_long.csv`); all 22, for every '
+      'selected sample and `full_selected_story` method, are recorded in `selected_sample_method_values.csv` '
+      'regardless of whether they drove selection.')
+    a('')
+
+    a('## 9. Raw-artifact requirements and validation')
     a('')
     a('Topology CSVs (plain text, git-tracked) were read directly and cross-checked: the independently '
       'recomputed PD/MT method means from the raw `*_pd_mt_distances.csv` / `phase_c_results.csv` sources '
       'match both the Phase-1 long table and Phase-1 `unified_primary_topology_validation.csv` within '
-      'tolerance for every topology-bearing `full_selected_story` method (see `selection_validation.csv`).')
+      'tolerance for every topology-bearing `full_selected_story` method (see `selection_validation.csv`). '
+      '`selection/raw_artifact_requirements.csv` enumerates the exact repository-relative paths, expected '
+      'shapes, and resolution convention for every method\'s idx/dataIN/dataGT/dataSR array.')
     a('')
-    a('Raw `.npy` array auditing (idx/dataIN/dataGT/dataSR existence, shape, alignment, finiteness) was '
-      '**not** performed in this run, because `data_out/` and `data_out_fixed/` are gitignored and absent '
-      'from this lightweight checkout by design. `selection/raw_artifact_requirements.csv` enumerates the '
-      'exact repository-relative paths, expected shapes, and resolution convention required to complete '
-      'this audit on a machine where those directories are present.')
+    if is_rendered:
+        n_methods = len(FULL_SELECTED_STORY)
+        n_samples = len(set(selection['selected_sample_idx_by_archetype'].values()))
+        a(f'Raw `.npy` array auditing was performed against the real `data_out/`/`data_out_fixed/` Spark '
+          f'arrays and PASSED with 0 failures across all {n_methods} `full_selected_story` methods. The audit '
+          f'validated: exact idx ordering (`idx == arange(168)`, never set equality); full-168-row '
+          f'dataIN/dataGT/dataSR shape and finiteness (not only the {n_samples} selected rows); full-168-row '
+          f'dataIN/dataGT exact alignment against the canonical CNN arrays; and per-selected-sample speed_mae '
+          f'reproduction against the Phase-1 long table for every method with no exemption, bicubic included. '
+          f'See `preview_audit/raw_artifact_inventory.csv`, `preview_audit/raw_alignment_validation.csv`, '
+          f'`preview_audit/selected_sample_array_statistics.csv`, '
+          f'`preview_audit/selected_sample_metric_reproduction.csv`, and '
+          f'`preview_audit/selected_sample_artifact_manifest.csv` for the full evidence trail.')
+    else:
+        a('Raw `.npy` array auditing (idx validation, full-168-row dataIN/dataGT/dataSR shape and finiteness, '
+          'full-168-row dataIN/dataGT alignment against the canonical CNN arrays, and per-selected-sample '
+          'speed_mae reproduction with no method exempted) was **not** performed in this run, because '
+          '`data_out/` and `data_out_fixed/` are gitignored and absent from this lightweight checkout by '
+          'design.')
     a('')
 
-    a('## 9. Preview inventory')
+    a('## 10. Preview inventory')
     a('')
-    a('**No preview PNGs were generated in this run.** `selection/preview_plan.csv` records what will be '
-      'rendered (one combined speed+error review PNG per selected sample, plus one contact sheet), each '
-      'currently `status=pending_raw_artifacts`.')
+    if is_rendered:
+        a('The following review-only preview PNGs were rendered (each titled "AUDIT PREVIEW -- NOT FINAL '
+          'FIGURE"):')
+        a('')
+        for r in render_result['render_rows']:
+            a(f'- `{r["output_path"]}` (archetype={r["archetype_id"]}, sample_idx={r["sample_idx"]}, '
+              f'status={r["status"]})')
+    else:
+        a('**No preview PNGs were generated in this run.** `selection/preview_plan.csv` records what will be '
+          'rendered (one combined speed+error review PNG per selected sample, plus one contact sheet), each '
+          'currently `status=pending_raw_artifacts`.')
     a('')
 
-    a('## 10. Figure plan for Phase 2D-B')
+    a('## 11. Figure plan for Phase 2D-B')
     a('')
     a('Phase 2D-A produces only review-only audit previews, never final publication figures. '
       '`selection/preview_method_manifest.csv` records the three method groups (`baseline_story`, '
-      '`descriptor_tradeoff_story`, `full_selected_story`) that Phase 2D-B\'s final figures will draw from. '
-      'Final rendering remains explicitly deferred to Phase 2D-B.')
+      '`descriptor_tradeoff_story`, `full_selected_story`) and `selection/figure_plan.csv` plans (does not '
+      'render) the six Phase-2D-B figures, one per archetype, each `status=planned_not_rendered`. No '
+      'automated TTK/ParaView rendering exists anywhere in this pipeline. Final figure production remains '
+      'explicitly deferred to Phase 2D-B.')
     a('')
 
-    a('## 11. Caveat: illustrative, not a population estimate')
+    a('## 12. Caveat: illustrative, not a population estimate')
     a('')
     a('The six selected samples are drawn from this fixed 168-sample benchmark using a fixed, designed set '
       'of 19 candidate methods. They are illustrative examples chosen to make specific, pre-registered '
       'archetypes concrete -- they are not a random sample, and no population-level or generalization claim '
-      'should be inferred from any single selected field.')
+      'should be inferred from any single selected field. These are review-only audit previews, not final '
+      'publication figures; Final publication-quality figure production remains explicitly deferred to Phase 2D-B.')
     a('')
 
-    a('## 12. Exact command to complete Phase 2D-A on Spark')
+    a('## 13. Exact command to complete Phase 2D-A on Spark')
     a('')
     a('```')
     a(SPARK_COMMAND)
     a('```')
     a('')
-    a('This reads the already-written `selection/archetype_selected_samples.csv` (unchanged from this run, '
-      'since selection is purely CSV-driven and deterministic), performs the full raw-artifact audit against '
-      'the real `data_out/`/`data_out_fixed/` arrays, and -- only if every audit check passes -- renders the '
-      'review-only preview PNGs. `--render-previews` alone performs the same audit-and-render step without '
-      're-running selection, provided `selection/archetype_selected_samples.csv` already exists.')
+    if is_rendered:
+        a('This command (or `--render-previews` alone, given an existing `selection/archetype_selected_samples.csv`) '
+          'is what produced this document\'s render-complete state: it read the already-written deterministic '
+          'selection manifest, performed the full raw-artifact audit against the real `data_out/`/'
+          '`data_out_fixed/` arrays, and -- because every audit check passed -- rendered the review-only '
+          'preview PNGs listed above.')
+    else:
+        a('This reads the already-written `selection/archetype_selected_samples.csv` (unchanged from this run, '
+          'since selection is purely CSV-driven and deterministic), performs the full raw-artifact audit against '
+          'the real `data_out/`/`data_out_fixed/` arrays, and -- only if every audit check passes -- renders the '
+          'review-only preview PNGs. `--render-previews` alone performs the same audit-and-render step without '
+          're-running selection, provided `selection/archetype_selected_samples.csv` already exists.')
     a('')
 
-    a('## 13. Generated files')
+    a('## 14. Generated files')
     a('')
     a('Selection-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/`):')
     for fname in [
         'archetype_score_table.csv', 'archetype_selected_samples.csv', 'archetype_alternates.csv',
         'archetype_selection_diagnostics.csv', 'selected_sample_metric_context.csv',
         'selected_sample_method_values.csv', 'selected_sample_pairwise_preferences.csv',
-        'preview_method_manifest.csv', 'preview_plan.csv', 'raw_artifact_requirements.csv',
+        'preview_method_manifest.csv', 'preview_plan.csv', 'raw_artifact_requirements.csv', 'figure_plan.csv',
         'selection_validation.csv', 'prior_phase_immutability_check.csv',
     ]:
         a(f'- `ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/{fname}`')
     a('- `docs/unified_candidate_analysis_phase2d.md` (this file)')
     a('- `logs/unified_candidate_analysis_phase2d_selection.log`')
-    a('')
-    a('Not yet generated (pending Spark): `preview_audit/*.csv`, `previews/**/*.png`.')
+    if is_rendered:
+        a('- `logs/unified_candidate_analysis_phase2d_render.log`')
+        a('')
+        a('Raw-audit-and-preview outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2d/preview_audit/`):')
+        for fname in [
+            'raw_artifact_inventory.csv', 'raw_alignment_validation.csv', 'selected_sample_array_statistics.csv',
+            'selected_sample_metric_reproduction.csv', 'selected_sample_artifact_manifest.csv',
+            'preview_render_validation.csv',
+        ]:
+            a(f'- `ttk_runs_fixed/unified_candidate_analysis/phase2d/preview_audit/{fname}`')
+        a('')
+        a('Preview PNGs (`ttk_runs_fixed/unified_candidate_analysis/phase2d/previews/`):')
+        for r in render_result['render_rows']:
+            a(f'- `{r["output_path"]}`')
+    else:
+        a('')
+        a('Not yet generated (pending Spark): `preview_audit/*.csv`, `previews/**/*.png`.')
     a('')
 
-    _write_doc(lines)
+    return lines
 
 
-def write_phase2d_doc_render_complete(selection, render_result):
-    lines = []
-    a = lines.append
-    a('# Phase 2D-A: Deterministic Archetype Selection and Raw-Artifact Preview Plan')
-    a('')
-    a('```')
-    a('Phase 2D-A complete.')
-    a('Selection, raw audit, and review-preview generation all passed.')
-    a('```')
-    a('')
-    a('## Selected samples')
-    a('')
-    for archetype_id in ARCHETYPE_PRIORITY:
-        si = selection['selected_sample_idx_by_archetype'][archetype_id]
-        a(f'- **{archetype_id}**: sample_idx={si}')
-    a('')
-    a('## Raw-artifact audit')
-    a('')
-    n_fail = len(render_result['audit']['failures'])
-    a(f'All raw-artifact audit checks passed (0 failures) across the 7 `full_selected_story` methods and '
-      f'{len(set(selection["selected_sample_idx_by_archetype"].values()))} selected samples. See '
-      f'`preview_audit/raw_artifact_inventory.csv`, `preview_audit/raw_alignment_validation.csv`, '
-      f'`preview_audit/selected_sample_array_statistics.csv`, and '
-      f'`preview_audit/selected_sample_metric_reproduction.csv` for the full evidence trail.')
-    a('')
-    a('## Preview inventory')
-    a('')
-    for r in render_result['render_rows']:
-        a(f'- `{r["output_path"]}` (archetype={r["archetype_id"]}, sample_idx={r["sample_idx"]}, '
-          f'status={r["status"]})')
-    a('')
-    a('## Caveat')
-    a('')
-    a('These are review-only audit previews (each titled "AUDIT PREVIEW -- NOT FINAL FIGURE"), not final '
-      'publication figures. Final rendering remains deferred to Phase 2D-B. The six selected samples are '
-      'illustrative examples from this fixed benchmark, not a population estimate.')
-    a('')
-    _write_doc(lines)
+def write_phase2d_doc(selection, render_result=None):
+    _write_doc(build_phase2d_doc_lines(selection, render_result))
 
 
 # =============================================================================
@@ -1909,7 +2260,7 @@ def cmd_selection_only() -> dict:
     selection = run_selection(long_table, metric_direction, phase1_refs, phase2a_refs, phase2b_refs,
                                  phase2c_refs, immutability_ledgers, topology_source_map, method_inventory)
 
-    write_phase2d_doc_selection_only(selection)
+    write_phase2d_doc(selection)
 
     postflight_immutability(checksums_before, file_to_phase, SELECTION_DIR / 'prior_phase_immutability_check.csv')
 
@@ -1938,18 +2289,41 @@ def cmd_render_previews(selection=None) -> dict:
     method_inventory = load_method_inventory()
     long_table = load_long_table()
     per_sample = long_table['per_sample']
+    column_mapping_rows = load_column_mapping_rows()
+    topology_source_map = build_topology_source_map(column_mapping_rows)
 
     if selection is not None:
         selected_sample_idx_by_archetype = selection['selected_sample_idx_by_archetype']
     else:
-        selected_sample_idx_by_archetype = read_selected_samples_manifest()
+        # Strong manifest validation (Section 6): the on-disk manifest is
+        # validated for row count, archetype identity/order, unique in-range
+        # indices, and required fields before it is trusted at all.
+        manifest_selected = read_selected_samples_manifest()
+        # A standalone --render-previews invocation has no in-memory `results`
+        # (per-archetype eligibility, score formula, alternates, etc.) needed
+        # for the complete Phase-2D-A report. Selection is purely CSV-driven
+        # and deterministic, so the same pure (no-CSV-write) computation used
+        # by --selection-only is re-run here in memory only, and cross-checked
+        # against the already-validated on-disk manifest before being trusted.
+        phase2c_refs = load_phase2c_refs()
+        results = compute_all_archetypes(per_sample, phase2c_refs['sample_pref'], phase2c_refs['samplewise'])
+        selection_by_archetype, all_diagnostics, _, _ = run_all_selections(results)
+        recomputed_selected = {a: selection_by_archetype[a]['selected']['sample_idx'] for a in ARCHETYPE_PRIORITY}
+        if recomputed_selected != manifest_selected:
+            raise SystemExit(
+                f'[hard-fail] In-memory recomputed selection does not match the validated on-disk manifest '
+                f'{SELECTION_DIR / "archetype_selected_samples.csv"}: recomputed='
+                f'{recomputed_selected!r} manifest={manifest_selected!r}'
+            )
+        selection = dict(results=results, selection_by_archetype=selection_by_archetype,
+                           selected_sample_idx_by_archetype=recomputed_selected, all_diagnostics=all_diagnostics)
+        selected_sample_idx_by_archetype = recomputed_selected
     log(f'[selection] Using selected samples: {selected_sample_idx_by_archetype}')
 
-    render_result = run_render(selected_sample_idx_by_archetype, per_sample, method_inventory)
+    render_result = run_render(selected_sample_idx_by_archetype, per_sample, method_inventory,
+                                  topology_source_map)
 
-    if selection is None:
-        selection = dict(selected_sample_idx_by_archetype=selected_sample_idx_by_archetype)
-    write_phase2d_doc_render_complete(selection, render_result)
+    write_phase2d_doc(selection, render_result)
 
     postflight_immutability(checksums_before, file_to_phase, SELECTION_DIR / 'prior_phase_immutability_check.csv')
 

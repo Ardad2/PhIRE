@@ -1,0 +1,29 @@
+method_id,array_role,path,exists,shape,dtype,size_bytes
+bicubic,idx,data_out_fixed/wind_mrhr_cnn/idx.npy,True,"(168,)",int64,1472
+bicubic,dataIN,data_out_fixed/wind_mrhr_cnn/dataIN.npy,True,"(168, 100, 100, 2)",float64,26880128
+bicubic,dataGT,data_out_fixed/wind_mrhr_cnn/dataGT.npy,True,"(168, 500, 500, 2)",float64,672000128
+bicubic,dataSR,(reconstructed_in_memory),True,,,
+cnn,idx,data_out_fixed/wind_mrhr_cnn/idx.npy,True,"(168,)",int64,1472
+cnn,dataIN,data_out_fixed/wind_mrhr_cnn/dataIN.npy,True,"(168, 100, 100, 2)",float64,26880128
+cnn,dataGT,data_out_fixed/wind_mrhr_cnn/dataGT.npy,True,"(168, 500, 500, 2)",float64,672000128
+cnn,dataSR,data_out_fixed/wind_mrhr_cnn/dataSR.npy,True,"(168, 500, 500, 2)",float64,672000128
+gan,idx,data_out_fixed/wind_mrhr_gan/idx.npy,True,"(168,)",int64,1472
+gan,dataIN,data_out_fixed/wind_mrhr_gan/dataIN.npy,True,"(168, 100, 100, 2)",float64,26880128
+gan,dataGT,data_out_fixed/wind_mrhr_gan/dataGT.npy,True,"(168, 500, 500, 2)",float64,672000128
+gan,dataSR,data_out_fixed/wind_mrhr_gan/dataSR.npy,True,"(168, 500, 500, 2)",float64,672000128
+candidate_c,idx,data_out/wind_finetune_candidateC_expanded2688/idx.npy,True,"(168,)",int64,1472
+candidate_c,dataIN,data_out/wind_finetune_candidateC_expanded2688/dataIN.npy,True,"(168, 100, 100, 2)",float64,26880128
+candidate_c,dataGT,data_out/wind_finetune_candidateC_expanded2688/dataGT.npy,True,"(168, 500, 500, 2)",float64,672000128
+candidate_c,dataSR,data_out/wind_finetune_candidateC_expanded2688/dataSR.npy,True,"(168, 500, 500, 2)",float64,672000128
+f3_grad_crit,idx,data_out/wind_finetune_candidateF_grad_crit_expanded2688/idx.npy,True,"(168,)",int64,1472
+f3_grad_crit,dataIN,data_out/wind_finetune_candidateF_grad_crit_expanded2688/dataIN.npy,True,"(168, 100, 100, 2)",float64,26880128
+f3_grad_crit,dataGT,data_out/wind_finetune_candidateF_grad_crit_expanded2688/dataGT.npy,True,"(168, 500, 500, 2)",float64,672000128
+f3_grad_crit,dataSR,data_out/wind_finetune_candidateF_grad_crit_expanded2688/dataSR.npy,True,"(168, 500, 500, 2)",float64,672000128
+f2_grad_levelset_e2,idx,data_out/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/idx.npy,True,"(168,)",int64,1472
+f2_grad_levelset_e2,dataIN,data_out/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/dataIN.npy,True,"(168, 100, 100, 2)",float64,26880128
+f2_grad_levelset_e2,dataGT,data_out/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/dataGT.npy,True,"(168, 500, 500, 2)",float64,672000128
+f2_grad_levelset_e2,dataSR,data_out/wind_finetune_candidateF_grad_levelset_E2_low_expanded2688/dataSR.npy,True,"(168, 500, 500, 2)",float64,672000128
+uv_e2,idx,data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/idx.npy,True,"(168,)",int64,1472
+uv_e2,dataIN,data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataIN.npy,True,"(168, 100, 100, 2)",float64,26880128
+uv_e2,dataGT,data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataGT.npy,True,"(168, 500, 500, 2)",float64,672000128
+uv_e2,dataSR,data_out/wind_finetune_candidateUV_plus_E2_tf_lowlambda_expanded2688/dataSR.npy,True,"(168, 500, 500, 2)",float64,672000128
