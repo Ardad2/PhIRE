@@ -63,6 +63,7 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -90,35 +91,74 @@ DOC_PATH = DOCS_DIR / 'unified_candidate_analysis_phase2db.md'
 LOG_PATH = REPO_ROOT / 'logs' / 'unified_candidate_analysis_phase2db.log'
 
 # -----------------------------------------------------------------------
-# Protected files: everything Phase-1 through Phase-2D-A produced. Reuses
-# Phase-2D-A's own explicit (never-a-glob) Phase-1/2A/2B/2C lists, plus this
-# script's own explicit list of every Phase-2D-A core artifact that exists
-# in this checkout today.
+# Protected files: the COMPLETE authoritative Phase-2D-A package (86 prior
+# + 32 Phase-2D-A = 118), never a glob. Reuses Phase-2D-A's own explicit
+# Phase-1/2A/2B/2C lists.
 # -----------------------------------------------------------------------
-PHASE2D_A_PROTECTED_CSV_NAMES = [
+PHASE2D_A_SELECTION_CSV_NAMES = [
     'archetype_alternates.csv', 'archetype_score_table.csv', 'archetype_selected_samples.csv',
     'archetype_selection_diagnostics.csv', 'figure_plan.csv', 'preview_method_manifest.csv',
     'preview_plan.csv', 'prior_phase_immutability_check.csv', 'raw_artifact_requirements.csv',
     'selected_sample_method_values.csv', 'selected_sample_metric_context.csv',
     'selected_sample_pairwise_preferences.csv', 'selection_validation.csv',
 ]
-PHASE2D_A_PROTECTED_CSVS = [p2da.SELECTION_DIR / n for n in PHASE2D_A_PROTECTED_CSV_NAMES]
-PHASE2D_A_PROTECTED_OTHER = [
+PHASE2D_A_SELECTION_CSVS = [p2da.SELECTION_DIR / n for n in PHASE2D_A_SELECTION_CSV_NAMES]
+assert len(PHASE2D_A_SELECTION_CSVS) == 13
+
+PHASE2D_A_PREVIEW_AUDIT_CSV_NAMES = [
+    'raw_artifact_inventory.csv', 'raw_alignment_validation.csv', 'selected_sample_array_statistics.csv',
+    'selected_sample_metric_reproduction.csv', 'selected_sample_artifact_manifest.csv',
+    'preview_render_validation.csv',
+]
+PHASE2D_A_PREVIEW_AUDIT_CSVS = [p2da.PREVIEW_AUDIT_DIR / n for n in PHASE2D_A_PREVIEW_AUDIT_CSV_NAMES]
+assert len(PHASE2D_A_PREVIEW_AUDIT_CSVS) == 6
+
+# The six per-sample review PNGs live one directory per archetype. The literal
+# archetype_id -> sample_idx mapping here is deliberately restated (not a
+# forward reference to FROZEN_SAMPLE_SET, defined further below) so this
+# protected-file list never depends on definition order.
+PHASE2D_A_PREVIEW_PNGS = [
+    p2da.PREVIEWS_DIR / archetype_id / f'selected_sample_{sample_idx}_review.png'
+    for archetype_id, sample_idx in [
+        ('global_descriptor_disagreement', 120), ('gan_pd_vs_cnn_mt_conflict', 34),
+        ('f3_pd_vs_uv_e2_mt_tradeoff', 119), ('f2_balanced_vs_cnn', 25),
+        ('candidate_c_continuity', 30), ('global_descriptor_agreement', 19),
+    ]
+] + [p2da.PREVIEWS_DIR / 'phase2d_selected_archetypes_contact_sheet.png']
+assert len(PHASE2D_A_PREVIEW_PNGS) == 7
+
+PHASE2D_A_DOCS = [
     REPO_ROOT / 'docs' / 'unified_candidate_analysis_phase2d.md',
-    REPO_ROOT / 'logs' / 'unified_candidate_analysis_phase2d_selection.log',
+    REPO_ROOT / 'docs' / 'unified_candidate_phase2d_visual_review.md',
+]
+assert len(PHASE2D_A_DOCS) == 2
+
+PHASE2D_A_SCRIPTS = [
     REPO_ROOT / 'scripts' / 'select_and_preview_unified_candidates_phase2d.py',
     REPO_ROOT / 'scripts' / 'test_select_and_preview_unified_candidates_phase2d.py',
 ]
-PHASE2D_A_PROTECTED_FILES = PHASE2D_A_PROTECTED_CSVS + PHASE2D_A_PROTECTED_OTHER  # exactly 17
-assert len(PHASE2D_A_PROTECTED_FILES) == 17
+assert len(PHASE2D_A_SCRIPTS) == 2
+
+PHASE2D_A_LOGS = [
+    REPO_ROOT / 'logs' / 'unified_candidate_analysis_phase2d_selection.log',
+    REPO_ROOT / 'logs' / 'unified_candidate_analysis_phase2d_render.log',
+]
+assert len(PHASE2D_A_LOGS) == 2
+
+PHASE2D_A_PROTECTED_FILES = (PHASE2D_A_SELECTION_CSVS + PHASE2D_A_PREVIEW_AUDIT_CSVS + PHASE2D_A_PREVIEW_PNGS +
+                               PHASE2D_A_DOCS + PHASE2D_A_SCRIPTS + PHASE2D_A_LOGS)  # 13+6+7+2+2+2 = 32
+assert len(PHASE2D_A_PROTECTED_FILES) == 32
+
+VISUAL_REVIEW_DOC_PATH = REPO_ROOT / 'docs' / 'unified_candidate_phase2d_visual_review.md'
 
 ALL_PROTECTED_FILES = (p2da.PHASE1_PROTECTED_FILES + p2da.PHASE2A_PROTECTED_FILES +
                          p2da.PHASE2B_PROTECTED_FILES + p2da.PHASE2C_PROTECTED_FILES +
-                         PHASE2D_A_PROTECTED_FILES)  # 12+14+28+32+17 = 103
-assert len(ALL_PROTECTED_FILES) == 103
+                         PHASE2D_A_PROTECTED_FILES)  # 12+14+28+32+32 = 118
+assert len(ALL_PROTECTED_FILES) == 118
 
 PROTECTED_DIRS_AND_CSVS = list(p2da.PROTECTED_DIRS_AND_CSVS) + [
-    (p2da.SELECTION_DIR, set(PHASE2D_A_PROTECTED_CSVS)),
+    (p2da.SELECTION_DIR, set(PHASE2D_A_SELECTION_CSVS)),
+    (p2da.PREVIEW_AUDIT_DIR, set(PHASE2D_A_PREVIEW_AUDIT_CSVS)),
 ]
 
 # -----------------------------------------------------------------------
@@ -133,6 +173,9 @@ FROZEN_SAMPLE_SET = {
     'global_descriptor_agreement': 19,
 }
 assert set(FROZEN_SAMPLE_SET) == set(p2da.ARCHETYPE_PRIORITY)
+assert sorted(int(p.stem.split('_')[2]) for p in PHASE2D_A_PREVIEW_PNGS
+               if p.name != 'phase2d_selected_archetypes_contact_sheet.png') == \
+    sorted(FROZEN_SAMPLE_SET.values()), 'PHASE2D_A_PREVIEW_PNGS sample indices must match FROZEN_SAMPLE_SET'
 
 CNN, GAN, BICUBIC, CANDIDATE_C, F2, F3, UV_E2 = (
     p2da.CNN_METHOD, p2da.GAN_METHOD, p2da.BICUBIC_METHOD, p2da.CANDIDATE_C_METHOD,
@@ -179,7 +222,7 @@ def require_protected_files() -> None:
         raise SystemExit(
             f'[hard-fail] Missing required prior-phase protected file(s) (expected exactly '
             f'{len(ALL_PROTECTED_FILES)}: 12 Phase-1 + 14 Phase-2A + 28 Phase-2B + 32 Phase-2C + '
-            f'17 Phase-2D-A):\n' + '\n'.join(f'  - {m}' for m in missing)
+            f'32 Phase-2D-A):\n' + '\n'.join(f'  - {m}' for m in missing)
         )
     for directory, expected_csvs in PROTECTED_DIRS_AND_CSVS:
         actual_csvs = sorted(directory.glob('*.csv'), key=str)
@@ -208,7 +251,7 @@ def preflight_immutability():
         file_to_phase.update({p.resolve().relative_to(REPO_ROOT).as_posix(): phase for p in files})
     checksums_before = checksum_all(ALL_PROTECTED_FILES)
     log(f'[immutability] Checksummed {len(checksums_before)} prior-phase file(s) before this stage '
-        f'(12 Phase-1 + 14 Phase-2A + 28 Phase-2B + 32 Phase-2C + 17 Phase-2D-A = 103 exactly).')
+        f'(12 Phase-1 + 14 Phase-2A + 28 Phase-2B + 32 Phase-2C + 32 Phase-2D-A = 118 exactly).')
     return checksums_before, file_to_phase
 
 
@@ -300,6 +343,60 @@ def load_selected_sample_method_values() -> dict:
     return {(r['archetype_id'], r['method_id']): r for r in rows}
 
 
+# Phrasing accepted as an explicit "no alternate was activated" statement in
+# the human visual-review record. Deliberately several equivalent phrasings
+# rather than one exact string, since the record is authored by a person.
+VISUAL_REVIEW_NO_ALTERNATE_PHRASES = (
+    'no alternate', 'zero alternates', 'alternate activated: none', 'alternates activated: none',
+    'no alternates were activated', 'without activating any alternate',
+)
+
+
+def require_completed_phase2d_a_state(manifest) -> None:
+    """Requires (a) Phase-2D-A's own report to state the fully rendered
+    'complete' state (never merely the planning-only state), and (b) the
+    human visual-review record to explicitly confirm, in text, that every
+    one of the six frozen primaries was accepted and that no alternate was
+    activated. Never inferred from the mere presence of the files -- their
+    content is read and checked."""
+    if not p2da.DOC_PATH.exists():
+        raise SystemExit(f'[hard-fail] Required Phase-2D-A report is missing: {p2da.DOC_PATH}')
+    doc_text = p2da.DOC_PATH.read_text()
+    if 'Phase 2D-A complete.' not in doc_text:
+        raise SystemExit(
+            f'[hard-fail] {p2da.DOC_PATH} does not report the completed Phase-2D-A state (the '
+            f'"Phase 2D-A complete." banner, written only after --render-previews/--full succeeds, was not '
+            f'found). Phase 2D-B may only build on the fully rendered, authoritative Phase-2D-A package -- '
+            f'not a --selection-only-only state.'
+        )
+    if not VISUAL_REVIEW_DOC_PATH.exists():
+        raise SystemExit(
+            f'[hard-fail] Required human visual-review record is missing: {VISUAL_REVIEW_DOC_PATH}. Phase '
+            f'2D-B never infers visual acceptance -- it must be explicitly recorded by a human reviewer.'
+        )
+    review_text = VISUAL_REVIEW_DOC_PATH.read_text()
+    review_lower = review_text.lower()
+    missing_acceptance = []
+    for archetype_id, sample_idx in manifest.items():
+        found = any(archetype_id in line.lower() and str(sample_idx) in line and 'accept' in line.lower()
+                     for line in review_text.splitlines())
+        if not found:
+            missing_acceptance.append((archetype_id, sample_idx))
+    if missing_acceptance:
+        raise SystemExit(
+            f'[hard-fail] {VISUAL_REVIEW_DOC_PATH} does not explicitly confirm acceptance for: '
+            f'{missing_acceptance}. Required format: at least one line containing the archetype_id, its '
+            f'sample_idx, and the word "accept" (e.g. "global_descriptor_disagreement sample_idx=120: '
+            f'ACCEPTED").'
+        )
+    if not any(phrase in review_lower for phrase in VISUAL_REVIEW_NO_ALTERNATE_PHRASES):
+        raise SystemExit(
+            f'[hard-fail] {VISUAL_REVIEW_DOC_PATH} does not explicitly state that no alternate was '
+            f'activated (expected phrasing such as "no alternate(s) activated" or '
+            f'"alternate activated: none").'
+        )
+
+
 # =============================================================================
 # Figure contracts (Section: FINAL FIGURE CONTRACT)
 # =============================================================================
@@ -321,7 +418,7 @@ ZOOM_CROP = 'zoom_crop'
 MT_PANEL_TYPES = {MT_EVIDENCE, MT_COMPARISON, TOPOLOGY_COMPARISON}
 # Panels requiring frozen persistence-diagram COORDINATE data (birth/death
 # pairs), distinct from the scalar pd_distance value already in the long
-# table. See resolve_pd_diagram_source().
+# table. See discover_pd_source_candidates().
 PD_DIAGRAM_PANEL_TYPES = {PD_EVIDENCE, PD_COMPARISON}
 # Figure-level (not per-method) panels.
 FIGURE_LEVEL_PANEL_TYPES = {METRIC_STRIP, PD_MT_TRADEOFF_COMPACT, PD_MT_COMPARISON_COMPACT, ZOOM_CROP}
@@ -332,8 +429,8 @@ FIGURE_CONTRACTS = [
     dict(
         figure_id=1, short_name='global_disagreement', archetype_id='global_descriptor_disagreement',
         primary_claim='PD and MT can produce strongly different cross-method preferences.',
-        required_methods=[GAN, CNN, CANDIDATE_C, F3, F2, UV_E2],
-        full_panel_methods=[GAN, CNN, CANDIDATE_C, F3, F2, UV_E2],
+        required_methods=[CNN, GAN, CANDIDATE_C, F3, F2, UV_E2],
+        full_panel_methods=[CNN, GAN, CANDIDATE_C, F3, F2, UV_E2],
         method_roles={},
         panels=[SPEED_FIELDS, ERROR_MAPS, METRIC_STRIP, PD_EVIDENCE, MT_EVIDENCE],
         emphasis='GAN best PD but worst MT; CNN worst displayed PD but best MT; UV+E2 is comparatively '
@@ -352,7 +449,7 @@ FIGURE_CONTRACTS = [
         figure_id=3, short_name='f3_uv_e2_tradeoff', archetype_id='f3_pd_vs_uv_e2_mt_tradeoff',
         primary_claim='Gradient-plus-critical supervision and repaired E2 supervision influence different '
                         'topology descriptors.',
-        required_methods=[CNN, F3, UV_E2, F2],
+        required_methods=[CNN, F3, F2, UV_E2],
         full_panel_methods=[CNN, F3, UV_E2],  # F2 appears only as a compact contextual reference
         method_roles={F2: 'compact_contextual_reference'},
         panels=[SPEED_FIELDS, ERROR_MAPS, PD_EVIDENCE, MT_EVIDENCE, ZOOM_CROP, METRIC_STRIP],
@@ -382,8 +479,8 @@ FIGURE_CONTRACTS = [
         figure_id=6, short_name='global_agreement', archetype_id='global_descriptor_agreement',
         primary_claim='PD and MT disagreement is not universal; strong methods can show broad descriptor '
                         'concordance without identical rankings.',
-        required_methods=[GAN, CNN, CANDIDATE_C, F3, F2, UV_E2],
-        full_panel_methods=[GAN, CNN, CANDIDATE_C, F3, F2, UV_E2],
+        required_methods=[CNN, GAN, CANDIDATE_C, F3, F2, UV_E2],
+        full_panel_methods=[CNN, GAN, CANDIDATE_C, F3, F2, UV_E2],
         method_roles={},
         panels=[SPEED_FIELDS, ERROR_MAPS, PD_MT_COMPARISON_COMPACT, METRIC_STRIP],
         emphasis='',
@@ -414,43 +511,231 @@ def final_figure_paths(contract):
 
 
 # =============================================================================
-# PD-diagram coordinate source resolution. This project's frozen topology
-# artifacts (column_mapping.csv-referenced CSVs, confirmed by direct
-# inspection) contain only the SCALAR pd_distance/mt_distance value already
-# in the Phase-1 long table -- never raw persistence-diagram birth/death
-# coordinates. This function documents the deterministic repository-relative
-# naming convention such coordinate exports would need to follow if/when
-# they become available, and returns None (never fabricates) when absent.
+# Authoritative PD-diagram coordinate source discovery. A real repository-
+# relative filesystem search (never a fixed 3-filename guess): topology
+# source parent directories, their siblings/descendants, paths referenced by
+# Phase-2D-A artifact manifests, and prior-pipeline `<method>_topology/pd/`
+# conventions used elsewhere in this repository. GT and bicubic are searched
+# exactly like every other method -- neither is ever marked found without a
+# concrete candidate_path.
+#
+# Three-status vocabulary only:
+#   available_validated                    -- a coordinate source was found,
+#                                              mapped to this exact sample/
+#                                              method, and its values are finite.
+#   pending_authoritative_spark_source_discovery
+#                                           -- nothing conclusive yet; this is
+#                                              the ONLY status ever produced by
+#                                              a lightweight (non-Spark)
+#                                              checkout, since a raw .vtu Spark
+#                                              intermediate being absent here
+#                                              never proves it is absent on the
+#                                              authoritative Spark machine.
+#   unavailable_after_authoritative_spark_audit
+#                                           -- only reachable when this process
+#                                              IS running where data_out_fixed/
+#                                              exists (i.e. on Spark) and the
+#                                              search still finds nothing.
 # =============================================================================
 
-def resolve_pd_diagram_source(mid, sample_idx, topology_source_map):
-    if mid not in topology_source_map:
-        return None
-    candidate_dir = topology_source_map[mid]['path'].parent
-    candidates = [
-        candidate_dir / f'{mid}_sample{sample_idx}_pd_diagram.csv',
-        candidate_dir / f'sample_{sample_idx}_pd_diagram_{mid}.csv',
-        candidate_dir / 'pd_diagrams' / f'{mid}_s{sample_idx}.csv',
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    return None
+PD_SEARCH_EXTENSIONS = ('.csv', '.vtu', '.vtp', '.vtk')
+PD_COORDINATE_COLUMN_MARKERS = {
+    'birth', 'death', 'birth_x', 'birth_y', 'death_x', 'death_y', 'x_birth', 'x_death',
+    'coord_x', 'coord_y', 'birth_value', 'death_value',
+}
+PD_OVERLAY_SCRIPT_NAME_MARKERS = ('pd_critical_pairs', 'pd_diagram', 'persistence_diagram')
+
+# True in this checkout (and any lightweight checkout): raw Spark
+# intermediates (data_out_fixed/, and by the same reasoning any raw .vtu
+# TTK output) are gitignored and never present here by design.
+IS_LIGHTWEIGHT_CHECKOUT = not (REPO_ROOT / 'data_out_fixed').exists()
+
+STATUS_AVAILABLE = 'available_validated'
+STATUS_PENDING = 'pending_authoritative_spark_source_discovery'
+STATUS_UNAVAILABLE = 'unavailable_after_authoritative_spark_audit'
+
+PD_SOURCE_DISCOVERY_FIELDS = [
+    'figure_id', 'sample_idx', 'method_id', 'candidate_path', 'artifact_type', 'schema_or_array_names',
+    'sample_mapping_status', 'finite_status', 'usable_status', 'notes',
+]
+
+
+def _pd_search_roots(mid, topology_source_map):
+    """Deterministic repository-relative search roots. GT and bicubic (never
+    in topology_source_map) fall back to CNN's HR-grid-anchored convention
+    while still being searched under their OWN method token."""
+    roots = []
+    lookup_mid = mid if mid in topology_source_map else CNN
+    if lookup_mid in topology_source_map:
+        base = topology_source_map[lookup_mid]['path'].parent
+        roots += [base, base / 'pd', base / 'pd_diagrams']
+    for candidate_mid in dict.fromkeys([mid, lookup_mid]):
+        roots.append(REPO_ROOT / 'ttk_runs_fixed' / 'topology_finetuning' / f'{candidate_mid}_topology' / 'pd')
+    roots.append(REPO_ROOT / 'ttk_runs_fixed' / 'combined')
+    # Deliberately NOT the entire ttk_runs_fixed/topology_finetuning/ tree: that
+    # directory holds hundreds of unrelated per-candidate eval subdirectories
+    # whose filenames incidentally contain a method token (e.g.
+    # pairwise_cnn_vs_candidateB.csv), which would flood discovery with noise
+    # without narrowing the real search. Topology source parents, their
+    # pd/pd_diagrams descendants, and the specific <method>_topology/pd
+    # convention above already cover "parent + sibling + descendant" search.
+    seen = []
+    for r in roots:
+        if r not in seen:
+            seen.append(r)
+    return seen
+
+
+def find_pd_overlay_scripts():
+    """Existing repository scripts whose name suggests they already generate
+    PD overlays/coordinate extracts (informational provenance only)."""
+    return [p for p in sorted((REPO_ROOT / 'scripts').glob('*.py'))
+             if any(marker in p.name.lower() for marker in PD_OVERLAY_SCRIPT_NAME_MARKERS)]
+
+
+def _csv_artifact_type(path):
+    try:
+        with path.open(newline='') as fh:
+            header = next(csv.reader(fh))
+    except (OSError, StopIteration, UnicodeDecodeError):
+        return 'csv_unreadable', []
+    lowered = [h.strip().lower() for h in header]
+    if set(lowered) & PD_COORDINATE_COLUMN_MARKERS:
+        return 'csv_pd_coordinates', header
+    return 'csv_scalar_summary', header
+
+
+def _name_matches(name_lower, sample_idx, mid):
+    token_sample = any(tok in name_lower for tok in
+                         (f's{sample_idx}_', f'_s{sample_idx}.', f'sample{sample_idx}',
+                          f'sample_{sample_idx}', f'_{sample_idx}_'))
+    method_token = 'gt' if mid == 'GT' else mid.lower()
+    return token_sample, method_token in name_lower
+
+
+def discover_pd_source_candidates(figure_id, sample_idx, mid, topology_source_map):
+    """Real filesystem search for a PD coordinate source for one (figure,
+    method). Always returns at least one row -- a 'none_found' summary row
+    when nothing plausible turns up, never silently empty."""
+    rows = []
+    roots_searched = []
+    for root in _pd_search_roots(mid, topology_source_map):
+        roots_searched.append(_rel(root))
+        if not root.exists():
+            continue
+        for ext in PD_SEARCH_EXTENSIONS:
+            for path in sorted(root.rglob(f'*{ext}')):
+                name_lower = path.name.lower()
+                token_sample, token_method = _name_matches(name_lower, sample_idx, mid)
+                if not (token_sample or token_method):
+                    continue
+                if ext == '.csv':
+                    artifact_type, header = _csv_artifact_type(path)
+                    schema = ','.join(header)
+                else:
+                    artifact_type, schema = f'vtk_family_{ext.lstrip(".")}', ''
+                mapping = 'mapped' if (token_sample and token_method) else 'ambiguous_partial_match'
+                rows.append(dict(
+                    figure_id=figure_id, sample_idx=sample_idx, method_id=mid, candidate_path=_rel(path),
+                    artifact_type=artifact_type, schema_or_array_names=schema, sample_mapping_status=mapping,
+                    finite_status='', usable_status='', notes='',
+                ))
+    if not rows:
+        rows.append(dict(
+            figure_id=figure_id, sample_idx=sample_idx, method_id=mid, candidate_path='',
+            artifact_type='none_found', schema_or_array_names='', sample_mapping_status='not_found',
+            finite_status='not_applicable', usable_status='', notes=f'Searched: {"; ".join(roots_searched)}',
+        ))
+    return rows
+
+
+def _finalize_pd_candidate_row(row):
+    """Fills finite_status/usable_status for one discovered candidate row."""
+    if row['artifact_type'] == 'none_found':
+        row['usable_status'] = STATUS_PENDING if IS_LIGHTWEIGHT_CHECKOUT else STATUS_UNAVAILABLE
+        if IS_LIGHTWEIGHT_CHECKOUT:
+            row['notes'] += (' | Lightweight (non-Spark) checkout: absence here does not prove absence on the '
+                               'authoritative Spark machine (raw .vtu Spark intermediates are gitignored and '
+                               'never present here).')
+        return row
+    if row['artifact_type'] == 'csv_pd_coordinates' and row['sample_mapping_status'] == 'mapped':
+        path = REPO_ROOT / row['candidate_path']
+        values = []
+        try:
+            with path.open(newline='') as fh:
+                for r in csv.DictReader(fh):
+                    for k, v in r.items():
+                        if k and k.strip().lower() in PD_COORDINATE_COLUMN_MARKERS:
+                            try:
+                                values.append(float(v))
+                            except (TypeError, ValueError):
+                                values.append(float('nan'))
+            all_finite = bool(values) and all(math.isfinite(v) for v in values)
+        except OSError:
+            all_finite = False
+        row['finite_status'] = 'finite' if all_finite else 'non_finite_or_unreadable'
+        row['usable_status'] = STATUS_AVAILABLE if all_finite else STATUS_UNAVAILABLE
+        return row
+    if row['artifact_type'] == 'csv_scalar_summary':
+        row['finite_status'] = 'not_applicable_scalar_only'
+        row['usable_status'] = STATUS_PENDING
+        row['notes'] += (' | Scalar-only distance summary, not a coordinate source; does not by itself confirm '
+                           'absence of coordinate data on the authoritative Spark machine.')
+        return row
+    if row['artifact_type'].startswith('vtk_family_'):
+        row['finite_status'] = 'not_checked_requires_vtk_parse_at_render_fields'
+        row['usable_status'] = STATUS_PENDING
+        return row
+    row['finite_status'] = row['finite_status'] or 'not_checked_ambiguous_or_unreadable'
+    row['usable_status'] = STATUS_PENDING
+    return row
+
+
+def discover_pd_sources_for_figure(contract, manifest, topology_source_map):
+    si = manifest[contract['archetype_id']]
+    needs_pd = any(pt in PD_DIAGRAM_PANEL_TYPES for pt in contract['panels'])
+    methods_needing_pd = (['GT'] + contract['full_panel_methods']) if needs_pd else []
+    all_rows = []
+    for mid in methods_needing_pd:
+        candidates = discover_pd_source_candidates(contract['figure_id'], si, mid, topology_source_map)
+        all_rows.extend(_finalize_pd_candidate_row(r) for r in candidates)
+    return all_rows
+
+
+def figure_pd_source_verdict(discovery_rows_for_method):
+    """Reduces one method's discovered candidate rows to a single verdict:
+    available_validated beats pending beats unavailable."""
+    statuses = {r['usable_status'] for r in discovery_rows_for_method}
+    if STATUS_AVAILABLE in statuses:
+        return STATUS_AVAILABLE
+    if STATUS_PENDING in statuses or not statuses:
+        return STATUS_PENDING
+    return STATUS_UNAVAILABLE
 
 
 def require_pd_diagram_sources_for_figure(contract, manifest, topology_source_map):
-    """Hard-fails (never fabricates) if any full-panel method required by a
-    pd_evidence/pd_comparison panel in this figure has no resolvable PD
-    coordinate source."""
+    """Render-time gate: hard-fails (never fabricates) unless every
+    full-panel method required by a pd_evidence/pd_comparison panel has an
+    available_validated coordinate source. A pending or unavailable verdict
+    both block real coordinate rendering -- callers should switch to the
+    scalar fallback (Section 3) once a method's verdict is confirmed
+    unavailable, never before."""
     si = manifest[contract['archetype_id']]
-    missing = [mid for mid in contract['full_panel_methods']
-                if resolve_pd_diagram_source(mid, si, topology_source_map) is None]
-    if missing:
+    verdicts = {}
+    for mid in (['GT'] + contract['full_panel_methods']):
+        rows = discover_pd_source_candidates(contract['figure_id'], si, mid, topology_source_map)
+        rows = [_finalize_pd_candidate_row(r) for r in rows]
+        verdicts[mid] = figure_pd_source_verdict(rows)
+    not_ready = {mid: v for mid, v in verdicts.items() if v != STATUS_AVAILABLE}
+    if not_ready:
         raise SystemExit(
-            f"[hard-fail] Figure {contract['figure_id']} requires a PD evidence/comparison panel for "
-            f"{[HUMAN_LABELS[m] for m in missing]}, but no frozen PD coordinate source was found for "
-            f'sample_idx={si!r}. Refusing to fabricate this panel.'
+            f"[hard-fail] Figure {contract['figure_id']} requires a real PD coordinate panel for "
+            f'sample_idx={si!r}, but the following methods have no available_validated source: {not_ready}. '
+            f'Refusing to fabricate this panel. Methods with usable_status=unavailable_after_authoritative_'
+            f'spark_audit should use the scalar PD-evidence fallback instead (see '
+            f'build_scalar_pd_fallback_rows / render_pd_evidence_panel).'
         )
+    return verdicts
 
 
 # =============================================================================
@@ -532,10 +817,11 @@ FINAL_PANEL_MANIFEST_FIELDS = [
 ]
 
 
-def build_final_panel_manifest_rows(manifest, topology_source_map):
+def build_final_panel_manifest_rows(manifest, pd_verdicts_by_figure):
     rows = []
     for c in FIGURE_CONTRACTS:
         si = manifest[c['archetype_id']]
+        pd_verdicts = pd_verdicts_by_figure.get(c['figure_id'], {})
         for panel_type in c['panels']:
             if panel_type in PER_METHOD_PANEL_TYPES:
                 for mid in (['GT'] + c['full_panel_methods']):
@@ -544,22 +830,24 @@ def build_final_panel_manifest_rows(manifest, topology_source_map):
                     role = c['method_roles'].get(mid, 'primary')
                     needs_manual = panel_type in MT_PANEL_TYPES
                     needs_pd_source = panel_type in PD_DIAGRAM_PANEL_TYPES
-                    pd_found = ''
+                    pd_verdict = ''
                     status = 'planned_not_rendered'
                     if needs_manual:
                         status = 'blocked_awaiting_manual_topology_input'
                     elif needs_pd_source:
-                        pd_found = (mid == 'GT') or (resolve_pd_diagram_source(mid, si, topology_source_map)
-                                                       is not None)
-                        if not pd_found:
-                            status = 'blocked_missing_pd_source'
+                        pd_verdict = pd_verdicts.get(mid, STATUS_PENDING)
+                        status = {
+                            STATUS_AVAILABLE: 'planned_not_rendered',
+                            STATUS_PENDING: STATUS_PENDING,
+                            STATUS_UNAVAILABLE: 'scalar_fallback_planned',
+                        }[pd_verdict]
                     rows.append(dict(
                         figure_id=c['figure_id'], archetype_id=c['archetype_id'], sample_idx=si,
                         panel_type=panel_type, method_id=mid,
                         display_label=(GT_DISPLAY_LABEL if mid == 'GT' else HUMAN_LABELS[mid]),
                         method_role=role, output_path=panel_output_path(c, panel_type, mid),
                         requires_manual_topology_input=needs_manual,
-                        requires_pd_coordinate_source=needs_pd_source, pd_coordinate_source_found=pd_found,
+                        requires_pd_coordinate_source=needs_pd_source, pd_coordinate_source_found=pd_verdict,
                         status=status,
                     ))
             else:
@@ -570,6 +858,54 @@ def build_final_panel_manifest_rows(manifest, topology_source_map):
                     requires_manual_topology_input=False, requires_pd_coordinate_source=False,
                     pd_coordinate_source_found='', status='planned_not_rendered',
                 ))
+    return rows
+
+
+FINAL_COMPOSITE_MANIFEST_FIELDS = [
+    'figure_id', 'panel_order', 'panel_group', 'panel_type', 'method_id', 'source_path', 'final_visible_status',
+]
+
+
+def build_final_composite_manifest_rows(manifest, pd_verdicts_by_figure):
+    """Section 7: the EXPLICIT ordered manifest --assemble-composites must
+    use exclusively (never glob-and-alphabetically-sort). One row per panel
+    that will appear in the final composite, in declared method/panel
+    order, with a deterministic source_path routed by the current PD
+    discovery verdict (coordinate panel, scalar fallback, or still-pending)."""
+    rows = []
+    for c in FIGURE_CONTRACTS:
+        pd_verdicts = pd_verdicts_by_figure.get(c['figure_id'], {})
+        order = 0
+
+        def add(group, panel_type, mid, source_path, visible_status):
+            nonlocal order
+            order += 1
+            rows.append(dict(figure_id=c['figure_id'], panel_order=order, panel_group=group,
+                                panel_type=panel_type, method_id=mid, source_path=source_path,
+                                final_visible_status=visible_status))
+
+        for panel_type in c['panels']:
+            if panel_type in MT_PANEL_TYPES:
+                for mid in (['GT'] + c['full_panel_methods']):
+                    add('manual_topology', panel_type, mid,
+                         f"ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/"
+                         f"figure_{c['figure_id']:02d}/{mid}_mt.png", 'visible')
+            elif panel_type in PD_DIAGRAM_PANEL_TYPES:
+                for mid in (['GT'] + c['full_panel_methods']):
+                    verdict = pd_verdicts.get(mid, STATUS_PENDING)
+                    if verdict == STATUS_AVAILABLE:
+                        add('pd_coordinate', panel_type, mid, panel_output_path(c, panel_type, mid), 'visible')
+                    elif verdict == STATUS_UNAVAILABLE:
+                        add('pd_scalar_fallback', panel_type, mid,
+                             panel_output_path(c, panel_type, 'scalar_fallback'), 'scalar_fallback')
+                    else:
+                        add('pd_coordinate', panel_type, mid, panel_output_path(c, panel_type, mid), 'pending')
+            elif panel_type in PER_METHOD_PANEL_TYPES:
+                methods = c['full_panel_methods'] if panel_type == ERROR_MAPS else (['GT'] + c['full_panel_methods'])
+                for mid in methods:
+                    add('scripted_per_method', panel_type, mid, panel_output_path(c, panel_type, mid), 'visible')
+            else:
+                add('scripted_figure_level', panel_type, '', panel_output_path(c, panel_type, None), 'visible')
     return rows
 
 
@@ -708,6 +1044,13 @@ def validate_panel_manifest(panel_rows):
     return rows
 
 
+FINAL_FIGURE_VALIDATION_FIELDS = [
+    'figure_id', 'archetype_id', 'sample_idx', 'expected_png_path', 'expected_vector_path', 'png_exists',
+    'width_px', 'height_px', 'dpi_x', 'dpi_y', 'png_file_size_bytes', 'png_min_dpi_ok', 'vector_exists',
+    'pdf_page_count', 'pdf_file_size_bytes', 'pdf_valid', 'vector_kind', 'status',
+]
+
+
 def build_not_yet_rendered_final_figure_validation(manifest):
     rows = []
     for c in FIGURE_CONTRACTS:
@@ -715,8 +1058,10 @@ def build_not_yet_rendered_final_figure_validation(manifest):
         paths = final_figure_paths(c)
         rows.append(dict(
             figure_id=c['figure_id'], archetype_id=c['archetype_id'], sample_idx=si,
-            expected_png_path=paths['png'], expected_vector_path=paths['pdf'],
-            png_exists=False, png_min_dpi_ok='', vector_exists=False, status='not_yet_rendered',
+            expected_png_path=paths['png'], expected_vector_path=paths['pdf'], png_exists=False,
+            width_px='', height_px='', dpi_x='', dpi_y='', png_file_size_bytes='', png_min_dpi_ok='',
+            vector_exists=False, pdf_page_count='', pdf_file_size_bytes='', pdf_valid='', vector_kind='',
+            status='not_yet_rendered',
         ))
     return rows
 
@@ -769,7 +1114,8 @@ CAPTIONS_PATH = PLAN_DIR / 'final_figure_captions.md'
 # Report
 # =============================================================================
 
-def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows, is_full_complete=False):
+def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows=None,
+                                is_full_complete=False):
     lines = []
     a = lines.append
     a('# Phase 2D-B: Final Publication-Quality Figure Production')
@@ -786,7 +1132,7 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
     a('## 1. Scope and frozen inputs')
     a('')
     a('This document reflects a `--plan-only` run in a lightweight checkout. It reads exclusively frozen '
-      'Phase-1 through Phase-2D-A artifacts (103 files, checksummed before and after this stage) and never '
+      'Phase-1 through Phase-2D-A artifacts (118 files, checksummed before and after this stage) and never '
       'touches `data_out/`, `data_out_fixed/`, or reruns any training/inference/TTK step. Phase 2D-A is '
       'treated as complete and authoritative; no sample is re-selected and no alternate is activated here.')
     a('')
@@ -827,15 +1173,24 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
           '(`data_out_fixed/`/`data_out/`), which are absent in this lightweight checkout by design. '
           '`select_deterministic_zoom()` is implemented and synthetic-tested; it will run in `--render-fields`.')
     a('')
-    a('## 5. PD coordinate source status')
+    a('## 5. Authoritative PD coordinate source discovery')
     a('')
-    a('This project\'s frozen topology artifacts (every CSV referenced by `column_mapping.csv`) were directly '
-      'inspected and contain only the scalar `pd_distance`/`mt_distance` value per sample/method -- never raw '
-      'persistence-diagram birth/death coordinates. `resolve_pd_diagram_source()` documents the deterministic '
-      'naming convention such coordinate exports would need; it currently finds none for any method. Every '
-      '`pd_evidence`/`pd_comparison` panel is recorded with `status=blocked_missing_pd_source` in '
-      '`plan/final_panel_manifest.csv` (Figures 1, 2, 3). `--render-fields` will hard-fail rather than '
-      'fabricate these panels unless coordinate-level PD data becomes available.')
+    if pd_discovery_rows:
+        n_avail = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_AVAILABLE)
+        n_pending = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_PENDING)
+        n_unavail = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_UNAVAILABLE)
+        env = 'a lightweight (non-Spark) checkout' if IS_LIGHTWEIGHT_CHECKOUT else 'the authoritative Spark machine'
+        a(f'A real, repository-relative filesystem search (`plan/pd_source_discovery.csv`, {len(pd_discovery_rows)} '
+          f'candidate row(s)) was performed for every (figure, method) requiring a `pd_evidence`/`pd_comparison` '
+          f'panel -- GT and Bicubic included, neither assumed found without a concrete `candidate_path`. This '
+          f'process is running in {env}: {n_avail} candidate(s) available_validated, {n_pending} '
+          f'pending_authoritative_spark_source_discovery, {n_unavail} unavailable_after_authoritative_spark_audit. '
+          f'`blocked_missing_pd_source` is never used before this authoritative search has run to completion on '
+          f'Spark. Search roots included topology source parent directories and their `pd/`/`pd_diagrams/` '
+          f'children, `<method>_topology/pd/` sibling conventions, and `ttk_runs_fixed/combined/`; existing '
+          f'PD-overlay-related scripts already in this repository were also inventoried for provenance.')
+    else:
+        a('Not yet run in this render state.')
     a('')
     a('## 6. Manual topology (merge-tree) requirements')
     a('')
@@ -854,7 +1209,7 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
       f'({REPRO_TOLERANCE:g}); hard-fails on any disagreement.')
     a('- `validation/panel_validation.csv`: every planned panel structurally matches its figure contract.')
     a('- `validation/final_figure_validation.csv`: all six final figures are `status=not_yet_rendered`.')
-    a('- `validation/prior_phase_immutability_check.csv`: all 103 protected files confirmed unchanged.')
+    a('- `validation/prior_phase_immutability_check.csv`: all 118 protected files confirmed unchanged.')
     a('')
     a('## 8. Exact commands to complete Phase 2D-B on Spark')
     a('')
@@ -874,10 +1229,11 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
     a('Planning-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2db/`):')
     for rel in [
         'plan/final_figure_plan.csv', 'plan/final_panel_manifest.csv', 'plan/manual_topology_requirements.csv',
-        'plan/final_figure_captions.md',
+        'plan/pd_source_discovery.csv', 'plan/final_composite_manifest.csv', 'plan/final_figure_captions.md',
     ] + [f'figure_data/{FIGURE_DATA_FILENAMES[i]}' for i in range(1, 7)] + [
         'validation/prior_phase_immutability_check.csv', 'validation/figure_data_reproduction.csv',
         'validation/panel_validation.csv', 'validation/final_figure_validation.csv',
+        'validation/zoom_selection_validation.csv', 'validation/panel_scale_provenance.csv',
     ]:
         a(f'- `ttk_runs_fixed/unified_candidate_analysis/phase2db/{rel}`')
     a('- `docs/unified_candidate_analysis_phase2db.md` (this file)')
@@ -889,8 +1245,10 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
     return lines
 
 
-def write_phase2db_doc(manifest, zoom_result, manual_topo_rows, panel_rows, is_full_complete=False):
-    lines = build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows, is_full_complete)
+def write_phase2db_doc(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows=None,
+                          is_full_complete=False):
+    lines = build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows,
+                                        is_full_complete)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     DOC_PATH.write_text('\n'.join(lines) + '\n')
     log(f'[write] {DOC_PATH}')
@@ -905,13 +1263,14 @@ def cmd_plan_only() -> dict:
     log('=' * 88)
     log('Unified candidate figures -- Phase 2D-B (--plan-only)')
     log(f'Repo root: {REPO_ROOT}')
-    log('Read-only w.r.t. Phase-1/2A/2B/2C/2D-A artifacts (103 files). Reads only frozen CSV/Markdown '
+    log('Read-only w.r.t. Phase-1/2A/2B/2C/2D-A artifacts (118 files). Reads only frozen CSV/Markdown '
         'inputs; touches no raw .npy array; renders no image.')
     log('=' * 88)
 
     checksums_before, file_to_phase = preflight_immutability()
 
     manifest = read_and_validate_selection_manifest()
+    require_completed_phase2d_a_state(manifest)
     log(f'[selection] Frozen sample set confirmed: {manifest}')
 
     method_inventory = p2da.load_method_inventory()
@@ -925,11 +1284,28 @@ def cmd_plan_only() -> dict:
     figure_plan_rows = build_final_figure_plan_rows(manifest)
     write_csv(PLAN_DIR / 'final_figure_plan.csv', FINAL_FIGURE_PLAN_FIELDS, figure_plan_rows)
 
-    panel_rows = build_final_panel_manifest_rows(manifest, topology_source_map)
+    pd_discovery_rows = []
+    pd_verdicts_by_figure = {}
+    for c in FIGURE_CONTRACTS:
+        rows_for_figure = discover_pd_sources_for_figure(c, manifest, topology_source_map)
+        pd_discovery_rows.extend(rows_for_figure)
+        by_method = {}
+        for mid in dict.fromkeys(r['method_id'] for r in rows_for_figure):
+            by_method[mid] = figure_pd_source_verdict([r for r in rows_for_figure if r['method_id'] == mid])
+        pd_verdicts_by_figure[c['figure_id']] = by_method
+    write_csv(PLAN_DIR / 'pd_source_discovery.csv', PD_SOURCE_DISCOVERY_FIELDS, pd_discovery_rows)
+    overlay_scripts = find_pd_overlay_scripts()
+    log(f'[pd-discovery] Found {len(overlay_scripts)} existing PD-overlay-related script(s) (informational): '
+        f'{[str(p.relative_to(REPO_ROOT)) for p in overlay_scripts]}')
+
+    panel_rows = build_final_panel_manifest_rows(manifest, pd_verdicts_by_figure)
     write_csv(PLAN_DIR / 'final_panel_manifest.csv', FINAL_PANEL_MANIFEST_FIELDS, panel_rows)
 
     manual_topo_rows = build_manual_topology_requirements_rows(manifest)
     write_csv(PLAN_DIR / 'manual_topology_requirements.csv', MANUAL_TOPOLOGY_REQ_FIELDS, manual_topo_rows)
+
+    composite_manifest_rows = build_final_composite_manifest_rows(manifest, pd_verdicts_by_figure)
+    write_csv(PLAN_DIR / 'final_composite_manifest.csv', FINAL_COMPOSITE_MANIFEST_FIELDS, composite_manifest_rows)
 
     zoom_result = None  # requires real GT/error arrays; absent by design in this checkout
 
@@ -951,27 +1327,39 @@ def cmd_plan_only() -> dict:
                 'notes'], panel_validation_rows)
 
     final_figure_validation_rows = build_not_yet_rendered_final_figure_validation(manifest)
-    write_csv(VALIDATION_DIR / 'final_figure_validation.csv',
-               ['figure_id', 'archetype_id', 'sample_idx', 'expected_png_path', 'expected_vector_path',
-                'png_exists', 'png_min_dpi_ok', 'vector_exists', 'status'], final_figure_validation_rows)
+    write_csv(VALIDATION_DIR / 'final_figure_validation.csv', FINAL_FIGURE_VALIDATION_FIELDS,
+               final_figure_validation_rows)
+
+    write_zoom_selection_validation(zoom_result, manifest)
+    write_csv(VALIDATION_DIR / 'panel_scale_provenance.csv',
+               ['figure_id', 'speed_vmin', 'speed_vmax', 'error_vmin', 'error_vmax', 'colormap_speed',
+                'colormap_error', 'physical_units'], [])
 
     write_captions_md(manifest)
-    write_phase2db_doc(manifest, zoom_result, manual_topo_rows, panel_rows, is_full_complete=False)
+    write_phase2db_doc(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows,
+                         is_full_complete=False)
 
     postflight_immutability(checksums_before, file_to_phase, VALIDATION_DIR / 'prior_phase_immutability_check.csv')
 
     n_manual_missing = sum(1 for r in manual_topo_rows if r['status'] == 'missing')
-    n_pd_blocked = sum(1 for r in panel_rows if r['status'] == 'blocked_missing_pd_source')
+    n_pd_available = sum(1 for r in panel_rows if r['requires_pd_coordinate_source']
+                           and r['pd_coordinate_source_found'] == STATUS_AVAILABLE)
+    n_pd_pending = sum(1 for r in panel_rows if r['requires_pd_coordinate_source']
+                         and r['pd_coordinate_source_found'] == STATUS_PENDING)
+    n_pd_unavailable = sum(1 for r in panel_rows if r['requires_pd_coordinate_source']
+                             and r['pd_coordinate_source_found'] == STATUS_UNAVAILABLE)
     log('')
     log('=' * 88)
     log(f'RESULT: phase2db_planning_complete_final_rendering_pending. 6 figure plans, {len(panel_rows)} '
-        f'planned panels ({n_manual_missing} awaiting manual topology input, {n_pd_blocked} blocked on a '
-        f'missing PD coordinate source), {len(repro_rows)} figure-data values reproduced within tolerance.')
+        f'planned panels ({n_manual_missing} awaiting manual topology input, {n_pd_available} PD panels '
+        f'available_validated, {n_pd_pending} pending_authoritative_spark_source_discovery, '
+        f'{n_pd_unavailable} unavailable_after_authoritative_spark_audit), {len(repro_rows)} figure-data '
+        f'values reproduced within tolerance.')
     log('=' * 88)
     flush_log(LOG_PATH)
     return dict(manifest=manifest, figure_plan_rows=figure_plan_rows, panel_rows=panel_rows,
                  manual_topo_rows=manual_topo_rows, figure_data_by_id=figure_data_by_id,
-                 repro_rows=repro_rows)
+                 repro_rows=repro_rows, pd_discovery_rows=pd_discovery_rows)
 
 
 # =============================================================================
@@ -1097,6 +1485,370 @@ def render_zoom_crop_panel(contract, manifest, gt_speed, method_speeds, zoom):
     return str(out_path.relative_to(REPO_ROOT))
 
 
+# =============================================================================
+# Real PD panel rendering (Section 3): reads VALIDATED birth/death
+# coordinates (never fabricates), verifies finiteness and sample/method
+# identity, uses common axes within a figure, draws the diagonal, and
+# annotates the frozen scalar PD distance. When a method's authoritative
+# discovery verdict is unavailable_after_authoritative_spark_audit (never
+# merely pending), the figure contract switches to a scalar PD-evidence
+# fallback panel for that method instead.
+# =============================================================================
+
+def read_pd_coordinates_csv(path):
+    birth, death = [], []
+    with Path(path).open(newline='') as fh:
+        for row in csv.DictReader(fh):
+            b = next((row[k] for k in row if k.strip().lower() in ('birth', 'birth_x', 'x_birth', 'birth_value')),
+                       None)
+            d = next((row[k] for k in row if k.strip().lower() in ('death', 'death_x', 'x_death', 'death_value')),
+                       None)
+            if b is None or d is None:
+                continue
+            birth.append(float(b))
+            death.append(float(d))
+    birth, death = np.asarray(birth, dtype=np.float64), np.asarray(death, dtype=np.float64)
+    if birth.size == 0:
+        raise SystemExit(f'[hard-fail] PD coordinate source {path} produced zero birth/death pairs.')
+    if not (np.isfinite(birth).all() and np.isfinite(death).all()):
+        raise SystemExit(f'[hard-fail] PD coordinate source {path} contains non-finite birth/death values.')
+    return birth, death
+
+
+def read_pd_coordinates_from_vtu(path):
+    try:
+        import vtk
+        from vtk.util.numpy_support import vtk_to_numpy
+    except ImportError:
+        raise SystemExit(
+            f'[hard-fail] Cannot parse VTU PD source {path}: the `vtk` package is not installed in this '
+            f'environment. Install VTK, or supply a pre-extracted birth/death coordinate CSV instead. '
+            f'Refusing to fabricate coordinates.'
+        )
+    reader = vtk.vtkXMLUnstructuredGridReader()
+    reader.SetFileName(str(path))
+    reader.Update()
+    points = reader.GetOutput().GetPoints()
+    if points is None:
+        raise SystemExit(f'[hard-fail] VTU PD source {path} has no point data.')
+    coords = vtk_to_numpy(points.GetData())
+    if coords.ndim != 2 or coords.shape[1] < 2:
+        raise SystemExit(f'[hard-fail] VTU PD source {path} point data has fewer than 2 dimensions.')
+    birth, death = coords[:, 0].astype(np.float64), coords[:, 1].astype(np.float64)
+    if not (np.isfinite(birth).all() and np.isfinite(death).all()):
+        raise SystemExit(f'[hard-fail] VTU PD source {path} contains non-finite birth/death coordinates.')
+    return birth, death
+
+
+def load_validated_pd_coordinates(candidate_path):
+    path = REPO_ROOT / candidate_path
+    if path.suffix.lower() == '.csv':
+        return read_pd_coordinates_csv(path)
+    return read_pd_coordinates_from_vtu(path)
+
+
+def render_pd_diagram_panels(contract, panel_type, manifest, per_sample, pd_sources_by_method):
+    """Real coordinate-based PD panel renderer: one panel per method (GT +
+    full_panel_methods with an available_validated source), common axes
+    within the figure, the diagonal drawn, and the frozen scalar PD
+    distance annotated. `pd_sources_by_method` maps method_id -> validated
+    candidate_path (only for methods with usable_status==available_validated
+    -- callers must route unavailable methods to the scalar fallback
+    instead)."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    si = manifest[contract['archetype_id']]
+    out_dir = PANELS_DIR / figure_dir_name(contract)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    methods = ['GT'] + [m for m in contract['full_panel_methods'] if m in pd_sources_by_method]
+    coords = {mid: load_validated_pd_coordinates(pd_sources_by_method[mid]) for mid in methods
+               if mid in pd_sources_by_method}
+    if 'GT' not in pd_sources_by_method:
+        raise SystemExit(
+            f"[hard-fail] Figure {contract['figure_id']} {panel_type} panel requires a validated GT PD "
+            f'coordinate source; GT is never assumed found without a concrete candidate_path.'
+        )
+    all_vals = np.concatenate([np.concatenate([b, d]) for b, d in coords.values()])
+    lo, hi = float(all_vals.min()), float(all_vals.max())
+    rows = []
+    for mid in methods:
+        birth, death = coords[mid]
+        fig, ax = plt.subplots(figsize=(2.6, 2.6), dpi=300)
+        ax.plot([lo, hi], [lo, hi], color='gray', linestyle='--', linewidth=0.8, label='diagonal')
+        ax.scatter(birth, death, s=6, alpha=0.7)
+        ax.set_xlim(lo, hi)
+        ax.set_ylim(lo, hi)
+        label = GT_DISPLAY_LABEL if mid == 'GT' else HUMAN_LABELS[mid]
+        if mid != 'GT':
+            pd_val = per_sample[mid][si]['pd_distance']
+            ax.set_title(f'{label}\nPD distance={pd_val:.3f}', fontsize=8)
+        else:
+            ax.set_title(label, fontsize=8)
+        ax.set_xlabel('Birth', fontsize=7)
+        ax.set_ylabel('Death', fontsize=7)
+        out_path = out_dir / f'{panel_type}_{mid}.png'
+        fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+        plt.close(fig)
+        rows.append(dict(output_path=str(out_path.relative_to(REPO_ROOT)), method_id=mid, panel_type=panel_type))
+    return rows
+
+
+def render_scalar_pd_fallback_panel(contract, panel_type, manifest, per_sample, fallback_methods):
+    """Scalar PD-evidence fallback (Section 3): used only for methods whose
+    authoritative discovery verdict is confirmed
+    unavailable_after_authoritative_spark_audit. Draws the frozen PD
+    distance, method rank, and pairwise improvement margin vs CNN as a
+    compact bar/dot comparison -- never a fabricated diagram."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    si = manifest[contract['archetype_id']]
+    out_dir = PANELS_DIR / figure_dir_name(contract)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    labels, values, margins = [], [], []
+    for mid in fallback_methods:
+        pd_val = per_sample.get(mid, {}).get(si, {}).get('pd_distance', float('nan'))
+        cnn_val = per_sample.get(CNN, {}).get(si, {}).get('pd_distance', float('nan'))
+        labels.append(HUMAN_LABELS[mid])
+        values.append(pd_val if math.isfinite(pd_val) else 0.0)
+        margins.append((cnn_val - pd_val) if (math.isfinite(pd_val) and math.isfinite(cnn_val)) else float('nan'))
+    fig, ax = plt.subplots(figsize=(1.6 * max(len(fallback_methods), 1), 2.4), dpi=300)
+    finite_mask = [math.isfinite(per_sample.get(mid, {}).get(si, {}).get('pd_distance', float('nan')))
+                    for mid in fallback_methods]
+    colors = ['#4C72B0' if ok else '#BBBBBB' for ok in finite_mask]
+    ax.bar(labels, values, color=colors)
+    for i, (v, ok) in enumerate(zip(values, finite_mask)):
+        ax.text(i, v, (f'{v:.2f}' if ok else 'N/A'), ha='center', va='bottom', fontsize=7)
+    ax.set_ylabel('PD distance (scalar fallback)', fontsize=7)
+    ax.set_title('Scalar PD-evidence fallback\n(no validated coordinate source)', fontsize=8)
+    out_path = out_dir / f'{panel_type}_scalar_fallback.png'
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    plt.close(fig)
+    return dict(output_path=str(out_path.relative_to(REPO_ROOT)), method_id=','.join(fallback_methods),
+                 panel_type=panel_type)
+
+
+def render_pd_mt_tradeoff_compact_panel(contract, manifest, per_sample):
+    """Figure 4: compact PD-vs-MT improvement scatter for each required
+    method relative to CNN."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    si = manifest[contract['archetype_id']]
+    out_dir = PANELS_DIR / figure_dir_name(contract)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cnn_pd = per_sample[CNN][si]['pd_distance']
+    cnn_mt = per_sample[CNN][si]['mt_distance']
+    fig, ax = plt.subplots(figsize=(2.8, 2.8), dpi=300)
+    for mid in contract['required_methods']:
+        if mid == CNN:
+            continue
+        pd_imp = cnn_pd - per_sample[mid][si]['pd_distance']
+        mt_imp = cnn_mt - per_sample[mid][si]['mt_distance']
+        ax.scatter(pd_imp, mt_imp, s=30)
+        ax.annotate(HUMAN_LABELS[mid], (pd_imp, mt_imp), fontsize=6, xytext=(3, 3), textcoords='offset points')
+    ax.axhline(0, color='gray', linewidth=0.6)
+    ax.axvline(0, color='gray', linewidth=0.6)
+    ax.set_xlabel('PD improvement vs CNN', fontsize=7)
+    ax.set_ylabel('MT improvement vs CNN', fontsize=7)
+    ax.set_title('PD/MT tradeoff (compact)', fontsize=8)
+    out_path = out_dir / f'{PD_MT_TRADEOFF_COMPACT}.png'
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    plt.close(fig)
+    return str(out_path.relative_to(REPO_ROOT))
+
+
+def render_pd_mt_comparison_compact_panel(contract, manifest, per_sample):
+    """Figure 6: compact side-by-side PD/MT bar comparison across required
+    methods (both descriptors, not just a tradeoff scatter)."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
+    si = manifest[contract['archetype_id']]
+    out_dir = PANELS_DIR / figure_dir_name(contract)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    methods = contract['required_methods']
+    pd_vals = [per_sample[mid][si]['pd_distance'] for mid in methods]
+    mt_vals = [per_sample[mid][si]['mt_distance'] for mid in methods]
+    x = np.arange(len(methods))
+    width = 0.35
+    fig, ax = plt.subplots(figsize=(1.4 * len(methods), 2.6), dpi=300)
+    ax.bar(x - width / 2, pd_vals, width, label='PD')
+    ax.bar(x + width / 2, mt_vals, width, label='MT')
+    ax.set_xticks(x)
+    ax.set_xticklabels([HUMAN_LABELS[mid] for mid in methods], fontsize=6, rotation=30, ha='right')
+    ax.legend(fontsize=7)
+    ax.set_title('PD/MT comparison (compact)', fontsize=8)
+    out_path = out_dir / f'{PD_MT_COMPARISON_COMPACT}.png'
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    plt.close(fig)
+    return str(out_path.relative_to(REPO_ROOT))
+
+
+def best_available_pd_source(discovery_rows_for_method):
+    for r in discovery_rows_for_method:
+        if r['usable_status'] == STATUS_AVAILABLE:
+            return r['candidate_path']
+    return None
+
+
+def render_figure_transactional(contract, panel_render_fn):
+    """Renders one figure's panels into a temporary staging directory
+    (inside the repo tree, so relative-path bookkeeping stays valid),
+    validates every declared panel actually exists and is non-empty, and
+    only then promotes the staged directory over the authoritative
+    panels/<figure_dir>/ location -- replacing it wholesale, so any stale
+    or unexpected PNG left over from a prior run is removed. On any
+    failure, the staging directory is discarded and the authoritative
+    directory is left completely untouched (no partial update)."""
+    import shutil
+    import tempfile
+
+    global PANELS_DIR
+    real_panels_dir = PANELS_DIR
+    staging_base = OUT_DIR / '_staging'
+    staging_base.mkdir(parents=True, exist_ok=True)
+    staging_run_dir = Path(tempfile.mkdtemp(prefix=f"fig{contract['figure_id']:02d}_", dir=staging_base))
+    PANELS_DIR = staging_run_dir
+    try:
+        result = panel_render_fn()
+        rows = result[0] if isinstance(result, tuple) else result
+        for r in rows:
+            p = REPO_ROOT / r['output_path']
+            if not p.exists() or p.stat().st_size == 0:
+                raise SystemExit(
+                    f"[hard-fail] Figure {contract['figure_id']}: declared panel {r['output_path']} was not "
+                    f'actually produced (missing or empty). No partial panel set was promoted to the '
+                    f'authoritative directory.'
+                )
+    except BaseException:
+        shutil.rmtree(staging_run_dir, ignore_errors=True)
+        PANELS_DIR = real_panels_dir
+        raise
+    PANELS_DIR = real_panels_dir
+    staged_figure_dir = staging_run_dir / figure_dir_name(contract)
+    final_dir = PANELS_DIR / figure_dir_name(contract)
+    if final_dir.exists():
+        shutil.rmtree(final_dir)  # reject/remove stale unexpected PNGs from a prior run
+    final_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(staged_figure_dir), str(final_dir))
+    shutil.rmtree(staging_run_dir, ignore_errors=True)
+    staged_rel = str(staging_run_dir.relative_to(REPO_ROOT) / figure_dir_name(contract))
+    final_rel = str(final_dir.relative_to(REPO_ROOT))
+    if isinstance(result, tuple):
+        promoted_rows = [dict(r, output_path=r['output_path'].replace(staged_rel, final_rel)) for r in rows]
+        return (promoted_rows,) + result[1:]
+    return [dict(r, output_path=r['output_path'].replace(staged_rel, final_rel)) for r in rows]
+
+
+def render_all_panels_for_figure(contract, manifest, audit, ordered_selected, per_sample, pd_verdicts,
+                                    pd_discovery_rows_by_method):
+    """Renders EVERY declared scripted panel type for one figure. No panel
+    type declared in a figure contract is ever skipped or silently marked
+    rendered without a real renderer call."""
+    si = manifest[contract['archetype_id']]
+    panel_rows, gt_speed, method_speeds, panel_data = render_speed_and_error_panels(
+        contract, manifest, audit, ordered_selected)
+    panel_rows.append(dict(output_path=render_metric_strip(contract, manifest, per_sample), method_id='',
+                              panel_type=METRIC_STRIP))
+
+    scale_row = dict(
+        figure_id=contract['figure_id'], speed_vmin=panel_data['speed_vmin'], speed_vmax=panel_data['speed_vmax'],
+        error_vmin=panel_data['error_vmin'], error_vmax=panel_data['error_vmax'], colormap_speed='cividis',
+        colormap_error='magma', physical_units='m/s',
+    )
+
+    zoom_result = None
+    for panel_type in contract['panels']:
+        if panel_type in PD_DIAGRAM_PANEL_TYPES:
+            pending = [mid for mid in (['GT'] + contract['full_panel_methods'])
+                        if pd_verdicts.get(mid) == STATUS_PENDING]
+            if pending:
+                raise SystemExit(
+                    f"[hard-fail] Figure {contract['figure_id']} {panel_type}: {pending} still "
+                    f'pending_authoritative_spark_source_discovery. Cannot render a real panel or fall back '
+                    f'to the scalar path until the authoritative Spark search concludes for these methods.'
+                )
+            available = {mid: best_available_pd_source(pd_discovery_rows_by_method[mid])
+                          for mid in (['GT'] + contract['full_panel_methods'])
+                          if pd_verdicts.get(mid) == STATUS_AVAILABLE}
+            unavailable = [mid for mid in contract['full_panel_methods']
+                            if pd_verdicts.get(mid) == STATUS_UNAVAILABLE]
+            if available:
+                if pd_verdicts.get('GT') != STATUS_AVAILABLE:
+                    raise SystemExit(
+                        f"[hard-fail] Figure {contract['figure_id']} {panel_type}: GT has no "
+                        f'available_validated PD coordinate source; refusing to render method panels '
+                        f'without a validated GT reference.'
+                    )
+                panel_rows.extend(render_pd_diagram_panels(contract, panel_type, manifest, per_sample, available))
+            if unavailable:
+                panel_rows.append(render_scalar_pd_fallback_panel(contract, panel_type, manifest, per_sample,
+                                                                      unavailable))
+        elif panel_type == PD_MT_TRADEOFF_COMPACT:
+            panel_rows.append(dict(output_path=render_pd_mt_tradeoff_compact_panel(contract, manifest, per_sample),
+                                      method_id='', panel_type=panel_type))
+        elif panel_type == PD_MT_COMPARISON_COMPACT:
+            panel_rows.append(dict(
+                output_path=render_pd_mt_comparison_compact_panel(contract, manifest, per_sample),
+                method_id='', panel_type=panel_type))
+        elif panel_type == ZOOM_CROP:
+            zoom_result = select_deterministic_zoom(
+                gt_speed, {mid: np.abs(method_speeds[mid] - gt_speed) for mid in contract['full_panel_methods']})
+            panel_rows.append(dict(
+                output_path=render_zoom_crop_panel(contract, manifest, gt_speed, method_speeds, zoom_result),
+                method_id='', panel_type=ZOOM_CROP))
+        # speed_fields, error_maps, metric_strip already rendered above; MT_* panel
+        # types are manual-only (Section 8) and are never scripted here.
+
+    return panel_rows, scale_row, zoom_result
+
+
+def propagate_zoom_result(zoom_result, manifest):
+    """Section 6: writes the exact zoom bounds and score to all four
+    required destinations. No-op (leaves them in their pending state) when
+    zoom_result is None."""
+    fig3 = FIGURE_BY_ID[3]
+    si = manifest[fig3['archetype_id']]
+    if zoom_result is None:
+        return
+    fd_path = FIGURE_DATA_DIR / FIGURE_DATA_FILENAMES[3]
+    if fd_path.exists():
+        rows = p2da.read_csv_dicts(fd_path)
+        for r in rows:
+            r['zoom_y0'], r['zoom_y1'] = zoom_result['y0'], zoom_result['y1']
+            r['zoom_x0'], r['zoom_x1'] = zoom_result['x0'], zoom_result['x1']
+        write_csv(fd_path, FIGURE_DATA_FIELDS, rows)
+    pm_path = PLAN_DIR / 'final_panel_manifest.csv'
+    if pm_path.exists():
+        rows = p2da.read_csv_dicts(pm_path)
+        for r in rows:
+            if int(r['figure_id']) == 3 and r['panel_type'] == ZOOM_CROP:
+                r['status'] = 'rendered'
+        write_csv(pm_path, FINAL_PANEL_MANIFEST_FIELDS, rows)
+
+
+def write_zoom_selection_validation(zoom_result, manifest):
+    fig3 = FIGURE_BY_ID[3]
+    si = manifest[fig3['archetype_id']]
+    row = dict(
+        figure_id=3, archetype_id=fig3['archetype_id'], sample_idx=si, window_size=ZOOM_WINDOW_SIZE,
+        stride=ZOOM_STRIDE, scoring_formula=ZOOM_SCORE_FORMULA,
+        y0=nfmt(zoom_result['y0']) if zoom_result else '', y1=nfmt(zoom_result['y1']) if zoom_result else '',
+        x0=nfmt(zoom_result['x0']) if zoom_result else '', x1=nfmt(zoom_result['x1']) if zoom_result else '',
+        score=nfmt(zoom_result['score']) if zoom_result else '',
+        status=('computed' if zoom_result else 'not_yet_computed'),
+    )
+    write_csv(VALIDATION_DIR / 'zoom_selection_validation.csv',
+               ['figure_id', 'archetype_id', 'sample_idx', 'window_size', 'stride', 'scoring_formula', 'y0', 'y1',
+                'x0', 'x1', 'score', 'status'], [row])
+
+
 def cmd_render_fields(plan_result=None) -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     log('=' * 88)
@@ -1107,6 +1859,7 @@ def cmd_render_fields(plan_result=None) -> dict:
 
     checksums_before, file_to_phase = preflight_immutability()
     manifest = read_and_validate_selection_manifest()
+    require_completed_phase2d_a_state(manifest)
     method_inventory = p2da.load_method_inventory()
     long_table = p2da.load_long_table()
     per_sample = long_table['per_sample']
@@ -1116,24 +1869,34 @@ def cmd_render_fields(plan_result=None) -> dict:
     audit, ordered_selected = _load_full_panel_arrays(manifest, method_inventory)
 
     render_rows = []
+    scale_rows = []
+    zoom_result = None
     for c in FIGURE_CONTRACTS:
-        panel_rows, gt_speed, method_speeds, _panel = render_speed_and_error_panels(
-            c, manifest, audit, ordered_selected)
-        render_rows.extend(panel_rows)
-        metric_strip_path = render_metric_strip(c, manifest, per_sample)
-        render_rows.append(dict(output_path=metric_strip_path, method_id='', panel_type=METRIC_STRIP))
-        for panel_type in c['panels']:
-            if panel_type in PD_DIAGRAM_PANEL_TYPES:
-                require_pd_diagram_sources_for_figure(c, manifest, topology_source_map)
-            if panel_type == ZOOM_CROP:
-                gt_full = gt_speed
-                zoom = select_deterministic_zoom(gt_full, {mid: np.abs(method_speeds[mid] - gt_full)
-                                                              for mid in c['full_panel_methods']})
-                render_rows.append(dict(
-                    output_path=render_zoom_crop_panel(c, manifest, gt_full, method_speeds, zoom),
-                    method_id='', panel_type=ZOOM_CROP,
-                ))
+        pd_discovery_rows_by_method = {}
+        pd_verdicts = {}
+        if any(pt in PD_DIAGRAM_PANEL_TYPES for pt in c['panels']):
+            for mid in (['GT'] + c['full_panel_methods']):
+                rows = discover_pd_source_candidates(c['figure_id'], manifest[c['archetype_id']], mid,
+                                                        topology_source_map)
+                rows = [_finalize_pd_candidate_row(r) for r in rows]
+                pd_discovery_rows_by_method[mid] = rows
+                pd_verdicts[mid] = figure_pd_source_verdict(rows)
 
+        def _render(c=c, pd_verdicts=pd_verdicts, pd_discovery_rows_by_method=pd_discovery_rows_by_method):
+            return render_all_panels_for_figure(c, manifest, audit, ordered_selected, per_sample, pd_verdicts,
+                                                   pd_discovery_rows_by_method)
+
+        panel_rows, scale_row, fig_zoom = render_figure_transactional(c, _render)
+        render_rows.extend(panel_rows)
+        scale_rows.append(scale_row)
+        if fig_zoom is not None:
+            zoom_result = fig_zoom
+
+    propagate_zoom_result(zoom_result, manifest)
+    write_zoom_selection_validation(zoom_result, manifest)
+    write_csv(VALIDATION_DIR / 'panel_scale_provenance.csv',
+               ['figure_id', 'speed_vmin', 'speed_vmax', 'error_vmin', 'error_vmax', 'colormap_speed',
+                'colormap_error', 'physical_units'], scale_rows)
     write_csv(VALIDATION_DIR / 'panel_validation.csv',
                ['output_path', 'method_id', 'panel_type'], render_rows)
     postflight_immutability(checksums_before, file_to_phase, VALIDATION_DIR / 'prior_phase_immutability_check.csv')
@@ -1142,14 +1905,80 @@ def cmd_render_fields(plan_result=None) -> dict:
     log(f'RESULT: --render-fields wrote {len(render_rows)} panel(s).')
     log('=' * 88)
     flush_log(LOG_PATH)
-    return dict(render_rows=render_rows)
+    return dict(render_rows=render_rows, zoom_result=zoom_result)
+
+
+# =============================================================================
+# Real PNG/PDF output inspection (Section 9). Never hardcode a pass -- every
+# dimension/DPI/page-count value is measured from the actual file.
+# =============================================================================
+
+# Coarse minimum pixel floor consistent with >=300 dpi at a plausible minimum
+# publication panel size (single-column figures are commonly >=3.3in wide).
+PNG_MIN_WIDTH_PX = 300
+PNG_MIN_HEIGHT_PX = 300
+
+
+def inspect_png(path):
+    """Opens the PNG and measures real width/height/dpi/size. Never assumes
+    success from the file merely existing."""
+    p = Path(path)
+    if not p.exists() or p.stat().st_size == 0:
+        return dict(width_px='', height_px='', dpi_x='', dpi_y='',
+                     file_size_bytes=(p.stat().st_size if p.exists() else 0),
+                     validation_status='FAIL_missing_or_empty')
+    from PIL import Image, UnidentifiedImageError
+    try:
+        with Image.open(p) as img:
+            img.verify()
+        with Image.open(p) as img:
+            width_px, height_px = img.size
+            dpi = img.info.get('dpi', (0, 0))
+            dpi_x, dpi_y = (dpi[0], dpi[1]) if dpi and dpi[0] else (0, 0)
+    except (UnidentifiedImageError, OSError):
+        return dict(width_px='', height_px='', dpi_x='', dpi_y='', file_size_bytes=p.stat().st_size,
+                     validation_status='FAIL_corrupt_or_unreadable')
+    ok = width_px >= PNG_MIN_WIDTH_PX and height_px >= PNG_MIN_HEIGHT_PX
+    return dict(width_px=width_px, height_px=height_px, dpi_x=nfmt(dpi_x or None), dpi_y=nfmt(dpi_y or None),
+                 file_size_bytes=p.stat().st_size, validation_status=('PASS' if ok else 'FAIL_min_dimensions'))
+
+
+def inspect_pdf(path):
+    """Dependency-free PDF validity check: %PDF- header magic bytes and a
+    page count via /Type /Page object occurrences (never /Type /Pages)."""
+    p = Path(path)
+    if not p.exists() or p.stat().st_size == 0:
+        return dict(file_size_bytes=(p.stat().st_size if p.exists() else 0), pdf_page_count=0,
+                     validation_status='FAIL_missing_or_empty')
+    data = p.read_bytes()
+    valid_header = data[:5] == b'%PDF-'
+    page_count = len(re.findall(rb'/Type\s*/Page(?!s)\b', data))
+    ok = valid_header and page_count > 0
+    return dict(file_size_bytes=len(data), pdf_page_count=page_count,
+                 validation_status=('PASS' if ok else 'FAIL_invalid_pdf'))
 
 
 # =============================================================================
 # --assemble-composites (requires manual topology panels; not run here)
 # =============================================================================
 
+MT_CONSISTENCY_FIELDS = ('persistence_threshold', 'camera_or_view_id', 'scalar_range')
+
+
+def _read_single_metadata_row(meta_path):
+    meta_rows = p2da.read_csv_dicts(meta_path)
+    if not meta_rows:
+        raise SystemExit(f'[hard-fail] Manual topology metadata file is empty: {meta_path}')
+    return meta_rows[0]
+
+
 def require_manual_topology_panels(manifest):
+    """Section 8: full manual MT panel + metadata validation -- nonempty
+    valid PNG, real pixel dimensions matching the declared metadata,
+    identity fields (figure_id/sample_idx/method_id) matching the manifest,
+    a repository-relative source_vtu_path, numeric threshold/sampling/
+    line-size fields, and same-figure comparability (persistence_threshold/
+    camera_or_view_id/scalar_range consistent across a figure's panels)."""
     manual_topo_rows = build_manual_topology_requirements_rows(manifest)
     missing = [r for r in manual_topo_rows if r['status'] == 'missing']
     if missing:
@@ -1162,58 +1991,152 @@ def require_manual_topology_panels(manifest):
             f'This script never automates merge-tree geometry rendering -- supply the manual ParaView/TTK '
             f'exports first:\n{detail}'
         )
+    by_figure = {}
     for r in manual_topo_rows:
         meta_path = REPO_ROOT / r['expected_metadata_path']
-        meta_rows = p2da.read_csv_dicts(meta_path)
-        if not meta_rows:
-            raise SystemExit(f'[hard-fail] Manual topology metadata file is empty: {meta_path}')
-        row0 = meta_rows[0]
+        panel_path = REPO_ROOT / r['expected_panel_path']
+        row0 = _read_single_metadata_row(meta_path)
+
         missing_fields = [f for f in MANUAL_TOPOLOGY_METADATA_FIELDS if not str(row0.get(f, '')).strip()]
         if missing_fields:
             raise SystemExit(
                 f'[hard-fail] Manual topology metadata {meta_path} is missing required field(s): {missing_fields}'
             )
+        if str(row0.get('figure_id', '')) != str(r['figure_id']):
+            raise SystemExit(f"[hard-fail] {meta_path}: metadata figure_id={row0.get('figure_id')!r} does not "
+                               f"match expected {r['figure_id']!r}.")
+        if str(row0.get('sample_idx', '')) != str(r['sample_idx']):
+            raise SystemExit(f"[hard-fail] {meta_path}: metadata sample_idx={row0.get('sample_idx')!r} does not "
+                               f"match expected {r['sample_idx']!r}.")
+        if str(row0.get('method_id', '')) != str(r['method_id']):
+            raise SystemExit(f"[hard-fail] {meta_path}: metadata method_id={row0.get('method_id')!r} does not "
+                               f"match expected {r['method_id']!r}.")
+        source_vtu_path = str(row0.get('source_vtu_path', ''))
+        if source_vtu_path.startswith('/'):
+            raise SystemExit(f'[hard-fail] {meta_path}: source_vtu_path must be repository-relative POSIX text, '
+                               f'got an absolute path: {source_vtu_path!r}.')
+        for numeric_field in ('persistence_threshold', 'arc_sampling', 'arc_line_size', 'image_width',
+                                'image_height'):
+            try:
+                float(row0[numeric_field])
+            except (TypeError, ValueError):
+                raise SystemExit(f'[hard-fail] {meta_path}: field {numeric_field!r}={row0[numeric_field]!r} is '
+                                   f'not numeric.')
+
+        insp = inspect_png(panel_path)
+        if insp['validation_status'] != 'PASS':
+            raise SystemExit(f"[hard-fail] Manual topology panel {panel_path} failed validation: "
+                               f"{insp['validation_status']} (expected a nonempty, valid, adequately-sized PNG).")
+        if int(float(row0['image_width'])) != insp['width_px'] or int(float(row0['image_height'])) != insp['height_px']:
+            raise SystemExit(
+                f"[hard-fail] {meta_path}: declared image_width/image_height "
+                f"({row0['image_width']}x{row0['image_height']}) does not match the actual PNG pixel "
+                f"dimensions ({insp['width_px']}x{insp['height_px']}) of {panel_path}."
+            )
+        by_figure.setdefault(r['figure_id'], []).append(row0)
+
+    for figure_id, rows0 in by_figure.items():
+        if len(rows0) < 2:
+            continue
+        for field in MT_CONSISTENCY_FIELDS:
+            values = {row0[field] for row0 in rows0}
+            if len(values) > 1:
+                raise SystemExit(
+                    f'[hard-fail] Figure {figure_id}: manual topology panels are not comparable -- field '
+                    f'{field!r} differs across panels required to share common axes/scale conventions: '
+                    f'{values}.'
+                )
     return manual_topo_rows
 
 
-def gather_composite_source_panels(contract):
-    """Collects the ordered list of PNG panel paths (script-rendered +
-    manual topology) available on disk for one figure's composite. Pure
-    filesystem lookup; raises no error -- callers decide what an empty
-    result means."""
-    panel_dir = PANELS_DIR / figure_dir_name(contract)
-    script_panel_paths = sorted(panel_dir.glob('*.png')) if panel_dir.exists() else []
-    needs_manual_mt = any(pt in MT_PANEL_TYPES for pt in contract['panels'])
-    manual_paths = [MANUAL_TOPOLOGY_DIR / f"figure_{contract['figure_id']:02d}" / f'{mid}_mt.png'
-                      for mid in (['GT'] + contract['full_panel_methods'])] if needs_manual_mt else []
-    return script_panel_paths + [p for p in manual_paths if p.exists()]
+def load_composite_manifest_for_figure(figure_id):
+    path = PLAN_DIR / 'final_composite_manifest.csv'
+    if not path.exists():
+        raise SystemExit(f'[hard-fail] {path} does not exist; run --plan-only first.')
+    rows = [r for r in p2da.read_csv_dicts(path) if int(r['figure_id']) == figure_id]
+    rows.sort(key=lambda r: int(r['panel_order']))
+    return rows
 
 
 def build_composite_for_figure(contract, manifest):
-    """Assembles ONE figure's final composite (PNG + vector PDF) from
-    whatever validated panels are currently on disk for it. Hard-fails if no
-    panel is available. Returns the final_figure_validation.csv row."""
+    """Assembles ONE figure's final composite (PNG + vector PDF) STRICTLY
+    from plan/final_composite_manifest.csv -- never a directory glob. Every
+    row with final_visible_status in (visible, scalar_fallback) is required
+    to exist; a `pending` row hard-fails (still awaiting an authoritative PD
+    verdict); any PNG present on disk that is not referenced by the
+    manifest is rejected as unexpected; duplicate source_path entries are
+    rejected. Declared panel_order is preserved exactly (figure 3's compact
+    F2 role -- excluded from full_panel_methods, so it never appears as a
+    speed/error/PD panel -- is respected automatically since the manifest
+    is itself built from the same figure contract)."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
     si = manifest[contract['archetype_id']]
-    all_panels = gather_composite_source_panels(contract)
-    if not all_panels:
+    manifest_rows = load_composite_manifest_for_figure(contract['figure_id'])
+    if not manifest_rows:
+        raise SystemExit(f"[hard-fail] Figure {contract['figure_id']} has no rows in "
+                           f'plan/final_composite_manifest.csv; run --plan-only first.')
+
+    pending_rows = [r for r in manifest_rows if r['final_visible_status'] == 'pending']
+    if pending_rows:
         raise SystemExit(
-            f"[hard-fail] No rendered panels found for figure {contract['figure_id']} under "
-            f"{PANELS_DIR / figure_dir_name(contract)}; run --render-fields first."
+            f"[hard-fail] Figure {contract['figure_id']} has {len(pending_rows)} panel(s) still "
+            f"final_visible_status=pending (awaiting an authoritative PD source verdict): "
+            f"{[(r['panel_type'], r['method_id']) for r in pending_rows]}. Cannot assemble the final composite."
         )
-    n = len(all_panels)
+    required_rows = [r for r in manifest_rows if r['final_visible_status'] in ('visible', 'scalar_fallback')]
+
+    # Reject duplicate (panel_type, method_id) identities -- never source_path
+    # identity, since the scalar PD fallback deliberately shares ONE combined
+    # image across several method rows (that sharing is intentional, not a bug).
+    seen_identities = set()
+    for r in required_rows:
+        identity = (r['panel_type'], r['method_id'])
+        if identity in seen_identities:
+            raise SystemExit(f"[hard-fail] Figure {contract['figure_id']}: duplicate panel identity in the "
+                               f'composite manifest: {identity!r}.')
+        seen_identities.add(identity)
+
+    missing = sorted({r['source_path'] for r in required_rows if not (REPO_ROOT / r['source_path']).exists()})
+    if missing:
+        raise SystemExit(
+            f"[hard-fail] Figure {contract['figure_id']}: {len(missing)} panel(s) declared in the composite "
+            f'manifest are missing on disk (never assembling an incomplete composite): {missing}'
+        )
+
+    # De-duplicate at the IMAGE level (preserving first-occurrence/declared order):
+    # several manifest rows may legitimately point at the same shared scalar
+    # PD-fallback file, but that file must appear exactly once in the visual grid.
+    seen_paths = set()
+    unique_source_paths = []
+    for r in required_rows:
+        if r['source_path'] not in seen_paths:
+            seen_paths.add(r['source_path'])
+            unique_source_paths.append(r['source_path'])
+
+    panel_dir = PANELS_DIR / figure_dir_name(contract)
+    if panel_dir.exists():
+        on_disk = {str(p.relative_to(REPO_ROOT)) for p in panel_dir.glob('*.png')}
+        unexpected = on_disk - seen_paths
+        if unexpected:
+            raise SystemExit(
+                f"[hard-fail] Figure {contract['figure_id']}: unexpected PNG(s) present in {panel_dir} that are "
+                f'not declared in the composite manifest (rejected, never silently included): {sorted(unexpected)}'
+            )
+
+    ordered_panels = [REPO_ROOT / p for p in unique_source_paths]
+    n = len(ordered_panels)
     n_cols = min(n, 4)
     n_rows = math.ceil(n / n_cols)
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.4 * n_cols, 2.4 * n_rows), dpi=300)
     axes_flat = np.atleast_1d(axes).ravel()
-    for ax, p in zip(axes_flat, all_panels):
+    for ax, p in zip(axes_flat, ordered_panels):
         ax.imshow(plt.imread(p))
         ax.set_xticks([])
         ax.set_yticks([])
-    for ax in axes_flat[len(all_panels):]:
+    for ax in axes_flat[len(ordered_panels):]:
         ax.axis('off')
     out_paths = final_figure_paths(contract)
     png_path = REPO_ROOT / out_paths['png']
@@ -1222,10 +2145,18 @@ def build_composite_for_figure(contract, manifest):
     pdf_path = REPO_ROOT / out_paths['pdf']
     fig.savefig(pdf_path, metadata={'Creator': '', 'Producer': ''})
     plt.close(fig)
+
+    png_insp = inspect_png(png_path)
+    pdf_insp = inspect_pdf(pdf_path)
     return dict(
         figure_id=contract['figure_id'], archetype_id=contract['archetype_id'], sample_idx=si,
         expected_png_path=out_paths['png'], expected_vector_path=out_paths['pdf'],
-        png_exists=png_path.exists(), png_min_dpi_ok=True, vector_exists=pdf_path.exists(),
+        png_exists=png_path.exists(), width_px=png_insp['width_px'], height_px=png_insp['height_px'],
+        dpi_x=png_insp['dpi_x'], dpi_y=png_insp['dpi_y'], png_file_size_bytes=png_insp['file_size_bytes'],
+        png_min_dpi_ok=(png_insp['validation_status'] == 'PASS'), vector_exists=pdf_path.exists(),
+        pdf_page_count=pdf_insp['pdf_page_count'], pdf_file_size_bytes=pdf_insp['file_size_bytes'],
+        pdf_valid=(pdf_insp['validation_status'] == 'PASS'),
+        vector_kind='raster_panel_pdf',  # panels are pre-rendered raster PNGs placed in a PDF, not vector objects
         status='rendered',
     )
 
@@ -1237,14 +2168,24 @@ def cmd_assemble_composites(plan_result=None) -> dict:
     log('=' * 88)
     checksums_before, file_to_phase = preflight_immutability()
     manifest = read_and_validate_selection_manifest()
+    require_completed_phase2d_a_state(manifest)
     manual_topo_rows = require_manual_topology_panels(manifest)
 
     final_rows = [build_composite_for_figure(c, manifest) for c in FIGURE_CONTRACTS]
-    write_csv(VALIDATION_DIR / 'final_figure_validation.csv',
-               ['figure_id', 'archetype_id', 'sample_idx', 'expected_png_path', 'expected_vector_path',
-                'png_exists', 'png_min_dpi_ok', 'vector_exists', 'status'], final_rows)
+    write_csv(VALIDATION_DIR / 'final_figure_validation.csv', FINAL_FIGURE_VALIDATION_FIELDS, final_rows)
+
+    # Never claim completion with any blocked/pending/invalid composite -- all six
+    # exact composite manifests must be fully satisfied and pass real inspection.
+    not_ready = [r for r in final_rows if not (r['status'] == 'rendered' and r['png_exists']
+                                                  and r['png_min_dpi_ok'] and r['vector_exists'] and r['pdf_valid'])]
+    if len(final_rows) != 6 or not_ready:
+        raise SystemExit(
+            f'[hard-fail] Cannot report Phase 2D-B complete: {len(final_rows)}/6 composites built, '
+            f'{len(not_ready)} failed real PNG/PDF validation: {[r["figure_id"] for r in not_ready]}.'
+        )
+
     postflight_immutability(checksums_before, file_to_phase, VALIDATION_DIR / 'prior_phase_immutability_check.csv')
-    write_phase2db_doc(manifest, None, manual_topo_rows, [], is_full_complete=True)
+    write_phase2db_doc(manifest, None, manual_topo_rows, [], pd_discovery_rows=None, is_full_complete=True)
     log('')
     log('=' * 88)
     log(f'RESULT: Phase 2D-B complete. {len(final_rows)} final composite figure(s) written.')
