@@ -7,7 +7,7 @@ Final publication rendering pending required panels.
 
 ## 1. Scope and frozen inputs
 
-This document reflects a `--plan-only` run in a lightweight checkout. It reads exclusively frozen Phase-1 through Phase-2D-A artifacts (103 files, checksummed before and after this stage) and never touches `data_out/`, `data_out_fixed/`, or reruns any training/inference/TTK step. Phase 2D-A is treated as complete and authoritative; no sample is re-selected and no alternate is activated here.
+This document reflects a `--plan-only` run in a lightweight checkout. It reads exclusively frozen Phase-1 through Phase-2D-A artifacts (118 files, checksummed before and after this stage) and never touches `data_out/`, `data_out_fixed/`, or reruns any training/inference/TTK step. Phase 2D-A is treated as complete and authoritative; no sample is re-selected and no alternate is activated here.
 
 ## 2. Frozen sample set
 
@@ -25,7 +25,7 @@ Cross-checked against `ttk_runs_fixed/unified_candidate_analysis/phase2d/selecti
 ### Figure 1: `global_descriptor_disagreement` (sample_idx=120)
 
 - Primary claim: PD and MT can produce strongly different cross-method preferences.
-- Required methods: Ground Truth, GAN, CNN, Candidate C, F3: Grad+Crit, F2: Grad+Levelset+E2, UV+E2
+- Required methods: Ground Truth, CNN, GAN, Candidate C, F3: Grad+Crit, F2: Grad+Levelset+E2, UV+E2
 - Required panels: speed_fields, error_maps, metric_strip, pd_evidence, mt_evidence
 - Emphasis: GAN best PD but worst MT; CNN worst displayed PD but best MT; UV+E2 is comparatively MT-oriented.
 
@@ -38,7 +38,7 @@ Cross-checked against `ttk_runs_fixed/unified_candidate_analysis/phase2d/selecti
 ### Figure 3: `f3_pd_vs_uv_e2_mt_tradeoff` (sample_idx=119)
 
 - Primary claim: Gradient-plus-critical supervision and repaired E2 supervision influence different topology descriptors.
-- Required methods: Ground Truth, CNN, F3: Grad+Crit, UV+E2, F2: Grad+Levelset+E2
+- Required methods: Ground Truth, CNN, F3: Grad+Crit, F2: Grad+Levelset+E2, UV+E2
 - Method roles: F2: Grad+Levelset+E2=compact_contextual_reference
 - Required panels: speed_fields, error_maps, pd_evidence, mt_evidence, zoom_crop, metric_strip
 - Emphasis: This figure must not rely on speed/error panels alone.
@@ -58,7 +58,7 @@ Cross-checked against `ttk_runs_fixed/unified_candidate_analysis/phase2d/selecti
 ### Figure 6: `global_descriptor_agreement` (sample_idx=19)
 
 - Primary claim: PD and MT disagreement is not universal; strong methods can show broad descriptor concordance without identical rankings.
-- Required methods: Ground Truth, GAN, CNN, Candidate C, F3: Grad+Crit, F2: Grad+Levelset+E2, UV+E2
+- Required methods: Ground Truth, CNN, GAN, Candidate C, F3: Grad+Crit, F2: Grad+Levelset+E2, UV+E2
 - Required panels: speed_fields, error_maps, pd_mt_comparison_compact, metric_strip
 
 ## 4. Deterministic zoom region (sample 119, Figure 3)
@@ -67,9 +67,9 @@ Scoring formula: score(y0,x0) = sum((d/dy GT_speed)^2 + (d/dx GT_speed)^2) over 
 
 **Not yet computed.** The zoom window score requires the real GT and per-method error fields (`data_out_fixed/`/`data_out/`), which are absent in this lightweight checkout by design. `select_deterministic_zoom()` is implemented and synthetic-tested; it will run in `--render-fields`.
 
-## 5. PD coordinate source status
+## 5. Authoritative PD coordinate source discovery
 
-This project's frozen topology artifacts (every CSV referenced by `column_mapping.csv`) were directly inspected and contain only the scalar `pd_distance`/`mt_distance` value per sample/method -- never raw persistence-diagram birth/death coordinates. `resolve_pd_diagram_source()` documents the deterministic naming convention such coordinate exports would need; it currently finds none for any method. Every `pd_evidence`/`pd_comparison` panel is recorded with `status=blocked_missing_pd_source` in `plan/final_panel_manifest.csv` (Figures 1, 2, 3). `--render-fields` will hard-fail rather than fabricate these panels unless coordinate-level PD data becomes available.
+A real, repository-relative filesystem search (`plan/pd_source_discovery.csv`, 57 candidate row(s)) was performed for every (figure, method) requiring a `pd_evidence`/`pd_comparison` panel -- GT and Bicubic included, neither assumed found without a concrete `candidate_path`. This process is running in the authoritative Spark machine: 0 candidate(s) available_validated, 48 pending_authoritative_spark_source_discovery, 9 unavailable_after_authoritative_spark_audit. `blocked_missing_pd_source` is never used before this authoritative search has run to completion on Spark. Search roots included topology source parent directories and their `pd/`/`pd_diagrams/` children, `<method>_topology/pd/` sibling conventions, and `ttk_runs_fixed/combined/`; existing PD-overlay-related scripts already in this repository were also inventoried for provenance.
 
 ## 6. Manual topology (merge-tree) requirements
 
@@ -80,7 +80,7 @@ This project's frozen topology artifacts (every CSV referenced by `column_mappin
 - `validation/figure_data_reproduction.csv`: every figure-data metric value cross-checked against the frozen Phase-1 long table and Phase-2D-A `selected_sample_method_values.csv` within tolerance (1e-06); hard-fails on any disagreement.
 - `validation/panel_validation.csv`: every planned panel structurally matches its figure contract.
 - `validation/final_figure_validation.csv`: all six final figures are `status=not_yet_rendered`.
-- `validation/prior_phase_immutability_check.csv`: all 103 protected files confirmed unchanged.
+- `validation/prior_phase_immutability_check.csv`: all 118 protected files confirmed unchanged.
 
 ## 8. Exact commands to complete Phase 2D-B on Spark
 
@@ -98,6 +98,8 @@ Planning-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2db/`):
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/final_figure_plan.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/final_panel_manifest.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/manual_topology_requirements.csv`
+- `ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/pd_source_discovery.csv`
+- `ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/final_composite_manifest.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/final_figure_captions.md`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/figure_data/figure_01_global_disagreement.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/figure_data/figure_02_gan_cnn_conflict.csv`
@@ -109,6 +111,8 @@ Planning-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2db/`):
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/figure_data_reproduction.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/panel_validation.csv`
 - `ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/final_figure_validation.csv`
+- `ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/zoom_selection_validation.csv`
+- `ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/panel_scale_provenance.csv`
 - `docs/unified_candidate_analysis_phase2db.md` (this file)
 - `logs/unified_candidate_analysis_phase2db.log`
 
