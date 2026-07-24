@@ -236,6 +236,73 @@ def make_completed_phase2d_a_fixture():
 
 
 # =============================================================================
+# Synthetic TTK PD VTU builder (Section 8): a minimal but schema-correct
+# ASCII-inline VTU matching the REAL TTK ttkPersistenceDiagram output --
+# CellData = PairIdentifier, PairType, Persistence, Birth, IsFinite;
+# PointData = ttkVertexScalarField; Cells = connectivity/offsets/types.
+# Point (mesh) geometry is deliberately set to large, obviously-bogus values
+# far from any birth/death value, so any test that accidentally used raw
+# point coordinates as birth/death would fail loudly.
+# =============================================================================
+
+def _write_synthetic_pd_vtu(path, pair_id, pair_type, persistence, birth, is_finite, omit_arrays=()):
+    n_cells = len(pair_id)
+    n_points = n_cells * 2
+    vertex_ids = list(range(2000, 2000 + n_points))
+    connectivity = list(range(n_points))
+    offsets = [2 * (i + 1) for i in range(n_cells)]
+    types = [3] * n_cells
+    points = []
+    for i in range(n_points):
+        points += [8888.0 + i, -8888.0 - i, 0.0]
+
+    def _fmt(vals):
+        return ' '.join(str(v) for v in vals)
+
+    cell_arrays = [
+        ('PairIdentifier', 'Int32', pair_id), ('PairType', 'Int32', pair_type),
+        ('Persistence', 'Float32', persistence), ('Birth', 'Float32', birth),
+        ('IsFinite', 'UInt8', is_finite),
+    ]
+    cell_data_xml = '\n'.join(
+        f'        <DataArray type="{dtype}" Name="{name}" format="ascii">{_fmt(vals)}</DataArray>'
+        for name, dtype, vals in cell_arrays if name not in omit_arrays)
+    point_data_xml = (
+        '' if 'ttkVertexScalarField' in omit_arrays else
+        f'        <DataArray type="Int32" Name="ttkVertexScalarField" format="ascii">{_fmt(vertex_ids)}</DataArray>')
+    connectivity_xml = (
+        '' if 'connectivity' in omit_arrays else
+        f'        <DataArray type="Int64" Name="connectivity" format="ascii">{_fmt(connectivity)}</DataArray>')
+    xml = f'''<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian" header_type="UInt32">
+  <UnstructuredGrid>
+    <Piece NumberOfPoints="{n_points}" NumberOfCells="{n_cells}">
+      <PointData>
+{point_data_xml}
+      </PointData>
+      <CellData>
+{cell_data_xml}
+      </CellData>
+      <Points>
+        <DataArray type="Float32" Name="Points" NumberOfComponents="3" format="ascii">{_fmt(points)}</DataArray>
+      </Points>
+      <Cells>
+{connectivity_xml}
+        <DataArray type="Int64" Name="offsets" format="ascii">{_fmt(offsets)}</DataArray>
+        <DataArray type="UInt8" Name="types" format="ascii">{_fmt(types)}</DataArray>
+      </Cells>
+    </Piece>
+  </UnstructuredGrid>
+</VTKFile>
+'''
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(xml)
+
+
+def _pd_vtu_path(tmp_root, alias, role, sample_idx, suffix='v0'):
+    return tmp_root / f'{alias}_topology' / 'pd' / role / f'{alias}_{role}_s{sample_idx}_{suffix}_pd_port_0.vtu'
+
+
+# =============================================================================
 # Run the whole suite inside a top-level try/finally so that even an
 # unexpected mid-suite exception (or Ctrl-C) cannot leave any pre-existing
 # tracked or untracked Phase-2D-B/Phase-2D-A artifact modified.
@@ -542,124 +609,233 @@ try:
         shutil.rmtree(tmp10, ignore_errors=True)
 
     print()
-    print('=== 11. Real PD source discovery (available / pending / unavailable routing) ===')
+    print('=== 11. Authoritative PD VTU discovery, parsing, and validation (available / pending / unavailable '
+          'routing; exact role/alias/sample mapping; hard-fail-on-malformed) ===')
     tmp11 = m.OUT_DIR / '_test11_scratch'
+    old_topology_tree_root = m._topology_tree_root
+    old_cnn_gan_bicubic_roots = dict(m.CNN_GAN_BICUBIC_SEARCH_ROOTS)
+    old_lightweight_flag = m.IS_LIGHTWEIGHT_CHECKOUT
+    ALIAS_C = m.METHOD_ARTIFACT_ALIASES[m.CANDIDATE_C]
+    ALIAS_F3 = m.METHOD_ARTIFACT_ALIASES[m.F3]
     try:
-        # --- 11a: nothing at all present for this (sample, method) ---
-        dir_a = tmp11 / 'scenario_a'
-        dir_a.mkdir(parents=True)
-        src_a = {m.CNN: dict(path=dir_a / 'unrelated_placeholder.csv', pd_column='pd', mt_column='mt',
-                                is_shared_combined=False)}
-        candidates_a = m.discover_pd_source_candidates(1, 501, m.CNN, src_a)
-        check('no coordinate file present anywhere in the search roots -> a none_found candidate row',
-              any(c['artifact_type'] == 'none_found' for c in candidates_a))
-        check('GT is never marked found without a concrete candidate_path (structural check on discovery '
-              'output)', all(r['candidate_path'] for r in candidates_a if r['artifact_type'] != 'none_found'))
+        tmp11.mkdir(parents=True, exist_ok=True)
+        m._topology_tree_root = lambda alias: tmp11 / f'{alias}_topology'
+        m.CNN_GAN_BICUBIC_SEARCH_ROOTS = {
+            m.CNN: [tmp11 / 'cnn_root'], m.GAN: [tmp11 / 'gan_root'], m.BICUBIC: [tmp11 / 'bicubic_root'],
+        }
 
-        # --- 11b: a real coordinate CSV matching the naming convention ---
-        dir_b = tmp11 / 'scenario_b'
-        dir_b.mkdir(parents=True)
-        src_b = {m.CNN: dict(path=dir_b / 'unrelated_placeholder.csv', pd_column='pd', mt_column='mt',
-                                is_shared_combined=False)}
-        coord_file = dir_b / f'{m.CNN}_sample502_pd_diagram.csv'
-        coord_file.write_text('birth,death\n0.1,0.2\n0.3,0.9\n')
-        candidates_b = [m._finalize_pd_candidate_row(c)
-                         for c in m.discover_pd_source_candidates(1, 502, m.CNN, src_b)]
-        coord_rows_b = [c for c in candidates_b if c['artifact_type'] == 'csv_pd_coordinates']
-        check('a coordinate CSV matching the naming convention is discovered', len(coord_rows_b) == 1)
-        check('a finite, mapped coordinate CSV resolves to available_validated',
-              m.figure_pd_source_verdict(candidates_b) == m.STATUS_AVAILABLE)
+        check('Section 2 method-to-artifact aliases match the task specification exactly',
+              m.METHOD_ARTIFACT_ALIASES == {
+                  m.CANDIDATE_C: 'candidateC_expanded2688', m.F3: 'candidateF_grad_crit_expanded2688',
+                  m.F2: 'candidateF_grad_levelset_E2_low_expanded2688',
+                  m.UV_E2: 'candidateUV_plus_E2_tf_lowlambda_expanded2688',
+              })
+        check('CNN/GAN/bicubic are never given an invented <alias>_topology directory (no entry in '
+              'METHOD_ARTIFACT_ALIASES)',
+              not ({m.CNN, m.GAN, m.BICUBIC} & set(m.METHOD_ARTIFACT_ALIASES)))
 
-        # --- 11c: only a scalar-only distance summary is present ---
-        dir_c = tmp11 / 'scenario_c'
-        dir_c.mkdir(parents=True)
-        src_c = {m.CNN: dict(path=dir_c / f'{m.CNN}_sample503_scalar.csv', pd_column='pd', mt_column='mt',
-                                is_shared_combined=False)}
-        src_c[m.CNN]['path'].write_text('sample_idx,pd_distance,mt_distance\n503,1.0,2.0\n')
-        candidates_c = [m._finalize_pd_candidate_row(c)
-                         for c in m.discover_pd_source_candidates(1, 503, m.CNN, src_c)]
-        check('a scalar-only summary CSV is classified as csv_scalar_summary, not a coordinate source',
-              any(c['artifact_type'] == 'csv_scalar_summary' for c in candidates_c)
-              and not any(c['artifact_type'] == 'csv_pd_coordinates' for c in candidates_c))
-        check('scalar-only summary alone resolves to pending (never confirms absence of a real coordinate '
-              'source)', m.figure_pd_source_verdict(candidates_c) == m.STATUS_PENDING)
+        # --- 11a: birth/death are derived from Birth/Persistence CellData, never
+        # from raw VTU point geometry; infinite pairs, pair_type==-1, and
+        # zero/negative-persistence pairs are all excluded from the mask. ---
+        mixed_path = _pd_vtu_path(tmp11, ALIAS_C, 'SR', 601)
+        _write_synthetic_pd_vtu(
+            mixed_path,
+            pair_id=[0, 1, 2, 3, 4, 5], pair_type=[0, 1, 0, -1, 0, 0],
+            persistence=[2.0, 0.5, 5.0, 5.0, 0.0, -1.0], birth=[1.0, 4.0, 0.0, 0.0, 0.0, 0.0],
+            is_finite=[1, 1, 0, 1, 1, 1])
+        result_11a = m.parse_and_validate_pd_vtu(mixed_path, 601, 'SR', ALIAS_C)
+        check('exactly the two finite/positive-persistence/non-infinite pairs survive masking',
+              result_11a['pair_count'] == 2)
+        check('birth/death are derived from Birth+Persistence CellData (never raw point geometry, which was '
+              'deliberately set to ~8888/-8888 in this fixture)',
+              sorted(result_11a['birth'].tolist()) == [1.0, 4.0]
+              and sorted(result_11a['death'].tolist()) == [3.0, 4.5]
+              and not any(abs(v) > 100 for v in list(result_11a['birth']) + list(result_11a['death'])))
 
-        # --- 11d: bicubic (never in topology_source_map) gets a real, non-trivial search ---
-        dir_d = tmp11 / 'scenario_d'
-        dir_d.mkdir(parents=True)
-        src_d = {m.CNN: dict(path=dir_d / 'unrelated_placeholder.csv', pd_column='pd', mt_column='mt',
-                                is_shared_combined=False)}
-        bicubic_candidates_before = m.discover_pd_source_candidates(2, 504, m.BICUBIC, src_d)
-        check('bicubic discovery runs a real search (returns at least the none_found summary row)',
-              len(bicubic_candidates_before) >= 1 and bicubic_candidates_before[0]['method_id'] == m.BICUBIC
-              and bicubic_candidates_before[0]['artifact_type'] == 'none_found')
-        bicubic_coord = dir_d / 'bicubic_sample504_pd_diagram.csv'
-        bicubic_coord.write_text('birth,death\n0.0,1.0\n')
-        bicubic_candidates_after = m.discover_pd_source_candidates(2, 504, m.BICUBIC, src_d)
-        check('bicubic PD discovery finds a real matching artifact when one exists (not a hardcoded '
-              'exclusion)', any(c['artifact_type'] == 'csv_pd_coordinates' for c in bicubic_candidates_after))
+        # --- 11b: missing required array -> hard-fail (present-but-malformed, never
+        # silently reclassified as pending/unavailable). ---
+        missing_arr_path = _pd_vtu_path(tmp11, ALIAS_C, 'SR', 602)
+        _write_synthetic_pd_vtu(missing_arr_path, pair_id=[0], pair_type=[0], persistence=[1.0], birth=[0.0],
+                                  is_finite=[1], omit_arrays=('IsFinite',))
+        try:
+            m.parse_and_validate_pd_vtu(missing_arr_path, 602, 'SR', ALIAS_C)
+            check('a PD VTU missing a required CellData array hard-fails', False)
+        except SystemExit:
+            check('a PD VTU missing a required CellData array hard-fails', True)
 
-        # --- 11e: non-finite coordinate values are rejected ---
-        dir_e = tmp11 / 'scenario_e'
-        dir_e.mkdir(parents=True)
-        src_e = {m.CNN: dict(path=dir_e / 'unrelated_placeholder.csv', pd_column='pd', mt_column='mt',
-                                is_shared_combined=False)}
-        non_finite_file = dir_e / f'{m.CNN}_sample505_pd_diagram.csv'
-        non_finite_file.write_text('birth,death\nnan,0.5\n')
-        candidates_e = [m._finalize_pd_candidate_row(c)
-                         for c in m.discover_pd_source_candidates(1, 505, m.CNN, src_e)]
-        matched_e = next(c for c in candidates_e if c['artifact_type'] == 'csv_pd_coordinates')
-        check('non-finite coordinate values are rejected (finite_status/usable_status reflect this)',
-              matched_e['finite_status'] == 'non_finite_or_unreadable')
+        # --- 11c: non-finite value in a mask-passing pair -> hard-fail. ---
+        nonfinite_path = _pd_vtu_path(tmp11, ALIAS_C, 'SR', 603)
+        _write_synthetic_pd_vtu(nonfinite_path, pair_id=[0], pair_type=[0], persistence=[1.0], birth=['nan'],
+                                  is_finite=[1])
+        try:
+            m.parse_and_validate_pd_vtu(nonfinite_path, 603, 'SR', ALIAS_C)
+            check('a non-finite birth/death value in a mask-passing pair hard-fails', False)
+        except SystemExit:
+            check('a non-finite birth/death value in a mask-passing pair hard-fails', True)
 
-        # --- 11f: unavailable_after_authoritative_spark_audit is legal only when
-        # IS_LIGHTWEIGHT_CHECKOUT is False -- proven directly, since this container
-        # cannot become the real authoritative Spark machine. A genuinely-not-found
-        # search must resolve to STATUS_PENDING while the flag is True (already
-        # proven by 11a), and to STATUS_UNAVAILABLE once the flag is False.
-        dir_f = tmp11 / 'scenario_f'
-        dir_f.mkdir(parents=True)
-        src_f = {m.CNN: dict(path=dir_f / 'unrelated_placeholder.csv', pd_column='pd', mt_column='mt',
-                                is_shared_combined=False)}
-        old_lightweight_flag = m.IS_LIGHTWEIGHT_CHECKOUT
+        # --- 11d: exact sample_idx mapping -- a correctly-formed file for sample
+        # 601 is REJECTED when the caller expects a different sample. ---
+        try:
+            m.parse_and_validate_pd_vtu(mixed_path, 999999, 'SR', ALIAS_C)
+            check('a PD VTU whose filename sample_idx does not exactly match the expected sample_idx '
+                  'hard-fails (never a partial/prefix match)', False)
+        except SystemExit:
+            check('a PD VTU whose filename sample_idx does not exactly match the expected sample_idx '
+                  'hard-fails (never a partial/prefix match)', True)
+        wrong_prefix_dir = tmp11 / f'{ALIAS_C}_topology' / 'pd' / 'SR'
+        (wrong_prefix_dir / f'{ALIAS_C}_SR_s6010_extra_pd_port_0.vtu').write_bytes(mixed_path.read_bytes())
+        found_601 = m.find_exact_pd_vtu_candidates(tmp11 / f'{ALIAS_C}_topology', 'SR', ALIAS_C, 601)
+        check('exact sample-index search for s601 never matches a file for s6010 (boundary-safe prefix, not '
+              'a raw substring match)', {p.name for p in found_601} == {mixed_path.name})
+
+        # --- 11e: MT paths are never mapped as a PD source, even if nested inside
+        # an otherwise-plausible pd/<role>/ tree; _mt_port_*/_pd_port_1 filenames
+        # are rejected outright. ---
+        check('_is_valid_pd_vtu_path rejects _mt_port_0.vtu', not m._is_valid_pd_vtu_path(
+            tmp11 / 'x_mt_port_0.vtu'))
+        check('_is_valid_pd_vtu_path rejects _mt_port_1.vtu', not m._is_valid_pd_vtu_path(
+            tmp11 / 'x_mt_port_1.vtu'))
+        check('_is_valid_pd_vtu_path rejects _pd_port_1.vtu', not m._is_valid_pd_vtu_path(
+            tmp11 / 'x_pd_port_1.vtu'))
+        check('_is_valid_pd_vtu_path rejects any path with an mt/ directory component',
+              not m._is_valid_pd_vtu_path(tmp11 / f'{ALIAS_C}_topology' / 'mt' / 'x_pd_port_0.vtu'))
+        check('_is_valid_pd_vtu_path accepts a real, correctly-suffixed pd_port_0.vtu path',
+              m._is_valid_pd_vtu_path(mixed_path))
+        stray_mt_dir = tmp11 / f'{ALIAS_C}_topology' / 'pd' / 'SR' / 'mt'
+        stray_mt_dir.mkdir(parents=True, exist_ok=True)
+        (stray_mt_dir / f'{ALIAS_C}_SR_s601_stray_pd_port_0.vtu').write_bytes(mixed_path.read_bytes())
+        found_after_stray = m.find_exact_pd_vtu_candidates(tmp11 / f'{ALIAS_C}_topology', 'SR', ALIAS_C, 601)
+        check('a file nested under an mt/ subdirectory is never returned as a PD candidate, even though it '
+              'matches the filename convention (only the real, non-mt/ file is found)',
+              [p.name for p in found_after_stray] == [mixed_path.name])
+        shutil.rmtree(stray_mt_dir)
+        (wrong_prefix_dir / f'{ALIAS_C}_SR_s6010_extra_pd_port_0.vtu').unlink()
+
+        # --- 11f: duplicate resolved paths (e.g. the same directory reachable via
+        # two overlapping search roots) collapse to ONE candidate, never a
+        # duplicate row / spurious conflict. ---
+        old_cnn_roots_for_dedup = m.CNN_GAN_BICUBIC_SEARCH_ROOTS
+        cnn_root = tmp11 / 'cnn_root'
+        cnn_sr_path = cnn_root / 'pd' / 'SR' / 'cnn_SR_s604_v0_pd_port_0.vtu'
+        cnn_sr_path.parent.mkdir(parents=True, exist_ok=True)
+        _write_synthetic_pd_vtu(cnn_sr_path, pair_id=[0], pair_type=[0], persistence=[1.0], birth=[0.5],
+                                  is_finite=[1])
+        try:
+            m.CNN_GAN_BICUBIC_SEARCH_ROOTS = {m.CNN: [cnn_root, cnn_root], m.GAN: [], m.BICUBIC: []}
+            verdict_dedup = m.resolve_pd_source_verdict(99, 604, m.CNN)
+            check('the exact same file reachable via a duplicated search root resolves to a single '
+                  'available_validated candidate (not a spurious conflict)',
+                  verdict_dedup['verdict'] == m.STATUS_AVAILABLE and verdict_dedup['parsed_pair_count'] == 1)
+        finally:
+            m.CNN_GAN_BICUBIC_SEARCH_ROOTS = old_cnn_roots_for_dedup
+
+        # --- 11g: role-aware GT vs SR mapping; artifact-alias mapping end to end
+        # via resolve_pd_source_verdict(). ---
+        gt_path_c = _pd_vtu_path(tmp11, ALIAS_C, 'GT', 605)
+        sr_path_c = _pd_vtu_path(tmp11, ALIAS_C, 'SR', 605)
+        _write_synthetic_pd_vtu(gt_path_c, pair_id=[0, 1], pair_type=[0, 0], persistence=[1.0, 2.0],
+                                  birth=[0.0, 1.0], is_finite=[1, 1])
+        _write_synthetic_pd_vtu(sr_path_c, pair_id=[0, 1], pair_type=[0, 0], persistence=[1.5, 1.0],
+                                  birth=[0.1, 0.9], is_finite=[1, 1])
+        gt_verdict = m.resolve_pd_source_verdict(99, 605, 'GT')
+        sr_verdict = m.resolve_pd_source_verdict(99, 605, m.CANDIDATE_C)
+        check('GT role resolves to the pd/GT/ file, never the pd/SR/ file',
+              gt_verdict['verdict'] == m.STATUS_AVAILABLE and gt_verdict['source_role'] == 'GT'
+              and gt_verdict['selected_candidate_path'] == m._rel(gt_path_c))
+        check('SR (learned-method) role resolves to the pd/SR/ file, never pd/GT/, with the correct resolved '
+              'artifact alias', sr_verdict['verdict'] == m.STATUS_AVAILABLE and sr_verdict['source_role'] == 'SR'
+              and sr_verdict['selected_candidate_path'] == m._rel(sr_path_c)
+              and sr_verdict['artifact_alias'] == ALIAS_C)
+        check('GT and SR verdicts for the same sample never cross-map to each other\'s file',
+              gt_verdict['selected_candidate_path'] != sr_verdict['selected_candidate_path'])
+
+        # --- 11h: canonical GT selection -- a single exact GT copy is accepted
+        # directly; two agreeing copies (different pair order, same content) also
+        # resolve cleanly to the highest-priority alias; two DISAGREEING copies
+        # hard-fail, listing every conflicting path. ---
+        single_gt = m.resolve_canonical_gt_pd_source(605)
+        check('a single exact GT copy resolves directly as canonical',
+              single_gt is not None and single_gt['n_copies'] == 1 and single_gt['alias'] == ALIAS_C)
+
+        gt_path_c2 = _pd_vtu_path(tmp11, ALIAS_C, 'GT', 606)
+        gt_path_f3 = _pd_vtu_path(tmp11, ALIAS_F3, 'GT', 606)
+        _write_synthetic_pd_vtu(gt_path_c2, pair_id=[0, 1], pair_type=[0, 0], persistence=[1.0, 2.0],
+                                  birth=[0.0, 5.0], is_finite=[1, 1])
+        _write_synthetic_pd_vtu(gt_path_f3, pair_id=[1, 0], pair_type=[0, 0], persistence=[2.0, 1.0],
+                                  birth=[5.0, 0.0], is_finite=[1, 1])  # same pairs, different order
+        agreeing = m.resolve_canonical_gt_pd_source(606)
+        check('two exact GT copies with identical birth/death content (in a different pair order) agree and '
+              'resolve to the highest-priority alias (candidate_c before f3_grad_crit)',
+              agreeing is not None and agreeing['n_copies'] == 2 and agreeing['alias'] == ALIAS_C)
+
+        gt_path_f3.write_text(gt_path_f3.read_text().replace('5.0', '9.0'))
+        try:
+            m.resolve_canonical_gt_pd_source(606)
+            check('two exact GT copies that disagree on birth/death hard-fail, never an arbitrary pick', False)
+        except SystemExit as e:
+            check('two exact GT copies that disagree on birth/death hard-fail, never an arbitrary pick',
+                  m._rel(gt_path_c2) in str(e) and m._rel(gt_path_f3) in str(e))
+
+        # --- 11i: available/pending/unavailable routing in both environments, and
+        # "no pending verdicts in simulated authoritative mode after complete
+        # discovery" for the methods that DO have a real exact source. ---
+        nothing_verdict_lightweight = m.resolve_pd_source_verdict(99, 607, m.CANDIDATE_C)
+        check('a genuinely-not-found search resolves to pending_authoritative_spark_source_discovery in the '
+              'real (lightweight) checkout', nothing_verdict_lightweight['verdict'] ==
+              (m.STATUS_PENDING if old_lightweight_flag else nothing_verdict_lightweight['verdict']))
         try:
             m.IS_LIGHTWEIGHT_CHECKOUT = False
-            candidates_f = [m._finalize_pd_candidate_row(c)
-                             for c in m.discover_pd_source_candidates(1, 506, m.CNN, src_f)]
-            check('with IS_LIGHTWEIGHT_CHECKOUT forced False, a genuinely-not-found search resolves to '
+            nothing_verdict_spark = m.resolve_pd_source_verdict(99, 607, m.CANDIDATE_C)
+            check('with IS_LIGHTWEIGHT_CHECKOUT forced False, the SAME genuinely-not-found search resolves to '
                   'unavailable_after_authoritative_spark_audit (never fabricated as pending)',
-                  m.figure_pd_source_verdict(candidates_f) == m.STATUS_UNAVAILABLE)
+                  nothing_verdict_spark['verdict'] == m.STATUS_UNAVAILABLE)
+
+            complete_gt = m.resolve_pd_source_verdict(99, 605, 'GT')
+            complete_sr = m.resolve_pd_source_verdict(99, 605, m.CANDIDATE_C)
+            check('in simulated authoritative (Spark) mode, every method with a real exact source resolves to '
+                  'available_validated -- never left pending -- after a complete discovery pass',
+                  complete_gt['verdict'] == m.STATUS_AVAILABLE and complete_sr['verdict'] == m.STATUS_AVAILABLE)
         finally:
             m.IS_LIGHTWEIGHT_CHECKOUT = old_lightweight_flag
-        check('IS_LIGHTWEIGHT_CHECKOUT restored to its real value after the forced-False sub-test',
+        check('IS_LIGHTWEIGHT_CHECKOUT restored to its real value after the forced-False sub-tests',
               m.IS_LIGHTWEIGHT_CHECKOUT == old_lightweight_flag)
-        candidates_f_restored = [m._finalize_pd_candidate_row(c)
-                                    for c in m.discover_pd_source_candidates(1, 506, m.CNN, src_f)]
+        restored_verdict = m.resolve_pd_source_verdict(99, 607, m.CANDIDATE_C)
         check('with the real (lightweight) IS_LIGHTWEIGHT_CHECKOUT restored, the SAME not-found search '
               'resolves back to pending_authoritative_spark_source_discovery',
-              m.figure_pd_source_verdict(candidates_f_restored) == m.STATUS_PENDING or not m.IS_LIGHTWEIGHT_CHECKOUT)
+              restored_verdict['verdict'] == m.STATUS_PENDING or not m.IS_LIGHTWEIGHT_CHECKOUT)
     finally:
+        m._topology_tree_root = old_topology_tree_root
+        m.CNN_GAN_BICUBIC_SEARCH_ROOTS = old_cnn_gan_bicubic_roots
+        m.IS_LIGHTWEIGHT_CHECKOUT = old_lightweight_flag
         shutil.rmtree(tmp11, ignore_errors=True)
 
     print()
-    print('=== 12. PD coordinate rendering produces a real panel; scalar fallback used only after unavailable '
-          '===')
-    tmp12b_root = m.OUT_DIR / '_test_pd_coords'
+    print('=== 12. Mixed real-coordinate / scalar-fallback PD panel rendering (Section 7) ===')
+    tmp12_root = m.OUT_DIR / '_test_pd_coords'
     panel_dirs_created = []
     try:
-        tmp12b_root.mkdir(parents=True, exist_ok=True)
-        gt_coord = tmp12b_root / 'gt.csv'
-        gt_coord.write_text('birth,death\n0.0,1.0\n0.2,0.8\n')
-        cnn_coord = tmp12b_root / 'cnn.csv'
-        cnn_coord.write_text('birth,death\n0.1,0.9\n0.3,0.6\n')
+        tmp12_root.mkdir(parents=True, exist_ok=True)
         fig2 = m.FIGURE_BY_ID[2]
         manifest12 = dict(m.FROZEN_SAMPLE_SET)
         si12 = manifest12[fig2['archetype_id']]
         per_sample12 = {mid: {si12: dict(pd_distance=3.14, mt_distance=1.0)} for mid in fig2['full_panel_methods']}
-        pd_sources = {'GT': str(gt_coord.relative_to(m.REPO_ROOT)), m.CNN: str(cnn_coord.relative_to(m.REPO_ROOT))}
-        rows = m.render_pd_diagram_panels(fig2, m.PD_COMPARISON, manifest12, per_sample12, pd_sources)
+
+        def _fake_verdict(mid, birth, death):
+            return dict(figure_id=2, sample_idx=si12, method_id=mid, source_role=('GT' if mid == 'GT' else 'SR'),
+                          artifact_alias=(mid if mid != 'GT' else ''), verdict=m.STATUS_AVAILABLE,
+                          selected_candidate_path='synthetic/test/only.vtu', parsed_pair_count=len(birth),
+                          fallback_required='False', notes='', birth=np.asarray(birth, dtype=np.float64),
+                          death=np.asarray(death, dtype=np.float64))
+
+        pd_verdicts_available = {
+            'GT': _fake_verdict('GT', [0.0, 0.2], [1.0, 0.8]),
+            m.CNN: _fake_verdict(m.CNN, [0.1, 0.3], [0.9, 0.6]),
+        }
+        rows = m.render_pd_diagram_panels(fig2, m.PD_COMPARISON, manifest12, per_sample12, pd_verdicts_available)
         panel_dirs_created.append(m.PANELS_DIR / m.figure_dir_name(fig2))
-        check('render_pd_diagram_panels produces one real panel per available method (GT + CNN)', len(rows) == 2)
+        check('render_pd_diagram_panels produces one real panel per available_validated method (GT + CNN), '
+              'reading coordinates directly from the resolved verdict (never re-parsing point geometry)',
+              len(rows) == 2)
         for r in rows:
             p = m.REPO_ROOT / r['output_path']
             check(f"real PD coordinate panel {r['output_path']} exists and is non-empty",
@@ -670,8 +846,46 @@ try:
         check('scalar PD fallback panel is a distinct, real, non-empty file', p.exists() and p.stat().st_size > 0)
         check('scalar fallback panel path is distinct from the coordinate-based panel path',
               fallback_row['output_path'] not in {r['output_path'] for r in rows})
+
+        # Mixed figure: GT + one available method get real coordinate panels, one
+        # unavailable method gets the explicit scalar fallback -- both routed by
+        # render_all_panels_for_figure() from a single pd_verdicts mapping, and the
+        # composite manifest must keep the two panel groups distinct (Section 7).
+        mixed_pd_verdicts = {
+            'GT': _fake_verdict('GT', [0.0, 0.2], [1.0, 0.8]),
+            m.CNN: _fake_verdict(m.CNN, [0.1, 0.3], [0.9, 0.6]),
+            m.GAN: dict(figure_id=2, sample_idx=si12, method_id=m.GAN, source_role='SR', artifact_alias='gan',
+                          verdict=m.STATUS_UNAVAILABLE, selected_candidate_path='', parsed_pair_count='',
+                          fallback_required='True', notes='not found', birth=None, death=None),
+        }
+        pending_methods = [mid for mid in ('GT', m.CNN, m.GAN) if mixed_pd_verdicts[mid]['verdict'] ==
+                            m.STATUS_PENDING]
+        check('no method in the mixed-rendering fixture is left pending (a precondition for rendering)',
+              pending_methods == [])
+        available_mixed = {mid: mixed_pd_verdicts[mid] for mid in ('GT', m.CNN)
+                             if mixed_pd_verdicts[mid]['verdict'] == m.STATUS_AVAILABLE}
+        unavailable_mixed = [mid for mid in (m.GAN,) if mixed_pd_verdicts[mid]['verdict'] == m.STATUS_UNAVAILABLE]
+        mixed_rows = m.render_pd_diagram_panels(fig2, m.PD_COMPARISON, manifest12, per_sample12, available_mixed)
+        mixed_fallback = m.render_scalar_pd_fallback_panel(fig2, m.PD_COMPARISON, manifest12, per_sample12,
+                                                               unavailable_mixed)
+        check('mixed rendering produces real coordinate panels for GT + available methods AND one explicit '
+              'scalar-fallback panel for the unavailable method, never a fabricated coordinate panel for it',
+              len(mixed_rows) == 2 and (m.REPO_ROOT / mixed_fallback['output_path']).exists())
+
+        composite_pd_verdicts_by_figure = {2: {mid: v['verdict'] for mid, v in mixed_pd_verdicts.items()}}
+        mixed_composite_rows = [r for r in m.build_final_composite_manifest_rows(manifest12,
+                                                                                    composite_pd_verdicts_by_figure)
+                                  if r['figure_id'] == 2 and r['panel_type'] == m.PD_COMPARISON]
+        check('the composite manifest keeps pd_coordinate and pd_scalar_fallback as distinct panel groups for '
+              'the same figure/panel_type (Section 7)',
+              {r['panel_group'] for r in mixed_composite_rows if r['method_id'] in ('GT', m.CNN)} == {'pd_coordinate'}
+              and {r['panel_group'] for r in mixed_composite_rows if r['method_id'] == m.GAN} ==
+              {'pd_scalar_fallback'})
+        check('the composite manifest never labels the scalar-fallback panel as a real coordinate diagram',
+              all(r['final_visible_status'] != 'visible' or r['panel_group'] != 'pd_scalar_fallback'
+                  for r in mixed_composite_rows if r['method_id'] == m.GAN))
     finally:
-        shutil.rmtree(tmp12b_root, ignore_errors=True)
+        shutil.rmtree(tmp12_root, ignore_errors=True)
         for d in panel_dirs_created:
             shutil.rmtree(d, ignore_errors=True)
 
