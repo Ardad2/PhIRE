@@ -569,13 +569,60 @@ STATUS_UNAVAILABLE = 'unavailable_after_authoritative_spark_audit'
 
 PD_SOURCE_DISCOVERY_FIELDS = [
     'figure_id', 'sample_idx', 'method_id', 'candidate_path', 'artifact_type', 'schema_or_array_names',
-    'sample_mapping_status', 'finite_status', 'usable_status', 'notes',
+    'sample_mapping_status', 'finite_status', 'usable_status', 'filtration_convention', 'source_family',
+    'eligible_for_main_figure', 'exclusion_reason', 'notes',
 ]
 
 PD_SOURCE_VERDICT_FIELDS = [
-    'figure_id', 'sample_idx', 'method_id', 'source_role', 'artifact_alias', 'verdict',
-    'selected_candidate_path', 'parsed_pair_count', 'fallback_required', 'notes',
+    'figure_id', 'sample_idx', 'method_id', 'source_role', 'artifact_alias', 'filtration_convention',
+    'source_family', 'verdict', 'selected_candidate_path', 'parsed_pair_count', 'fallback_required', 'notes',
 ]
+
+# =============================================================================
+# Filtration-convention provenance (narrow correction on top of the exact
+# VTU discovery/parsing/validation machinery above -- none of which changes).
+#
+# TTK's ttkPersistenceDiagramCmd/ttkMergeTreeCmd compute SUBLEVEL-set
+# topology by default; no sublevel/superlevel flag is ever passed anywhere
+# in this repository (scripts/run_superlevel_topology_robustness.py's own
+# docstring documents this explicitly). Two disjoint real pipelines exist:
+#
+#   default_sublevel          -- the main topology evaluation: TTK's default
+#                                  sublevel-set topology on the RAW (non-
+#                                  negated) speed field. This is what every
+#                                  main Phase-2D-B figure and the paper's
+#                                  primary TTK evaluation report. Written by
+#                                  scripts/run_candidate_topology_pipeline.sh
+#                                  (candidate methods, under
+#                                  ttk_runs_fixed/topology_finetuning/) and
+#                                  scripts/run_topology_pipeline.sh (cnn/gan
+#                                  baseline, under ttk_runs_fixed/{cnn,gan}/).
+#   superlevel_negated_speed  -- a SEPARATE robustness evaluation
+#                                  (scripts/run_superlevel_topology_
+#                                  robustness.py) that feeds the SAME TTK
+#                                  binaries a NEGATED speed field; since
+#                                  superlevel(s) == sublevel(-s), this yields
+#                                  the superlevel-set topology of the true
+#                                  speed field using an unmodified sublevel
+#                                  TTK call. Written to a root that script
+#                                  asserts is disjoint from every sublevel
+#                                  root: ttk_runs_fixed/superlevel_topology/.
+#
+# Classification is by KNOWN PATH PROVENANCE (which script/pipeline writes to
+# which root) -- never inferred from coordinate signs. Only cnn/gan have a
+# real superlevel evaluation (bicubic is never in that script's
+# DEFAULT_METHODS list and has no directory anywhere); it is audited for
+# real and recorded as excluded provenance, never invented, never mixed into
+# a main-figure coordinate panel, and never compared against the
+# default_sublevel GT family.
+# =============================================================================
+
+FILTRATION_DEFAULT_SUBLEVEL = 'default_sublevel'
+FILTRATION_SUPERLEVEL_NEGATED_SPEED = 'superlevel_negated_speed'
+
+SOURCE_FAMILY_TOPOLOGY_FINETUNING = 'topology_finetuning'
+SOURCE_FAMILY_CNN_GAN_BICUBIC_BASELINE = 'cnn_gan_bicubic_baseline'
+SOURCE_FAMILY_SUPERLEVEL_ROBUSTNESS = 'superlevel_topology_robustness'
 
 PD_OVERLAY_SCRIPT_NAME_MARKERS = ('pd_critical_pairs', 'pd_diagram', 'persistence_diagram')
 
@@ -603,39 +650,72 @@ def _topology_tree_root(alias):
     return REPO_ROOT / 'ttk_runs_fixed' / 'topology_finetuning' / f'{alias}_topology'
 
 
-# CNN, GAN, and bicubic have no <alias>_topology directory anywhere in this
-# repository (confirmed by direct search: ttk_runs_fixed/cnn/,
-# ttk_runs_fixed/gan/, and ttk_runs_fixed/superlevel_topology/{cnn,gan}/
-# contain only scalar phase_c_final/*.csv summaries -- no pd/ VTU tree at
-# all; no bicubic-named topology directory exists anywhere). These plausible
-# raw-VTU root locations are still searched for real on every run -- a
-# pd/{GT,SR} tree could exist there on the authoritative Spark machine even
-# though it is absent (and *.vtu is gitignored) in this lightweight
-# checkout -- but no baseline source is ever invented if the search finds
-# nothing.
-CNN_GAN_BICUBIC_SEARCH_ROOTS = {
-    CNN: [REPO_ROOT / 'ttk_runs_fixed' / 'cnn',
-          REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'cnn' / 'topology'],
-    GAN: [REPO_ROOT / 'ttk_runs_fixed' / 'gan',
-          REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'gan' / 'topology'],
-    BICUBIC: [REPO_ROOT / 'ttk_runs_fixed' / 'bicubic',
-               REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'bicubic' / 'topology'],
+# DEFAULT-SUBLEVEL baseline roots for CNN/GAN/bicubic (Section 1/2/4):
+# confirmed against scripts/run_topology_pipeline.sh, which writes
+# out_base="$OUT_ROOT/$method" (OUT_ROOT=ttk_runs_fixed on Spark) with
+# pd/{GT,SR}/<method>_{GT,SR}_*_pd_port_0.vtu underneath -- i.e. exactly
+# ttk_runs_fixed/{cnn,gan}/pd/{GT,SR}/, matching the ${method}_GT_*/
+# ${method}_SR_* move_matches() globs in that script. Bicubic has no
+# topology-generation script or directory anywhere in this repository, but
+# is still searched for real (never invented) at the equivalent location.
+# These roots NEVER include ttk_runs_fixed/superlevel_topology/ -- that is a
+# different filtration convention, searched separately below.
+CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = {
+    CNN: [REPO_ROOT / 'ttk_runs_fixed' / 'cnn'],
+    GAN: [REPO_ROOT / 'ttk_runs_fixed' / 'gan'],
+    BICUBIC: [REPO_ROOT / 'ttk_runs_fixed' / 'bicubic'],
+}
+
+# SUPERLEVEL-VIA-NEGATED-SPEED roots (Section 1/3/4): confirmed against
+# scripts/run_superlevel_topology_robustness.py, which writes
+# ttk_runs_fixed/superlevel_topology/<name>/topology/pd/{GT,SR}/ and asserts
+# at startup that this root is disjoint from every default_sublevel root
+# (ttk_runs_fixed/topology_finetuning/, ttk_runs_fixed/cnn/,
+# ttk_runs_fixed/gan/, ttk_runs_fixed/combined/). Only cnn/gan are evaluated
+# there (bicubic is never in that script's DEFAULT_METHODS list and has no
+# directory anywhere). These sources are audited for real and recorded as
+# excluded provenance (Section 1/2) -- they never satisfy or block a
+# main-figure verdict and are never compared against the default_sublevel GT
+# family (Section 3).
+CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS = {
+    CNN: [REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'cnn' / 'topology'],
+    GAN: [REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'gan' / 'topology'],
 }
 
 # Deterministic priority order for canonical GT resolution: GT is shared by
 # every method's topology tree, so every tree that could plausibly hold it
-# is searched (never only the requesting method's own tree); ties among
-# multiple agreeing exact copies are broken by this fixed order.
+# (within the requested filtration convention) is searched (never only the
+# requesting method's own tree); ties among multiple agreeing exact copies
+# are broken by this fixed order.
 GT_SOURCE_PRIORITY_METHODS = [CANDIDATE_C, F3, F2, UV_E2, CNN, GAN, BICUBIC]
 
 
-def _method_search_roots_and_alias(mid):
-    """(topology_roots, filename_alias_token) for method mid. Real
-    repository-relative roots only -- never a fixed 3-filename guess."""
+def _method_search_roots_and_alias(mid, convention=FILTRATION_DEFAULT_SUBLEVEL):
+    """(topology_roots, filename_alias_token) for method mid under the given
+    filtration convention. Real repository-relative roots only -- never a
+    fixed 3-filename guess, and never a root for a method/convention
+    combination with no known real pipeline (e.g. candidate methods'
+    aliases have no superlevel search root here; bicubic has no superlevel
+    root at all) -- an empty root list, not an invented one."""
     if mid in METHOD_ARTIFACT_ALIASES:
         alias = METHOD_ARTIFACT_ALIASES[mid]
-        return [_topology_tree_root(alias)], alias
-    return CNN_GAN_BICUBIC_SEARCH_ROOTS.get(mid, []), mid
+        if convention == FILTRATION_DEFAULT_SUBLEVEL:
+            return [_topology_tree_root(alias)], alias
+        return [], alias
+    alias = mid
+    if convention == FILTRATION_DEFAULT_SUBLEVEL:
+        return CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS.get(mid, []), alias
+    if convention == FILTRATION_SUPERLEVEL_NEGATED_SPEED:
+        return CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS.get(mid, []), alias
+    return [], alias
+
+
+def _source_family_for_alias(alias):
+    """Classifies a resolved default_sublevel alias by which real pipeline
+    produced it -- known path provenance, never inferred from coordinates."""
+    if alias in METHOD_ARTIFACT_ALIASES.values():
+        return SOURCE_FAMILY_TOPOLOGY_FINETUNING
+    return SOURCE_FAMILY_CNN_GAN_BICUBIC_BASELINE
 
 
 def find_pd_overlay_scripts():
@@ -776,16 +856,18 @@ def _resolve_canonical_pd_copy(candidate_paths_and_aliases, sample_idx, role):
     return canonical_path, canonical_alias, canonical_result, len(parsed)
 
 
-def resolve_canonical_gt_pd_source(sample_idx):
+def resolve_canonical_gt_pd_source(sample_idx, convention=FILTRATION_DEFAULT_SUBLEVEL):
     """Deterministically resolves the single canonical GT PD coordinate
-    source for one sample_idx, searched across EVERY known topology tree in
-    GT_SOURCE_PRIORITY_METHODS order (GT is shared by all methods -- never
-    only the requesting method's own tree). Returns None if no exact GT
-    source is found anywhere."""
+    source for one sample_idx WITHIN one filtration convention only
+    (Section 3) -- default_sublevel and superlevel_negated_speed GT
+    families are never compared against each other; each is validated for
+    internal agreement independently. Searched across EVERY known topology
+    tree for that convention, in GT_SOURCE_PRIORITY_METHODS order. Returns
+    None if no exact GT source is found anywhere in that convention."""
     candidates = []
     seen_rel = set()
     for pmid in GT_SOURCE_PRIORITY_METHODS:
-        roots, alias = _method_search_roots_and_alias(pmid)
+        roots, alias = _method_search_roots_and_alias(pmid, convention)
         for root in roots:
             for path in find_exact_pd_vtu_candidates(root, PD_VTU_ROLE_GT, alias, sample_idx):
                 rel = _rel(path)
@@ -801,31 +883,40 @@ def resolve_canonical_gt_pd_source(sample_idx):
 
 def resolve_pd_source_verdict(figure_id, sample_idx, mid):
     """Reduces the exact-source search for one required (figure, sample,
-    method) to a single authoritative verdict row (Section 5/6). Also
-    carries the parsed birth/death coordinates (not part of the CSV schema)
-    so callers never re-open/re-parse the VTU a second time in-process."""
+    method) to a single authoritative verdict row (Section 5/6), STRICTLY
+    within the default_sublevel filtration convention -- the convention the
+    main reported PD distances and every main Phase-2D-B figure use
+    (Section 2). Also carries the parsed birth/death coordinates (not part
+    of the CSV schema) so callers never re-open/re-parse the VTU a second
+    time in-process."""
+    convention = FILTRATION_DEFAULT_SUBLEVEL
     if mid == 'GT':
-        canonical = resolve_canonical_gt_pd_source(sample_idx)
+        canonical = resolve_canonical_gt_pd_source(sample_idx, convention)
         if canonical is None:
             verdict = STATUS_PENDING if IS_LIGHTWEIGHT_CHECKOUT else STATUS_UNAVAILABLE
             notes = ('Lightweight (non-Spark) checkout: absence here does not prove absence on the '
                         'authoritative Spark machine (raw .vtu Spark intermediates are gitignored and never '
                         'present here).' if IS_LIGHTWEIGHT_CHECKOUT else
-                        f'Searched every known topology tree ({GT_SOURCE_PRIORITY_METHODS}) for an exact GT PD '
-                        f'source for sample_idx={sample_idx}; none found on the authoritative Spark machine.')
+                        f'Searched every known default_sublevel topology tree ({GT_SOURCE_PRIORITY_METHODS}) '
+                        f'for an exact GT PD source for sample_idx={sample_idx}; none found on the '
+                        f'authoritative Spark machine. (The superlevel_negated_speed family, if any exists for '
+                        f'this sample, is recorded separately as excluded provenance -- it is never used to '
+                        f'satisfy this default_sublevel verdict.)')
             return dict(figure_id=figure_id, sample_idx=sample_idx, method_id='GT', source_role=PD_VTU_ROLE_GT,
-                          artifact_alias='', verdict=verdict, selected_candidate_path='', parsed_pair_count='',
+                          artifact_alias='', filtration_convention=convention, source_family='', verdict=verdict,
+                          selected_candidate_path='', parsed_pair_count='',
                           fallback_required=str(verdict != STATUS_AVAILABLE), notes=notes, birth=None, death=None)
-        notes = ('Single exact GT copy found.' if canonical['n_copies'] == 1 else
-                   f"Canonical GT selected from {canonical['n_copies']} agreeing exact copies "
+        notes = ('Single exact default_sublevel GT copy found.' if canonical['n_copies'] == 1 else
+                   f"Canonical default_sublevel GT selected from {canonical['n_copies']} agreeing exact copies "
                    f"(priority alias={canonical['alias']!r}).")
         return dict(figure_id=figure_id, sample_idx=sample_idx, method_id='GT', source_role=PD_VTU_ROLE_GT,
-                      artifact_alias=canonical['alias'], verdict=STATUS_AVAILABLE,
+                      artifact_alias=canonical['alias'], filtration_convention=convention,
+                      source_family=_source_family_for_alias(canonical['alias']), verdict=STATUS_AVAILABLE,
                       selected_candidate_path=_rel(canonical['path']),
                       parsed_pair_count=canonical['result']['pair_count'], fallback_required='False', notes=notes,
                       birth=canonical['result']['birth'], death=canonical['result']['death'])
 
-    roots, alias = _method_search_roots_and_alias(mid)
+    roots, alias = _method_search_roots_and_alias(mid, convention)
     candidates = []
     seen_rel = set()
     for root in roots:
@@ -839,26 +930,130 @@ def resolve_pd_source_verdict(figure_id, sample_idx, mid):
         verdict = STATUS_PENDING if IS_LIGHTWEIGHT_CHECKOUT else STATUS_UNAVAILABLE
         notes = ('Lightweight (non-Spark) checkout: absence here does not prove absence on the authoritative '
                     'Spark machine.' if IS_LIGHTWEIGHT_CHECKOUT else
-                    f"Searched {[_rel(r) for r in roots]} for an exact SR PD source; none found on the "
-                    f'authoritative Spark machine.')
+                    f"Searched {[_rel(r) for r in roots]} (default_sublevel only) for an exact SR PD source; "
+                    f'none found on the authoritative Spark machine. This method\'s main figure panel uses the '
+                    f'scalar PD-evidence fallback instead.')
         return dict(figure_id=figure_id, sample_idx=sample_idx, method_id=mid, source_role=PD_VTU_ROLE_SR,
-                      artifact_alias=alias, verdict=verdict, selected_candidate_path='', parsed_pair_count='',
+                      artifact_alias=alias, filtration_convention=convention,
+                      source_family=_source_family_for_alias(alias), verdict=verdict,
+                      selected_candidate_path='', parsed_pair_count='',
                       fallback_required=str(verdict != STATUS_AVAILABLE), notes=notes, birth=None, death=None)
     path, resolved_alias, result, n_copies = _resolve_canonical_pd_copy(candidates, sample_idx, PD_VTU_ROLE_SR)
     notes = '' if n_copies == 1 else f'{n_copies} agreeing exact SR copies found; selected {_rel(path)}.'
     return dict(figure_id=figure_id, sample_idx=sample_idx, method_id=mid, source_role=PD_VTU_ROLE_SR,
-                  artifact_alias=resolved_alias, verdict=STATUS_AVAILABLE, selected_candidate_path=_rel(path),
-                  parsed_pair_count=result['pair_count'], fallback_required='False', notes=notes,
-                  birth=result['birth'], death=result['death'])
+                  artifact_alias=resolved_alias, filtration_convention=convention,
+                  source_family=_source_family_for_alias(resolved_alias), verdict=STATUS_AVAILABLE,
+                  selected_candidate_path=_rel(path), parsed_pair_count=result['pair_count'],
+                  fallback_required='False', notes=notes, birth=result['birth'], death=result['death'])
+
+
+def check_superlevel_gt_family_agreement(sample_idx):
+    """Section 3: an INDEPENDENT, non-blocking provenance check -- do the
+    superlevel-via-negated-speed GT copies (cnn, gan) agree with EACH
+    OTHER? Never compared against the default_sublevel GT family, and never
+    raises: a parse failure or disagreement here is recorded as diagnostic
+    provenance only and never controls main-figure source selection
+    (Section 2)."""
+    candidates = []
+    for mid in (CNN, GAN):
+        roots, alias = _method_search_roots_and_alias(mid, FILTRATION_SUPERLEVEL_NEGATED_SPEED)
+        for root in roots:
+            candidates.extend((p, alias) for p in
+                                find_exact_pd_vtu_candidates(root, PD_VTU_ROLE_GT, alias, sample_idx))
+    if len(candidates) < 2:
+        return dict(n_copies=len(candidates), agrees=None,
+                     note=f'{len(candidates)} exact superlevel_negated_speed GT copy(ies) found; at least 2 are '
+                           f'needed to cross-check agreement.')
+    try:
+        parsed = [(path, alias, parse_and_validate_pd_vtu(path, sample_idx, PD_VTU_ROLE_GT, alias))
+                   for path, alias in candidates]
+    except SystemExit as exc:
+        return dict(n_copies=len(candidates), agrees=None,
+                     note=f'Could not parse all superlevel_negated_speed GT copies for cross-checking: {exc}')
+    cb, cd = _sorted_pd_pairs(parsed[0][2]['birth'], parsed[0][2]['death'])
+    agrees = True
+    for _, _, result in parsed[1:]:
+        ob, od = _sorted_pd_pairs(result['birth'], result['death'])
+        if ob.shape != cb.shape or not (np.allclose(ob, cb, atol=GT_PD_COORD_TOLERANCE) and
+                                          np.allclose(od, cd, atol=GT_PD_COORD_TOLERANCE)):
+            agrees = False
+            break
+    return dict(n_copies=len(candidates), agrees=agrees,
+                 note=(f'All {len(candidates)} superlevel_negated_speed GT copies agree with each other.'
+                        if agrees else
+                        f'The {len(candidates)} superlevel_negated_speed GT copies disagree with each other '
+                        f'(informational only -- does not affect the main default_sublevel figure).'))
+
+
+def _excluded_family_discovery_rows(figure_id, sample_idx, row_method_id, roots, role, alias, convention,
+                                       source_family, exclusion_reason, extra_note=''):
+    """Section 1: real, non-invented filesystem search purely for
+    informational provenance -- these candidates are NEVER parsed for
+    validity here and never gate a verdict; they are always
+    eligible_for_main_figure=False. (Cross-copy agreement, when relevant,
+    is a SEPARATE, independent, non-blocking check -- see
+    check_superlevel_gt_family_agreement().)"""
+    found_paths = []
+    for root in roots:
+        found_paths.extend(find_exact_pd_vtu_candidates(root, role, alias, sample_idx))
+    if not found_paths:
+        return [dict(figure_id=figure_id, sample_idx=sample_idx, method_id=row_method_id, candidate_path='',
+                       artifact_type='none_found', schema_or_array_names='', sample_mapping_status='not_found',
+                       finite_status='not_applicable', usable_status='excluded', filtration_convention=convention,
+                       source_family=source_family, eligible_for_main_figure='False',
+                       exclusion_reason=exclusion_reason,
+                       notes=(f'Searched {[_rel(r) for r in roots]} for informational provenance only.'
+                               + extra_note))]
+    rows = []
+    for path in found_paths:
+        rows.append(dict(figure_id=figure_id, sample_idx=sample_idx, method_id=row_method_id,
+                           candidate_path=_rel(path), artifact_type='vtk_family_vtu',
+                           schema_or_array_names=','.join(PD_VTU_REQUIRED_ARRAYS), sample_mapping_status='mapped',
+                           finite_status='not_checked_excluded_by_filtration_convention', usable_status='excluded',
+                           filtration_convention=convention, source_family=source_family,
+                           eligible_for_main_figure='False', exclusion_reason=exclusion_reason,
+                           notes=('Real exact source found but excluded from the main default_sublevel figure '
+                                   'by filtration convention (Section 2).' + extra_note)))
+    return rows
+
+
+def discover_superlevel_sr_provenance_rows(figure_id, sample_idx, mid):
+    """Section 1: informational-only SR provenance for the
+    superlevel_negated_speed family (cnn/gan only)."""
+    roots, alias = _method_search_roots_and_alias(mid, FILTRATION_SUPERLEVEL_NEGATED_SPEED)
+    return _excluded_family_discovery_rows(figure_id, sample_idx, mid, roots, PD_VTU_ROLE_SR, alias,
+                                              FILTRATION_SUPERLEVEL_NEGATED_SPEED,
+                                              SOURCE_FAMILY_SUPERLEVEL_ROBUSTNESS,
+                                              'filtration_convention_mismatch')
+
+
+def discover_superlevel_gt_provenance_rows(figure_id, sample_idx):
+    """Section 1/3: informational-only GT provenance for the
+    superlevel_negated_speed family, searched under BOTH cnn's and gan's
+    superlevel roots (GT is shared within that family too). Includes the
+    independent, non-blocking cross-copy agreement check (Section 3) as a
+    note -- disagreement here is recorded only and never hard-fails or
+    affects main-figure selection."""
+    agreement = check_superlevel_gt_family_agreement(sample_idx)
+    extra_note = f' Cross-copy agreement check (informational, non-blocking): {agreement["note"]}'
+    rows = []
+    for mid in (CNN, GAN):
+        roots, alias = _method_search_roots_and_alias(mid, FILTRATION_SUPERLEVEL_NEGATED_SPEED)
+        rows.extend(_excluded_family_discovery_rows(
+            figure_id, sample_idx, 'GT', roots, PD_VTU_ROLE_GT, alias, FILTRATION_SUPERLEVEL_NEGATED_SPEED,
+            SOURCE_FAMILY_SUPERLEVEL_ROBUSTNESS, 'filtration_convention_mismatch', extra_note=extra_note))
+    return rows
 
 
 def discover_and_resolve_pd_sources_for_figure(contract, manifest):
     """Returns (discovery_rows, verdicts) for one figure. `verdicts` maps
-    method_id (including 'GT') -> the full resolve_pd_source_verdict() dict.
-    `discovery_rows` is raw per-method provenance in the legacy
-    PD_SOURCE_DISCOVERY_FIELDS schema (plan/pd_source_discovery.csv) --
-    retained for audit trail only; all render/plan gating now consumes
-    `verdicts` / plan/pd_source_verdicts.csv."""
+    method_id (including 'GT') -> the full resolve_pd_source_verdict() dict
+    -- STRICTLY default_sublevel (Section 2); this is what all render/plan
+    gating consumes. `discovery_rows` additionally records real,
+    non-invented superlevel_negated_speed provenance for cnn/gan
+    (Section 1) as excluded, informational-only rows that never affect
+    `verdicts` -- retained for audit trail in plan/pd_source_discovery.csv
+    only."""
     si = manifest[contract['archetype_id']]
     needs_pd = any(pt in PD_DIAGRAM_PANEL_TYPES for pt in contract['panels'])
     methods_needing_pd = (['GT'] + contract['full_panel_methods']) if needs_pd else []
@@ -875,8 +1070,14 @@ def discover_and_resolve_pd_sources_for_figure(contract, manifest):
             schema_or_array_names=(','.join(PD_VTU_REQUIRED_ARRAYS) if found else ''),
             sample_mapping_status=('mapped' if found else 'not_found'),
             finite_status=('finite' if v['verdict'] == STATUS_AVAILABLE else 'not_applicable'),
-            usable_status=v['verdict'], notes=v['notes'],
+            usable_status=v['verdict'], filtration_convention=v['filtration_convention'],
+            source_family=v['source_family'], eligible_for_main_figure='True', exclusion_reason='',
+            notes=v['notes'],
         ))
+        if mid in (CNN, GAN):
+            discovery_rows.extend(discover_superlevel_sr_provenance_rows(contract['figure_id'], si, mid))
+    if any(mid in (CNN, GAN) for mid in methods_needing_pd):
+        discovery_rows.extend(discover_superlevel_gt_provenance_rows(contract['figure_id'], si))
     return discovery_rows, verdicts
 
 
@@ -1428,16 +1629,21 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
     a('## 5. Authoritative PD coordinate source discovery')
     a('')
     if pd_discovery_rows:
-        n_avail = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_AVAILABLE)
-        n_pending = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_PENDING)
-        n_unavail = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_UNAVAILABLE)
+        main_rows = [r for r in pd_discovery_rows if r['eligible_for_main_figure'] == 'True']
+        excluded_rows = [r for r in pd_discovery_rows if r['eligible_for_main_figure'] == 'False']
+        n_avail = sum(1 for r in main_rows if r['usable_status'] == STATUS_AVAILABLE)
+        n_pending = sum(1 for r in main_rows if r['usable_status'] == STATUS_PENDING)
+        n_unavail = sum(1 for r in main_rows if r['usable_status'] == STATUS_UNAVAILABLE)
         env = 'a lightweight (non-Spark) checkout' if IS_LIGHTWEIGHT_CHECKOUT else 'the authoritative Spark machine'
-        baseline_search_roots = {mid: [_rel(p) for p in roots] for mid, roots in CNN_GAN_BICUBIC_SEARCH_ROOTS.items()}
+        default_sublevel_roots = {mid: [_rel(p) for p in roots]
+                                    for mid, roots in CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS.items()}
+        superlevel_roots = {mid: [_rel(p) for p in roots]
+                              for mid, roots in CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS.items()}
         a(f'An exact, repository-relative filesystem search (`plan/pd_source_discovery.csv`, '
           f'{len(pd_discovery_rows)} row(s); reduced per-`(figure, sample, method)` verdicts in '
-          f'`plan/pd_source_verdicts.csv`) was performed for every (figure, method) requiring a '
-          f'`pd_evidence`/`pd_comparison` panel -- GT, CNN, GAN, and Bicubic included, none assumed found '
-          f'without a concrete `selected_candidate_path`. This process is running in {env}: {n_avail} '
+          f'`plan/pd_source_verdicts.csv`, {len(main_rows)} row(s)) was performed for every (figure, method) '
+          f'requiring a `pd_evidence`/`pd_comparison` panel -- GT, CNN, GAN, and Bicubic included, none assumed '
+          f'found without a concrete `selected_candidate_path`. This process is running in {env}: {n_avail} '
           f'method(s) available_validated, {n_pending} pending_authoritative_spark_source_discovery, '
           f'{n_unavail} unavailable_after_authoritative_spark_audit. On the authoritative Spark machine, no '
           f'method-level verdict is ever left pending (enforced in code). Only the exact TTK PD VTU convention '
@@ -1446,8 +1652,25 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
           f'GT cross-checked for coordinate agreement across every candidate topology tree before being '
           f'accepted as canonical. Method-to-artifact aliases: {dict(METHOD_ARTIFACT_ALIASES)}; CNN/GAN/bicubic '
           f'use their own method_id (no `<alias>_topology` directory exists for them anywhere in this '
-          f'repository) and are searched under {baseline_search_roots}. Existing PD-overlay-related scripts '
+          f'repository) and are searched under {default_sublevel_roots}. Existing PD-overlay-related scripts '
           f'already in this repository were also inventoried for provenance.')
+        a('')
+        a('**Filtration convention.** All main-figure PD coordinate panels use the `default_sublevel` '
+          'filtration convention exclusively -- TTK\'s `ttkPersistenceDiagramCmd`/`ttkMergeTreeCmd` default '
+          '(sublevel-set) behavior on the raw, non-negated speed field, which is what the main reported PD '
+          'distances and the paper\'s primary TTK evaluation use. A separate `superlevel_negated_speed` '
+          'robustness evaluation (`scripts/run_superlevel_topology_robustness.py`) computes the SAME sublevel '
+          'TTK call on the NEGATED speed field -- mathematically the superlevel-set topology of the true speed '
+          'field -- and is written to a disjoint root, `ttk_runs_fixed/superlevel_topology/`. cnn/gan sources '
+          f'under that root were audited for real (searched under {superlevel_roots}) and are recorded in '
+          f'`plan/pd_source_discovery.csv` as excluded provenance ({len(excluded_rows)} row(s), '
+          '`eligible_for_main_figure=false`, `exclusion_reason=filtration_convention_mismatch`) -- they are '
+          'never mixed into a default_sublevel coordinate panel and never compared against the default_sublevel '
+          'GT family. Default_sublevel and superlevel_negated_speed diagrams are NOT expected to share raw '
+          'coordinates (different filtration, generally different pair counts and coordinate ranges); this is a '
+          'source-availability decision, not a change to any frozen metric. Methods with no exact '
+          'default_sublevel coordinate artifact use the explicit scalar PD-evidence fallback (clearly labeled, '
+          'never presented as a real persistence diagram) instead of a superlevel substitute.')
     elif execution_mode == EXECUTION_MODE_PLAN_ONLY:
         a('Not yet run in this render state.')
     else:
