@@ -1256,27 +1256,132 @@ CAPTIONS_PATH = PLAN_DIR / 'final_figure_captions.md'
 # Report
 # =============================================================================
 
+# Explicit execution-state vocabulary for the generated report (never inferred
+# merely from whether zoom_result is None): each cmd_* entry point states
+# truthfully which stage(s) it has actually completed.
+EXECUTION_MODE_PLAN_ONLY = 'plan_only'
+EXECUTION_MODE_RENDER_FIELDS = 'render_fields'
+EXECUTION_MODE_ASSEMBLE_COMPOSITES = 'assemble_composites'
+EXECUTION_MODE_FULL = 'full'
+EXECUTION_MODES = (EXECUTION_MODE_PLAN_ONLY, EXECUTION_MODE_RENDER_FIELDS, EXECUTION_MODE_ASSEMBLE_COMPOSITES,
+                     EXECUTION_MODE_FULL)
+
+
+def read_zoom_result_from_validation():
+    """Reads back the deterministic zoom bounds/score already written by a
+    prior --render-fields run (validation/zoom_selection_validation.csv) so
+    --assemble-composites/--full can report the real computed values
+    without needing render_fields' in-memory state threaded in. Returns
+    None if the file is absent or still not_yet_computed."""
+    path = VALIDATION_DIR / 'zoom_selection_validation.csv'
+    if not path.exists():
+        return None
+    rows = p2da.read_csv_dicts(path)
+    if not rows or rows[0]['status'] != 'computed':
+        return None
+    r = rows[0]
+    return dict(y0=int(r['y0']), y1=int(r['y1']), x0=int(r['x0']), x1=int(r['x1']), score=float(r['score']))
+
+
+def read_rendered_panel_rows():
+    """Reads back the scripted-panel rows already written by a prior
+    --render-fields run (validation/panel_validation.csv). Returns [] if
+    the file is absent."""
+    path = VALIDATION_DIR / 'panel_validation.csv'
+    if not path.exists():
+        return []
+    return p2da.read_csv_dicts(path)
+
+
+def _status_banner_lines(execution_mode):
+    if execution_mode == EXECUTION_MODE_FULL:
+        return ['Phase 2D-B complete.', 'All final composites and figure-data packages validated.']
+    if execution_mode == EXECUTION_MODE_ASSEMBLE_COMPOSITES:
+        return ['Phase 2D-B composite assembly complete.',
+                 'Final composites assembled from validated scripted panels and manual topology input.']
+    if execution_mode == EXECUTION_MODE_RENDER_FIELDS:
+        return ['Phase 2D-B scripted rendering complete.',
+                 'Manual topology input and final composite assembly still pending.']
+    # plan_only
+    if IS_LIGHTWEIGHT_CHECKOUT:
+        return ['Phase 2D-B planning complete (lightweight checkout).',
+                 'Final publication rendering pending; raw Spark arrays are absent here by design.']
+    return ['Phase 2D-B planning complete (authoritative Spark checkout).',
+             'Raw arrays were intentionally not loaded in --plan-only; run --render-fields to continue.']
+
+
+def _scope_intro_text(execution_mode):
+    if execution_mode == EXECUTION_MODE_PLAN_ONLY:
+        if IS_LIGHTWEIGHT_CHECKOUT:
+            return (
+                'This document reflects a `--plan-only` run in a lightweight (non-Spark) checkout. It reads '
+                'exclusively frozen Phase-1 through Phase-2D-A artifacts (118 files, checksummed before and '
+                'after this stage) and never touches `data_out/`, `data_out_fixed/`, or reruns any '
+                'training/inference/TTK step. Raw Spark arrays are absent in this checkout by design, so PD '
+                'source verdicts may remain `pending_authoritative_spark_source_discovery` here. Phase 2D-A '
+                'is treated as complete and authoritative; no sample is re-selected and no alternate is '
+                'activated here.'
+            )
+        return (
+            'This document reflects a `--plan-only` run on the authoritative Spark machine. It reads '
+            'exclusively frozen Phase-1 through Phase-2D-A artifacts (118 files, checksummed before and after '
+            'this stage) and never touches `data_out/`, `data_out_fixed/`, or reruns any training/inference/'
+            'TTK step. The raw Spark arrays may exist on this machine, but `--plan-only` intentionally does '
+            'not load or render them in this mode -- exact PD VTU sources are still audited directly on disk '
+            '(Section 5), and no method-level PD verdict may remain pending after this run. Phase 2D-A is '
+            'treated as complete and authoritative; no sample is re-selected and no alternate is activated '
+            'here.'
+        )
+    if execution_mode == EXECUTION_MODE_RENDER_FIELDS:
+        return (
+            'This document reflects a `--render-fields` run. The real Spark arrays (`data_out/`, '
+            '`data_out_fixed/`) were loaded and audited, and every scripted panel (speed/error fields, metric '
+            'strips, PD-diagram or scalar-fallback panels, and the deterministic sample-119 zoom crop) was '
+            'rendered and validated. Manual topology (merge-tree) input and final composite assembly may '
+            'still be pending -- see Sections 6 and 9.'
+        )
+    if execution_mode == EXECUTION_MODE_ASSEMBLE_COMPOSITES:
+        return (
+            'This document reflects an `--assemble-composites` run. Manual topology (merge-tree) inputs were '
+            'validated against their declared metadata, and the six final composite figures were assembled '
+            'strictly from the explicit `plan/final_composite_manifest.csv` -- never by globbing a directory. '
+            'This is not a `--plan-only` run: it consumes already-rendered scripted panels from a prior '
+            '`--render-fields` run and does not itself plan, re-select, or render fields.'
+        )
+    # full
+    return (
+        'This document reflects a completed `--full` run: planning, scripted rendering (`--render-fields`), '
+        'manual topology input validation, and final composite assembly (`--assemble-composites`) all '
+        'completed in sequence and passed every required validation. All six final composite figures are '
+        'rendered and validated; nothing in this run remains lightweight or planning-only.'
+    )
+
+
 def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows=None,
-                                is_full_complete=False):
+                                execution_mode=EXECUTION_MODE_PLAN_ONLY, final_figure_rows=None):
+    if execution_mode not in EXECUTION_MODES:
+        raise SystemExit(
+            f'[hard-fail] Unknown Phase 2D-B report execution_mode={execution_mode!r}; expected one of '
+            f'{EXECUTION_MODES}.'
+        )
+    if execution_mode != EXECUTION_MODE_PLAN_ONLY and zoom_result is None:
+        raise SystemExit(
+            f'[hard-fail] Cannot build the Phase 2D-B report in execution_mode={execution_mode!r} with '
+            f'zoom_result=None -- the deterministic zoom must already be computed by this stage. This '
+            f'indicates an inconsistent execution state; refusing to report it as though it were legitimate.'
+        )
     lines = []
     a = lines.append
     a('# Phase 2D-B: Final Publication-Quality Figure Production')
     a('')
     a('```')
-    if is_full_complete:
-        a('Phase 2D-B complete.')
-        a('All final composites and figure-data packages validated.')
-    else:
-        a('Phase 2D-B planning complete.')
-        a('Final publication rendering pending required panels.')
+    for banner_line in _status_banner_lines(execution_mode):
+        a(banner_line)
     a('```')
     a('')
     a('## 1. Scope and frozen inputs')
     a('')
-    a('This document reflects a `--plan-only` run in a lightweight checkout. It reads exclusively frozen '
-      'Phase-1 through Phase-2D-A artifacts (118 files, checksummed before and after this stage) and never '
-      'touches `data_out/`, `data_out_fixed/`, or reruns any training/inference/TTK step. Phase 2D-A is '
-      'treated as complete and authoritative; no sample is re-selected and no alternate is activated here.')
+    a(_scope_intro_text(execution_mode))
     a('')
     a('## 2. Frozen sample set')
     a('')
@@ -1309,11 +1414,16 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
     a('')
     if zoom_result is not None:
         a(f"Selected bounds: y=[{zoom_result['y0']}, {zoom_result['y1']}), "
-          f"x=[{zoom_result['x0']}, {zoom_result['x1']}), score={zoom_result['score']:.6f}.")
-    else:
+          f"x=[{zoom_result['x0']}, {zoom_result['x1']}), score={zoom_result['score']:.6f}. Computed from the "
+          f"real GT and per-method error fields loaded in `--render-fields`.")
+    elif IS_LIGHTWEIGHT_CHECKOUT:
         a('**Not yet computed.** The zoom window score requires the real GT and per-method error fields '
           '(`data_out_fixed/`/`data_out/`), which are absent in this lightweight checkout by design. '
           '`select_deterministic_zoom()` is implemented and synthetic-tested; it will run in `--render-fields`.')
+    else:
+        a('**Not yet computed.** The raw GT and per-method error fields required by the zoom-window score '
+          'exist on this authoritative Spark machine, but `--plan-only` intentionally does not load or render '
+          'them; `select_deterministic_zoom()` will run in `--render-fields`.')
     a('')
     a('## 5. Authoritative PD coordinate source discovery')
     a('')
@@ -1338,8 +1448,12 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
           f'use their own method_id (no `<alias>_topology` directory exists for them anywhere in this '
           f'repository) and are searched under {baseline_search_roots}. Existing PD-overlay-related scripts '
           f'already in this repository were also inventoried for provenance.')
-    else:
+    elif execution_mode == EXECUTION_MODE_PLAN_ONLY:
         a('Not yet run in this render state.')
+    else:
+        a('Not summarized in this execution_mode\'s report -- exact PD source discovery/resolution already '
+          'ran (per-figure, inside `--render-fields`) during rendering; see `plan/pd_source_discovery.csv` '
+          'and `plan/pd_source_verdicts.csv` from the most recent `--plan-only` run for the full audit trail.')
     a('')
     a('## 6. Manual topology (merge-tree) requirements')
     a('')
@@ -1389,16 +1503,37 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
     a('- `docs/unified_candidate_analysis_phase2db.md` (this file)')
     a('- `logs/unified_candidate_analysis_phase2db.log`')
     a('')
-    a('Not yet generated (pending Spark + manual topology export): `panels/**/*.png`, '
-      '`manual_topology_inputs/**/*`, `figures/**/*`.')
+    if execution_mode == EXECUTION_MODE_PLAN_ONLY:
+        a('Not yet generated (pending `--render-fields`, manual topology export, and `--assemble-composites`): '
+          '`panels/**/*.png`, `manual_topology_inputs/**/*`, `figures/**/*`.')
+    else:
+        n_panels = len(panel_rows or [])
+        a(f'Scripted panels rendered and validated in `--render-fields`: {n_panels} panel file(s) under '
+          f'`panels/**/*.png` (never claimed merely because the directory exists -- counted from '
+          f'`validation/panel_validation.csv`).')
+        if execution_mode == EXECUTION_MODE_RENDER_FIELDS:
+            a('')
+            a('Not yet generated (pending manual topology export and `--assemble-composites`): '
+              '`manual_topology_inputs/**/*`, `figures/**/*`.')
+        else:
+            n_manual = len(manual_topo_rows or [])
+            n_manual_present = sum(1 for r in (manual_topo_rows or []) if r['status'] == 'present')
+            a(f'Manual topology inputs validated: {n_manual_present}/{n_manual} panel(s) under '
+              f'`manual_topology_inputs/**/*` (see `plan/manual_topology_requirements.csv`).')
+            n_final = len(final_figure_rows or [])
+            n_final_ready = sum(1 for r in (final_figure_rows or [])
+                                  if r['status'] == 'rendered' and r['png_exists'] and r['png_min_dpi_ok']
+                                  and r['vector_exists'] and r['pdf_valid'])
+            a(f'Final composite figures assembled and validated: {n_final_ready}/{n_final} under '
+              f'`figures/**/*` (see `validation/final_figure_validation.csv`).')
     a('')
     return lines
 
 
 def write_phase2db_doc(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows=None,
-                          is_full_complete=False):
+                          execution_mode=EXECUTION_MODE_PLAN_ONLY, final_figure_rows=None):
     lines = build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows,
-                                        is_full_complete)
+                                        execution_mode, final_figure_rows)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     DOC_PATH.write_text('\n'.join(lines) + '\n')
     log(f'[write] {DOC_PATH}')
@@ -1495,7 +1630,7 @@ def cmd_plan_only() -> dict:
 
     write_captions_md(manifest)
     write_phase2db_doc(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows,
-                         is_full_complete=False)
+                         execution_mode=EXECUTION_MODE_PLAN_ONLY)
 
     postflight_immutability(checksums_before, file_to_phase, VALIDATION_DIR / 'prior_phase_immutability_check.csv')
 
@@ -1988,6 +2123,11 @@ def cmd_render_fields(plan_result=None) -> dict:
                 'colormap_error', 'physical_units'], scale_rows)
     write_csv(VALIDATION_DIR / 'panel_validation.csv',
                ['output_path', 'method_id', 'panel_type'], render_rows)
+
+    manual_topo_rows = build_manual_topology_requirements_rows(manifest)
+    write_phase2db_doc(manifest, zoom_result, manual_topo_rows, render_rows, pd_discovery_rows=None,
+                         execution_mode=EXECUTION_MODE_RENDER_FIELDS)
+
     postflight_immutability(checksums_before, file_to_phase, VALIDATION_DIR / 'prior_phase_immutability_check.csv')
     log('')
     log('=' * 88)
@@ -2160,10 +2300,14 @@ def build_composite_for_figure(contract, manifest):
     from plan/final_composite_manifest.csv -- never a directory glob. Every
     row with final_visible_status in (visible, scalar_fallback) is required
     to exist; a `pending` row hard-fails (still awaiting an authoritative PD
-    verdict); any PNG present on disk that is not referenced by the
-    manifest is rejected as unexpected; duplicate source_path entries are
-    rejected. Declared panel_order is preserved exactly (figure 3's compact
-    F2 role -- excluded from full_panel_methods, so it never appears as a
+    verdict). Duplicate (panel_type, method_id) identities are rejected, but
+    several unavailable-method rows may legitimately share ONE combined
+    scalar-fallback source_path -- that shared path is de-duplicated
+    (first-occurrence order preserved) so it appears exactly once in the
+    assembled visual grid, never once per sharing row. Any PNG present on
+    disk that is not referenced by the manifest is rejected as unexpected.
+    Declared panel_order is preserved exactly (figure 3's compact F2 role --
+    excluded from full_panel_methods, so it never appears as a
     speed/error/PD panel -- is respected automatically since the manifest
     is itself built from the same figure contract)."""
     import matplotlib
@@ -2258,7 +2402,7 @@ def build_composite_for_figure(contract, manifest):
     )
 
 
-def cmd_assemble_composites(plan_result=None) -> dict:
+def cmd_assemble_composites(plan_result=None, is_full_run=False) -> dict:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     log('=' * 88)
     log('Unified candidate figures -- Phase 2D-B (--assemble-composites)')
@@ -2282,7 +2426,11 @@ def cmd_assemble_composites(plan_result=None) -> dict:
         )
 
     postflight_immutability(checksums_before, file_to_phase, VALIDATION_DIR / 'prior_phase_immutability_check.csv')
-    write_phase2db_doc(manifest, None, manual_topo_rows, [], pd_discovery_rows=None, is_full_complete=True)
+    execution_mode = EXECUTION_MODE_FULL if is_full_run else EXECUTION_MODE_ASSEMBLE_COMPOSITES
+    zoom_result = read_zoom_result_from_validation()
+    panel_rows = read_rendered_panel_rows()
+    write_phase2db_doc(manifest, zoom_result, manual_topo_rows, panel_rows, pd_discovery_rows=None,
+                         execution_mode=execution_mode, final_figure_rows=final_rows)
     log('')
     log('=' * 88)
     log(f'RESULT: Phase 2D-B complete. {len(final_rows)} final composite figure(s) written.')
@@ -2294,7 +2442,7 @@ def cmd_assemble_composites(plan_result=None) -> dict:
 def cmd_full():
     plan_result = cmd_plan_only()
     render_result = cmd_render_fields(plan_result=plan_result)
-    composite_result = cmd_assemble_composites(plan_result=plan_result)
+    composite_result = cmd_assemble_composites(plan_result=plan_result, is_full_run=True)
     return plan_result, render_result, composite_result
 
 

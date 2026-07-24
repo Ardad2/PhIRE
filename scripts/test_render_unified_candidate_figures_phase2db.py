@@ -1317,6 +1317,173 @@ try:
     check('file restored to original checksum', restored == before)
     check('file restored byte-identically', target2.read_bytes() == original_bytes)
 
+    print()
+    print('=== 24. Execution-state-aware report text (never inferred merely from zoom_result) ===')
+    manifest24 = dict(m.FROZEN_SAMPLE_SET)
+    old_lightweight_flag24 = m.IS_LIGHTWEIGHT_CHECKOUT
+    zoom_result24 = dict(y0=10, y1=110, x0=20, x1=120, score=42.5)
+    panel_rows24 = [dict(output_path=f'ttk_runs_fixed/x/panel_{i}.png', method_id=m.CNN, panel_type='speed_fields')
+                     for i in range(3)]
+    try:
+        # --- 24a: lightweight plan-only ---
+        m.IS_LIGHTWEIGHT_CHECKOUT = True
+        text_a = '\n'.join(m.build_phase2db_doc_lines(manifest24, None, [], [], pd_discovery_rows=None,
+                                                          execution_mode=m.EXECUTION_MODE_PLAN_ONLY))
+        check('lightweight plan-only report retains the lightweight-checkout caveat',
+              'lightweight' in text_a.lower() and 'absent' in text_a.lower())
+        check('lightweight plan-only report never claims arrays were loaded',
+              'were loaded and audited' not in text_a)
+        check('lightweight plan-only generated-file inventory lists panels/manual/figures as pending',
+              'Not yet generated' in text_a and 'Scripted panels rendered' not in text_a)
+        check('lightweight plan-only report does not use the full-complete banner',
+              'Phase 2D-B complete.' not in text_a)
+
+        # --- 24b: authoritative Spark plan-only ---
+        m.IS_LIGHTWEIGHT_CHECKOUT = False
+        text_b = '\n'.join(m.build_phase2db_doc_lines(manifest24, None, [], [], pd_discovery_rows=None,
+                                                          execution_mode=m.EXECUTION_MODE_PLAN_ONLY))
+        check('Spark plan-only report never says "lightweight checkout"', 'lightweight checkout' not in text_b)
+        check('Spark plan-only report never says raw arrays are absent',
+              'arrays are absent' not in text_b.lower())
+        check('Spark plan-only report states --plan-only intentionally does not load the arrays',
+              'intentionally not loaded' in text_b or 'intentionally does not load' in text_b)
+        check('Spark plan-only report never claims arrays were loaded', 'were loaded and audited' not in text_b)
+
+        # --- 24c: render-fields state with a computed zoom ---
+        m.IS_LIGHTWEIGHT_CHECKOUT = old_lightweight_flag24
+        text_c = '\n'.join(m.build_phase2db_doc_lines(manifest24, zoom_result24, [dict(status='missing')],
+                                                          panel_rows24, pd_discovery_rows=None,
+                                                          execution_mode=m.EXECUTION_MODE_RENDER_FIELDS))
+        check('render-fields report never describes itself as a --plan-only run',
+              'This document reflects a `--plan-only`' not in text_c)
+        check('render-fields report contains the computed zoom bounds and score',
+              'y=[10, 110)' in text_c and 'x=[20, 120)' in text_c and '42.500000' in text_c)
+        check('render-fields report does not use the full-complete banner', 'Phase 2D-B complete.' not in text_c)
+        check('render-fields generated-file inventory reports scripted panels as generated with the real count',
+              f'{len(panel_rows24)} panel file(s)' in text_c)
+        check('render-fields generated-file inventory still lists manual topology/composites as pending',
+              'Not yet generated' in text_c and 'assemble-composites' in text_c)
+
+        # --- 24d: full-complete state ---
+        final_figure_rows24 = [dict(figure_id=i, status='rendered', png_exists=True, png_min_dpi_ok=True,
+                                       vector_exists=True, pdf_valid=True) for i in range(1, 7)]
+        manual_topo_rows24_full = [dict(status='present') for _ in range(21)]
+        text_d = '\n'.join(m.build_phase2db_doc_lines(manifest24, zoom_result24, manual_topo_rows24_full,
+                                                          panel_rows24, pd_discovery_rows=None,
+                                                          execution_mode=m.EXECUTION_MODE_FULL,
+                                                          final_figure_rows=final_figure_rows24))
+        check('full-complete report uses the Phase 2D-B complete banner', 'Phase 2D-B complete.' in text_d)
+        check('full-complete report does not say final rendering is pending', 'rendering pending' not in text_d)
+        check('full-complete report does not describe itself as a lightweight checkout or a plan-only run '
+              '(the negating sentence "...remains lightweight..." in the full-complete banner text is not a '
+              'self-description and is deliberately excluded from this check)',
+              'lightweight checkout' not in text_d and 'lightweight (non-Spark) checkout' not in text_d
+              and 'This document reflects a `--plan-only`' not in text_d)
+        check('full-complete generated-file inventory reports manual topology inputs fully validated',
+              '21/21 panel(s)' in text_d)
+        check('full-complete generated-file inventory reports all 6 final composite figures validated',
+              '6/6' in text_d)
+
+        # --- 24e: post-render/full states reject an inconsistent zoom_result=None ---
+        for mode in (m.EXECUTION_MODE_RENDER_FIELDS, m.EXECUTION_MODE_ASSEMBLE_COMPOSITES, m.EXECUTION_MODE_FULL):
+            try:
+                m.build_phase2db_doc_lines(manifest24, None, [], [], pd_discovery_rows=None, execution_mode=mode)
+                check(f'execution_mode={mode!r} with zoom_result=None is rejected as an inconsistent state', False)
+            except SystemExit:
+                check(f'execution_mode={mode!r} with zoom_result=None is rejected as an inconsistent state', True)
+
+        # --- 24f: an unknown execution_mode is rejected outright ---
+        try:
+            m.build_phase2db_doc_lines(manifest24, zoom_result24, [], [], pd_discovery_rows=None,
+                                          execution_mode='not_a_real_mode')
+            check('an unrecognized execution_mode is rejected', False)
+        except SystemExit:
+            check('an unrecognized execution_mode is rejected', True)
+    finally:
+        m.IS_LIGHTWEIGHT_CHECKOUT = old_lightweight_flag24
+    check('IS_LIGHTWEIGHT_CHECKOUT restored to its real value after the report-wording sub-tests',
+          m.IS_LIGHTWEIGHT_CHECKOUT == old_lightweight_flag24)
+
+    print()
+    print('=== 25. Composite assembly: a shared scalar-fallback source_path appears once in the visual grid '
+          '===')
+    tmp25 = Path(tempfile.mkdtemp(prefix='phase2db_test25_'))
+    old_plan_dir25 = m.PLAN_DIR
+    panel_dirs_created25 = []
+    composite_paths25 = []
+    try:
+        m.PLAN_DIR = tmp25
+        manifest25 = dict(m.FROZEN_SAMPLE_SET)
+        fig_probe25 = m.FIGURE_BY_ID[2]
+        panel_dir25 = m.PANELS_DIR / m.figure_dir_name(fig_probe25)
+        panel_dir25.mkdir(parents=True, exist_ok=True)
+        panel_dirs_created25.append(panel_dir25)
+
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+
+        def _write_panel_png(name):
+            p = panel_dir25 / name
+            fig, ax = plt.subplots(figsize=(1, 1), dpi=50)
+            ax.imshow(np.zeros((5, 5)))
+            fig.savefig(p)
+            plt.close(fig)
+            return str(p.relative_to(m.REPO_ROOT))
+
+        path_a = _write_panel_png('panel_a.png')
+        path_shared = _write_panel_png('panel_shared_fallback.png')
+        path_c = _write_panel_png('panel_c.png')
+
+        def _rows(order_start, method_ids_for_shared):
+            rows = [dict(figure_id=fig_probe25['figure_id'], panel_order=order_start, panel_group='pd_coordinate',
+                           panel_type='probe', method_id='GT', source_path=path_a, final_visible_status='visible')]
+            order = order_start + 1
+            for mid in method_ids_for_shared:
+                rows.append(dict(figure_id=fig_probe25['figure_id'], panel_order=order,
+                                    panel_group='pd_scalar_fallback', panel_type='probe', method_id=mid,
+                                    source_path=path_shared, final_visible_status='scalar_fallback'))
+                order += 1
+            rows.append(dict(figure_id=fig_probe25['figure_id'], panel_order=order, panel_group='pd_coordinate',
+                                panel_type='probe', method_id=m.CANDIDATE_C, source_path=path_c,
+                                final_visible_status='visible'))
+            return rows
+
+        # Manifest A: 3 unique images, but the fallback image is shared by THREE
+        # separate (panel_type, method_id) rows (5 rows total, 3 unique paths).
+        rows_shared = _rows(1, [m.GAN, m.F3, m.F2])
+        m.write_csv(m.PLAN_DIR / 'final_composite_manifest.csv', m.FINAL_COMPOSITE_MANIFEST_FIELDS, rows_shared)
+        result_shared = m.build_composite_for_figure(fig_probe25, manifest25)
+        composite_paths25 += [m.REPO_ROOT / result_shared['expected_png_path'],
+                                 m.REPO_ROOT / result_shared['expected_vector_path']]
+        insp_shared = m.inspect_png(m.REPO_ROOT / result_shared['expected_png_path'])
+
+        # Manifest B: the SAME 3 unique images, one row each (3 rows, 3 unique
+        # paths) -- the visual grid must be identical in size to Manifest A's,
+        # proving the 2 extra sharing rows in A never added extra grid cells.
+        rows_unique = _rows(1, [m.GAN])
+        m.write_csv(m.PLAN_DIR / 'final_composite_manifest.csv', m.FINAL_COMPOSITE_MANIFEST_FIELDS, rows_unique)
+        result_unique = m.build_composite_for_figure(fig_probe25, manifest25)
+        composite_paths25 += [m.REPO_ROOT / result_unique['expected_png_path'],
+                                 m.REPO_ROOT / result_unique['expected_vector_path']]
+        insp_unique = m.inspect_png(m.REPO_ROOT / result_unique['expected_png_path'])
+
+        check('a composite manifest with 5 rows sharing 3 unique source paths succeeds',
+              result_shared['status'] == 'rendered')
+        check('the assembled visual grid for the 5-row/3-unique-path manifest is the SAME size as a 3-row/'
+              '3-unique-path manifest -- the 2 duplicate-source_path rows never added extra grid cells',
+              insp_shared['width_px'] == insp_unique['width_px']
+              and insp_shared['height_px'] == insp_unique['height_px'])
+    finally:
+        m.PLAN_DIR = old_plan_dir25
+        shutil.rmtree(tmp25, ignore_errors=True)
+        for p in composite_paths25:
+            if p.exists():
+                p.unlink()
+        for d in panel_dirs_created25:
+            shutil.rmtree(d, ignore_errors=True)
+        shutil.rmtree(m.FIGURES_DIR, ignore_errors=True)
+
 finally:
     # Top-level safety net: restores every path the entire suite could ever
     # have touched, regardless of which section (if any) raised or was
@@ -1324,7 +1491,7 @@ finally:
     _top_level_restore(_top_snapshot)
 
 print()
-print('=== 23. Top-level artifact-safety verification ===')
+print('=== 26. Top-level artifact-safety verification ===')
 _final_snapshot = _top_level_snapshot()
 check('phase2db/ output tree is byte-identical to its pre-suite snapshot',
       _final_snapshot['out_dir'] == _top_snapshot['out_dir'])
