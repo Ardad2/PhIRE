@@ -72,6 +72,7 @@ import numpy as np
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 import select_and_preview_unified_candidates_phase2d as p2da  # noqa: E402
+import extract_ttk_pd_critical_pairs as ttk_pd_parser  # noqa: E402
 
 REPO_ROOT = p2da.REPO_ROOT
 assert REPO_ROOT == SCRIPT_DIR.parent
@@ -418,7 +419,7 @@ ZOOM_CROP = 'zoom_crop'
 MT_PANEL_TYPES = {MT_EVIDENCE, MT_COMPARISON, TOPOLOGY_COMPARISON}
 # Panels requiring frozen persistence-diagram COORDINATE data (birth/death
 # pairs), distinct from the scalar pd_distance value already in the long
-# table. See discover_pd_source_candidates().
+# table. See resolve_pd_source_verdict().
 PD_DIAGRAM_PANEL_TYPES = {PD_EVIDENCE, PD_COMPARISON}
 # Figure-level (not per-method) panels.
 FIGURE_LEVEL_PANEL_TYPES = {METRIC_STRIP, PD_MT_TRADEOFF_COMPACT, PD_MT_COMPARISON_COMPACT, ZOOM_CROP}
@@ -511,39 +512,51 @@ def final_figure_paths(contract):
 
 
 # =============================================================================
-# Authoritative PD-diagram coordinate source discovery. A real repository-
-# relative filesystem search (never a fixed 3-filename guess): topology
-# source parent directories, their siblings/descendants, paths referenced by
-# Phase-2D-A artifact manifests, and prior-pipeline `<method>_topology/pd/`
-# conventions used elsewhere in this repository. GT and bicubic are searched
-# exactly like every other method -- neither is ever marked found without a
-# concrete candidate_path.
+# Authoritative PD-diagram coordinate source discovery and validation. Real
+# repository-relative filesystem search against the EXACT conventions TTK's
+# ttkPersistenceDiagram filter and this repository's topology pipeline use --
+# never a fuzzy/partial-name match, never raw VTU point geometry.
+#
+# Real TTK PD VTU schema (see scripts/extract_ttk_pd_critical_pairs.py,
+# reused here via ttk_pd_parser.parse_vtu()): CellData = PairIdentifier,
+# PairType, Persistence, Birth, IsFinite; PointData = ttkVertexScalarField;
+# Cells = connectivity. Publication PD coordinates are ALL finite positive
+# pairs -- mask = (IsFinite==1) & (Persistence>0) & (PairType!=-1),
+# birth = Birth[mask], death = Birth[mask] + Persistence[mask] -- never the
+# critical-pair training script's top-k/persistence-fraction filtering
+# (extract_constraints()), and never vtkUnstructuredGrid point coordinates
+# (those are mesh geometry, not birth/death).
+#
+# Exact source convention (role-aware, Section 3):
+#   ttk_runs_fixed/topology_finetuning/<artifact_alias>_topology/pd/SR/
+#       <artifact_alias>_SR_s<sample_idx>_..._pd_port_0.vtu   (learned method)
+#   ttk_runs_fixed/topology_finetuning/<artifact_alias>_topology/pd/GT/
+#       <artifact_alias>_GT_s<sample_idx>_..._pd_port_0.vtu   (shared GT)
+# Never mapped: any path under an `mt/` directory, `_mt_port_0.vtu`,
+# `_mt_port_1.vtu`, `_pd_port_1.vtu`, a GT file to a learned-method panel, an
+# SR file to GT, a different sample_idx, or a partial method-name match.
 #
 # Three-status vocabulary only:
-#   available_validated                    -- a coordinate source was found,
-#                                              mapped to this exact sample/
-#                                              method, and its values are finite.
+#   available_validated                    -- an exact source was found,
+#                                              parsed, and validated.
 #   pending_authoritative_spark_source_discovery
-#                                           -- nothing conclusive yet; this is
-#                                              the ONLY status ever produced by
-#                                              a lightweight (non-Spark)
-#                                              checkout, since a raw .vtu Spark
-#                                              intermediate being absent here
-#                                              never proves it is absent on the
-#                                              authoritative Spark machine.
+#                                           -- the ONLY status ever produced
+#                                              by a lightweight (non-Spark)
+#                                              checkout, since a raw .vtu
+#                                              Spark intermediate being absent
+#                                              here never proves it is absent
+#                                              on the authoritative Spark
+#                                              machine.
 #   unavailable_after_authoritative_spark_audit
-#                                           -- only reachable when this process
-#                                              IS running where data_out_fixed/
-#                                              exists (i.e. on Spark) and the
-#                                              search still finds nothing.
+#                                           -- only reachable when this
+#                                              process IS running where
+#                                              data_out_fixed/ exists (i.e. on
+#                                              Spark) and the exact search
+#                                              still finds nothing.
+# A present exact candidate that fails parsing/validation HARD-FAILS -- it is
+# never silently reclassified as pending/unavailable, and never falls back
+# to scalar evidence.
 # =============================================================================
-
-PD_SEARCH_EXTENSIONS = ('.csv', '.vtu', '.vtp', '.vtk')
-PD_COORDINATE_COLUMN_MARKERS = {
-    'birth', 'death', 'birth_x', 'birth_y', 'death_x', 'death_y', 'x_birth', 'x_death',
-    'coord_x', 'coord_y', 'birth_value', 'death_value',
-}
-PD_OVERLAY_SCRIPT_NAME_MARKERS = ('pd_critical_pairs', 'pd_diagram', 'persistence_diagram')
 
 # True in this checkout (and any lightweight checkout): raw Spark
 # intermediates (data_out_fixed/, and by the same reasoning any raw .vtu
@@ -559,31 +572,70 @@ PD_SOURCE_DISCOVERY_FIELDS = [
     'sample_mapping_status', 'finite_status', 'usable_status', 'notes',
 ]
 
+PD_SOURCE_VERDICT_FIELDS = [
+    'figure_id', 'sample_idx', 'method_id', 'source_role', 'artifact_alias', 'verdict',
+    'selected_candidate_path', 'parsed_pair_count', 'fallback_required', 'notes',
+]
 
-def _pd_search_roots(mid, topology_source_map):
-    """Deterministic repository-relative search roots. GT and bicubic (never
-    in topology_source_map) fall back to CNN's HR-grid-anchored convention
-    while still being searched under their OWN method token."""
-    roots = []
-    lookup_mid = mid if mid in topology_source_map else CNN
-    if lookup_mid in topology_source_map:
-        base = topology_source_map[lookup_mid]['path'].parent
-        roots += [base, base / 'pd', base / 'pd_diagrams']
-    for candidate_mid in dict.fromkeys([mid, lookup_mid]):
-        roots.append(REPO_ROOT / 'ttk_runs_fixed' / 'topology_finetuning' / f'{candidate_mid}_topology' / 'pd')
-    roots.append(REPO_ROOT / 'ttk_runs_fixed' / 'combined')
-    # Deliberately NOT the entire ttk_runs_fixed/topology_finetuning/ tree: that
-    # directory holds hundreds of unrelated per-candidate eval subdirectories
-    # whose filenames incidentally contain a method token (e.g.
-    # pairwise_cnn_vs_candidateB.csv), which would flood discovery with noise
-    # without narrowing the real search. Topology source parents, their
-    # pd/pd_diagrams descendants, and the specific <method>_topology/pd
-    # convention above already cover "parent + sibling + descendant" search.
-    seen = []
-    for r in roots:
-        if r not in seen:
-            seen.append(r)
-    return seen
+PD_OVERLAY_SCRIPT_NAME_MARKERS = ('pd_critical_pairs', 'pd_diagram', 'persistence_diagram')
+
+PD_VTU_ROLE_GT = 'GT'
+PD_VTU_ROLE_SR = 'SR'
+PD_VTU_REQUIRED_SUFFIX = '_pd_port_0.vtu'
+PD_VTU_REJECTED_MARKERS = ('_mt_port_0.vtu', '_mt_port_1.vtu', '_pd_port_1.vtu')
+PD_VTU_REQUIRED_ARRAYS = ('pair_id', 'pair_type', 'persistence', 'birth', 'is_finite', 'connectivity',
+                            'vertex_ids')
+GT_PD_COORD_TOLERANCE = 1e-6
+
+# Section 2: explicit method-to-artifact aliases. Confirmed directly against
+# ttk_runs_fixed/unified_candidate_evaluation/column_mapping.csv (the same
+# artifact each method's own raw topology CSV is already resolved from) and
+# the actual ttk_runs_fixed/topology_finetuning/ directory listing.
+METHOD_ARTIFACT_ALIASES = {
+    CANDIDATE_C: 'candidateC_expanded2688',
+    F3: 'candidateF_grad_crit_expanded2688',
+    F2: 'candidateF_grad_levelset_E2_low_expanded2688',
+    UV_E2: 'candidateUV_plus_E2_tf_lowlambda_expanded2688',
+}
+
+
+def _topology_tree_root(alias):
+    return REPO_ROOT / 'ttk_runs_fixed' / 'topology_finetuning' / f'{alias}_topology'
+
+
+# CNN, GAN, and bicubic have no <alias>_topology directory anywhere in this
+# repository (confirmed by direct search: ttk_runs_fixed/cnn/,
+# ttk_runs_fixed/gan/, and ttk_runs_fixed/superlevel_topology/{cnn,gan}/
+# contain only scalar phase_c_final/*.csv summaries -- no pd/ VTU tree at
+# all; no bicubic-named topology directory exists anywhere). These plausible
+# raw-VTU root locations are still searched for real on every run -- a
+# pd/{GT,SR} tree could exist there on the authoritative Spark machine even
+# though it is absent (and *.vtu is gitignored) in this lightweight
+# checkout -- but no baseline source is ever invented if the search finds
+# nothing.
+CNN_GAN_BICUBIC_SEARCH_ROOTS = {
+    CNN: [REPO_ROOT / 'ttk_runs_fixed' / 'cnn',
+          REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'cnn' / 'topology'],
+    GAN: [REPO_ROOT / 'ttk_runs_fixed' / 'gan',
+          REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'gan' / 'topology'],
+    BICUBIC: [REPO_ROOT / 'ttk_runs_fixed' / 'bicubic',
+               REPO_ROOT / 'ttk_runs_fixed' / 'superlevel_topology' / 'bicubic' / 'topology'],
+}
+
+# Deterministic priority order for canonical GT resolution: GT is shared by
+# every method's topology tree, so every tree that could plausibly hold it
+# is searched (never only the requesting method's own tree); ties among
+# multiple agreeing exact copies are broken by this fixed order.
+GT_SOURCE_PRIORITY_METHODS = [CANDIDATE_C, F3, F2, UV_E2, CNN, GAN, BICUBIC]
+
+
+def _method_search_roots_and_alias(mid):
+    """(topology_roots, filename_alias_token) for method mid. Real
+    repository-relative roots only -- never a fixed 3-filename guess."""
+    if mid in METHOD_ARTIFACT_ALIASES:
+        alias = METHOD_ARTIFACT_ALIASES[mid]
+        return [_topology_tree_root(alias)], alias
+    return CNN_GAN_BICUBIC_SEARCH_ROOTS.get(mid, []), mid
 
 
 def find_pd_overlay_scripts():
@@ -593,149 +645,239 @@ def find_pd_overlay_scripts():
              if any(marker in p.name.lower() for marker in PD_OVERLAY_SCRIPT_NAME_MARKERS)]
 
 
-def _csv_artifact_type(path):
-    try:
-        with path.open(newline='') as fh:
-            header = next(csv.reader(fh))
-    except (OSError, StopIteration, UnicodeDecodeError):
-        return 'csv_unreadable', []
-    lowered = [h.strip().lower() for h in header]
-    if set(lowered) & PD_COORDINATE_COLUMN_MARKERS:
-        return 'csv_pd_coordinates', header
-    return 'csv_scalar_summary', header
+def _is_valid_pd_vtu_path(path):
+    """True only for a real PD-output VTU: ends with `_pd_port_0.vtu`, never
+    under an `mt/` directory, never `_mt_port_0/1.vtu` or `_pd_port_1.vtu`."""
+    name = path.name
+    if not name.endswith(PD_VTU_REQUIRED_SUFFIX):
+        return False
+    if any(marker in name for marker in PD_VTU_REJECTED_MARKERS):
+        return False
+    if 'mt' in {part.lower() for part in path.parts}:
+        return False
+    return True
 
 
-def _name_matches(name_lower, sample_idx, mid):
-    token_sample = any(tok in name_lower for tok in
-                         (f's{sample_idx}_', f'_s{sample_idx}.', f'sample{sample_idx}',
-                          f'sample_{sample_idx}', f'_{sample_idx}_'))
-    method_token = 'gt' if mid == 'GT' else mid.lower()
-    return token_sample, method_token in name_lower
-
-
-def discover_pd_source_candidates(figure_id, sample_idx, mid, topology_source_map):
-    """Real filesystem search for a PD coordinate source for one (figure,
-    method). Always returns at least one row -- a 'none_found' summary row
-    when nothing plausible turns up, never silently empty."""
-    rows = []
-    roots_searched = []
-    for root in _pd_search_roots(mid, topology_source_map):
-        roots_searched.append(_rel(root))
-        if not root.exists():
+def find_exact_pd_vtu_candidates(root, role, alias, sample_idx):
+    """Real filesystem search for exact `<alias>_<role>_s<sample_idx>_..._
+    pd_port_0.vtu` sources under root/pd/<role>/. Returns a deduplicated
+    (by resolved repository-relative path) list of Paths -- never a
+    fuzzy/partial match, never an mt/ or port-1 file."""
+    role_dir = root / 'pd' / role
+    if not role_dir.exists():
+        return []
+    prefix = f'{alias}_{role}_s{sample_idx}_'
+    seen_rel = set()
+    found = []
+    for path in sorted(role_dir.rglob('*_pd_port_0.vtu')):
+        if not _is_valid_pd_vtu_path(path):
             continue
-        for ext in PD_SEARCH_EXTENSIONS:
-            for path in sorted(root.rglob(f'*{ext}')):
-                name_lower = path.name.lower()
-                token_sample, token_method = _name_matches(name_lower, sample_idx, mid)
-                if not (token_sample or token_method):
+        if not path.name.startswith(prefix):
+            continue
+        rel = _rel(path)
+        if rel in seen_rel:
+            continue
+        seen_rel.add(rel)
+        found.append(path)
+    return found
+
+
+def parse_and_validate_pd_vtu(path, sample_idx, role, alias):
+    """Parses one exact PD VTU source via the repository's established TTK
+    PD parser (extract_ttk_pd_critical_pairs.parse_vtu) and derives the
+    publication PD coordinates: ALL finite positive pairs, never the
+    critical-pair training script's top-k/persistence-fraction filtering,
+    and never raw VTU point geometry. A present, exactly role/alias/sample-
+    mapped candidate that fails any check here HARD-FAILS -- it is never
+    silently reclassified as pending/unavailable."""
+    if not _is_valid_pd_vtu_path(path):
+        raise SystemExit(
+            f'[hard-fail] {_rel(path)} is not a valid PD-output path (must end with {PD_VTU_REQUIRED_SUFFIX!r}, '
+            f'never under an mt/ directory, never _mt_port_*/_pd_port_1).'
+        )
+    match = ttk_pd_parser._SAMPLE_IDX_RE.search(path.name)
+    if not match or int(match.group(1)) != sample_idx:
+        raise SystemExit(
+            f'[hard-fail] {_rel(path)} does not carry the exact expected sample index {sample_idx} '
+            f'(matched: {match.group(1) if match else None!r}).'
+        )
+    expected_prefix = f'{alias}_{role}_s{sample_idx}_'
+    if not path.name.startswith(expected_prefix):
+        raise SystemExit(
+            f'[hard-fail] {_rel(path)} does not match the expected {role} artifact-alias filename convention '
+            f'{expected_prefix!r}.'
+        )
+    try:
+        arrays = ttk_pd_parser.parse_vtu(path)
+    except Exception as exc:
+        raise SystemExit(f'[hard-fail] PD VTU source exists but failed to parse: {_rel(path)}: {exc}')
+    for name in PD_VTU_REQUIRED_ARRAYS:
+        if name not in arrays:
+            raise SystemExit(f'[hard-fail] PD VTU {_rel(path)} is missing required array {name!r}.')
+    pair_id, pair_type = arrays['pair_id'], arrays['pair_type']
+    persistence, birth, is_finite = arrays['persistence'], arrays['birth'], arrays['is_finite']
+    lengths = {len(pair_id), len(pair_type), len(persistence), len(birth), len(is_finite)}
+    if len(lengths) != 1:
+        raise SystemExit(
+            f'[hard-fail] PD VTU {_rel(path)} has mismatched CellData array lengths: pair_id={len(pair_id)} '
+            f'pair_type={len(pair_type)} persistence={len(persistence)} birth={len(birth)} '
+            f'is_finite={len(is_finite)}.'
+        )
+    if len(arrays['connectivity']) != 2 * len(pair_id):
+        raise SystemExit(
+            f'[hard-fail] PD VTU {_rel(path)} connectivity length {len(arrays["connectivity"])} does not equal '
+            f'2 * cell count ({2 * len(pair_id)}).'
+        )
+    mask = (is_finite == 1) & (persistence > 0) & (pair_type != -1)
+    if not np.any(mask):
+        raise SystemExit(f'[hard-fail] PD VTU {_rel(path)} has zero finite positive pairs after masking.')
+    birth_m = birth[mask].astype(np.float64)
+    pers_m = persistence[mask].astype(np.float64)
+    death_m = birth_m + pers_m
+    if not (np.all(np.isfinite(birth_m)) and np.all(np.isfinite(pers_m)) and np.all(np.isfinite(death_m))):
+        raise SystemExit(f'[hard-fail] PD VTU {_rel(path)} has non-finite birth/persistence/death after masking.')
+    if not np.all(pers_m > 0):
+        raise SystemExit(f'[hard-fail] PD VTU {_rel(path)} has non-positive persistence after masking.')
+    if not np.all(death_m >= birth_m):
+        raise SystemExit(f'[hard-fail] PD VTU {_rel(path)} has death < birth for at least one pair after masking.')
+    return dict(birth=birth_m, death=death_m, pair_count=int(mask.sum()))
+
+
+def _sorted_pd_pairs(birth, death):
+    """Row-consistent sort (never independently-sorted columns, which would
+    scramble the birth/death pairing) for cross-copy coordinate comparison."""
+    order = np.lexsort((death, birth))
+    return birth[order], death[order]
+
+
+def _resolve_canonical_pd_copy(candidate_paths_and_aliases, sample_idx, role):
+    """Parses every exact candidate (already deduplicated by resolved path)
+    and requires them to agree on birth/death coordinates within tolerance.
+    Returns (canonical_path, canonical_alias, canonical_result, n_copies).
+    Hard-fails, listing every conflicting path, on disagreement -- never an
+    arbitrary pick."""
+    parsed = [(path, alias, parse_and_validate_pd_vtu(path, sample_idx, role, alias))
+               for path, alias in candidate_paths_and_aliases]
+    canonical_path, canonical_alias, canonical_result = parsed[0]
+    if len(parsed) > 1:
+        cb, cd = _sorted_pd_pairs(canonical_result['birth'], canonical_result['death'])
+        conflicts = []
+        for other_path, _, other_result in parsed[1:]:
+            ob, od = _sorted_pd_pairs(other_result['birth'], other_result['death'])
+            if ob.shape != cb.shape or not (np.allclose(ob, cb, atol=GT_PD_COORD_TOLERANCE) and
+                                              np.allclose(od, cd, atol=GT_PD_COORD_TOLERANCE)):
+                conflicts.append(other_path)
+        if conflicts:
+            raise SystemExit(
+                f'[hard-fail] Conflicting exact {role} PD sources for sample_idx={sample_idx}: exact copies '
+                f'disagree on birth/death coordinates beyond tolerance {GT_PD_COORD_TOLERANCE}. Conflicting '
+                f'paths: {[_rel(p) for p, _, _ in parsed]}.'
+            )
+    return canonical_path, canonical_alias, canonical_result, len(parsed)
+
+
+def resolve_canonical_gt_pd_source(sample_idx):
+    """Deterministically resolves the single canonical GT PD coordinate
+    source for one sample_idx, searched across EVERY known topology tree in
+    GT_SOURCE_PRIORITY_METHODS order (GT is shared by all methods -- never
+    only the requesting method's own tree). Returns None if no exact GT
+    source is found anywhere."""
+    candidates = []
+    seen_rel = set()
+    for pmid in GT_SOURCE_PRIORITY_METHODS:
+        roots, alias = _method_search_roots_and_alias(pmid)
+        for root in roots:
+            for path in find_exact_pd_vtu_candidates(root, PD_VTU_ROLE_GT, alias, sample_idx):
+                rel = _rel(path)
+                if rel in seen_rel:
                     continue
-                if ext == '.csv':
-                    artifact_type, header = _csv_artifact_type(path)
-                    schema = ','.join(header)
-                else:
-                    artifact_type, schema = f'vtk_family_{ext.lstrip(".")}', ''
-                mapping = 'mapped' if (token_sample and token_method) else 'ambiguous_partial_match'
-                rows.append(dict(
-                    figure_id=figure_id, sample_idx=sample_idx, method_id=mid, candidate_path=_rel(path),
-                    artifact_type=artifact_type, schema_or_array_names=schema, sample_mapping_status=mapping,
-                    finite_status='', usable_status='', notes='',
-                ))
-    if not rows:
-        rows.append(dict(
-            figure_id=figure_id, sample_idx=sample_idx, method_id=mid, candidate_path='',
-            artifact_type='none_found', schema_or_array_names='', sample_mapping_status='not_found',
-            finite_status='not_applicable', usable_status='', notes=f'Searched: {"; ".join(roots_searched)}',
-        ))
-    return rows
+                seen_rel.add(rel)
+                candidates.append((path, alias))
+    if not candidates:
+        return None
+    path, alias, result, n_copies = _resolve_canonical_pd_copy(candidates, sample_idx, PD_VTU_ROLE_GT)
+    return dict(path=path, alias=alias, result=result, n_copies=n_copies)
 
 
-def _finalize_pd_candidate_row(row):
-    """Fills finite_status/usable_status for one discovered candidate row."""
-    if row['artifact_type'] == 'none_found':
-        row['usable_status'] = STATUS_PENDING if IS_LIGHTWEIGHT_CHECKOUT else STATUS_UNAVAILABLE
-        if IS_LIGHTWEIGHT_CHECKOUT:
-            row['notes'] += (' | Lightweight (non-Spark) checkout: absence here does not prove absence on the '
-                               'authoritative Spark machine (raw .vtu Spark intermediates are gitignored and '
-                               'never present here).')
-        return row
-    if row['artifact_type'] == 'csv_pd_coordinates' and row['sample_mapping_status'] == 'mapped':
-        path = REPO_ROOT / row['candidate_path']
-        values = []
-        try:
-            with path.open(newline='') as fh:
-                for r in csv.DictReader(fh):
-                    for k, v in r.items():
-                        if k and k.strip().lower() in PD_COORDINATE_COLUMN_MARKERS:
-                            try:
-                                values.append(float(v))
-                            except (TypeError, ValueError):
-                                values.append(float('nan'))
-            all_finite = bool(values) and all(math.isfinite(v) for v in values)
-        except OSError:
-            all_finite = False
-        row['finite_status'] = 'finite' if all_finite else 'non_finite_or_unreadable'
-        row['usable_status'] = STATUS_AVAILABLE if all_finite else STATUS_UNAVAILABLE
-        return row
-    if row['artifact_type'] == 'csv_scalar_summary':
-        row['finite_status'] = 'not_applicable_scalar_only'
-        row['usable_status'] = STATUS_PENDING
-        row['notes'] += (' | Scalar-only distance summary, not a coordinate source; does not by itself confirm '
-                           'absence of coordinate data on the authoritative Spark machine.')
-        return row
-    if row['artifact_type'].startswith('vtk_family_'):
-        row['finite_status'] = 'not_checked_requires_vtk_parse_at_render_fields'
-        row['usable_status'] = STATUS_PENDING
-        return row
-    row['finite_status'] = row['finite_status'] or 'not_checked_ambiguous_or_unreadable'
-    row['usable_status'] = STATUS_PENDING
-    return row
+def resolve_pd_source_verdict(figure_id, sample_idx, mid):
+    """Reduces the exact-source search for one required (figure, sample,
+    method) to a single authoritative verdict row (Section 5/6). Also
+    carries the parsed birth/death coordinates (not part of the CSV schema)
+    so callers never re-open/re-parse the VTU a second time in-process."""
+    if mid == 'GT':
+        canonical = resolve_canonical_gt_pd_source(sample_idx)
+        if canonical is None:
+            verdict = STATUS_PENDING if IS_LIGHTWEIGHT_CHECKOUT else STATUS_UNAVAILABLE
+            notes = ('Lightweight (non-Spark) checkout: absence here does not prove absence on the '
+                        'authoritative Spark machine (raw .vtu Spark intermediates are gitignored and never '
+                        'present here).' if IS_LIGHTWEIGHT_CHECKOUT else
+                        f'Searched every known topology tree ({GT_SOURCE_PRIORITY_METHODS}) for an exact GT PD '
+                        f'source for sample_idx={sample_idx}; none found on the authoritative Spark machine.')
+            return dict(figure_id=figure_id, sample_idx=sample_idx, method_id='GT', source_role=PD_VTU_ROLE_GT,
+                          artifact_alias='', verdict=verdict, selected_candidate_path='', parsed_pair_count='',
+                          fallback_required=str(verdict != STATUS_AVAILABLE), notes=notes, birth=None, death=None)
+        notes = ('Single exact GT copy found.' if canonical['n_copies'] == 1 else
+                   f"Canonical GT selected from {canonical['n_copies']} agreeing exact copies "
+                   f"(priority alias={canonical['alias']!r}).")
+        return dict(figure_id=figure_id, sample_idx=sample_idx, method_id='GT', source_role=PD_VTU_ROLE_GT,
+                      artifact_alias=canonical['alias'], verdict=STATUS_AVAILABLE,
+                      selected_candidate_path=_rel(canonical['path']),
+                      parsed_pair_count=canonical['result']['pair_count'], fallback_required='False', notes=notes,
+                      birth=canonical['result']['birth'], death=canonical['result']['death'])
+
+    roots, alias = _method_search_roots_and_alias(mid)
+    candidates = []
+    seen_rel = set()
+    for root in roots:
+        for path in find_exact_pd_vtu_candidates(root, PD_VTU_ROLE_SR, alias, sample_idx):
+            rel = _rel(path)
+            if rel in seen_rel:
+                continue
+            seen_rel.add(rel)
+            candidates.append((path, alias))
+    if not candidates:
+        verdict = STATUS_PENDING if IS_LIGHTWEIGHT_CHECKOUT else STATUS_UNAVAILABLE
+        notes = ('Lightweight (non-Spark) checkout: absence here does not prove absence on the authoritative '
+                    'Spark machine.' if IS_LIGHTWEIGHT_CHECKOUT else
+                    f"Searched {[_rel(r) for r in roots]} for an exact SR PD source; none found on the "
+                    f'authoritative Spark machine.')
+        return dict(figure_id=figure_id, sample_idx=sample_idx, method_id=mid, source_role=PD_VTU_ROLE_SR,
+                      artifact_alias=alias, verdict=verdict, selected_candidate_path='', parsed_pair_count='',
+                      fallback_required=str(verdict != STATUS_AVAILABLE), notes=notes, birth=None, death=None)
+    path, resolved_alias, result, n_copies = _resolve_canonical_pd_copy(candidates, sample_idx, PD_VTU_ROLE_SR)
+    notes = '' if n_copies == 1 else f'{n_copies} agreeing exact SR copies found; selected {_rel(path)}.'
+    return dict(figure_id=figure_id, sample_idx=sample_idx, method_id=mid, source_role=PD_VTU_ROLE_SR,
+                  artifact_alias=resolved_alias, verdict=STATUS_AVAILABLE, selected_candidate_path=_rel(path),
+                  parsed_pair_count=result['pair_count'], fallback_required='False', notes=notes,
+                  birth=result['birth'], death=result['death'])
 
 
-def discover_pd_sources_for_figure(contract, manifest, topology_source_map):
+def discover_and_resolve_pd_sources_for_figure(contract, manifest):
+    """Returns (discovery_rows, verdicts) for one figure. `verdicts` maps
+    method_id (including 'GT') -> the full resolve_pd_source_verdict() dict.
+    `discovery_rows` is raw per-method provenance in the legacy
+    PD_SOURCE_DISCOVERY_FIELDS schema (plan/pd_source_discovery.csv) --
+    retained for audit trail only; all render/plan gating now consumes
+    `verdicts` / plan/pd_source_verdicts.csv."""
     si = manifest[contract['archetype_id']]
     needs_pd = any(pt in PD_DIAGRAM_PANEL_TYPES for pt in contract['panels'])
     methods_needing_pd = (['GT'] + contract['full_panel_methods']) if needs_pd else []
-    all_rows = []
-    for mid in methods_needing_pd:
-        candidates = discover_pd_source_candidates(contract['figure_id'], si, mid, topology_source_map)
-        all_rows.extend(_finalize_pd_candidate_row(r) for r in candidates)
-    return all_rows
-
-
-def figure_pd_source_verdict(discovery_rows_for_method):
-    """Reduces one method's discovered candidate rows to a single verdict:
-    available_validated beats pending beats unavailable."""
-    statuses = {r['usable_status'] for r in discovery_rows_for_method}
-    if STATUS_AVAILABLE in statuses:
-        return STATUS_AVAILABLE
-    if STATUS_PENDING in statuses or not statuses:
-        return STATUS_PENDING
-    return STATUS_UNAVAILABLE
-
-
-def require_pd_diagram_sources_for_figure(contract, manifest, topology_source_map):
-    """Render-time gate: hard-fails (never fabricates) unless every
-    full-panel method required by a pd_evidence/pd_comparison panel has an
-    available_validated coordinate source. A pending or unavailable verdict
-    both block real coordinate rendering -- callers should switch to the
-    scalar fallback (Section 3) once a method's verdict is confirmed
-    unavailable, never before."""
-    si = manifest[contract['archetype_id']]
+    discovery_rows = []
     verdicts = {}
-    for mid in (['GT'] + contract['full_panel_methods']):
-        rows = discover_pd_source_candidates(contract['figure_id'], si, mid, topology_source_map)
-        rows = [_finalize_pd_candidate_row(r) for r in rows]
-        verdicts[mid] = figure_pd_source_verdict(rows)
-    not_ready = {mid: v for mid, v in verdicts.items() if v != STATUS_AVAILABLE}
-    if not_ready:
-        raise SystemExit(
-            f"[hard-fail] Figure {contract['figure_id']} requires a real PD coordinate panel for "
-            f'sample_idx={si!r}, but the following methods have no available_validated source: {not_ready}. '
-            f'Refusing to fabricate this panel. Methods with usable_status=unavailable_after_authoritative_'
-            f'spark_audit should use the scalar PD-evidence fallback instead (see '
-            f'build_scalar_pd_fallback_rows / render_pd_evidence_panel).'
-        )
-    return verdicts
+    for mid in methods_needing_pd:
+        v = resolve_pd_source_verdict(contract['figure_id'], si, mid)
+        verdicts[mid] = v
+        found = bool(v['selected_candidate_path'])
+        discovery_rows.append(dict(
+            figure_id=contract['figure_id'], sample_idx=si, method_id=mid,
+            candidate_path=v['selected_candidate_path'],
+            artifact_type=('vtk_family_vtu' if found else 'none_found'),
+            schema_or_array_names=(','.join(PD_VTU_REQUIRED_ARRAYS) if found else ''),
+            sample_mapping_status=('mapped' if found else 'not_found'),
+            finite_status=('finite' if v['verdict'] == STATUS_AVAILABLE else 'not_applicable'),
+            usable_status=v['verdict'], notes=v['notes'],
+        ))
+    return discovery_rows, verdicts
 
 
 # =============================================================================
@@ -1180,15 +1322,22 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
         n_pending = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_PENDING)
         n_unavail = sum(1 for r in pd_discovery_rows if r['usable_status'] == STATUS_UNAVAILABLE)
         env = 'a lightweight (non-Spark) checkout' if IS_LIGHTWEIGHT_CHECKOUT else 'the authoritative Spark machine'
-        a(f'A real, repository-relative filesystem search (`plan/pd_source_discovery.csv`, {len(pd_discovery_rows)} '
-          f'candidate row(s)) was performed for every (figure, method) requiring a `pd_evidence`/`pd_comparison` '
-          f'panel -- GT and Bicubic included, neither assumed found without a concrete `candidate_path`. This '
-          f'process is running in {env}: {n_avail} candidate(s) available_validated, {n_pending} '
-          f'pending_authoritative_spark_source_discovery, {n_unavail} unavailable_after_authoritative_spark_audit. '
-          f'`blocked_missing_pd_source` is never used before this authoritative search has run to completion on '
-          f'Spark. Search roots included topology source parent directories and their `pd/`/`pd_diagrams/` '
-          f'children, `<method>_topology/pd/` sibling conventions, and `ttk_runs_fixed/combined/`; existing '
-          f'PD-overlay-related scripts already in this repository were also inventoried for provenance.')
+        baseline_search_roots = {mid: [_rel(p) for p in roots] for mid, roots in CNN_GAN_BICUBIC_SEARCH_ROOTS.items()}
+        a(f'An exact, repository-relative filesystem search (`plan/pd_source_discovery.csv`, '
+          f'{len(pd_discovery_rows)} row(s); reduced per-`(figure, sample, method)` verdicts in '
+          f'`plan/pd_source_verdicts.csv`) was performed for every (figure, method) requiring a '
+          f'`pd_evidence`/`pd_comparison` panel -- GT, CNN, GAN, and Bicubic included, none assumed found '
+          f'without a concrete `selected_candidate_path`. This process is running in {env}: {n_avail} '
+          f'method(s) available_validated, {n_pending} pending_authoritative_spark_source_discovery, '
+          f'{n_unavail} unavailable_after_authoritative_spark_audit. On the authoritative Spark machine, no '
+          f'method-level verdict is ever left pending (enforced in code). Only the exact TTK PD VTU convention '
+          f'is matched: `<artifact_alias>_topology/pd/<GT|SR>/<artifact_alias>_<GT|SR>_s<sample_idx>_'
+          f'..._pd_port_0.vtu`, with `mt/` paths, `_mt_port_*.vtu`, and `_pd_port_1.vtu` always excluded, and '
+          f'GT cross-checked for coordinate agreement across every candidate topology tree before being '
+          f'accepted as canonical. Method-to-artifact aliases: {dict(METHOD_ARTIFACT_ALIASES)}; CNN/GAN/bicubic '
+          f'use their own method_id (no `<alias>_topology` directory exists for them anywhere in this '
+          f'repository) and are searched under {baseline_search_roots}. Existing PD-overlay-related scripts '
+          f'already in this repository were also inventoried for provenance.')
     else:
         a('Not yet run in this render state.')
     a('')
@@ -1229,7 +1378,8 @@ def build_phase2db_doc_lines(manifest, zoom_result, manual_topo_rows, panel_rows
     a('Planning-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2db/`):')
     for rel in [
         'plan/final_figure_plan.csv', 'plan/final_panel_manifest.csv', 'plan/manual_topology_requirements.csv',
-        'plan/pd_source_discovery.csv', 'plan/final_composite_manifest.csv', 'plan/final_figure_captions.md',
+        'plan/pd_source_discovery.csv', 'plan/pd_source_verdicts.csv', 'plan/final_composite_manifest.csv',
+        'plan/final_figure_captions.md',
     ] + [f'figure_data/{FIGURE_DATA_FILENAMES[i]}' for i in range(1, 7)] + [
         'validation/prior_phase_immutability_check.csv', 'validation/figure_data_reproduction.csv',
         'validation/panel_validation.csv', 'validation/final_figure_validation.csv',
@@ -1285,15 +1435,23 @@ def cmd_plan_only() -> dict:
     write_csv(PLAN_DIR / 'final_figure_plan.csv', FINAL_FIGURE_PLAN_FIELDS, figure_plan_rows)
 
     pd_discovery_rows = []
+    pd_verdict_rows = []
     pd_verdicts_by_figure = {}
     for c in FIGURE_CONTRACTS:
-        rows_for_figure = discover_pd_sources_for_figure(c, manifest, topology_source_map)
+        rows_for_figure, verdicts_for_figure = discover_and_resolve_pd_sources_for_figure(c, manifest)
         pd_discovery_rows.extend(rows_for_figure)
-        by_method = {}
-        for mid in dict.fromkeys(r['method_id'] for r in rows_for_figure):
-            by_method[mid] = figure_pd_source_verdict([r for r in rows_for_figure if r['method_id'] == mid])
-        pd_verdicts_by_figure[c['figure_id']] = by_method
+        pd_verdict_rows.extend({k: v[k] for k in PD_SOURCE_VERDICT_FIELDS} for v in verdicts_for_figure.values())
+        pd_verdicts_by_figure[c['figure_id']] = {mid: v['verdict'] for mid, v in verdicts_for_figure.items()}
     write_csv(PLAN_DIR / 'pd_source_discovery.csv', PD_SOURCE_DISCOVERY_FIELDS, pd_discovery_rows)
+    write_csv(PLAN_DIR / 'pd_source_verdicts.csv', PD_SOURCE_VERDICT_FIELDS, pd_verdict_rows)
+    if not IS_LIGHTWEIGHT_CHECKOUT:
+        still_pending = [r for r in pd_verdict_rows if r['verdict'] == STATUS_PENDING]
+        if still_pending:
+            raise SystemExit(
+                f'[hard-fail] On the authoritative Spark machine, no exact method-level PD source verdict may '
+                f'remain pending_authoritative_spark_source_discovery after a complete search. Still pending: '
+                f'{still_pending}.'
+            )
     overlay_scripts = find_pd_overlay_scripts()
     log(f'[pd-discovery] Found {len(overlay_scripts)} existing PD-overlay-related script(s) (informational): '
         f'{[str(p.relative_to(REPO_ROOT)) for p in overlay_scripts]}')
@@ -1359,7 +1517,7 @@ def cmd_plan_only() -> dict:
     flush_log(LOG_PATH)
     return dict(manifest=manifest, figure_plan_rows=figure_plan_rows, panel_rows=panel_rows,
                  manual_topo_rows=manual_topo_rows, figure_data_by_id=figure_data_by_id,
-                 repro_rows=repro_rows, pd_discovery_rows=pd_discovery_rows)
+                 repro_rows=repro_rows, pd_discovery_rows=pd_discovery_rows, pd_verdict_rows=pd_verdict_rows)
 
 
 # =============================================================================
@@ -1495,66 +1653,16 @@ def render_zoom_crop_panel(contract, manifest, gt_speed, method_speeds, zoom):
 # fallback panel for that method instead.
 # =============================================================================
 
-def read_pd_coordinates_csv(path):
-    birth, death = [], []
-    with Path(path).open(newline='') as fh:
-        for row in csv.DictReader(fh):
-            b = next((row[k] for k in row if k.strip().lower() in ('birth', 'birth_x', 'x_birth', 'birth_value')),
-                       None)
-            d = next((row[k] for k in row if k.strip().lower() in ('death', 'death_x', 'x_death', 'death_value')),
-                       None)
-            if b is None or d is None:
-                continue
-            birth.append(float(b))
-            death.append(float(d))
-    birth, death = np.asarray(birth, dtype=np.float64), np.asarray(death, dtype=np.float64)
-    if birth.size == 0:
-        raise SystemExit(f'[hard-fail] PD coordinate source {path} produced zero birth/death pairs.')
-    if not (np.isfinite(birth).all() and np.isfinite(death).all()):
-        raise SystemExit(f'[hard-fail] PD coordinate source {path} contains non-finite birth/death values.')
-    return birth, death
-
-
-def read_pd_coordinates_from_vtu(path):
-    try:
-        import vtk
-        from vtk.util.numpy_support import vtk_to_numpy
-    except ImportError:
-        raise SystemExit(
-            f'[hard-fail] Cannot parse VTU PD source {path}: the `vtk` package is not installed in this '
-            f'environment. Install VTK, or supply a pre-extracted birth/death coordinate CSV instead. '
-            f'Refusing to fabricate coordinates.'
-        )
-    reader = vtk.vtkXMLUnstructuredGridReader()
-    reader.SetFileName(str(path))
-    reader.Update()
-    points = reader.GetOutput().GetPoints()
-    if points is None:
-        raise SystemExit(f'[hard-fail] VTU PD source {path} has no point data.')
-    coords = vtk_to_numpy(points.GetData())
-    if coords.ndim != 2 or coords.shape[1] < 2:
-        raise SystemExit(f'[hard-fail] VTU PD source {path} point data has fewer than 2 dimensions.')
-    birth, death = coords[:, 0].astype(np.float64), coords[:, 1].astype(np.float64)
-    if not (np.isfinite(birth).all() and np.isfinite(death).all()):
-        raise SystemExit(f'[hard-fail] VTU PD source {path} contains non-finite birth/death coordinates.')
-    return birth, death
-
-
-def load_validated_pd_coordinates(candidate_path):
-    path = REPO_ROOT / candidate_path
-    if path.suffix.lower() == '.csv':
-        return read_pd_coordinates_csv(path)
-    return read_pd_coordinates_from_vtu(path)
-
-
-def render_pd_diagram_panels(contract, panel_type, manifest, per_sample, pd_sources_by_method):
+def render_pd_diagram_panels(contract, panel_type, manifest, per_sample, pd_verdicts_by_method):
     """Real coordinate-based PD panel renderer: one panel per method (GT +
-    full_panel_methods with an available_validated source), common axes
+    full_panel_methods with an available_validated verdict), common axes
     within the figure, the diagonal drawn, and the frozen scalar PD
-    distance annotated. `pd_sources_by_method` maps method_id -> validated
-    candidate_path (only for methods with usable_status==available_validated
-    -- callers must route unavailable methods to the scalar fallback
-    instead)."""
+    distance annotated. `pd_verdicts_by_method` maps method_id -> the full
+    resolve_pd_source_verdict() dict (only for methods with
+    verdict==available_validated -- callers must route unavailable methods
+    to the scalar fallback instead). Coordinates are read directly from the
+    verdict (already parsed and validated by parse_and_validate_pd_vtu()) --
+    never re-derived from raw VTU point geometry."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -1562,14 +1670,13 @@ def render_pd_diagram_panels(contract, panel_type, manifest, per_sample, pd_sour
     si = manifest[contract['archetype_id']]
     out_dir = PANELS_DIR / figure_dir_name(contract)
     out_dir.mkdir(parents=True, exist_ok=True)
-    methods = ['GT'] + [m for m in contract['full_panel_methods'] if m in pd_sources_by_method]
-    coords = {mid: load_validated_pd_coordinates(pd_sources_by_method[mid]) for mid in methods
-               if mid in pd_sources_by_method}
-    if 'GT' not in pd_sources_by_method:
+    methods = ['GT'] + [m for m in contract['full_panel_methods'] if m in pd_verdicts_by_method]
+    if 'GT' not in pd_verdicts_by_method:
         raise SystemExit(
             f"[hard-fail] Figure {contract['figure_id']} {panel_type} panel requires a validated GT PD "
             f'coordinate source; GT is never assumed found without a concrete candidate_path.'
         )
+    coords = {mid: (pd_verdicts_by_method[mid]['birth'], pd_verdicts_by_method[mid]['death']) for mid in methods}
     all_vals = np.concatenate([np.concatenate([b, d]) for b, d in coords.values()])
     lo, hi = float(all_vals.min()), float(all_vals.max())
     rows = []
@@ -1690,13 +1797,6 @@ def render_pd_mt_comparison_compact_panel(contract, manifest, per_sample):
     return str(out_path.relative_to(REPO_ROOT))
 
 
-def best_available_pd_source(discovery_rows_for_method):
-    for r in discovery_rows_for_method:
-        if r['usable_status'] == STATUS_AVAILABLE:
-            return r['candidate_path']
-    return None
-
-
 def render_figure_transactional(contract, panel_render_fn):
     """Renders one figure's panels into a temporary staging directory
     (inside the repo tree, so relative-path bookkeeping stays valid),
@@ -1746,11 +1846,12 @@ def render_figure_transactional(contract, panel_render_fn):
     return [dict(r, output_path=r['output_path'].replace(staged_rel, final_rel)) for r in rows]
 
 
-def render_all_panels_for_figure(contract, manifest, audit, ordered_selected, per_sample, pd_verdicts,
-                                    pd_discovery_rows_by_method):
+def render_all_panels_for_figure(contract, manifest, audit, ordered_selected, per_sample, pd_verdicts):
     """Renders EVERY declared scripted panel type for one figure. No panel
     type declared in a figure contract is ever skipped or silently marked
-    rendered without a real renderer call."""
+    rendered without a real renderer call. `pd_verdicts` maps method_id
+    (including 'GT') -> the full resolve_pd_source_verdict() dict for every
+    method required by a pd_evidence/pd_comparison panel in this figure."""
     si = manifest[contract['archetype_id']]
     panel_rows, gt_speed, method_speeds, panel_data = render_speed_and_error_panels(
         contract, manifest, audit, ordered_selected)
@@ -1767,20 +1868,19 @@ def render_all_panels_for_figure(contract, manifest, audit, ordered_selected, pe
     for panel_type in contract['panels']:
         if panel_type in PD_DIAGRAM_PANEL_TYPES:
             pending = [mid for mid in (['GT'] + contract['full_panel_methods'])
-                        if pd_verdicts.get(mid) == STATUS_PENDING]
+                        if pd_verdicts.get(mid, {}).get('verdict') == STATUS_PENDING]
             if pending:
                 raise SystemExit(
                     f"[hard-fail] Figure {contract['figure_id']} {panel_type}: {pending} still "
                     f'pending_authoritative_spark_source_discovery. Cannot render a real panel or fall back '
                     f'to the scalar path until the authoritative Spark search concludes for these methods.'
                 )
-            available = {mid: best_available_pd_source(pd_discovery_rows_by_method[mid])
-                          for mid in (['GT'] + contract['full_panel_methods'])
-                          if pd_verdicts.get(mid) == STATUS_AVAILABLE}
+            available = {mid: pd_verdicts[mid] for mid in (['GT'] + contract['full_panel_methods'])
+                          if pd_verdicts.get(mid, {}).get('verdict') == STATUS_AVAILABLE}
             unavailable = [mid for mid in contract['full_panel_methods']
-                            if pd_verdicts.get(mid) == STATUS_UNAVAILABLE]
+                            if pd_verdicts.get(mid, {}).get('verdict') == STATUS_UNAVAILABLE]
             if available:
-                if pd_verdicts.get('GT') != STATUS_AVAILABLE:
+                if pd_verdicts.get('GT', {}).get('verdict') != STATUS_AVAILABLE:
                     raise SystemExit(
                         f"[hard-fail] Figure {contract['figure_id']} {panel_type}: GT has no "
                         f'available_validated PD coordinate source; refusing to render method panels '
@@ -1863,8 +1963,6 @@ def cmd_render_fields(plan_result=None) -> dict:
     method_inventory = p2da.load_method_inventory()
     long_table = p2da.load_long_table()
     per_sample = long_table['per_sample']
-    column_mapping_rows = p2da.load_column_mapping_rows()
-    topology_source_map = p2da.build_topology_source_map(column_mapping_rows)
 
     audit, ordered_selected = _load_full_panel_arrays(manifest, method_inventory)
 
@@ -1872,19 +1970,10 @@ def cmd_render_fields(plan_result=None) -> dict:
     scale_rows = []
     zoom_result = None
     for c in FIGURE_CONTRACTS:
-        pd_discovery_rows_by_method = {}
-        pd_verdicts = {}
-        if any(pt in PD_DIAGRAM_PANEL_TYPES for pt in c['panels']):
-            for mid in (['GT'] + c['full_panel_methods']):
-                rows = discover_pd_source_candidates(c['figure_id'], manifest[c['archetype_id']], mid,
-                                                        topology_source_map)
-                rows = [_finalize_pd_candidate_row(r) for r in rows]
-                pd_discovery_rows_by_method[mid] = rows
-                pd_verdicts[mid] = figure_pd_source_verdict(rows)
+        _, pd_verdicts = discover_and_resolve_pd_sources_for_figure(c, manifest)
 
-        def _render(c=c, pd_verdicts=pd_verdicts, pd_discovery_rows_by_method=pd_discovery_rows_by_method):
-            return render_all_panels_for_figure(c, manifest, audit, ordered_selected, per_sample, pd_verdicts,
-                                                   pd_discovery_rows_by_method)
+        def _render(c=c, pd_verdicts=pd_verdicts):
+            return render_all_panels_for_figure(c, manifest, audit, ordered_selected, per_sample, pd_verdicts)
 
         panel_rows, scale_row, fig_zoom = render_figure_transactional(c, _render)
         render_rows.extend(panel_rows)
