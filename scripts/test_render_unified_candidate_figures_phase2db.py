@@ -406,14 +406,56 @@ try:
 
     print()
     print('=== 6. Full --plan-only pipeline succeeds end-to-end (real Phase-2D-A package used directly '
-          'when present; synthetic stand-ins only for genuinely-absent paths) ===')
+          'when present; synthetic stand-ins only for genuinely-absent paths; PD source roots isolated to a '
+          'synthetic fixture -- see Section 7 rationale: the contract suite must not depend on real Spark PD '
+          'families agreeing) ===')
     print(f'    Environment: IS_LIGHTWEIGHT_CHECKOUT={m.IS_LIGHTWEIGHT_CHECKOUT}')
     out_dir_snapshot = snapshot_tree(m.OUT_DIR)
     doc_2db_snapshot = m.DOC_PATH.read_bytes() if m.DOC_PATH.exists() else None
     cleanup_fixture, fixture_pre_snapshot = make_completed_phase2d_a_fixture()
+
+    # Isolated synthetic PD-source fixture (Section 7): the golden-path
+    # --plan-only run below must be deterministic and independent of
+    # whatever real PD VTU families do or do not exist/agree on the machine
+    # this suite happens to run on. Every PD source root/alias is
+    # monkeypatched to a temporary tree under OUT_DIR (cleaned up by this
+    # section's own out_dir_snapshot/restore_tree, and by the top-level
+    # wrapper as a second safety net); IS_LIGHTWEIGHT_CHECKOUT is forced
+    # False to exercise the authoritative-Spark "zero pending" contract for
+    # real, in-process, without needing an actual Spark machine.
+    tmp6_pd_root = m.OUT_DIR / '_test6_pd_fixture'
+    old_topology_tree_root6 = m._topology_tree_root
+    old_cnn_gan_default6 = dict(m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS)
+    old_cnn_gan_super6 = dict(m.CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS)
+    old_lightweight_flag6 = m.IS_LIGHTWEIGHT_CHECKOUT
+    ALIAS_C6 = m.METHOD_ARTIFACT_ALIASES[m.CANDIDATE_C]
+    ALIAS_F36 = m.METHOD_ARTIFACT_ALIASES[m.F3]
+    ALIAS_F26 = m.METHOD_ARTIFACT_ALIASES[m.F2]
+    ALIAS_UV6 = m.METHOD_ARTIFACT_ALIASES[m.UV_E2]
+    GT_SAMPLES6 = sorted({m.FROZEN_SAMPLE_SET[c['archetype_id']] for c in m.FIGURE_CONTRACTS[:3]})  # 120, 34, 119
     try:
+        m._topology_tree_root = lambda alias: tmp6_pd_root / f'{alias}_topology'
+        # cnn/gan/bicubic default_sublevel AND superlevel roots are all left
+        # empty (never invented) -- this fixture deliberately proves the
+        # scalar-fallback path for every baseline method, since only the
+        # candidate methods get a synthetic default_sublevel source below.
+        m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = {m.CNN: [], m.GAN: [], m.BICUBIC: []}
+        m.CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS = {m.CNN: [], m.GAN: []}
+        m.IS_LIGHTWEIGHT_CHECKOUT = False
+
+        for sample in GT_SAMPLES6:
+            _write_synthetic_pd_vtu(
+                _pd_vtu_path(tmp6_pd_root, ALIAS_C6, 'GT', sample), pair_id=[0, 1], pair_type=[0, 0],
+                persistence=[1.0, 2.0], birth=[0.1, 0.4], is_finite=[1, 1])
+        for alias, samples in ((ALIAS_C6, (120,)), (ALIAS_F36, (120, 119)), (ALIAS_F26, (120,)),
+                                  (ALIAS_UV6, (120, 119))):
+            for sample in samples:
+                _write_synthetic_pd_vtu(
+                    _pd_vtu_path(tmp6_pd_root, alias, 'SR', sample), pair_id=[0], pair_type=[0],
+                    persistence=[1.5], birth=[0.2], is_finite=[1])
+
         plan_result = m.cmd_plan_only()
-        check('cmd_plan_only() completed without raising', True)
+        check('cmd_plan_only() completed without raising against the isolated synthetic PD fixture', True)
 
         scanned = 0
         bad = []
@@ -424,46 +466,51 @@ try:
                         if 'path' in k.lower() and isinstance(v, str) and v.startswith('/'):
                             bad.append((csv_path, k, v))
                         scanned += 1
-        check(f'no absolute path found across {scanned} scanned field values in real plan-only output', bad == [])
+        check(f'no absolute path found across {scanned} scanned field values in plan-only output', bad == [])
 
         check('exactly 168 figure-data metric values reproduced within tolerance',
               len(plan_result['repro_rows']) == 168
               and all(r['status'] == 'PASS' for r in plan_result['repro_rows']))
 
         pd_rows = plan_result['pd_discovery_rows']
+        verdict_rows = plan_result['pd_verdict_rows']
         check('pd_source_discovery.csv has rows for figures 1, 2, 3 only (the figures needing PD diagram panels)',
               {r['figure_id'] for r in pd_rows} == {1, 2, 3})
+        check('pd_source_verdicts.csv has exactly the expected 15 figure/method rows (Section 6)',
+              len(verdict_rows) == 15)
         check('GT is present among the searched methods for figure 1 (never assumed found without a concrete '
               'source)', any(r['method_id'] == 'GT' and r['figure_id'] == 1 for r in pd_rows))
         check('bicubic is present among the searched methods for figure 2 (real search, not a hardcoded '
               'exclusion)', any(r['method_id'] == m.BICUBIC and r['figure_id'] == 2 for r in pd_rows))
 
-        allowed_statuses = ({m.STATUS_PENDING} if m.IS_LIGHTWEIGHT_CHECKOUT
-                              else {m.STATUS_AVAILABLE, m.STATUS_PENDING, m.STATUS_UNAVAILABLE})
-        check('every PD discovery row status is within the environment-appropriate vocabulary',
-              all(r['usable_status'] in allowed_statuses for r in pd_rows))
-        if m.IS_LIGHTWEIGHT_CHECKOUT:
-            check('every PD discovery row is pending_authoritative_spark_source_discovery in a lightweight '
-                  'checkout (never unavailable_after_authoritative_spark_audit here)',
-                  all(r['usable_status'] == m.STATUS_PENDING for r in pd_rows))
-        else:
-            check('available_validated rows have a concrete candidate_path',
-                  all(r['candidate_path'] for r in pd_rows if r['usable_status'] == m.STATUS_AVAILABLE))
-            check('GT is never marked available_validated without a concrete candidate_path',
-                  all(r['candidate_path'] for r in pd_rows
-                      if r['method_id'] == 'GT' and r['usable_status'] == m.STATUS_AVAILABLE))
-            check('unavailable_after_authoritative_spark_audit is legal here only because '
-                  'IS_LIGHTWEIGHT_CHECKOUT is False', not m.IS_LIGHTWEIGHT_CHECKOUT
-                  or not any(r['usable_status'] == m.STATUS_UNAVAILABLE for r in pd_rows))
+        check('with IS_LIGHTWEIGHT_CHECKOUT forced False (simulated authoritative Spark), zero verdict rows '
+              'remain pending -- every method resolves to available_validated or '
+              'unavailable_after_authoritative_spark_audit',
+              all(r['verdict'] != m.STATUS_PENDING for r in verdict_rows))
+        check('every verdict row uses the default_sublevel filtration convention (Section 2: main figures never '
+              'use another convention)',
+              all(r['filtration_convention'] == m.FILTRATION_DEFAULT_SUBLEVEL for r in verdict_rows))
+        check('the four candidate methods (present in the synthetic default_sublevel fixture) resolve to '
+              'available_validated with a concrete selected_candidate_path',
+              all(r['verdict'] == m.STATUS_AVAILABLE and r['selected_candidate_path']
+                  for r in verdict_rows if r['method_id'] in (m.CANDIDATE_C, m.F3, m.F2, m.UV_E2)))
+        check('GT resolves to available_validated from the synthetic default_sublevel candidate-family fixture',
+              all(r['verdict'] == m.STATUS_AVAILABLE and r['source_family'] == m.SOURCE_FAMILY_TOPOLOGY_FINETUNING
+                  for r in verdict_rows if r['method_id'] == 'GT'))
+        check('cnn/gan/bicubic (deliberately absent from the synthetic default_sublevel fixture) resolve to '
+              'unavailable_after_authoritative_spark_audit with fallback_required=True, never pending',
+              all(r['verdict'] == m.STATUS_UNAVAILABLE and r['fallback_required'] == 'True'
+                  for r in verdict_rows if r['method_id'] in (m.CNN, m.GAN, m.BICUBIC)))
 
         composite_path = m.PLAN_DIR / 'final_composite_manifest.csv'
         check('final_composite_manifest.csv was written', composite_path.exists())
         composite_rows = m.p2da.read_csv_dicts(composite_path)
         pd_group_rows = [r for r in composite_rows if int(r['figure_id']) in (1, 2, 3)
                            and r['panel_group'] in ('pd_coordinate', 'pd_scalar_fallback')]
-        check('every PD-related composite-manifest row for figures 1/2/3 has a status consistent with its '
-              'discovery verdict (pending, visible, or scalar_fallback)',
-              all(r['final_visible_status'] in ('pending', 'visible', 'scalar_fallback') for r in pd_group_rows))
+        check('every PD-related composite-manifest row for figures 1/2/3 is visible or scalar_fallback -- never '
+              'pending, since the simulated authoritative-Spark fixture leaves nothing unresolved',
+              pd_group_rows != [] and all(r['final_visible_status'] in ('visible', 'scalar_fallback')
+                                             for r in pd_group_rows))
 
         zoom_val_path = m.VALIDATION_DIR / 'zoom_selection_validation.csv'
         check('zoom_selection_validation.csv was written in the not_yet_computed state (requires real GT/error '
@@ -473,6 +520,11 @@ try:
         scale_path = m.VALIDATION_DIR / 'panel_scale_provenance.csv'
         check('panel_scale_provenance.csv was written (empty/pending in plan-only)', scale_path.exists())
     finally:
+        m._topology_tree_root = old_topology_tree_root6
+        m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = old_cnn_gan_default6
+        m.CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS = old_cnn_gan_super6
+        m.IS_LIGHTWEIGHT_CHECKOUT = old_lightweight_flag6
+        shutil.rmtree(tmp6_pd_root, ignore_errors=True)
         cleanup_fixture()
         restore_tree(m.OUT_DIR, out_dir_snapshot)
         if doc_2db_snapshot is None:
@@ -480,6 +532,8 @@ try:
                 m.DOC_PATH.unlink()
         else:
             m.DOC_PATH.write_bytes(doc_2db_snapshot)
+    check('IS_LIGHTWEIGHT_CHECKOUT restored to its real value after the isolated Section 6 fixture',
+          m.IS_LIGHTWEIGHT_CHECKOUT == old_lightweight_flag6)
     check('Phase-2D-A report (docs/unified_candidate_analysis_phase2d.md) restored to its exact pre-test '
           'content (never asserted to be non-complete -- the Spark report is legitimately already complete)',
           paths_match_snapshot([m.p2da.DOC_PATH], {m.p2da.DOC_PATH: fixture_pre_snapshot[m.p2da.DOC_PATH]}))
@@ -613,14 +667,14 @@ try:
           'routing; exact role/alias/sample mapping; hard-fail-on-malformed) ===')
     tmp11 = m.OUT_DIR / '_test11_scratch'
     old_topology_tree_root = m._topology_tree_root
-    old_cnn_gan_bicubic_roots = dict(m.CNN_GAN_BICUBIC_SEARCH_ROOTS)
+    old_cnn_gan_bicubic_roots = dict(m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS)
     old_lightweight_flag = m.IS_LIGHTWEIGHT_CHECKOUT
     ALIAS_C = m.METHOD_ARTIFACT_ALIASES[m.CANDIDATE_C]
     ALIAS_F3 = m.METHOD_ARTIFACT_ALIASES[m.F3]
     try:
         tmp11.mkdir(parents=True, exist_ok=True)
         m._topology_tree_root = lambda alias: tmp11 / f'{alias}_topology'
-        m.CNN_GAN_BICUBIC_SEARCH_ROOTS = {
+        m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = {
             m.CNN: [tmp11 / 'cnn_root'], m.GAN: [tmp11 / 'gan_root'], m.BICUBIC: [tmp11 / 'bicubic_root'],
         }
 
@@ -714,20 +768,20 @@ try:
         # --- 11f: duplicate resolved paths (e.g. the same directory reachable via
         # two overlapping search roots) collapse to ONE candidate, never a
         # duplicate row / spurious conflict. ---
-        old_cnn_roots_for_dedup = m.CNN_GAN_BICUBIC_SEARCH_ROOTS
+        old_cnn_roots_for_dedup = m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS
         cnn_root = tmp11 / 'cnn_root'
         cnn_sr_path = cnn_root / 'pd' / 'SR' / 'cnn_SR_s604_v0_pd_port_0.vtu'
         cnn_sr_path.parent.mkdir(parents=True, exist_ok=True)
         _write_synthetic_pd_vtu(cnn_sr_path, pair_id=[0], pair_type=[0], persistence=[1.0], birth=[0.5],
                                   is_finite=[1])
         try:
-            m.CNN_GAN_BICUBIC_SEARCH_ROOTS = {m.CNN: [cnn_root, cnn_root], m.GAN: [], m.BICUBIC: []}
+            m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = {m.CNN: [cnn_root, cnn_root], m.GAN: [], m.BICUBIC: []}
             verdict_dedup = m.resolve_pd_source_verdict(99, 604, m.CNN)
             check('the exact same file reachable via a duplicated search root resolves to a single '
                   'available_validated candidate (not a spurious conflict)',
                   verdict_dedup['verdict'] == m.STATUS_AVAILABLE and verdict_dedup['parsed_pair_count'] == 1)
         finally:
-            m.CNN_GAN_BICUBIC_SEARCH_ROOTS = old_cnn_roots_for_dedup
+            m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = old_cnn_roots_for_dedup
 
         # --- 11g: role-aware GT vs SR mapping; artifact-alias mapping end to end
         # via resolve_pd_source_verdict(). ---
@@ -805,7 +859,7 @@ try:
               restored_verdict['verdict'] == m.STATUS_PENDING or not m.IS_LIGHTWEIGHT_CHECKOUT)
     finally:
         m._topology_tree_root = old_topology_tree_root
-        m.CNN_GAN_BICUBIC_SEARCH_ROOTS = old_cnn_gan_bicubic_roots
+        m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = old_cnn_gan_bicubic_roots
         m.IS_LIGHTWEIGHT_CHECKOUT = old_lightweight_flag
         shutil.rmtree(tmp11, ignore_errors=True)
 
@@ -1483,6 +1537,109 @@ try:
         for d in panel_dirs_created25:
             shutil.rmtree(d, ignore_errors=True)
         shutil.rmtree(m.FIGURES_DIR, ignore_errors=True)
+
+    print()
+    print('=== 27. Filtration-convention-aware PD source resolution: default_sublevel vs. '
+          'superlevel_negated_speed cross-family behavior ===')
+    tmp27 = m.OUT_DIR / '_test27_filtration'
+    old_topology_tree_root27 = m._topology_tree_root
+    old_cnn_gan_default27 = dict(m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS)
+    old_cnn_gan_super27 = dict(m.CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS)
+    old_lightweight_flag27 = m.IS_LIGHTWEIGHT_CHECKOUT
+    ALIAS_C27 = m.METHOD_ARTIFACT_ALIASES[m.CANDIDATE_C]
+    ALIAS_F327 = m.METHOD_ARTIFACT_ALIASES[m.F3]
+    try:
+        m._topology_tree_root = lambda alias: tmp27 / f'{alias}_topology'
+        m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = {m.CNN: [tmp27 / 'cnn'], m.GAN: [tmp27 / 'gan'],
+                                                        m.BICUBIC: [tmp27 / 'bicubic']}
+        m.CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS = {
+            m.CNN: [tmp27 / 'superlevel_topology' / 'cnn' / 'topology'],
+            m.GAN: [tmp27 / 'superlevel_topology' / 'gan' / 'topology'],
+        }
+        m.IS_LIGHTWEIGHT_CHECKOUT = False
+
+        # --- 27a: default_sublevel and superlevel_negated_speed GT families
+        # may each be internally consistent while differing from one another;
+        # no cross-family conflict is raised; the default_sublevel family is
+        # selected for the main figure; the superlevel family is recorded but
+        # excluded. This directly reproduces the authoritative sample-120
+        # audit scenario (positive-coordinate default family vs.
+        # negative-coordinate superlevel family, same pair_count within each
+        # family, different pair_count and sign across families). ---
+        sample27 = 701
+        gt_c27 = _pd_vtu_path(tmp27, ALIAS_C27, 'GT', sample27)
+        gt_f327 = _pd_vtu_path(tmp27, ALIAS_F327, 'GT', sample27)
+        _write_synthetic_pd_vtu(gt_c27, pair_id=[0, 1], pair_type=[0, 0], persistence=[1.0, 2.0],
+                                  birth=[0.5, 1.0], is_finite=[1, 1])
+        _write_synthetic_pd_vtu(gt_f327, pair_id=[0, 1], pair_type=[0, 0], persistence=[1.0, 2.0],
+                                  birth=[0.5, 1.0], is_finite=[1, 1])
+        superlevel_gt_cnn27 = tmp27 / 'superlevel_topology' / 'cnn' / 'topology' / 'pd' / 'GT' / \
+            f'cnn_GT_s{sample27}_v0_pd_port_0.vtu'
+        superlevel_gt_gan27 = tmp27 / 'superlevel_topology' / 'gan' / 'topology' / 'pd' / 'GT' / \
+            f'gan_GT_s{sample27}_v0_pd_port_0.vtu'
+        _write_synthetic_pd_vtu(superlevel_gt_cnn27, pair_id=[0, 1, 2], pair_type=[0, 0, 0],
+                                  persistence=[1.0, 2.0, 3.0], birth=[-3.0, -2.0, -1.0], is_finite=[1, 1, 1])
+        _write_synthetic_pd_vtu(superlevel_gt_gan27, pair_id=[0, 1, 2], pair_type=[0, 0, 0],
+                                  persistence=[1.0, 2.0, 3.0], birth=[-3.0, -2.0, -1.0], is_finite=[1, 1, 1])
+
+        gt_verdict27 = m.resolve_pd_source_verdict(1, sample27, 'GT')
+        check('cross-family GT resolution raises no conflict (default_sublevel and superlevel families differ '
+              'in pair_count/coordinate sign but are never compared against each other)',
+              gt_verdict27['verdict'] == m.STATUS_AVAILABLE)
+        check('the default_sublevel family is the one selected for the main figure',
+              gt_verdict27['filtration_convention'] == m.FILTRATION_DEFAULT_SUBLEVEL
+              and gt_verdict27['selected_candidate_path'] in (m._rel(gt_c27), m._rel(gt_f327))
+              and gt_verdict27['source_family'] == m.SOURCE_FAMILY_TOPOLOGY_FINETUNING)
+
+        superlevel_agreement27 = m.check_superlevel_gt_family_agreement(sample27)
+        check('the superlevel_negated_speed GT family (cnn, gan) is independently internally consistent',
+              superlevel_agreement27['agrees'] is True and superlevel_agreement27['n_copies'] == 2)
+
+        fig1 = m.FIGURE_BY_ID[1]
+        discovery27, verdicts27 = m.discover_and_resolve_pd_sources_for_figure(
+            fig1, {fig1['archetype_id']: sample27})
+        check("the main verdict for 'GT' is the default_sublevel resolution, never the superlevel one",
+              verdicts27['GT']['filtration_convention'] == m.FILTRATION_DEFAULT_SUBLEVEL)
+        superlevel_rows27 = [r for r in discovery27 if r['filtration_convention'] ==
+                                m.FILTRATION_SUPERLEVEL_NEGATED_SPEED]
+        check('the superlevel family is recorded in discovery provenance but excluded from the main figure',
+              len(superlevel_rows27) > 0
+              and all(r['eligible_for_main_figure'] == 'False' for r in superlevel_rows27)
+              and all(r['exclusion_reason'] == 'filtration_convention_mismatch' for r in superlevel_rows27))
+        check('superlevel discovery rows are never treated as conflicting duplicate copies of the '
+              'default_sublevel GT (usable_status is the distinct "excluded" status, not available/pending/'
+              'unavailable)', all(r['usable_status'] == 'excluded' for r in superlevel_rows27))
+
+        # --- 27b: within-(default_sublevel)-family disagreement still hard-fails. ---
+        gt_f327.write_text(gt_f327.read_text().replace('1.0 2.0', '9.0 9.0'))
+        try:
+            m.resolve_pd_source_verdict(1, sample27, 'GT')
+            check('within-family (default_sublevel) GT disagreement still hard-fails', False)
+        except SystemExit as e:
+            check('within-family (default_sublevel) GT disagreement still hard-fails',
+                  m._rel(gt_c27) in str(e) and m._rel(gt_f327) in str(e))
+
+        # --- 27c: a malformed exact default_sublevel source still hard-fails
+        # (never silently downgraded to unavailable/pending). ---
+        sample27b = 702
+        malformed_sr27 = _pd_vtu_path(tmp27, ALIAS_C27, 'SR', sample27b)
+        _write_synthetic_pd_vtu(malformed_sr27, pair_id=[0], pair_type=[0], persistence=[1.0], birth=[0.5],
+                                  is_finite=[1], omit_arrays=('Persistence',))
+        try:
+            m.resolve_pd_source_verdict(1, sample27b, m.CANDIDATE_C)
+            check('a malformed exact default_sublevel source hard-fails rather than being marked '
+                  'unavailable/pending', False)
+        except SystemExit:
+            check('a malformed exact default_sublevel source hard-fails rather than being marked '
+                  'unavailable/pending', True)
+    finally:
+        m._topology_tree_root = old_topology_tree_root27
+        m.CNN_GAN_BICUBIC_DEFAULT_SUBLEVEL_ROOTS = old_cnn_gan_default27
+        m.CNN_GAN_SUPERLEVEL_NEGATED_SPEED_ROOTS = old_cnn_gan_super27
+        m.IS_LIGHTWEIGHT_CHECKOUT = old_lightweight_flag27
+        shutil.rmtree(tmp27, ignore_errors=True)
+    check('IS_LIGHTWEIGHT_CHECKOUT restored to its real value after the Section 27 fixture',
+          m.IS_LIGHTWEIGHT_CHECKOUT == old_lightweight_flag27)
 
 finally:
     # Top-level safety net: restores every path the entire suite could ever
