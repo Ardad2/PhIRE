@@ -189,6 +189,21 @@ HUMAN_LABELS = {
 }
 GT_DISPLAY_LABEL = 'Ground Truth'
 
+# Deterministic, method-keyed point-label offsets (x, y) in points, used by
+# render_pd_mt_tradeoff_compact_panel (Figure 4) to keep annotations legible
+# and mutually non-overlapping without any optional external label-layout
+# dependency. Fixed per method identity -- never computed from a run's data
+# values, so placement is exactly reproducible.
+PD_MT_LABEL_OFFSETS_PT = {
+    CANDIDATE_C: (10, 10),
+    F3: (10, -16),
+    F2: (-52, 10),
+    UV_E2: (10, 10),
+    GAN: (10, -16),
+    BICUBIC: (-52, 10),
+}
+PD_MT_LABEL_OFFSET_DEFAULT = (10, 10)
+
 _LOG_LINES: list = []
 
 
@@ -1916,40 +1931,66 @@ def render_speed_and_error_panels(contract, manifest, audit, ordered_selected):
     out_dir = PANELS_DIR / figure_dir_name(contract)
     out_dir.mkdir(parents=True, exist_ok=True)
     rows = []
+
+    def _colorbar(fig, ax, im, label):
+        # Small side colorbar (never a large one dominating the panel): the
+        # `fraction`/`pad` convention scales the bar to a modest fraction of
+        # the axes it is attached to. Never alters the image's own data,
+        # vmin/vmax, colormap, or origin -- purely adds numerical context.
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label(label, fontsize=7)
+        cbar.ax.tick_params(labelsize=6)
+
     fig, ax = plt.subplots(figsize=(3, 3), dpi=300)
-    ax.imshow(gt_speed, cmap='cividis', vmin=panel['speed_vmin'], vmax=panel['speed_vmax'],
-               origin='lower', aspect='equal')
+    im = ax.imshow(gt_speed, cmap='cividis', vmin=panel['speed_vmin'], vmax=panel['speed_vmax'],
+                     origin='lower', aspect='equal')
     ax.set_title(GT_DISPLAY_LABEL)
     ax.set_xticks([])
     ax.set_yticks([])
+    _colorbar(fig, ax, im, 'Speed')
     out_path = out_dir / f'{SPEED_FIELDS}_GT.png'
-    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.06)
     plt.close(fig)
     rows.append(dict(output_path=str(out_path.relative_to(REPO_ROOT)), method_id='GT', panel_type=SPEED_FIELDS))
     for mid in methods:
         fig, ax = plt.subplots(figsize=(3, 3), dpi=300)
-        ax.imshow(method_speeds[mid], cmap='cividis', vmin=panel['speed_vmin'], vmax=panel['speed_vmax'],
-                    origin='lower', aspect='equal')
+        im = ax.imshow(method_speeds[mid], cmap='cividis', vmin=panel['speed_vmin'], vmax=panel['speed_vmax'],
+                         origin='lower', aspect='equal')
         ax.set_title(HUMAN_LABELS[mid])
         ax.set_xticks([])
         ax.set_yticks([])
+        _colorbar(fig, ax, im, 'Speed')
         out_path = out_dir / f'{SPEED_FIELDS}_{mid}.png'
-        fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+        fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.06)
         plt.close(fig)
         rows.append(dict(output_path=str(out_path.relative_to(REPO_ROOT)), method_id=mid,
                            panel_type=SPEED_FIELDS))
 
         fig, ax = plt.subplots(figsize=(3, 3), dpi=300)
-        ax.imshow(panel['errors'][mid], cmap='magma', vmin=panel['error_vmin'], vmax=panel['error_vmax'],
-                    origin='lower', aspect='equal')
+        im = ax.imshow(panel['errors'][mid], cmap='magma', vmin=panel['error_vmin'], vmax=panel['error_vmax'],
+                         origin='lower', aspect='equal')
         ax.set_title(f'|{HUMAN_LABELS[mid]} - GT|')
         ax.set_xticks([])
         ax.set_yticks([])
+        _colorbar(fig, ax, im, '|Speed - GT|')
         out_path = out_dir / f'{ERROR_MAPS}_{mid}.png'
-        fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+        fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.06)
         plt.close(fig)
         rows.append(dict(output_path=str(out_path.relative_to(REPO_ROOT)), method_id=mid, panel_type=ERROR_MAPS))
     return rows, gt_speed, method_speeds, panel
+
+
+def _build_metric_strip_table(ax, col_labels, cell_text, n_cols):
+    table = ax.table(cellText=cell_text, colLabels=col_labels, rowLabels=['PD', 'MT'], loc='center',
+                       cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(11)
+    # Stretch row height (not column width) so the compact 2-row table fills
+    # most of the panel canvas instead of sitting small in a large blank
+    # axes -- values, labels, and method ordering are untouched.
+    table.scale(1.0, 2.6)
+    table.auto_set_column_width(col=list(range(n_cols)))
+    return table
 
 
 def render_metric_strip(contract, manifest, per_sample):
@@ -1960,21 +2001,44 @@ def render_metric_strip(contract, manifest, per_sample):
     si = manifest[contract['archetype_id']]
     out_dir = PANELS_DIR / figure_dir_name(contract)
     out_dir.mkdir(parents=True, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(1.6 * (len(contract['required_methods']) + 1), 1.2), dpi=300)
-    ax.axis('off')
+    n_cols = len(contract['required_methods']) + 1
     col_labels = [GT_DISPLAY_LABEL] + [HUMAN_LABELS[m] for m in contract['required_methods']]
     cell_text = [['--'] + [f"{per_sample[m][si]['pd_distance']:.2f}" for m in contract['required_methods']],
                   ['--'] + [f"{per_sample[m][si]['mt_distance']:.2f}" for m in contract['required_methods']]]
-    table = ax.table(cellText=cell_text, colLabels=col_labels, rowLabels=['PD', 'MT'], loc='center')
-    table.auto_set_font_size(False)
-    table.set_fontsize(7)
+
+    # matplotlib's tight-bbox computation includes an Axes' spines/patch at
+    # their full nominal extent even when ax.axis('off') is used, so
+    # bbox_inches='tight' alone cannot shrink a wide axes down to a small
+    # auto-sized table. Instead: measure the table's real (font-metric-
+    # accurate) size in a throwaway pass, then build the actual figure sized
+    # to fit that measured content plus a small consistent margin, so the
+    # table fills most of the panel canvas rather than sitting small inside
+    # a much larger blank axes.
+    probe_fig, probe_ax = plt.subplots(figsize=(1.6 * n_cols, 1.6), dpi=300)
+    probe_ax.axis('off')
+    probe_table = _build_metric_strip_table(probe_ax, col_labels, cell_text, n_cols)
+    probe_fig.canvas.draw()
+    table_bbox_in = probe_table.get_window_extent(
+        probe_fig.canvas.get_renderer()).transformed(probe_fig.dpi_scale_trans.inverted())
+    plt.close(probe_fig)
+
+    margin_in = 0.12
+    fig, ax = plt.subplots(figsize=(table_bbox_in.width + 2 * margin_in, table_bbox_in.height + 2 * margin_in),
+                             dpi=300)
+    ax.axis('off')
+    _build_metric_strip_table(ax, col_labels, cell_text, n_cols)
     out_path = out_dir / f'{METRIC_STRIP}.png'
-    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.08)
     plt.close(fig)
     return str(out_path.relative_to(REPO_ROOT))
 
 
 def render_zoom_crop_panel(contract, manifest, gt_speed, method_speeds, zoom):
+    """Compact 2x2 layout for the deterministic sample-119 zoom crop (GT +
+    the figure's full_panel_methods, in the same order the figure contract
+    already declares -- never recomputed or reselected here; `zoom` is
+    consumed exactly as given). All four crops share one vmin/vmax so the
+    color scale is directly comparable across panels."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -1982,21 +2046,25 @@ def render_zoom_crop_panel(contract, manifest, gt_speed, method_speeds, zoom):
     out_dir = PANELS_DIR / figure_dir_name(contract)
     out_dir.mkdir(parents=True, exist_ok=True)
     methods = contract['full_panel_methods']
-    n = 1 + len(methods)
-    fig, axes = plt.subplots(1, n, figsize=(2.2 * n, 2.4), dpi=300)
+    panels = [(GT_DISPLAY_LABEL, gt_speed)] + [(HUMAN_LABELS[mid], method_speeds[mid]) for mid in methods]
+    n = len(panels)
+    n_cols = 2
+    n_rows = math.ceil(n / n_cols)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(2.8 * n_cols, 2.8 * n_rows), dpi=300)
+    axes_flat = np.atleast_1d(axes).ravel()
     vmin = min([float(gt_speed.min())] + [float(v.min()) for v in method_speeds.values()])
     vmax = max([float(gt_speed.max())] + [float(v.max()) for v in method_speeds.values()])
     y0, y1, x0, x1 = zoom['y0'], zoom['y1'], zoom['x0'], zoom['x1']
-    axes[0].imshow(gt_speed[y0:y1, x0:x1], cmap='cividis', vmin=vmin, vmax=vmax, origin='lower')
-    axes[0].set_title(GT_DISPLAY_LABEL, fontsize=8)
-    for j, mid in enumerate(methods, start=1):
-        axes[j].imshow(method_speeds[mid][y0:y1, x0:x1], cmap='cividis', vmin=vmin, vmax=vmax, origin='lower')
-        axes[j].set_title(HUMAN_LABELS[mid], fontsize=8)
-    for axi in axes:
-        axi.set_xticks([])
-        axi.set_yticks([])
+    for ax, (label, field) in zip(axes_flat, panels):
+        ax.imshow(field[y0:y1, x0:x1], cmap='cividis', vmin=vmin, vmax=vmax, origin='lower')
+        ax.set_title(label, fontsize=10)
+        ax.set_xticks([])
+        ax.set_yticks([])
+    for ax in axes_flat[len(panels):]:
+        ax.axis('off')
+    fig.subplots_adjust(wspace=0.06, hspace=0.18)
     out_path = out_dir / f'{ZOOM_CROP}.png'
-    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.06)
     plt.close(fig)
     return str(out_path.relative_to(REPO_ROOT))
 
@@ -2051,10 +2119,11 @@ def render_pd_diagram_panels(contract, panel_type, manifest, per_sample, pd_verd
             ax.set_title(f'{label}\nPD distance={pd_val:.3f}', fontsize=8)
         else:
             ax.set_title(label, fontsize=8)
-        ax.set_xlabel('Birth', fontsize=7)
-        ax.set_ylabel('Death', fontsize=7)
+        ax.set_xlabel('Birth', fontsize=9)
+        ax.set_ylabel('Death', fontsize=9)
+        ax.tick_params(labelsize=8)
         out_path = out_dir / f'{panel_type}_{mid}.png'
-        fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+        fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.06)
         plt.close(fig)
         rows.append(dict(output_path=str(out_path.relative_to(REPO_ROOT)), method_id=mid, panel_type=panel_type))
     return rows
@@ -2080,17 +2149,23 @@ def render_scalar_pd_fallback_panel(contract, panel_type, manifest, per_sample, 
         labels.append(HUMAN_LABELS[mid])
         values.append(pd_val if math.isfinite(pd_val) else 0.0)
         margins.append((cnn_val - pd_val) if (math.isfinite(pd_val) and math.isfinite(cnn_val)) else float('nan'))
-    fig, ax = plt.subplots(figsize=(1.6 * max(len(fallback_methods), 1), 2.4), dpi=300)
+    fig, ax = plt.subplots(figsize=(1.8 * max(len(fallback_methods), 1), 2.8), dpi=300)
     finite_mask = [math.isfinite(per_sample.get(mid, {}).get(si, {}).get('pd_distance', float('nan')))
                     for mid in fallback_methods]
     colors = ['#4C72B0' if ok else '#BBBBBB' for ok in finite_mask]
     ax.bar(labels, values, color=colors)
     for i, (v, ok) in enumerate(zip(values, finite_mask)):
-        ax.text(i, v, (f'{v:.2f}' if ok else 'N/A'), ha='center', va='bottom', fontsize=7)
-    ax.set_ylabel('PD distance (scalar fallback)', fontsize=7)
-    ax.set_title('Scalar PD-evidence fallback\n(no validated coordinate source)', fontsize=8)
+        ax.text(i, v, (f'{v:.2f}' if ok else 'N/A'), ha='center', va='bottom', fontsize=9)
+    ax.set_ylabel('PD distance (scalar fallback)', fontsize=9)
+    ax.set_title('Scalar PD-evidence fallback\n(no validated coordinate source)', fontsize=9)
+    ax.tick_params(axis='x', labelsize=8, rotation=(20 if len(fallback_methods) > 2 else 0))
+    if len(fallback_methods) > 2:
+        for tick in ax.get_xticklabels():
+            tick.set_ha('right')
+    ax.tick_params(axis='y', labelsize=8)
+    ax.margins(y=0.15)
     out_path = out_dir / f'{panel_type}_scalar_fallback.png'
-    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.08)
     plt.close(fig)
     return dict(output_path=str(out_path.relative_to(REPO_ROOT)), method_id=','.join(fallback_methods),
                  panel_type=panel_type)
@@ -2098,7 +2173,12 @@ def render_scalar_pd_fallback_panel(contract, panel_type, manifest, per_sample, 
 
 def render_pd_mt_tradeoff_compact_panel(contract, manifest, per_sample):
     """Figure 4: compact PD-vs-MT improvement scatter for each required
-    method relative to CNN."""
+    method relative to CNN. Label placement uses fixed, method-keyed
+    offsets (PD_MT_LABEL_OFFSETS_PT) rather than any data-dependent or
+    external auto-layout step, so it is exactly reproducible; saving with
+    bbox_inches='tight' guarantees every annotation, even one whose offset
+    pushes it past the plotted axes, is still fully included in the output
+    PNG rather than clipped."""
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -2108,21 +2188,25 @@ def render_pd_mt_tradeoff_compact_panel(contract, manifest, per_sample):
     out_dir.mkdir(parents=True, exist_ok=True)
     cnn_pd = per_sample[CNN][si]['pd_distance']
     cnn_mt = per_sample[CNN][si]['mt_distance']
-    fig, ax = plt.subplots(figsize=(2.8, 2.8), dpi=300)
+    fig, ax = plt.subplots(figsize=(3.4, 3.4), dpi=300)
     for mid in contract['required_methods']:
         if mid == CNN:
             continue
         pd_imp = cnn_pd - per_sample[mid][si]['pd_distance']
         mt_imp = cnn_mt - per_sample[mid][si]['mt_distance']
-        ax.scatter(pd_imp, mt_imp, s=30)
-        ax.annotate(HUMAN_LABELS[mid], (pd_imp, mt_imp), fontsize=6, xytext=(3, 3), textcoords='offset points')
+        ax.scatter(pd_imp, mt_imp, s=36)
+        dx, dy = PD_MT_LABEL_OFFSETS_PT.get(mid, PD_MT_LABEL_OFFSET_DEFAULT)
+        ax.annotate(HUMAN_LABELS[mid], (pd_imp, mt_imp), fontsize=8, xytext=(dx, dy),
+                     textcoords='offset points')
     ax.axhline(0, color='gray', linewidth=0.6)
     ax.axvline(0, color='gray', linewidth=0.6)
-    ax.set_xlabel('PD improvement vs CNN', fontsize=7)
-    ax.set_ylabel('MT improvement vs CNN', fontsize=7)
-    ax.set_title('PD/MT tradeoff (compact)', fontsize=8)
+    ax.margins(0.3)
+    ax.set_xlabel('PD improvement vs CNN', fontsize=9)
+    ax.set_ylabel('MT improvement vs CNN', fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.set_title('PD/MT tradeoff (compact)', fontsize=9)
     out_path = out_dir / f'{PD_MT_TRADEOFF_COMPACT}.png'
-    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
     return str(out_path.relative_to(REPO_ROOT))
 
@@ -2142,15 +2226,18 @@ def render_pd_mt_comparison_compact_panel(contract, manifest, per_sample):
     mt_vals = [per_sample[mid][si]['mt_distance'] for mid in methods]
     x = np.arange(len(methods))
     width = 0.35
-    fig, ax = plt.subplots(figsize=(1.4 * len(methods), 2.6), dpi=300)
-    ax.bar(x - width / 2, pd_vals, width, label='PD')
-    ax.bar(x + width / 2, mt_vals, width, label='MT')
+    fig, ax = plt.subplots(figsize=(2.1 * len(methods), 3.6), dpi=300)
+    ax.bar(x - width / 2, pd_vals, width, label='PD', color='#4C72B0')
+    ax.bar(x + width / 2, mt_vals, width, label='MT', color='#DD8452')
     ax.set_xticks(x)
-    ax.set_xticklabels([HUMAN_LABELS[mid] for mid in methods], fontsize=6, rotation=30, ha='right')
-    ax.legend(fontsize=7)
-    ax.set_title('PD/MT comparison (compact)', fontsize=8)
+    ax.set_xticklabels([HUMAN_LABELS[mid] for mid in methods], fontsize=10, rotation=30, ha='right')
+    ax.tick_params(axis='y', labelsize=9)
+    ax.set_ylabel('Distance', fontsize=10)
+    ax.legend(fontsize=10)
+    ax.set_title('PD/MT comparison (compact)', fontsize=11)
+    ax.margins(y=0.1)
     out_path = out_dir / f'{PD_MT_COMPARISON_COMPACT}.png'
-    fig.savefig(out_path, dpi=300, metadata={'Software': ''})
+    fig.savefig(out_path, dpi=300, metadata={'Software': ''}, bbox_inches='tight', pad_inches=0.1)
     plt.close(fig)
     return str(out_path.relative_to(REPO_ROOT))
 

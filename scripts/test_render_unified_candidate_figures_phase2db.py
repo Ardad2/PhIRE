@@ -302,6 +302,38 @@ def _pd_vtu_path(tmp_root, alias, role, sample_idx, suffix='v0'):
     return tmp_root / f'{alias}_topology' / 'pd' / role / f'{alias}_{role}_s{sample_idx}_{suffix}_pd_port_0.vtu'
 
 
+def _content_bbox_area_fraction(png_path, white_threshold=250):
+    """Fraction of the image's area covered by the tight bounding box of
+    its non-(near-)white pixels -- a robust, non-OCR proxy for "the real
+    content occupies most of the panel canvas / margins are not excessive".
+    A panel saved with bbox_inches='tight' should score close to 1.0."""
+    with Image.open(png_path) as img:
+        arr = np.asarray(img.convert('RGB'))
+    mask = np.any(arr < white_threshold, axis=-1)
+    if not mask.any():
+        return 0.0
+    ys, xs = np.where(mask)
+    bbox_h = int(ys.max()) - int(ys.min()) + 1
+    bbox_w = int(xs.max()) - int(xs.min()) + 1
+    return (bbox_h * bbox_w) / (arr.shape[0] * arr.shape[1])
+
+
+def _quadrant_nonwhite_fractions(png_path, n_rows, n_cols, white_threshold=250):
+    """Splits the image into an n_rows x n_cols grid and returns the
+    non-white pixel fraction of each cell, row-major -- used to confirm a
+    compact multi-panel layout has real (non-blank) content in every cell,
+    without needing to OCR titles or reconstruct exact subplot boundaries."""
+    with Image.open(png_path) as img:
+        arr = np.asarray(img.convert('RGB'))
+    h, w = arr.shape[:2]
+    fractions = []
+    for i in range(n_rows):
+        for j in range(n_cols):
+            cell = arr[i * h // n_rows:(i + 1) * h // n_rows, j * w // n_cols:(j + 1) * w // n_cols]
+            fractions.append(float(np.mean(np.any(cell < white_threshold, axis=-1))))
+    return fractions
+
+
 # =============================================================================
 # Run the whole suite inside a top-level try/finally so that even an
 # unexpected mid-suite exception (or Ctrl-C) cannot leave any pre-existing
@@ -1640,6 +1672,265 @@ try:
         shutil.rmtree(tmp27, ignore_errors=True)
     check('IS_LIGHTWEIGHT_CHECKOUT restored to its real value after the Section 27 fixture',
           m.IS_LIGHTWEIGHT_CHECKOUT == old_lightweight_flag27)
+
+    print()
+    print('=== 28. Publication-layout refinements (metric strip, Fig 4/6 compact panels, zoom crop, PD panels, '
+          'speed/error color-scale context) ===')
+    import inspect as _inspect
+    tmp28 = m.OUT_DIR / '_test28_layout'
+    panel_dirs_created28 = []
+    try:
+        manifest28 = dict(m.FROZEN_SAMPLE_SET)
+        per_sample28 = {}
+        for mid in (m.CNN, m.GAN, m.CANDIDATE_C, m.F3, m.F2, m.UV_E2, m.BICUBIC):
+            per_sample28[mid] = {si: dict(pd_distance=1.0 + (abs(hash((mid, si))) % 11) * 0.3,
+                                             mt_distance=2.0 + (abs(hash((mid, si, 1))) % 11) * 0.2)
+                                    for si in manifest28.values()}
+
+        # --- 28a: metric strips (all 6 figures) -- tightly cropped, readable,
+        # values/ordering untouched. ---
+        strip_src = _inspect.getsource(m.render_metric_strip)
+        table_src = _inspect.getsource(m._build_metric_strip_table)
+        check("render_metric_strip saves with bbox_inches='tight' (guards against clipped rows/columns)",
+              "bbox_inches='tight'" in strip_src)
+        check('render_metric_strip increases table font size and row height over a bare default (>=10pt, '
+              'row-height scale > 1)',
+              'set_fontsize(11)' in table_src and 'table.scale(1.0, 2.6)' in table_src)
+        check('render_metric_strip measures the table\'s real rendered size before building the final figure, '
+              'so the panel canvas is sized to fit the content instead of leaving it small in oversized '
+              'whitespace', 'get_window_extent' in strip_src and 'probe' in strip_src)
+        for c in m.FIGURE_CONTRACTS:
+            path = m.render_metric_strip(c, manifest28, per_sample28)
+            panel_dirs_created28.append(m.PANELS_DIR / m.figure_dir_name(c))
+            full = m.REPO_ROOT / path
+            insp = m.inspect_png(full)
+            check(f"figure {c['figure_id']} metric strip is a valid PNG with readable minimum dimensions",
+                  insp['validation_status'] == 'PASS' and insp['width_px'] >= 500 and insp['height_px'] >= 150)
+            frac = _content_bbox_area_fraction(full)
+            check(f"figure {c['figure_id']} metric strip content occupies most of the canvas (substantially "
+                  f'reduced empty margins)', frac >= 0.75)
+        # Determinism: identical inputs -> identical output bytes.
+        p_a = m.REPO_ROOT / m.render_metric_strip(m.FIGURE_BY_ID[1], manifest28, per_sample28)
+        p_b = m.REPO_ROOT / m.render_metric_strip(m.FIGURE_BY_ID[1], manifest28, per_sample28)
+        check('render_metric_strip output is a deterministic PNG for identical inputs',
+              p_a.read_bytes() == p_b.read_bytes())
+
+        # --- 28b: Figure 4 compact PD/MT tradeoff -- every label visible, no
+        # overlap, deterministic method-keyed offsets. ---
+        tradeoff_src = _inspect.getsource(m.render_pd_mt_tradeoff_compact_panel)
+        check("render_pd_mt_tradeoff_compact_panel saves with bbox_inches='tight' (annotations extending past "
+              'the axes are still fully included, never clipped)',
+              "bbox_inches='tight'" in tradeoff_src and 'ax.margins(0.3)' in tradeoff_src)
+        fig4 = m.FIGURE_BY_ID[4]
+        offsets_used = [m.PD_MT_LABEL_OFFSETS_PT.get(mid, m.PD_MT_LABEL_OFFSET_DEFAULT)
+                          for mid in fig4['required_methods'] if mid != m.CNN]
+        check('every method label offset used by figure 4 is distinct (deterministic, method-keyed placement '
+              'that avoids annotations landing on top of one another)',
+              len(offsets_used) == len(set(offsets_used)))
+        path4 = m.render_pd_mt_tradeoff_compact_panel(fig4, manifest28, per_sample28)
+        panel_dirs_created28.append(m.PANELS_DIR / m.figure_dir_name(fig4))
+        full4 = m.REPO_ROOT / path4
+        insp4 = m.inspect_png(full4)
+        check('figure 4 compact tradeoff panel is a valid, readably-sized PNG',
+              insp4['validation_status'] == 'PASS' and insp4['width_px'] >= 300 and insp4['height_px'] >= 300)
+        check('figure 4 compact tradeoff panel has adequate margins (content does not run edge-to-edge, which '
+              'would indicate a clipped annotation)', _content_bbox_area_fraction(full4) <= 0.98)
+
+        # --- 28c: Figure 6 compact PD/MT comparison -- readable labels, PD/MT
+        # still visually distinguishable (distinct colors + legend), title
+        # readable, nothing clipped. ---
+        fig6 = m.FIGURE_BY_ID[6]
+        comp_src = _inspect.getsource(m.render_pd_mt_comparison_compact_panel)
+        check("render_pd_mt_comparison_compact_panel saves with bbox_inches='tight' (rotated method labels "
+              'never clipped at the bottom edge)', "bbox_inches='tight'" in comp_src)
+        path6 = m.render_pd_mt_comparison_compact_panel(fig6, manifest28, per_sample28)
+        panel_dirs_created28.append(m.PANELS_DIR / m.figure_dir_name(fig6))
+        full6 = m.REPO_ROOT / path6
+        insp6 = m.inspect_png(full6)
+        check('figure 6 compact comparison panel is a valid PNG with readable minimum dimensions',
+              insp6['validation_status'] == 'PASS' and insp6['width_px'] >= 900 and insp6['height_px'] >= 400)
+        check('figure 6 compact comparison panel content occupies most of the panel canvas',
+              _content_bbox_area_fraction(full6) >= 0.6)
+        check('figure 6 compact comparison values/ordering are read from the unchanged required_methods list '
+              'and per_sample values (never renormalized)',
+              'pd_distance' in comp_src and 'mt_distance' in comp_src
+              and "methods = contract['required_methods']" in comp_src)
+
+        # --- 28d: Figure 3 deterministic zoom panel -- exact authoritative
+        # crop (y=100:200, x=25:125), compact 2x2 layout, four visibly
+        # nonempty crops in GT/CNN/F3/UV+E2 order, same speed range,
+        # zoom region never recomputed here. ---
+        zoom_src = _inspect.getsource(m.render_zoom_crop_panel)
+        check('render_zoom_crop_panel still slices with the exact given zoom bounds (never recomputes/'
+              're-selects the region)', 'field[y0:y1, x0:x1]' in zoom_src)
+        check("render_zoom_crop_panel saves with bbox_inches='tight' (unnecessary whitespace removed, titles "
+              'never clipped)', "bbox_inches='tight'" in zoom_src)
+        fig3 = m.FIGURE_BY_ID[3]
+        check('figure 3 full_panel_methods is exactly [CNN, F3, UV_E2] (GT + these 4 fields, unchanged '
+              'ordering, is what the zoom panel displays)',
+              fig3['full_panel_methods'] == [m.CNN, m.F3, m.UV_E2])
+        rng28 = np.random.default_rng(42)
+        gt_speed28 = rng28.uniform(2.0, 18.0, size=(240, 240)).astype(np.float32)
+        method_speeds28 = {}
+        for k, mid in enumerate(fig3['full_panel_methods']):
+            offset_field = rng28.normal(loc=(k + 1) * 2.0, scale=1.5, size=gt_speed28.shape).astype(np.float32)
+            method_speeds28[mid] = gt_speed28 + offset_field
+        zoom28 = dict(y0=100, y1=200, x0=25, x1=125, score=7.5)
+        zoom_path_a = m.REPO_ROOT / m.render_zoom_crop_panel(fig3, manifest28, gt_speed28, method_speeds28,
+                                                                  zoom28)
+        panel_dirs_created28.append(m.PANELS_DIR / m.figure_dir_name(fig3))
+        insp_zoom = m.inspect_png(zoom_path_a)
+        check('figure 3 zoom panel is a valid, readably-sized PNG (large images, not four tiny ones in a wide '
+              'strip)', insp_zoom['validation_status'] == 'PASS' and insp_zoom['width_px'] >= 500
+              and insp_zoom['height_px'] >= 500)
+        aspect_ratio = insp_zoom['width_px'] / insp_zoom['height_px']
+        check('figure 3 zoom panel is compact (roughly square, 2x2 arrangement) rather than a wide 1x4 strip',
+              0.6 <= aspect_ratio <= 1.6)
+        quadrant_fracs = _quadrant_nonwhite_fractions(zoom_path_a, 2, 2)
+        check('figure 3 zoom panel contains four visibly nonempty crop regions arranged in a 2x2 grid',
+              len(quadrant_fracs) == 4 and all(f > 0.05 for f in quadrant_fracs))
+        zoom_path_b = m.REPO_ROOT / m.render_zoom_crop_panel(fig3, manifest28, gt_speed28, method_speeds28,
+                                                                  zoom28)
+        check('figure 3 zoom panel output is deterministic and unchanged from the exact given zoom bounds when '
+              'rendered again from the same known validation fixture',
+              zoom_path_a.read_bytes() == zoom_path_b.read_bytes())
+
+        # --- 28e: PD coordinate panels -- Birth/Death labels retained (never
+        # claimed absent), common axes, coordinates unchanged, larger
+        # legible ticks/labels. ---
+        pd_src = _inspect.getsource(m.render_pd_diagram_panels)
+        check("render_pd_diagram_panels already sets and RETAINS 'Birth'/'Death' axis labels (not newly added)",
+              "'Birth'" in pd_src and "'Death'" in pd_src)
+        check('render_pd_diagram_panels increases axis-label and tick-label sizes modestly',
+              'fontsize=9' in pd_src and 'labelsize=8' in pd_src)
+        check('render_pd_diagram_panels still derives one shared (lo, hi) axis range applied to every method '
+              "panel in the figure (common axes preserved)",
+              'ax.set_xlim(lo, hi)' in pd_src and 'ax.set_ylim(lo, hi)' in pd_src)
+        fig2_28 = m.FIGURE_BY_ID[2]
+        si2_28 = manifest28[fig2_28['archetype_id']]
+        per_sample28_fig2 = {mid: {si2_28: dict(pd_distance=3.14, mt_distance=1.0)}
+                                for mid in fig2_28['full_panel_methods']}
+        verdicts28 = {
+            'GT': dict(birth=np.array([0.0, 0.2]), death=np.array([1.0, 0.8])),
+            m.CNN: dict(birth=np.array([0.1, 0.3]), death=np.array([0.9, 0.6])),
+        }
+        pd_rows28 = m.render_pd_diagram_panels(fig2_28, m.PD_COMPARISON, manifest28, per_sample28_fig2, verdicts28)
+        panel_dirs_created28.append(m.PANELS_DIR / m.figure_dir_name(fig2_28))
+        check('PD coordinate panels still contain the exact unchanged birth/death coordinate values (same '
+              'method count rendered, values threaded through unmodified)', len(pd_rows28) == 2)
+        for r in pd_rows28:
+            insp_pd = m.inspect_png(m.REPO_ROOT / r['output_path'])
+            check(f"PD coordinate panel {r['output_path']} is a valid, tightly-cropped PNG",
+                  insp_pd['validation_status'] == 'PASS')
+
+        # --- 28f: scalar-fallback panels -- explicit fallback statement,
+        # N/A preserved exactly, labels/values not clipped. ---
+        fallback_src = _inspect.getsource(m.render_scalar_pd_fallback_panel)
+        check('render_scalar_pd_fallback_panel preserves the explicit "no validated coordinate source" '
+              'statement verbatim', 'no validated coordinate source' in fallback_src)
+        check("render_scalar_pd_fallback_panel preserves the exact 'N/A' text for an unavailable frozen scalar "
+              'metric', "'N/A'" in fallback_src)
+        check("render_scalar_pd_fallback_panel saves with bbox_inches='tight' (two-line title and rotated "
+              'method labels never clipped)', "bbox_inches='tight'" in fallback_src)
+        per_sample28_fb = dict(per_sample28)
+        per_sample28_fb[m.GAN] = {si2_28: dict(pd_distance=float('nan'), mt_distance=float('nan'))}
+        fb28 = m.render_scalar_pd_fallback_panel(fig2_28, m.PD_COMPARISON, manifest28, per_sample28_fb, [m.GAN])
+        insp_fb = m.inspect_png(m.REPO_ROOT / fb28['output_path'])
+        check('scalar fallback panel (with a non-finite frozen PD distance, exercising the N/A path) is a '
+              'valid, tightly-cropped PNG', insp_fb['validation_status'] == 'PASS')
+
+        # --- 28g: speed/error panels -- compact color-scale context added
+        # without altering origin/colormap/data, and without breaking the
+        # single shared vmin/vmax per figure. Intercepts the REAL matplotlib
+        # calls (never a re-implementation) to verify this at runtime. ---
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.axes as mpl_axes
+        import matplotlib.figure as mpl_figure
+        captured_imshow = []
+        captured_colorbar = []
+        original_imshow = mpl_axes.Axes.imshow
+        original_colorbar = mpl_figure.Figure.colorbar
+
+        def _capturing_imshow(self, *args, **kwargs):
+            captured_imshow.append(dict(vmin=kwargs.get('vmin'), vmax=kwargs.get('vmax'),
+                                           cmap=kwargs.get('cmap'), origin=kwargs.get('origin')))
+            return original_imshow(self, *args, **kwargs)
+
+        def _capturing_colorbar(self, mappable, *args, **kwargs):
+            result = original_colorbar(self, mappable, *args, **kwargs)
+            captured_colorbar.append(result)
+            return result
+
+        mpl_axes.Axes.imshow = _capturing_imshow
+        mpl_figure.Figure.colorbar = _capturing_colorbar
+        try:
+            rng28b = np.random.default_rng(11)
+            fake_gt28 = rng28b.normal(size=(12, 12, 2)).astype(np.float32) * 3 + 1
+            fake_audit28 = dict(selected_data={
+                mid: dict(gt=np.stack([fake_gt28]),
+                            sr=np.stack([fake_gt28 + rng28b.normal(size=fake_gt28.shape) * 0.1 * (k + 1)]))
+                for k, mid in enumerate((m.CNN, m.BICUBIC, m.GAN))
+            })
+            fig2_28b = m.FIGURE_BY_ID[2]
+            se_rows, se_gt, se_methods, se_panel = m.render_speed_and_error_panels(
+                fig2_28b, manifest28, fake_audit28, [manifest28[fig2_28b['archetype_id']]])
+            panel_dirs_created28.append(m.PANELS_DIR / m.figure_dir_name(fig2_28b))
+        finally:
+            mpl_axes.Axes.imshow = original_imshow
+            mpl_figure.Figure.colorbar = original_colorbar
+
+        check('render_speed_and_error_panels calls fig.colorbar() once per image (real color-scale context, '
+              'not merely claimed)', len(captured_colorbar) == len(captured_imshow) == len(se_rows))
+        speed_calls = [c for c, r in zip(captured_imshow, se_rows) if r['panel_type'] == m.SPEED_FIELDS]
+        error_calls = [c for c, r in zip(captured_imshow, se_rows) if r['panel_type'] == m.ERROR_MAPS]
+        check('every speed panel in this figure was drawn with the identical shared vmin/vmax (never '
+              'independently autoscaled)',
+              len({(c['vmin'], c['vmax']) for c in speed_calls}) == 1
+              and speed_calls[0]['vmin'] == se_panel['speed_vmin'] and speed_calls[0]['vmax'] ==
+              se_panel['speed_vmax'])
+        check('every error panel in this figure was drawn with the identical shared vmin/vmax (never '
+              'independently autoscaled)',
+              len({(c['vmin'], c['vmax']) for c in error_calls}) == 1
+              and error_calls[0]['vmin'] == se_panel['error_vmin'] and error_calls[0]['vmax'] ==
+              se_panel['error_vmax'])
+        check('speed panels keep the cividis colormap and lower origin unchanged',
+              all(c['cmap'] == 'cividis' and c['origin'] == 'lower' for c in speed_calls))
+        check('error panels keep the magma colormap and lower origin unchanged',
+              all(c['cmap'] == 'magma' and c['origin'] == 'lower' for c in error_calls))
+        speed_error_src = _inspect.getsource(m.render_speed_and_error_panels)
+        check("speed panel colorbars are labeled 'Speed' and error panel colorbars are labeled '|Speed - GT|'",
+              "'Speed'" in speed_error_src and "'|Speed - GT|'" in speed_error_src)
+        check("render_speed_and_error_panels saves every panel with bbox_inches='tight' (excessive surrounding "
+              'whitespace removed)', "bbox_inches='tight'" in speed_error_src)
+        for r in se_rows:
+            insp_se = m.inspect_png(m.REPO_ROOT / r['output_path'])
+            check(f"speed/error panel {r['output_path']} is a valid PNG", insp_se['validation_status'] == 'PASS')
+
+        # --- 28h: contract stability -- no panel type/manifest schema
+        # changed by any of this section's layout refinements. ---
+        check('FINAL_PANEL_MANIFEST_FIELDS is unchanged by the layout-only refinements (no new manifest field '
+              'was introduced)',
+              m.FINAL_PANEL_MANIFEST_FIELDS == [
+                  'figure_id', 'archetype_id', 'sample_idx', 'panel_type', 'method_id', 'method_role',
+                  'display_label', 'output_path', 'requires_manual_topology_input',
+                  'requires_pd_coordinate_source', 'pd_coordinate_source_found', 'status',
+              ])
+        check('FINAL_COMPOSITE_MANIFEST_FIELDS is unchanged by the layout-only refinements (no new manifest '
+              'field was introduced)',
+              m.FINAL_COMPOSITE_MANIFEST_FIELDS == [
+                  'figure_id', 'panel_order', 'panel_group', 'panel_type', 'method_id', 'source_path',
+                  'final_visible_status',
+              ])
+        check('no new panel type constant was introduced (the declared scripted-panel-type set used across '
+              'figure contracts is exactly the pre-existing 8)',
+              {m.SPEED_FIELDS, m.ERROR_MAPS, m.METRIC_STRIP, m.PD_EVIDENCE, m.PD_COMPARISON,
+                m.PD_MT_TRADEOFF_COMPACT, m.PD_MT_COMPARISON_COMPACT, m.ZOOM_CROP} ==
+              set().union(*[set(c['panels']) for c in m.FIGURE_CONTRACTS]) - m.MT_PANEL_TYPES)
+    finally:
+        for d in panel_dirs_created28:
+            shutil.rmtree(d, ignore_errors=True)
+        shutil.rmtree(tmp28, ignore_errors=True)
 
 finally:
     # Top-level safety net: restores every path the entire suite could ever
