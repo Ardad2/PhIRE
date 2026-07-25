@@ -1980,6 +1980,24 @@ def render_speed_and_error_panels(contract, manifest, audit, ordered_selected):
     return rows, gt_speed, method_speeds, panel
 
 
+def _metric_strip_value_text(value):
+    """Publication-facing formatting for one metric-strip cell. Missing,
+    empty, NaN, or infinite values are always shown as the explicit `N/A`
+    marker -- the same convention already used by the scalar PD-evidence
+    fallback panel -- never the literal `nan`/`inf`/`-inf` Python's `:.2f`
+    format would otherwise print. Every finite numeric value keeps its
+    existing 2-decimal formatting unchanged."""
+    if value is None or value == '':
+        return 'N/A'
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return 'N/A'
+    if not math.isfinite(numeric):
+        return 'N/A'
+    return f'{numeric:.2f}'
+
+
 def _build_metric_strip_table(ax, col_labels, cell_text, n_cols):
     table = ax.table(cellText=cell_text, colLabels=col_labels, rowLabels=['PD', 'MT'], loc='center',
                        cellLoc='center')
@@ -2003,8 +2021,10 @@ def render_metric_strip(contract, manifest, per_sample):
     out_dir.mkdir(parents=True, exist_ok=True)
     n_cols = len(contract['required_methods']) + 1
     col_labels = [GT_DISPLAY_LABEL] + [HUMAN_LABELS[m] for m in contract['required_methods']]
-    cell_text = [['--'] + [f"{per_sample[m][si]['pd_distance']:.2f}" for m in contract['required_methods']],
-                  ['--'] + [f"{per_sample[m][si]['mt_distance']:.2f}" for m in contract['required_methods']]]
+    cell_text = [
+        ['--'] + [_metric_strip_value_text(per_sample[m][si]['pd_distance']) for m in contract['required_methods']],
+        ['--'] + [_metric_strip_value_text(per_sample[m][si]['mt_distance']) for m in contract['required_methods']],
+    ]
 
     # matplotlib's tight-bbox computation includes an Axes' spines/patch at
     # their full nominal extent even when ax.axis('off') is used, so
