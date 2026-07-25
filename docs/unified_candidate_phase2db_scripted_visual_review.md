@@ -1,65 +1,60 @@
 # Phase 2D-B Scripted-Panel Visual Review
 
 The 81 scripted Phase 2D-B panels were reviewed after the authoritative
-Spark `--render-fields` run.
+Spark `--render-fields` run and the publication-layout refinement.
 
 ## Review result
 
 - Figure 1 — global descriptor disagreement:
-  ACCEPTED for scientific content and panel identity; final layout refinement
-  remains pending.
+  ACCEPTED.
 - Figure 2 — GAN/CNN descriptor conflict:
-  ACCEPTED for scientific content and panel identity; final layout refinement
-  remains pending.
+  CONDITIONALLY ACCEPTED. The scientific content and panel identities are
+  correct, but the metric strip currently displays unavailable Bicubic PD
+  and MT entries as `nan`. These entries must be rendered as `N/A` before
+  final scripted-panel acceptance.
 - Figure 3 — F3 versus UV+E2 tradeoff:
-  ACCEPTED for scientific content and panel identity; the deterministic zoom
-  panel should be enlarged or more tightly cropped in the final presentation.
+  ACCEPTED. The deterministic zoom is clearly presented in a 2-by-2 layout.
 - Figure 4 — F2 balanced case:
-  CONDITIONALLY ACCEPTED. The compact PD/MT tradeoff panel contains crowded
-  or clipped annotations and an apparently clipped lower-axis label. This
-  panel should be corrected and reviewed again before final composite
-  acceptance.
+  ACCEPTED. The compact PD/MT tradeoff plot has readable annotations and
+  unclipped axes.
 - Figure 5 — Candidate C continuity:
-  ACCEPTED for scientific content and panel identity; final layout refinement
-  remains pending.
+  ACCEPTED.
 - Figure 6 — global descriptor agreement:
-  ACCEPTED for scientific content and panel identity; the compact PD/MT
-  comparison chart should be enlarged for publication readability.
+  ACCEPTED. The compact PD/MT comparison is sufficiently legible for
+  continued composite development.
 
 ## Checks performed
 
 - Method identities and panel assignments were verified.
 - No blank, duplicated, or visibly misassigned scripted panel was found.
-- Shared speed and error-map scaling appeared visually consistent within each
-  figure and was supported by the generated scale-provenance validation.
+- Shared speed scaling appeared consistent within each figure.
+- Shared error-map scaling appeared consistent within each figure.
+- Speed panels include compact colorbars labeled `Speed`.
+- Error panels include compact colorbars labeled `|Speed - GT|`.
 - Persistence-diagram coordinate panels were clearly distinguished from
   scalar PD-distance fallback evidence.
 - Scalar fallback panels were explicitly labeled as having no validated
   coordinate source and were not presented as genuine persistence diagrams.
-- No superlevel-negated persistence diagram was visibly mixed into a main
+- No superlevel-negated persistence diagram was mixed into a main
   default-sublevel figure.
-- Figure 3's deterministic zoom region was checked at
+- Figure 3's deterministic zoom region was verified at
   `y=100:200, x=25:125`.
-- Titles and method labels were generally clear and consistent.
-- The speed and error fields showed meaningful method-dependent structural
-  differences rather than blank or degenerate results.
+- Persistence-diagram Birth and Death labels, ticks, titles, and distance
+  annotations were readable.
+- Figure 4's compact tradeoff annotations and axis labels were not visibly
+  clipped.
+- Figure 6's compact PD/MT comparison was readable.
+- Metric-strip tables occupied substantially more of their canvases and were
+  generally readable.
 
-## Presentation refinements required before final acceptance
+## Remaining scripted-panel correction
 
-- Enlarge or tightly crop the metric-strip tables. They currently occupy a
-  small fraction of their panel canvases and may be unreadable at paper scale.
-- Correct the annotation and axis-label clipping in Figure 4's compact PD/MT
-  tradeoff panel.
-- Enlarge Figure 6's compact PD/MT comparison chart.
-- Enlarge or more tightly crop Figure 3's zoom-comparison panel.
-- Add explicit `Birth` and `Death` axis labels to the persistence-diagram
-  panels, or provide unambiguous shared axis labels in the final composite.
-- Provide shared colorbars or clearly stated shared numerical ranges for the
-  speed-field and error-map groups in the final composites.
-- Recheck all compact tables, charts, labels, legends, and annotations at the
-  actual intended publication size.
+- Replace non-finite or unavailable metric-strip values such as `nan` with
+  the explicit display text `N/A`.
+- Preserve Ground Truth reference entries as `--`.
+- Rerender and visually recheck Figure 2's metric strip.
 
-The scripted panels are accepted as scientifically valid inputs for continued
-Phase 2D-B work, but final publication-quality acceptance remains conditional
-on the presentation refinements above, completion of the manual merge-tree
-panels, and review of the assembled composites.
+Figures 1, 3, 4, 5, and 6 are accepted as scripted inputs for final composite
+assembly. Figure 2 remains conditionally accepted until its metric-strip
+formatting is corrected. Manual merge-tree panels and final composite review
+remain pending.
