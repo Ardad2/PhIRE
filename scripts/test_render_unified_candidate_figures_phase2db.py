@@ -1715,6 +1715,60 @@ try:
         check('render_metric_strip output is a deterministic PNG for identical inputs',
               p_a.read_bytes() == p_b.read_bytes())
 
+        # --- 28a-bis: metric-strip N/A formatting (never literal nan/inf). ---
+        na_cases = [
+            (None, 'N/A'), ('', 'N/A'), (float('nan'), 'N/A'), (float('inf'), 'N/A'), (float('-inf'), 'N/A'),
+        ]
+        for raw, expected in na_cases:
+            got = m._metric_strip_value_text(raw)
+            check(f'_metric_strip_value_text({raw!r}) renders as the explicit N/A marker, never a literal '
+                  f"nan/inf string", got == expected)
+        finite_cases = [(1.23456, '1.23'), (0.0, '0.00'), (-2.5, '-2.50'), ('3.14159', '3.14')]
+        for raw, expected in finite_cases:
+            got = m._metric_strip_value_text(raw)
+            check(f'_metric_strip_value_text({raw!r}) preserves the exact existing 2-decimal formatting',
+                  got == expected)
+        strip_helper_src = _inspect.getsource(m._metric_strip_value_text)
+        check('_metric_strip_value_text contains no route that ever formats a non-finite value as the literal '
+              "text 'nan', 'inf', '+inf', or '-inf' (every non-finite/missing/empty branch returns the "
+              "explicit N/A marker before any :.2f formatting is applied)",
+              "return 'N/A'" in strip_helper_src
+              and strip_helper_src.count("return 'N/A'") >= 3
+              and 'math.isfinite' in strip_helper_src)
+
+        fig2_na = m.FIGURE_BY_ID[2]
+        si2_na = manifest28[fig2_na['archetype_id']]
+        per_sample28_na = {mid: {si2_na: dict(pd_distance=1.11, mt_distance=2.22)}
+                              for mid in fig2_na['required_methods']}
+        per_sample28_na[m.BICUBIC][si2_na] = dict(pd_distance=float('nan'), mt_distance=float('inf'))
+        per_sample28_na[m.GAN][si2_na] = dict(pd_distance=float('-inf'), mt_distance=None)
+        path_na = m.render_metric_strip(fig2_na, manifest28, per_sample28_na)
+        panel_dirs_created28.append(m.PANELS_DIR / m.figure_dir_name(fig2_na))
+        insp_na = m.inspect_png(m.REPO_ROOT / path_na)
+        check('a metric strip built from a fixture containing NaN/+inf/-inf/None values still renders as a '
+              'valid PNG (never crashes, never leaves a literal nan/inf artifact)',
+              insp_na['validation_status'] == 'PASS')
+        rendered_cell_text = [
+            ['--'] + [m._metric_strip_value_text(per_sample28_na[mid][si2_na]['pd_distance'])
+                       for mid in fig2_na['required_methods']],
+            ['--'] + [m._metric_strip_value_text(per_sample28_na[mid][si2_na]['mt_distance'])
+                       for mid in fig2_na['required_methods']],
+        ]
+        check('the exact cell text the renderer would draw for this fixture is free of any literal nan/inf '
+              'substring',
+              not any('nan' in cell.lower() or 'inf' in cell.lower() for row in rendered_cell_text
+                       for cell in row))
+        check('the same fixture keeps every Ground Truth reference cell as the unchanged "--" marker',
+              rendered_cell_text[0][0] == '--' and rendered_cell_text[1][0] == '--')
+        bicubic_col = 1 + fig2_na['required_methods'].index(m.BICUBIC)
+        cnn_col = 1 + fig2_na['required_methods'].index(m.CNN)
+        gan_col = 1 + fig2_na['required_methods'].index(m.GAN)
+        check('the same fixture renders the NaN/+inf bicubic cells and the -inf/None gan cells as N/A',
+              rendered_cell_text[0][bicubic_col] == 'N/A' and rendered_cell_text[1][bicubic_col] == 'N/A'
+              and rendered_cell_text[0][gan_col] == 'N/A' and rendered_cell_text[1][gan_col] == 'N/A')
+        check('the same fixture leaves the finite cnn cells formatted exactly as before (unchanged 2-decimal '
+              'formatting)', rendered_cell_text[0][cnn_col] == '1.11' and rendered_cell_text[1][cnn_col] == '2.22')
+
         # --- 28b: Figure 4 compact PD/MT tradeoff -- every label visible, no
         # overlap, deterministic method-keyed offsets. ---
         tradeoff_src = _inspect.getsource(m.render_pd_mt_tradeoff_compact_panel)
