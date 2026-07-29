@@ -1,7 +1,7 @@
 # Dataset Generation and Repair Notes
 
-**Last consolidated update:** July 22, 2026  
-**Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C complete, validated on Spark, archived, and checksum-verified. Phase 2D has not yet begun.
+**Last consolidated update:** July 29, 2026  
+**Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. Final human visual review of the six composites, repository commit, and archival/checksum closeout remain to be recorded.
 
 
 ## Purpose
@@ -11765,12 +11765,580 @@ Phase 2C:
   archived
   checksum-verified
 
-Phase 2D:
-  not yet begun
+Phase 2D-A:
+  sample-archetype selection complete
+  six primary samples frozen
+  visual review complete
+  prior phases treated as immutable
+
+Phase 2D-B:
+  scripted panel rendering complete
+  manual merge-tree generation complete
+  six final composites generated and automatically validated
+  final human composite review / commit / archive closeout pending
 ```
 
-The next stage is algorithmic sample-archetype selection and
-publication-quality figure generation. It should treat all Phase-1 through
-Phase-2C artifacts as read-only.
+All Phase-1 through Phase-2D-A protected artifacts remained read-only during
+Phase 2D-B. The final automated immutability record contains 118 protected
+files, all with identical before/after SHA-256 values and status `unchanged`.
 
 ---
+
+# Part XXXIV — Phase 2D-A/2D-B: frozen archetypes and final publication-figure production
+
+## XXXIV.1 Completion status and scope
+
+Phase 2D converted the completed unified benchmark into a frozen,
+publication-oriented qualitative figure set.
+
+The work was divided into two stages:
+
+- **Phase 2D-A:** algorithmic sample-archetype selection, preview generation,
+  and human confirmation of the six primary examples;
+- **Phase 2D-B:** reproducible figure planning, scripted panel rendering,
+  authoritative persistence-diagram source auditing, manual merge-tree panel
+  production, final composite assembly, and validation.
+
+The final `--full` execution ended with:
+
+```text
+RESULT: Phase 2D-B complete. 6 final composite figure(s) written.
+Full finalization exit status: 0
+```
+
+Automated technical validation is complete. The only remaining closeout work
+is final human review of the six composite PNGs, followed by repository commit
+and archive/checksum preservation.
+
+---
+
+## XXXIV.2 Phase 2D-A frozen sample archetypes
+
+The six primary examples were selected from the authoritative 168-sample
+benchmark and then frozen. Alternates were retained only as diagnostics and
+were never silently substituted for a primary sample.
+
+| Figure | Archetype | Frozen sample | Primary purpose |
+|---:|---|---:|---|
+| 1 | `global_descriptor_disagreement` | 120 | Show broad PD/MT disagreement across the principal methods. |
+| 2 | `gan_pd_vs_cnn_mt_conflict` | 34 | Show a direct GAN-PD versus CNN-MT conflict, with Bicubic as a contextual baseline. |
+| 3 | `f3_pd_vs_uv_e2_mt_tradeoff` | 119 | Show the learned F3 PD advantage versus the repaired-E2 MT advantage. |
+| 4 | `f2_balanced_vs_cnn` | 25 | Show the balanced F2 compromise relative to CNN. |
+| 5 | `candidate_c_continuity` | 30 | Preserve continuity with the earlier Candidate-C narrative while placing it in the final descriptor-specific context. |
+| 6 | `global_descriptor_agreement` | 19 | Show an example where the descriptor families align more closely. |
+
+The frozen mapping is enforced by the Phase 2D-B tests. A known alternate
+sample is explicitly rejected rather than accepted as a replacement.
+
+Important Phase 2D-A artifacts include:
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2d/selection/
+ttk_runs_fixed/unified_candidate_analysis/phase2d/previews/
+ttk_runs_fixed/unified_candidate_analysis/phase2d/preview_audit/
+docs/unified_candidate_analysis_phase2d.md
+docs/unified_candidate_phase2d_visual_review.md
+```
+
+---
+
+## XXXIV.3 Phase 2D-B planning contract
+
+The canonical renderer is:
+
+```text
+scripts/render_unified_candidate_figures_phase2db.py
+```
+
+The contract/regression suite is:
+
+```text
+scripts/test_render_unified_candidate_figures_phase2db.py
+```
+
+The final plan contains:
+
+```text
+6 figure plans
+105 manifest rows / planned panels
+81 scripted panel PNGs
+21 manual merge-tree PNG/metadata pairs
+168 reproduced figure-data values
+0 manual topology panels awaiting input
+```
+
+Persistence-diagram source resolution ended in a fully explicit state:
+
+```text
+9  available_validated coordinate panels
+6  unavailable_after_authoritative_spark_audit panels
+0  pending_authoritative_spark_source_discovery panels
+```
+
+Unavailable coordinate panels use a clearly labeled scalar fallback. The
+pipeline never fabricates birth/death coordinates, and the fallback is kept as
+its own panel group rather than being mislabeled as a real diagram.
+
+The main figures use only the authoritative `default_sublevel` filtration
+family. Superlevel-negated sources are recorded in discovery provenance but
+excluded from the main figure family, so cross-family copies are not treated
+as contradictory duplicates.
+
+The deterministic Figure-3 zoom was computed once and propagated to all
+required destinations:
+
+```text
+y = 100:200
+x = 25:125
+score = 36596.48337384819
+```
+
+---
+
+## XXXIV.4 Scripted panel rendering results
+
+The verified scripted pass rendered 81 panels and wrote six figure-level
+scale rows. All scripted panels passed visual review before manual topology
+installation.
+
+Important outputs include:
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/final_figure_plan.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/final_panel_manifest.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/final_composite_manifest.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/pd_source_discovery.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/plan/pd_source_verdicts.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/figure_data/
+ttk_runs_fixed/unified_candidate_analysis/phase2db/panels/
+ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/panel_scale_provenance.csv
+docs/unified_candidate_phase2db_scripted_visual_review.md
+```
+
+Figure 2's metric strip provides a useful concrete check of the final
+formatting and missing-value policy:
+
+```text
+Ground Truth: PD --,   MT --
+Bicubic:      PD N/A,  MT N/A
+CNN:          PD 37.36, MT 6.32
+GAN:          PD 28.91, MT 19.45
+```
+
+`N/A` is used for unavailable/non-finite values; literal `nan`/`inf` strings
+are never rendered in the publication table.
+
+---
+
+## XXXIV.5 Manual merge-tree panel contract
+
+Twenty-one merge-tree panels were required:
+
+```text
+Figure 1 / sample 120: 7 panels
+  GT, CNN, GAN, Candidate C, F3, F2, UV+E2
+
+Figure 2 / sample 34: 4 panels
+  GT, Bicubic, CNN, GAN
+
+Figure 3 / sample 119: 4 panels
+  GT, CNN, F3, UV+E2
+
+Figure 5 / sample 30: 6 panels
+  GT, CNN, Candidate C, F3, F2, UV+E2
+```
+
+The frozen display settings were:
+
+```text
+filtration family:       default sublevel
+merge-tree type:         Join Tree
+persistence threshold:   11.0 absolute
+arc sampling:            10
+arc line size:           3
+node point size:         5
+field colormap:           cividis
+background:              white
+scalar legend:           hidden
+orientation axes:        hidden
+panel size:              1200 x 1200
+Mac renderer:            ParaView 6.1.0
+```
+
+Per-figure shared scalar ranges were:
+
+```text
+Figure 1: [0.004631552681959958, 23.696232135200372]
+Figure 2: [0.0015429837994549844, 49.69148981604192]
+Figure 3: [0.004337943606259474, 24.774924928978656]
+Figure 5: [0.021458192169549858, 37.62227177383977]
+```
+
+The Figure-3 camera/view was first verified manually and then reused as the
+reference style. Merge-tree arcs are embedded in the 2-D scalar-field domain,
+so visual crossings do not imply cycles in the abstract tree. Likewise,
+branches that terminate at the domain boundary are not automatically clipped
+or invalid.
+
+---
+
+## XXXIV.6 Native macOS TTK failure and the stable split-platform workaround
+
+A direct macOS batch approach was attempted first. Figure-1 Ground Truth
+rendered, but Figure-1 CNN crashed after the merge-tree computation with a
+native allocator failure:
+
+```text
+malloc: Incorrect checksum for freed object
+Abort trap: 6
+```
+
+The same CNN input crashed in a fresh one-panel process, showing that the
+problem was input/native-library specific rather than accumulated batch state.
+The project therefore stopped computing topology on macOS.
+
+The stable workflow separated **topology computation** from **rendering**:
+
+1. Compute persistence simplification and Join-tree geometry on Spark/Linux.
+2. Validate and sanitize the resulting VTK geometry.
+3. Transfer only plain VTI/VTU data to the Mac.
+4. Render the scalar field plus solid-black precomputed geometry in ParaView,
+   without loading or invoking TTK.
+
+Spark topology environment:
+
+```text
+Docker image: phire-ttk:latest
+TTK:          1.3.0
+VTK:          9.1.0
+```
+
+Primary Spark-side scripts:
+
+```text
+scripts/phase2db_extract_simplified_mt.py
+scripts/phase2db_sanitize_mt_geometry.py
+scripts/phase2db_extract_all_simplified_mt.sh
+scripts/package_phase2db_mt_inputs.py
+```
+
+The Python TTK wrapper could abort during native object destruction even after
+all files had been written. The extraction script therefore flushes output
+and uses `os._exit(0)` after successful write/readback validation. This is a
+contained teardown workaround, not a substitute for checking the generated
+files.
+
+The sanitizer verifies finite coordinates, expected cell types, valid
+connectivity, and in-domain bounds, then writes stripped display-only files:
+
+```text
+nodes_display.vtu
+arcs_display.vtu
+display_geometry_report.json
+```
+
+All non-rendered point/cell/field arrays are removed to minimize transfer size
+and avoid macOS reader/plugin interactions.
+
+The Figure-5 UV+E2 topology extraction also exposed a thread-sensitive native
+failure at 20 threads. A single-thread retry succeeded and passed the same
+sanitizer/readback checks. This is why single-threaded extraction is the safe
+fallback for a missing or failed panel.
+
+---
+
+## XXXIV.7 Bicubic VTI compatibility repair
+
+The original Figure-2 Bicubic scalar VTI was accepted by host VTK 9.6 but not
+by the Spark container's VTK 9.1 reader. The file had one trailing byte and a
+serialization form that was not portable across the two readers.
+
+It was rewritten host-side as inline Base64 binary with no compression. The
+numeric values were preserved exactly.
+
+Validated rewritten artifact:
+
+```text
+shape:       160 x 160 x 1
+points:      25,600
+cells:       25,281
+speed range: [0.17603544890880585, 23.97262191772461]
+SHA-256:     ec653aa69e02f234c490b3cb6571308d9006fe4d3bd704757a9bee269b52c82b
+```
+
+Repair provenance is retained in:
+
+```text
+bicubic_vti_repair_provenance.json
+bicubic_vti_vtk91_compat_rewrite.json
+```
+
+Bicubic topology metrics remain `N/A`; the VTI repair enabled the qualitative
+field/tree panel and did not invent quantitative PD/MT results.
+
+---
+
+## XXXIV.8 Geometry packaging, transfer, rendering, and QA
+
+The completed Spark geometry archive contained all 21 panels:
+
+```text
+phase2db_mt_precomputed_geometry.tar.gz
+bytes:   24,010
+SHA-256: c71311ce9a754fbd58205cf82fdd7ad1d5f466e94cba4e6ea8763cf465b354a4
+```
+
+The repaired field-input archive was:
+
+```text
+phase2db_mt_batch_inputs_repaired_bicubic.tar.gz
+SHA-256: 71527c4e80d9b48b05c895b5e077bca5023cedefe35ed00f915957055103ce52
+```
+
+On macOS, each of the 21 panels was rendered in a fresh `pvpython` process.
+The OpenVKL startup messages about a missing CPU module were nonfatal: the
+renderer continued, produced the PNG/CSV pair, and exited with status 0.
+
+The renderer initially failed on `ColorBy(proxy, None)` in ParaView 6.1.0.
+Solid coloring was repaired with:
+
+```python
+proxy.ColorArrayName = ["POINTS", ""]
+```
+
+The native-TTK Ground Truth panel and the Spark-precomputed Ground Truth panel
+had different PNG hashes but visually equivalent critical nodes, branch
+connectivity, embedded trajectories, camera, and styling. This established
+cross-workflow visual equivalence before the full batch was accepted.
+
+Final local manual-panel validation:
+
+```text
+LOCAL OUTPUT VALIDATION PASSED
+Validated PNG/CSV pairs: 21
+```
+
+The four QA contact sheets also passed human review. Observed features were
+consistent with the descriptor outputs:
+
+- Figure 1 GAN had a much denser tree than the other methods, without evidence
+  of corruption;
+- Figure 2 showed complete and consistently framed GT/Bicubic/CNN/GAN panels;
+- Figure 3 clearly separated GT, CNN, F3, and UV+E2 topology;
+- Figure 5 showed valid F2/UV+E2 branches reaching the upper domain boundary;
+- no panel contained a scalar legend, orientation axes, clipping, or an
+  incorrect title.
+
+---
+
+## XXXIV.9 Authoritative manual package and repository installation
+
+The authoritative package created on the Mac was:
+
+```text
+phase2db_authoritative_manual_package_20260729.tar.gz
+size:    approximately 13 MiB
+SHA-256: 3d3e5bd3845e3d50362f1717b9bed416283d97d482741d3997ac75d3195721c5
+```
+
+The package contains:
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/
+ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/
+docs/phase2db_manual_topology_qa/
+package_manifest.json
+```
+
+macOS archive metadata produced 172 AppleDouble files (`._*`) during Linux
+extraction. These files doubled wildcard counts but were not scientific data.
+They were removed **only from the temporary staging directory**, after which
+exact file-set validation passed:
+
+```text
+PNG panels:    21
+Metadata CSVs: 21
+Node VTUs:     21
+Arc VTUs:      21
+```
+
+The staged package was then installed into the repository and compared
+byte-for-byte against the validated staging copy. Existing destinations were
+preserved first. The installation record and package manifest are stored in:
+
+```text
+docs/phase2db_manual_topology_qa/authoritative_install_record.txt
+docs/phase2db_manual_topology_qa/authoritative_package_manifest.json
+```
+
+Preserved non-repository backups include:
+
+```text
+~/PhIRE_phase2db_backups/phase2db_staging_before_final_tests_20260729
+~/PhIRE_phase2db_backups/composites_before_full_finalization_20260729
+```
+
+---
+
+## XXXIV.10 Regression, immutability, and finalization results
+
+The first post-install test run had one failure because historical working
+material had been placed under the renderer-reserved `phase2db/_staging/`
+directory. The directory was moved intact outside the repository. The next
+run completed with:
+
+```text
+ALL TESTS PASSED
+Test exit status: 0
+PHASE 2D-B REGRESSION TESTS PASSED
+```
+
+The plan-only pass then reported:
+
+```text
+6 figure plans
+105 planned panels
+0 awaiting manual topology input
+9 PD panels available_validated
+0 PD panels pending authoritative discovery
+6 PD panels unavailable after authoritative Spark audit
+168 figure-data values reproduced within tolerance
+Plan exit status: 0
+```
+
+An assembly-only run generated valid composites but exited with status 1 when
+its report builder received `zoom_result=None`. This was an execution-state
+reporting guard, not a composite-render failure. The canonical `--full` mode
+reran planning, scripted rendering, and assembly in one process with the zoom
+state present and completed successfully.
+
+The final immutability table contains 118 protected files. Every row has:
+
+```text
+status = unchanged
+sha256_before = sha256_after
+```
+
+A one-off checker initially searched for the substring `changed`, which also
+matches the valid word `unchanged`; exact status comparison corrected that
+checker error.
+
+After finalization, `_staging/` was empty and removed. No staging directory
+remains in the repository.
+
+---
+
+## XXXIV.11 Final composite inventory
+
+All six figures have a 300-dpi PNG and a valid one-page raster-panel PDF:
+
+| Figure | PNG dimensions | PNG bytes | PDF bytes | Automated status |
+|---:|---:|---:|---:|---|
+| 1 | 2880 × 5040 | 4,381,068 | 3,872,722 | rendered / valid |
+| 2 | 2880 × 2880 | 1,885,000 | 1,627,366 | rendered / valid |
+| 3 | 2880 × 3600 | 2,620,362 | 2,285,689 | rendered / valid |
+| 4 | 2880 × 2160 | 1,700,751 | 1,484,471 | rendered / valid |
+| 5 | 2880 × 3600 | 3,176,708 | 2,783,015 | rendered / valid |
+| 6 | 2880 × 2880 | 2,707,702 | 2,377,054 | rendered / valid |
+
+Final paths:
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2db/figures/figure_01_global_disagreement.{png,pdf}
+ttk_runs_fixed/unified_candidate_analysis/phase2db/figures/figure_02_gan_cnn_conflict.{png,pdf}
+ttk_runs_fixed/unified_candidate_analysis/phase2db/figures/figure_03_f3_uv_e2_tradeoff.{png,pdf}
+ttk_runs_fixed/unified_candidate_analysis/phase2db/figures/figure_04_f2_balanced.{png,pdf}
+ttk_runs_fixed/unified_candidate_analysis/phase2db/figures/figure_05_candidate_c_continuity.{png,pdf}
+ttk_runs_fixed/unified_candidate_analysis/phase2db/figures/figure_06_global_agreement.{png,pdf}
+```
+
+Validation records:
+
+```text
+ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/final_figure_validation.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/prior_phase_immutability_check.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/figure_data_reproduction.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/panel_validation.csv
+ttk_runs_fixed/unified_candidate_analysis/phase2db/validation/zoom_selection_validation.csv
+```
+
+---
+
+## XXXIV.12 Reproduction protocol
+
+From the Spark repository root:
+
+```bash
+cd ~/PhIRE
+
+# 1. Contract/regression validation
+python3 scripts/test_render_unified_candidate_figures_phase2db.py
+
+# 2. Rebuild the plan and source verdicts
+python3 scripts/render_unified_candidate_figures_phase2db.py --plan-only
+
+# 3. Render the 81 scripted panels and deterministic zoom
+python3 scripts/render_unified_candidate_figures_phase2db.py --render-fields
+
+# 4. Generate/install the 21 manual MT PNG/CSV pairs using the
+#    Spark-precompute -> sanitize -> Mac plain-VTK render workflow documented
+#    above. Verify the package manifest and copy it to:
+#      phase2db/manual_topology_inputs/
+#      phase2db/manual_topology_sources/
+
+# 5. Canonical finalization; preferred over assembly-only mode because it
+#    carries the computed zoom state through report generation.
+python3 scripts/render_unified_candidate_figures_phase2db.py --full
+```
+
+Expected final result:
+
+```text
+RESULT: Phase 2D-B complete. 6 final composite figure(s) written.
+```
+
+The manual topology stage should be considered reproduced only when all 21
+PNG/CSV pairs pass identity, dimensions, threshold, camera, and per-figure
+scalar-range checks, and when the four manual QA contact sheets pass visual
+review.
+
+---
+
+## XXXIV.13 Phase 2D scientific observations
+
+The publication examples reinforce, rather than replace, the benchmark-level
+conclusions:
+
+1. PD and MT preserve different aspects of the wind-speed field and can make
+   sharply different method preferences on the same sample.
+2. GAN can provide strong persistence-diagram agreement while producing a
+   much denser and less favorable merge-tree representation.
+3. F3 preserves the gradient-driven PD side of the tradeoff.
+4. UV+E2 and F1/F2 preserve the repaired-E2 MT side of the tradeoff.
+5. Candidate C remains valuable for continuity with the earlier paper story,
+   but the full ablation evidence does not support treating its local-maxima
+   proxy as the dominant MT mechanism.
+6. A domain-embedded tree should be interpreted by critical nodes,
+   connectivity, and branch placement—not by whether drawn arcs cross in 2-D.
+7. Figure selection is illustrative and sample-specific; it does not create a
+   universal scalar ranking of the methods.
+
+---
+
+## XXXIV.14 Current closeout state
+
+```text
+Phase 2D-A selection:                   complete
+Phase 2D-A preview visual review:       complete
+Phase 2D-B scripted rendering:          complete
+Phase 2D-B manual MT generation:        complete
+Manual MT structural validation:        complete
+Manual MT visual QA:                    complete
+Phase 2D-B regression suite:            complete / all tests passed
+Phase 2D-B final composite generation:  complete
+Final composite automated validation:   complete / 6 of 6
+Final composite human visual review:    pending
+Repository commit:                      pending
+Phase 2D archive/checksum preservation: pending
+```
+

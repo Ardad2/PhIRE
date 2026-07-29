@@ -1,0 +1,275 @@
+{
+  "input": "/inputs/inputs/figure_05/f3_grad_crit.vti",
+  "settings": {
+    "scalar_array": "wind_speed",
+    "pair_type": "EXTREMUM_SADDLE",
+    "pair_type_value": 0,
+    "persistence_threshold": 11.0,
+    "threshold_is_absolute": true,
+    "compute_perturbation": false,
+    "merge_tree_backend": "FTM",
+    "merge_tree_backend_value": 0,
+    "tree_type": "Join",
+    "tree_type_value": 0,
+    "arc_sampling": 10,
+    "with_segmentation": true,
+    "with_normalize": true,
+    "with_advanced_statistics": true,
+    "threads": 20,
+    "vtk_version": "9.1.0"
+  },
+  "input_data": {
+    "vtk_class": "vtkImageData",
+    "points": 25600,
+    "cells": 25281,
+    "point_arrays": [
+      {
+        "name": "wind_speed",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.02145819179713726,
+          33.21504592895508
+        ]
+      },
+      {
+        "name": "wind_speed_Order",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.0,
+          25599.0
+        ]
+      }
+    ],
+    "cell_arrays": []
+  },
+  "simplified_data": {
+    "vtk_class": "vtkImageData",
+    "points": 25600,
+    "cells": 25281,
+    "point_arrays": [
+      {
+        "name": "wind_speed",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.02145819179713726,
+          33.21504592895508
+        ]
+      },
+      {
+        "name": "wind_speed_Order",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.0,
+          25599.0
+        ]
+      }
+    ],
+    "cell_arrays": []
+  },
+  "nodes": {
+    "vtk_class": "vtkUnstructuredGrid",
+    "points": 4,
+    "cells": 4,
+    "point_arrays": [
+      {
+        "name": "NodeId",
+        "components": 1,
+        "tuples": 4,
+        "range": [
+          0.0,
+          3.0
+        ]
+      },
+      {
+        "name": "Scalar",
+        "components": 1,
+        "tuples": 4,
+        "range": [
+          0.02145819179713726,
+          33.21504592895508
+        ]
+      },
+      {
+        "name": "VertexId",
+        "components": 1,
+        "tuples": 4,
+        "range": [
+          8061.0,
+          24928.0
+        ]
+      },
+      {
+        "name": "CriticalType",
+        "components": 1,
+        "tuples": 4,
+        "range": [
+          0.0,
+          3.0
+        ]
+      },
+      {
+        "name": "RegionSize",
+        "components": 1,
+        "tuples": 4,
+        "range": [
+          3489.0,
+          13135.0
+        ]
+      },
+      {
+        "name": "RegionSpan",
+        "components": 1,
+        "tuples": 4,
+        "range": [
+          44.0,
+          65.0
+        ]
+      }
+    ],
+    "cell_arrays": []
+  },
+  "arcs": {
+    "vtk_class": "vtkUnstructuredGrid",
+    "points": 34,
+    "cells": 33,
+    "point_arrays": [
+      {
+        "name": "Scalar",
+        "components": 1,
+        "tuples": 34,
+        "range": [
+          0.02145819179713726,
+          33.21504592895508
+        ]
+      },
+      {
+        "name": "ttkMaskScalarField",
+        "components": 1,
+        "tuples": 34,
+        "range": [
+          0.0,
+          1.0
+        ]
+      }
+    ],
+    "cell_arrays": [
+      {
+        "name": "SegmentationId",
+        "components": 1,
+        "tuples": 33,
+        "range": [
+          0.0,
+          2.0
+        ]
+      },
+      {
+        "name": "upNodeId",
+        "components": 1,
+        "tuples": 33,
+        "range": [
+          2.0,
+          3.0
+        ]
+      },
+      {
+        "name": "downNodeId",
+        "components": 1,
+        "tuples": 33,
+        "range": [
+          0.0,
+          2.0
+        ]
+      },
+      {
+        "name": "RegionSize",
+        "components": 1,
+        "tuples": 33,
+        "range": [
+          3489.0,
+          13135.0
+        ]
+      },
+      {
+        "name": "RegionSpan",
+        "components": 1,
+        "tuples": 33,
+        "range": [
+          44.04542922973633,
+          65.0
+        ]
+      }
+    ]
+  },
+  "segmentation": {
+    "vtk_class": "vtkImageData",
+    "points": 25600,
+    "cells": 25281,
+    "point_arrays": [
+      {
+        "name": "wind_speed",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.02145819179713726,
+          33.21504592895508
+        ]
+      },
+      {
+        "name": "wind_speed_Order",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.0,
+          25599.0
+        ]
+      },
+      {
+        "name": "SegmentationId",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.0,
+          2.0
+        ]
+      },
+      {
+        "name": "RegionSize",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          3489.0,
+          13135.0
+        ]
+      },
+      {
+        "name": "RegionSpan",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          44.04542922973633,
+          65.0
+        ]
+      },
+      {
+        "name": "RegionType",
+        "components": 1,
+        "tuples": 25600,
+        "range": [
+          0.0,
+          1.0
+        ]
+      }
+    ],
+    "cell_arrays": []
+  },
+  "outputs": {
+    "simplified": "simplified_p11.vti",
+    "nodes": "nodes.vtu",
+    "arcs": "arcs.vtu",
+    "segmentation": "segmentation.vti"
+  }
+}

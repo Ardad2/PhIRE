@@ -1,13 +1,13 @@
 # Phase 2D-B: Final Publication-Quality Figure Production
 
 ```
-Phase 2D-B scripted rendering complete.
-Manual topology input and final composite assembly still pending.
+Phase 2D-B complete.
+All final composites and figure-data packages validated.
 ```
 
 ## 1. Scope and frozen inputs
 
-This document reflects a `--render-fields` run. The real Spark arrays (`data_out/`, `data_out_fixed/`) were loaded and audited, and every scripted panel (speed/error fields, metric strips, PD-diagram or scalar-fallback panels, and the deterministic sample-119 zoom crop) was rendered and validated. Manual topology (merge-tree) input and final composite assembly may still be pending -- see Sections 6 and 9.
+This document reflects a completed `--full` run: planning, scripted rendering (`--render-fields`), manual topology input validation, and final composite assembly (`--assemble-composites`) all completed in sequence and passed every required validation. All six final composite figures are rendered and validated; nothing in this run remains lightweight or planning-only.
 
 ## 2. Frozen sample set
 
@@ -73,7 +73,7 @@ Not summarized in this execution_mode's report -- exact PD source discovery/reso
 
 ## 6. Manual topology (merge-tree) requirements
 
-21 manual ParaView/TTK merge-tree panel(s) are required across all figures (Figures 1, 2, 3, 5); 21 are currently missing. Each requires both `manual_topology_inputs/figure_XX/<method_id>_mt.png` and the sibling `_mt_metadata.csv` (schema: figure_id, sample_idx, method_id, source_vtu_path, persistence_threshold, arc_sampling, arc_line_size, camera_or_view_id, scalar_range, image_width, image_height, paraview_version, ttk_version, renderer_type, notes). Default initial settings: persistence_threshold=11.0, arc_sampling=10, arc_line_size=3 -- final metadata must record the actual values used. See `plan/manual_topology_requirements.csv` for the exact per-panel list.
+21 manual ParaView/TTK merge-tree panel(s) are required across all figures (Figures 1, 2, 3, 5); 0 are currently missing. Each requires both `manual_topology_inputs/figure_XX/<method_id>_mt.png` and the sibling `_mt_metadata.csv` (schema: figure_id, sample_idx, method_id, source_vtu_path, persistence_threshold, arc_sampling, arc_line_size, camera_or_view_id, scalar_range, image_width, image_height, paraview_version, ttk_version, renderer_type, notes). Default initial settings: persistence_threshold=11.0, arc_sampling=10, arc_line_size=3 -- final metadata must record the actual values used. See `plan/manual_topology_requirements.csv` for the exact per-panel list.
 
 ## 7. Validation summary
 
@@ -118,6 +118,6 @@ Planning-stage outputs (`ttk_runs_fixed/unified_candidate_analysis/phase2db/`):
 - `logs/unified_candidate_analysis_phase2db.log`
 
 Scripted panels rendered and validated in `--render-fields`: 81 panel file(s) under `panels/**/*.png` (never claimed merely because the directory exists -- counted from `validation/panel_validation.csv`).
-
-Not yet generated (pending manual topology export and `--assemble-composites`): `manual_topology_inputs/**/*`, `figures/**/*`.
+Manual topology inputs validated: 21/21 panel(s) under `manual_topology_inputs/**/*` (see `plan/manual_topology_requirements.csv`).
+Final composite figures assembled and validated: 6/6 under `figures/**/*` (see `validation/final_figure_validation.csv`).
 

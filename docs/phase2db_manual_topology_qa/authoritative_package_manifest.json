@@ -1,0 +1,799 @@
+{
+  "schema_version": 1,
+  "purpose": "Phase 2D-B authoritative manual topology inputs and Spark-precomputed display geometry",
+  "panel_count": 21,
+  "figures": [
+    1,
+    2,
+    3,
+    5
+  ],
+  "persistence_threshold": 11.0,
+  "arc_sampling": 10,
+  "arc_line_size": 3,
+  "image_dimensions": [
+    1200,
+    1200
+  ],
+  "paraview_version": "6.1.0",
+  "ttk_environment": "Spark-TTK-1.3.0-VTK-9.1.0",
+  "panels": [
+    {
+      "figure_id": 1,
+      "sample_idx": 120,
+      "method_id": "GT",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/GT_mt.png",
+        "bytes": 598521,
+        "sha256": "1e12c9cb33b3bb38256bcea4abbde5ccae1899869834e231419ea81d62fe535b"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/GT_mt_metadata.csv",
+        "bytes": 742,
+        "sha256": "e58b01cba37a27b7f082608a6fac4d1ca973cc8c9397c3f53886db6110d8eb5d"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/GT/nodes_display.vtu",
+          "bytes": 1400,
+          "sha256": "133e2401daa294f3b4d9f058358d201812985c3a1297ad297ba0cefaec4a99f2"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/GT/arcs_display.vtu",
+          "bytes": 1583,
+          "sha256": "aa980627859351e188a347f31ffb3e5561721919c4de3f5b59ffe312f3857ef3"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/GT/summary.json",
+          "bytes": 5213,
+          "sha256": "8d8e74d8fd8995b0856ea2f791ca05f9fe22c71e04758721d7a075a24612e02b"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/GT/display_geometry_report.json",
+          "bytes": 1505,
+          "sha256": "ab755a10365f7af9e89ec84640f48cf19366300d175ef5e1b25568b416f7bc0c"
+        }
+      }
+    },
+    {
+      "figure_id": 1,
+      "sample_idx": 120,
+      "method_id": "cnn",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/cnn_mt.png",
+        "bytes": 583205,
+        "sha256": "904515ed017aba9186213b2dc7501833e0e9e55e6b0fc0d27bd9d1ea4bb385e2"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/cnn_mt_metadata.csv",
+        "bytes": 744,
+        "sha256": "5501d18ca3b08701e2d32ccbd42da4a341aa5ef35f818ed3117475ed2d71072c"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/cnn/nodes_display.vtu",
+          "bytes": 1431,
+          "sha256": "a15dc6ca234353fcba2ce47ce08bb210ecf9387eb1141d14a2d32451565b19bf"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/cnn/arcs_display.vtu",
+          "bytes": 1967,
+          "sha256": "34cdc5508a1cea669e0ca84ea74401121c086210521fa867563044eb7ce1d484"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/cnn/summary.json",
+          "bytes": 5234,
+          "sha256": "4fc1da136eb835c83dfffe18f817476bb8139e7c0368d98d9b538797c843390b"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/cnn/display_geometry_report.json",
+          "bytes": 1514,
+          "sha256": "58d66f073424d1bdc8f0b117ed3967a05e4b7185f4be6a7889bc1df19f35b201"
+        }
+      }
+    },
+    {
+      "figure_id": 1,
+      "sample_idx": 120,
+      "method_id": "gan",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/gan_mt.png",
+        "bytes": 833110,
+        "sha256": "ba7fdd3d250ee0aeb60ad60bb437569aac1d9ffbf816b72f8fa70cbffda127b4"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/gan_mt_metadata.csv",
+        "bytes": 744,
+        "sha256": "62da87cfae5918a16ddf7e2d97041162a2edbf9937f02f1ece1bff4028fa9ac7"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/gan/nodes_display.vtu",
+          "bytes": 1584,
+          "sha256": "23940711ff8fa068c393ff64b0f96587731c176f279bff5a7ecc80456d557533"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/gan/arcs_display.vtu",
+          "bytes": 3719,
+          "sha256": "69dbe8d6d418e30897c4407f0f06242407f85832390e3df7a38dcb9de09c5598"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/gan/summary.json",
+          "bytes": 5248,
+          "sha256": "236a5e1ace648c4510a5f856b320fe83d0ddd7da4c4614878adba07fb865d252"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/gan/display_geometry_report.json",
+          "bytes": 1489,
+          "sha256": "127c4827eeaa749e015704a1bd958df9c0d3756664049f54e3cfb13acab3722a"
+        }
+      }
+    },
+    {
+      "figure_id": 1,
+      "sample_idx": 120,
+      "method_id": "candidate_c",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/candidate_c_mt.png",
+        "bytes": 576005,
+        "sha256": "bfb2ad0d82d9c863128518aa0d125d1bbff9fbb222213c0b6cbd8e0bc4e50d09"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/candidate_c_mt_metadata.csv",
+        "bytes": 760,
+        "sha256": "00c26c5632bb935729037ab9f85ab6d69d0600080f733a4fd8b1885c198f50da"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/candidate_c/nodes_display.vtu",
+          "bytes": 1400,
+          "sha256": "76b6c536bb31d9db2a19c94f6085d22bf4ef3be37ff952c943fd88780b5cbd56"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/candidate_c/arcs_display.vtu",
+          "bytes": 1570,
+          "sha256": "453be4a56ad1616cce59f31e7aafac26c44bcf38e445e4e8ea0a3d5d39ed54c2"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/candidate_c/summary.json",
+          "bytes": 5245,
+          "sha256": "52807b9c05fe65cc9ee6fd16509934468ceb626b7ce01820197e711bb3377068"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/candidate_c/display_geometry_report.json",
+          "bytes": 1576,
+          "sha256": "9bee5111f7d43730499846e1503e8d1969f2a5a0c5150fc2b3218cd93330f66d"
+        }
+      }
+    },
+    {
+      "figure_id": 1,
+      "sample_idx": 120,
+      "method_id": "f3_grad_crit",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/f3_grad_crit_mt.png",
+        "bytes": 594779,
+        "sha256": "c57a4c93159bc710f46849ebebe86c480f27c6b17fe38a2504d72293dde9fac8"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/f3_grad_crit_mt_metadata.csv",
+        "bytes": 762,
+        "sha256": "908ca00a7fa861a34bc70acbe69d8ef62276ed9494e269c586c91cd8e516de99"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f3_grad_crit/nodes_display.vtu",
+          "bytes": 1400,
+          "sha256": "3a4e56afccacb92a000f3f492ab41e9621fc374770c60e2906b6b242faa65f76"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f3_grad_crit/arcs_display.vtu",
+          "bytes": 1587,
+          "sha256": "a2b8161129ad55ec00dae5ab07a4e8bb5987603b65f23c2a16340a9478206552"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f3_grad_crit/summary.json",
+          "bytes": 5247,
+          "sha256": "315c539adbd304b599c59caa47e886b6f7347bafc7ec8e1193235f143b9afe97"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f3_grad_crit/display_geometry_report.json",
+          "bytes": 1582,
+          "sha256": "6fc778dd7a28c86614c7d059274104adbd47fc5b11e4a1495b65088af6fa5f9c"
+        }
+      }
+    },
+    {
+      "figure_id": 1,
+      "sample_idx": 120,
+      "method_id": "f2_grad_levelset_e2",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/f2_grad_levelset_e2_mt.png",
+        "bytes": 570322,
+        "sha256": "898a5b58b4b8aa0d2405096eabad5b368e7b67af3fbe56e7b60f2e3e36927cc5"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/f2_grad_levelset_e2_mt_metadata.csv",
+        "bytes": 776,
+        "sha256": "b70279d506e5eff78acd6debb68c9a5c3b83be1a5f52ba0298e3634a15591c93"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f2_grad_levelset_e2/nodes_display.vtu",
+          "bytes": 1399,
+          "sha256": "f0539837287f1a98a64378e3fcd627b0c79bd5eb0ed0d6eff950d4cbc0ef6453"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f2_grad_levelset_e2/arcs_display.vtu",
+          "bytes": 1579,
+          "sha256": "cc3417536d003112047e7c7c0245e7c00b3d2788e8455d26424206c28a319140"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f2_grad_levelset_e2/summary.json",
+          "bytes": 5244,
+          "sha256": "e0bb2baa9d90c58d305efec3a9898c10f7f97f8a94d0ef29b5260f1c0913ab98"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/f2_grad_levelset_e2/display_geometry_report.json",
+          "bytes": 1592,
+          "sha256": "51e33f4ecbcce4c0c7a20596f19ec0ec1934f76b5a7fab6babdd7a704094b223"
+        }
+      }
+    },
+    {
+      "figure_id": 1,
+      "sample_idx": 120,
+      "method_id": "uv_e2",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/uv_e2_mt.png",
+        "bytes": 529822,
+        "sha256": "37faabcb954e6f660532c009ede29c55c03310b95f2dbf5bce85d177973bbf27"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_01/uv_e2_mt_metadata.csv",
+        "bytes": 748,
+        "sha256": "e6cc11be8379b915869b933371f0c57b5e638302f72b7cc4b6b47344f6f3cc28"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/uv_e2/nodes_display.vtu",
+          "bytes": 1400,
+          "sha256": "0977feddb0bddc8441a807139897afae4a559e31149bce623a7eff4d9a3fb6ac"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/uv_e2/arcs_display.vtu",
+          "bytes": 1586,
+          "sha256": "3282e62a44c5f4fef436da3dbfb770d5c97e68c2a8bd6b8731f20f7c27d4f22a"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/uv_e2/summary.json",
+          "bytes": 5236,
+          "sha256": "6e1d66ee139f981b63da2f1b7b2af18568f5a4c578cf2ee0209aee3bee0bd480"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_01/uv_e2/display_geometry_report.json",
+          "bytes": 1535,
+          "sha256": "109ee147724ab99e84d6497c399f0d45c9d65de2213e26dfca73f7fdadd3e2b9"
+        }
+      }
+    },
+    {
+      "figure_id": 2,
+      "sample_idx": 34,
+      "method_id": "GT",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/GT_mt.png",
+        "bytes": 531728,
+        "sha256": "6f4e3a7077848e5283b38e62919ce767fa8f73bd19d72dbc0b337d393e9da69a"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/GT_mt_metadata.csv",
+        "bytes": 741,
+        "sha256": "d92712efc450b529c4f3affcd344e31893a12e75145ce3bc0dc67284bd0a45c8"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/GT/nodes_display.vtu",
+          "bytes": 1397,
+          "sha256": "e2895fc253191b9878596607bc6835c4873610e6b551ed6729a521cb1c6bcc02"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/GT/arcs_display.vtu",
+          "bytes": 1586,
+          "sha256": "cf58039540c6195e4ef521b7486bb154d9ac04617cafa9a79bea8da1cbc5ccfa"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/GT/summary.json",
+          "bytes": 5215,
+          "sha256": "4a40ee5eefebfd72c6929f116bd72846f906bda17fcae86b308b3c22c576c90a"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/GT/display_geometry_report.json",
+          "bytes": 1531,
+          "sha256": "8cef0b5ec0d415f59f9c1928e22e42248c26fc91f16c6832d77a530f2fb24b88"
+        }
+      }
+    },
+    {
+      "figure_id": 2,
+      "sample_idx": 34,
+      "method_id": "bicubic",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/bicubic_mt.png",
+        "bytes": 315983,
+        "sha256": "7488ab57dffa12be3970f9e0844544f0e058f0a929897ca9efc31ce7b8164c69"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/bicubic_mt_metadata.csv",
+        "bytes": 751,
+        "sha256": "a95cce9448e5acccc9c91b9ee3641b7cdb366a1ccaaa42721764f53b24df9d78"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/bicubic/nodes_display.vtu",
+          "bytes": 1401,
+          "sha256": "a83591db105e6f9977cc5919d47fcf934c3bcc799ae6b997ad175ac4abf3dab4"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/bicubic/arcs_display.vtu",
+          "bytes": 1591,
+          "sha256": "493b29ae5fe53f4919c84dbe34aa7749802c277ebde903650f7980ea38913036"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/bicubic/summary.json",
+          "bytes": 6531,
+          "sha256": "449c5d10acfde29f19bb89b9e26f22c6bafdd950ea0415583135cce45d3db1e8"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/bicubic/display_geometry_report.json",
+          "bytes": 1558,
+          "sha256": "95281cc9e04ea17d660df264e296594408fe9fd3b078f2318e4dfcf2611ef1af"
+        }
+      }
+    },
+    {
+      "figure_id": 2,
+      "sample_idx": 34,
+      "method_id": "cnn",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/cnn_mt.png",
+        "bytes": 290696,
+        "sha256": "b7db4ab06a958dbd5b93eeef80cf2654a0bae7891ea7bfae7c99040b0ce9b7de"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/cnn_mt_metadata.csv",
+        "bytes": 743,
+        "sha256": "95060bfd66fe114732ca1bfd3d76bf6e6012e40a50ef17c5631406047304acfe"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/cnn/nodes_display.vtu",
+          "bytes": 1396,
+          "sha256": "4625c559faf121f9749fd54bc30259dd278bdf4961f1db93defbd6c28ab4412b"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/cnn/arcs_display.vtu",
+          "bytes": 1586,
+          "sha256": "f91d52648c7a30a2cd5db669ea825a115e58512909a6e1b8c29bcf72490fc194"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/cnn/summary.json",
+          "bytes": 5248,
+          "sha256": "ab2107dbca88e15986731186b7685ceeefa6071c9d75cff14e10a35c3ea62c87"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/cnn/display_geometry_report.json",
+          "bytes": 1523,
+          "sha256": "b0fc06a0a29b6a1a0fa165d37d8338857159ac7185b9e25a00700c5f0eb3ccc3"
+        }
+      }
+    },
+    {
+      "figure_id": 2,
+      "sample_idx": 34,
+      "method_id": "gan",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/gan_mt.png",
+        "bytes": 442172,
+        "sha256": "cb711b1291725eef8e3a7bfdfdceae9a9f844b9277cafb5aa33ab0c8672b8d95"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_02/gan_mt_metadata.csv",
+        "bytes": 743,
+        "sha256": "3134e5c7e38dba9b5662496a1382fd037420dbbd5f2c52ca5d3e029241bf1cac"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/gan/nodes_display.vtu",
+          "bytes": 1398,
+          "sha256": "5e63e78ae8b2b997bc7350c4a620b9a2b949bdc0c6fc11bca8088806277841a1"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/gan/arcs_display.vtu",
+          "bytes": 1587,
+          "sha256": "8964adf0fe9645f866c84c1881a1eed22c51d8ac83fea96e886133af393a027e"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/gan/summary.json",
+          "bytes": 5251,
+          "sha256": "d2ce68b9f84557b3c4d2703725d0b1c4a512a7bd45008af794c3a6476ade75e2"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_02/gan/display_geometry_report.json",
+          "bytes": 1511,
+          "sha256": "804258a4b9d3b838c62ccb6094703472a0997ba1771a72a6b79c634399070f0f"
+        }
+      }
+    },
+    {
+      "figure_id": 3,
+      "sample_idx": 119,
+      "method_id": "GT",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/GT_mt.png",
+        "bytes": 590191,
+        "sha256": "d17996a4adc0e92955c2e3b741568629cabb1d9256dab64fc360b1d0a0e239f0"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/GT_mt_metadata.csv",
+        "bytes": 742,
+        "sha256": "a2bc1ac5670bd131c9b5cbaebbb401bd01783e55bdc889c6cab48bc992c0dd82"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/GT/nodes_display.vtu",
+          "bytes": 1404,
+          "sha256": "39e7a7a00e7fee023ede521b36a151b980c330217f11824d931bd1cbaaab4d88"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/GT/arcs_display.vtu",
+          "bytes": 1584,
+          "sha256": "df56c3328d09ffdd54eb16a0e703e3c912122c9d9ae9e9084c9921d8f93f7a37"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/GT/summary.json",
+          "bytes": 5232,
+          "sha256": "2aa78c4cd3d0e5d3d43936aaf26fb05a55eb8cc8351ac690914c28048e7e71bf"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/GT/display_geometry_report.json",
+          "bytes": 1520,
+          "sha256": "13ecb62af383e2adcd1bb5acd0d51766af6b65428d9358bb35f8cdf0e7627364"
+        }
+      }
+    },
+    {
+      "figure_id": 3,
+      "sample_idx": 119,
+      "method_id": "cnn",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/cnn_mt.png",
+        "bytes": 548681,
+        "sha256": "ec205a3be435755af0a24c720eae7224b2bba69201b11517e34708b1b76eb730"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/cnn_mt_metadata.csv",
+        "bytes": 744,
+        "sha256": "a24383d4a753d57b73e3b235214f7c1b3107279592f85b2063cac4346b405c46"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/cnn/nodes_display.vtu",
+          "bytes": 1403,
+          "sha256": "cb1e00be7a4624b552fba0b06f096f7928e02ccbd94a6de9d716d11e04074a3e"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/cnn/arcs_display.vtu",
+          "bytes": 1589,
+          "sha256": "b7228ab1d2911674a50f8260196cb6a44b0e6b1c2f8c6c0e584b18a57d2972a6"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/cnn/summary.json",
+          "bytes": 5234,
+          "sha256": "ffa0fe8cfe24d446a7b6fce44c967d8797d0bf366382df1d4d0b20cd7d15dde9"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/cnn/display_geometry_report.json",
+          "bytes": 1523,
+          "sha256": "6b08b3d20654938a3821d92000bfbe0e5411e8ff8732d7f8e291db102d44c629"
+        }
+      }
+    },
+    {
+      "figure_id": 3,
+      "sample_idx": 119,
+      "method_id": "f3_grad_crit",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/f3_grad_crit_mt.png",
+        "bytes": 581776,
+        "sha256": "2460bb22d63b0cd4aa55188baede8154efe1c8f218a2629a0ca2aceb4c6dc14b"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/f3_grad_crit_mt_metadata.csv",
+        "bytes": 762,
+        "sha256": "2d3ec53dc607258011958e03fd07e928556ed6611df7fffcb11f0019d4182980"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/f3_grad_crit/nodes_display.vtu",
+          "bytes": 1400,
+          "sha256": "f54aeb2e3ba292e7d34a80d7339e1f0b68d3c5d1a91c280e70749343092f667f"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/f3_grad_crit/arcs_display.vtu",
+          "bytes": 1588,
+          "sha256": "2d400b6a3636c6b00bd80e59e71d38c7076fa6737e3eb5e07131712823edb89b"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/f3_grad_crit/summary.json",
+          "bytes": 5243,
+          "sha256": "a7ac9943bc8a432b2b7b2c17c0f0986634155721f722c79c5c0ca991d33c9108"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/f3_grad_crit/display_geometry_report.json",
+          "bytes": 1584,
+          "sha256": "02a07676a34aff8da49fbe1caccbd5bd90a9d26b7997c45fb711e62255c87f7f"
+        }
+      }
+    },
+    {
+      "figure_id": 3,
+      "sample_idx": 119,
+      "method_id": "uv_e2",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/uv_e2_mt.png",
+        "bytes": 498291,
+        "sha256": "d863ee45ee195202b7e5ede72898053515e56ccf82a9a015dddd601bdd5dd172"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_03/uv_e2_mt_metadata.csv",
+        "bytes": 748,
+        "sha256": "ec91f924317fe65331a172d9096d59d1749859a96d07804af43521c0919d6395"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/uv_e2/nodes_display.vtu",
+          "bytes": 1376,
+          "sha256": "b575beb00d03437e47ab8a687a9c08f1d95cfbf68d36dc75407e42a3b37e37d8"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/uv_e2/arcs_display.vtu",
+          "bytes": 1580,
+          "sha256": "35b1ca7e4cf127e8053f5bb0546e9fe6d25ee36dd7daae891f703db0d4bf9ab2"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/uv_e2/summary.json",
+          "bytes": 5240,
+          "sha256": "7cfbbd6779ef2ecbae3cd03ae7d182e7ee9f038f8ca0a2607bed4de3df1a9d94"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_03/uv_e2/display_geometry_report.json",
+          "bytes": 1550,
+          "sha256": "978ce65c8d6b36e6f0732c87da68e4483c2d4f7e6cad8999824cf3d58450a695"
+        }
+      }
+    },
+    {
+      "figure_id": 5,
+      "sample_idx": 30,
+      "method_id": "GT",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/GT_mt.png",
+        "bytes": 696526,
+        "sha256": "1595c0eb3c6b814e5403ec494f5823e0f84d87240f969f674ecf410df534ac79"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/GT_mt_metadata.csv",
+        "bytes": 740,
+        "sha256": "3c51f1192c8f935c1b12eaf498c7248f6c67bd82db0a4d36eda8a7322baac574"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/GT/nodes_display.vtu",
+          "bytes": 1522,
+          "sha256": "6a5f4b8b1a485a34ae40666d49eda7d9465a5e20dc3c79e03883272f0d924e0c"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/GT/arcs_display.vtu",
+          "bytes": 2603,
+          "sha256": "c9a339c312add1080cf0da2377d735ddfd38aeaa1e2c9f8927419b621cc78efa"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/GT/summary.json",
+          "bytes": 5236,
+          "sha256": "97b37e512147d771d40c2fa0ae0de21336bc6798f68daf2d1dd61f979cb2dd42"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/GT/display_geometry_report.json",
+          "bytes": 1508,
+          "sha256": "e7d4c53e3c294f7c3c577979762bdfce7fb8c4ba5d4733fc02063151f713c403"
+        }
+      }
+    },
+    {
+      "figure_id": 5,
+      "sample_idx": 30,
+      "method_id": "cnn",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/cnn_mt.png",
+        "bytes": 397256,
+        "sha256": "e667c1a35aa8020a2f21b4bdfab51c09a287aec9a321792d4286cf72af9b67c0"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/cnn_mt_metadata.csv",
+        "bytes": 742,
+        "sha256": "0c7009d8c739555a434ecc45421f980f823a8ee9533518af88f9c77ed761a84c"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/cnn/nodes_display.vtu",
+          "bytes": 1402,
+          "sha256": "ce70e01c7b446b95ac16d0642fbef7a0d5bee0ee2d65c591bb89932266f35766"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/cnn/arcs_display.vtu",
+          "bytes": 1590,
+          "sha256": "d4b433ee5b5ab944a314ce50f6fb5a3e47005f3c0097aa2b2b97af6d28c414c1"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/cnn/summary.json",
+          "bytes": 5249,
+          "sha256": "fee62f1eadf0e7f236baf01e6b6b7b4c17fbdee3666e4e6519c7360d499d6bca"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/cnn/display_geometry_report.json",
+          "bytes": 1525,
+          "sha256": "8c314061e4eb4ad7a0236e9f42fc3d5ee5fae478c5d89c5768b5168b4ceb4e56"
+        }
+      }
+    },
+    {
+      "figure_id": 5,
+      "sample_idx": 30,
+      "method_id": "candidate_c",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/candidate_c_mt.png",
+        "bytes": 588857,
+        "sha256": "9848468e81c7c0a73d00827b7d51f1e7ed6ea29dc4cd1e80e88d1198c57f2247"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/candidate_c_mt_metadata.csv",
+        "bytes": 758,
+        "sha256": "4e1386099220b00575346b0f7777bc6d717357d4148b26461317b272cad257e2"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/candidate_c/nodes_display.vtu",
+          "bytes": 1431,
+          "sha256": "80c7ddbeee8b558a1a15a66e76694ba75a6dbd2ab486092fdc144318857de9eb"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/candidate_c/arcs_display.vtu",
+          "bytes": 1923,
+          "sha256": "bccb14038c5e75007429a451803782828e97055f03440aa99a1faeac6cdbc21c"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/candidate_c/summary.json",
+          "bytes": 5243,
+          "sha256": "2192a8df63af9cb921076d6d07d6cfe23e56629f94d91a109bbeece4845919e9"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/candidate_c/display_geometry_report.json",
+          "bytes": 1566,
+          "sha256": "5ca9535eba73790e2bcc1dae9c2b781152bffd67a5fd8371a66a0003115c3ec7"
+        }
+      }
+    },
+    {
+      "figure_id": 5,
+      "sample_idx": 30,
+      "method_id": "f3_grad_crit",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/f3_grad_crit_mt.png",
+        "bytes": 623394,
+        "sha256": "86b7910f54219d5b736d6159efce8721026d8e1541d0616ab2a362314f9d807d"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/f3_grad_crit_mt_metadata.csv",
+        "bytes": 760,
+        "sha256": "0c6f61274252339e04b9e221d84455b78420941f0eecf8eb43fb7f6dc4025070"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f3_grad_crit/nodes_display.vtu",
+          "bytes": 1430,
+          "sha256": "651f58fe7a367b83a361b4c62593a71ed36685f5a92966ce0267eb63f3c16b3d"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f3_grad_crit/arcs_display.vtu",
+          "bytes": 1937,
+          "sha256": "780e8329cf11829c2a97ac91fcc53c3892c0f0bfa1136c6e96f40db78c7e4588"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f3_grad_crit/summary.json",
+          "bytes": 5213,
+          "sha256": "60f38ce75e5584d3483b57cc7e34eb1816918df9b653ff6f8817e8333e460783"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f3_grad_crit/display_geometry_report.json",
+          "bytes": 1585,
+          "sha256": "3198036c8ed48719a693502276cbf6fef68cb94e8859a3ad4b309e40987e9647"
+        }
+      }
+    },
+    {
+      "figure_id": 5,
+      "sample_idx": 30,
+      "method_id": "f2_grad_levelset_e2",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/f2_grad_levelset_e2_mt.png",
+        "bytes": 588642,
+        "sha256": "b1745a6953abf7b98fb2006ea827dc7ed0afc3e35090d348f2f49e97994653a4"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/f2_grad_levelset_e2_mt_metadata.csv",
+        "bytes": 774,
+        "sha256": "de2caa1988accd4c4f834abf96fb9a7eff56bd942d9f224fa1b569e4d7ec9b43"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f2_grad_levelset_e2/nodes_display.vtu",
+          "bytes": 1431,
+          "sha256": "479f0460763942ba6217df7f6db8537e22d1e42e484459347e22605021b5296b"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f2_grad_levelset_e2/arcs_display.vtu",
+          "bytes": 1911,
+          "sha256": "c6b17991414901ab7789c61d56632106752a06066faf1df9e0517bb710d38287"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f2_grad_levelset_e2/summary.json",
+          "bytes": 5244,
+          "sha256": "f2d97206bcd4b230fd580097d90b6853af5805eeff07ac4466dd1a43aba387be"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/f2_grad_levelset_e2/display_geometry_report.json",
+          "bytes": 1594,
+          "sha256": "1dfe0f23ba4068357269fd9360a2da734326c2c8133bebedcee109eb46c8b955"
+        }
+      }
+    },
+    {
+      "figure_id": 5,
+      "sample_idx": 30,
+      "method_id": "uv_e2",
+      "png": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/uv_e2_mt.png",
+        "bytes": 569347,
+        "sha256": "8bbcfe0b4ecffef8a5f7a0217fa6475f15a08687b2b31c99766e2e00acff30a1"
+      },
+      "metadata": {
+        "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_inputs/figure_05/uv_e2_mt_metadata.csv",
+        "bytes": 746,
+        "sha256": "22f32345a02d221d5fba4b629611ba685e26003a5159c3521e57c5b8c0c63894"
+      },
+      "geometry": {
+        "nodes_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/uv_e2/nodes_display.vtu",
+          "bytes": 1427,
+          "sha256": "7144f7d6668fbf75f4369081c59620440c636e817d07403284310b495e3d7923"
+        },
+        "arcs_display.vtu": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/uv_e2/arcs_display.vtu",
+          "bytes": 1941,
+          "sha256": "ab04bedbe4db501f787436999a11f076b6fdf9c93c177990cfd3eda7c72c42e1"
+        },
+        "summary.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/uv_e2/summary.json",
+          "bytes": 5185,
+          "sha256": "26c772e2bf6e6d57b72280e554400679ea0c6b414ed7969ae611e70fd27985b8"
+        },
+        "display_geometry_report.json": {
+          "path": "ttk_runs_fixed/unified_candidate_analysis/phase2db/manual_topology_sources/figure_05/uv_e2/display_geometry_report.json",
+          "bytes": 1537,
+          "sha256": "47c453cc854020845f382d5e7c5d67c439e7d3761cadbf9918b42902c6eb79b9"
+        }
+      }
+    }
+  ]
+}
