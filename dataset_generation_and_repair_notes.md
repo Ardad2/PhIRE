@@ -1,7 +1,7 @@
 # Dataset Generation and Repair Notes
 
 **Last consolidated update:** September 7, 2026  
-**Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. Final human visual review of the six composites, repository commit, and archival/checksum closeout remain to be recorded.
+**Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. The corrected persistence-diagram distance layer has now also completed an independent GUDHI audit across all 8,568 GT-SR comparisons with 8,568 PASS, zero mismatches/errors, exact bottleneck agreement, and maximum aggregate W2 discrepancy 1.0178524689763435e-12. The GUDHI persistence-distance audit is now fully preserved with an exported environment, version manifest, per-artifact SHA-256 manifest, and a hash-frozen archive. Final human visual review of the six composites and any separate repository/figure archival tasks should still be recorded independently.
 
 
 ## Purpose
@@ -13657,7 +13657,7 @@ the TTK persistence-diagram artifacts that will be supplied to GUDHI.
 
 ---
 
-## XXXV.12 Exhaustive 8,568-comparison GUDHI run — launched
+## XXXV.12 Exhaustive 8,568-comparison GUDHI run — completed / PASS
 
 After the preflight passed, the exhaustive numerical cross-check was launched
 inside a persistent `tmux` session named:
@@ -13672,8 +13672,8 @@ Session creation:
 tmux new -s gudhi_full
 ```
 
-The numerical run uses the same isolated environment and clears inherited
-Python path variables before execution:
+The numerical run used the isolated micromamba environment and explicitly
+cleared inherited Python path variables:
 
 ```bash
 export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
@@ -13696,11 +13696,10 @@ echo "full GUDHI exit status = $STATUS"
 ```
 
 The run is resume-safe: already-recorded `(run, sample)` keys are skipped if
-the command is restarted.
+the command is restarted. This means an SSH/VS Code disconnect does not
+require discarding completed comparisons.
 
-### Progress monitoring
-
-The safest lightweight progress checks are:
+### Progress monitoring used during the run
 
 ```bash
 wc -l "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv"
@@ -13718,32 +13717,211 @@ Because the CSV has one header row:
 completed comparisons = CSV line count - 1
 ```
 
-Final completion should therefore produce:
-
-```text
-8,568 data rows + 1 header = 8,569 lines
-```
-
-### Progress snapshot recorded on September 7, 2026
-
-Shortly after launch:
+An early snapshot was:
 
 ```text
 103 /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full.csv
 ```
 
-Therefore, at this documentation snapshot:
+which corresponded to 102 completed comparisons.
+
+The final line count was:
 
 ```text
-completed GUDHI comparisons: 102 / 8,568
-full numerical sweep status: running
-final PASS/MISMATCH/ERROR counts: pending
-final maximum numerical discrepancies: pending
+8569 /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full.csv
 ```
 
-No final conclusion should be drawn from this intermediate line count alone.
-The authoritative exhaustive result will be the completed CSV plus
-`gudhi_crosscheck_full_summary.txt` and the independent integrity check.
+which is exactly:
+
+```text
+8,568 data rows + 1 header row
+```
+
+### Final runtime / terminal status
+
+The final progress line was:
+
+```text
+progress canonical_index=8568/8568 attempted=8568 pass=8568 mismatch=0 error=0 elapsed=3672.9s
+```
+
+The run therefore completed all 8,568 canonical comparisons in approximately:
+
+```text
+3,672.9 s
+= 61.215 min
+= 1 h 1 min 12.9 s
+```
+
+The shell exit status was:
+
+```text
+full GUDHI exit status = 0
+```
+
+### Authoritative final summary
+
+Command:
+
+```bash
+cat "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt"
+```
+
+Observed output:
+
+```text
+GUDHI FULL-SWEEP CROSS-CHECK SUMMARY
+================================================================================
+expected comparisons: 8568
+rows in GUDHI CSV:     8568
+unique (run,sample):   8568
+PASS rows:             8568
+MISMATCH rows:         0
+ERROR rows:            0
+max |delta dB_all|:    0
+max |delta W2_all|:    1.0178524689763435e-12
+abs tolerance:         1e-10
+rel tolerance:         1e-12
+
+OVERALL: PASS
+```
+
+### Numerical interpretation
+
+The exhaustive result is stronger than the pilot:
+
+```text
+Aggregate bottleneck:
+    comparisons checked: 8,568
+    maximum |ours - GUDHI|: 0
+    exact agreement on every comparison
+
+Aggregate W2:
+    comparisons checked: 8,568
+    maximum |ours - GUDHI|: 1.0178524689763435e-12
+    tolerance: abs=1e-10, rel=1e-12
+    all 8,568 comparisons PASS
+```
+
+The maximum W2 discrepancy is many orders of magnitude smaller than the
+scientific scale of the distances and is consistent with ordinary
+floating-point differences between independent optimization/aggregation
+implementations. It is also comfortably inside the fixed audit tolerance.
+
+The bottleneck result is especially strong: the aggregate bottleneck values
+agreed **exactly for every one of the 8,568 comparisons**.
+
+---
+
+## XXXV.12A Independent post-hoc CSV integrity check — completed / PASS
+
+A second check was run directly on the completed CSV rather than relying only
+on the validator's own summary. This independently verifies row count,
+uniqueness, status distribution, finiteness, and discrepancy statistics.
+
+Command:
+
+```bash
+python3 - <<'PY'
+import csv
+import math
+import os
+from collections import Counter
+
+p = os.path.expandvars(
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv"
+)
+
+with open(p, newline="") as f:
+    rows = list(csv.DictReader(f))
+
+keys = [(r["run"], int(r["sample"])) for r in rows]
+statuses = Counter(r["status"] for r in rows)
+
+print("rows:", len(rows))
+print("unique (run,sample):", len(set(keys)))
+print("duplicate rows:", len(rows) - len(set(keys)))
+print("statuses:", statuses)
+
+for col in [
+    "abs_diff_bottleneck_all",
+    "abs_diff_w2_all",
+]:
+    vals = [
+        float(r[col])
+        for r in rows
+        if r[col] not in ("", None)
+    ]
+
+    finite = [v for v in vals if math.isfinite(v)]
+
+    print()
+    print(col)
+    print("  values:", len(vals))
+    print("  finite:", len(finite))
+    print("  nonfinite:", len(vals) - len(finite))
+    print("  max:", max(finite) if finite else None)
+    print("  mean:", sum(finite) / len(finite) if finite else None)
+
+assert len(rows) == 8568
+assert len(set(keys)) == 8568
+assert statuses.get("ERROR", 0) == 0
+assert statuses.get("MISMATCH", 0) == 0
+assert statuses.get("PASS", 0) == 8568
+
+print()
+print("=" * 80)
+print("INDEPENDENT CSV INTEGRITY CHECK: PASS")
+print("=" * 80)
+PY
+```
+
+Observed output:
+
+```text
+rows: 8568
+unique (run,sample): 8568
+duplicate rows: 0
+statuses: Counter({'PASS': 8568})
+
+abs_diff_bottleneck_all
+  values: 8568
+  finite: 8568
+  nonfinite: 0
+  max: 0.0
+  mean: 0.0
+
+abs_diff_w2_all
+  values: 8568
+  finite: 8568
+  nonfinite: 0
+  max: 1.0178524689763435e-12
+  mean: 9.090871016858297e-15
+
+================================================================================
+INDEPENDENT CSV INTEGRITY CHECK: PASS
+================================================================================
+```
+
+This independent check establishes:
+
+```text
+rows:                    8,568
+unique comparison keys:  8,568
+duplicate rows:           0
+PASS:                     8,568
+MISMATCH:                 0
+ERROR:                    0
+nonfinite discrepancy values: 0
+```
+
+It also quantifies the typical W2 disagreement:
+
+```text
+mean |delta W2_all| = 9.090871016858297e-15
+```
+
+which is close to machine-precision-scale numerical variation.
 
 ---
 
@@ -13801,7 +13979,7 @@ required for validating the corrected distance implementation itself.
 
 ---
 
-## XXXV.14 Current status at the time of this update
+## XXXV.14 Final status — PD distance-computation audit closed
 
 ```text
 Historical TTK PD metric audit:            complete
@@ -13817,29 +13995,547 @@ GUDHI syntax check of full validator:       complete / PASS
 GUDHI synthetic cross-check:               complete / PASS
 GUDHI CNN sample-0 D0/D1 cross-check:      complete / PASS
 GUDHI full-source preflight:               complete / PASS (8,568 / 8,568)
-GUDHI full 8,568-comparison cross-check:   RUNNING
-Progress snapshot:                         102 / 8,568 comparisons recorded
+GUDHI full 8,568-comparison cross-check:   complete / PASS
+GUDHI full-sweep exit status:              0
+GUDHI independent CSV integrity check:     complete / PASS
 
-Final GUDHI summary/integrity check:        pending full-sweep completion
-Full GUDHI checksum/archive closeout:      pending full-sweep completion
+Full-sweep rows:                            8,568
+Unique (run,sample):                       8,568
+Duplicate rows:                            0
+PASS rows:                                 8,568
+MISMATCH rows:                             0
+ERROR rows:                                0
+
+max |delta dB_all|:                        0
+mean |delta dB_all|:                       0
+max |delta W2_all|:                        1.0178524689763435e-12
+mean |delta W2_all|:                       9.090871016858297e-15
+
+Distance-computation audit conclusion:     CLOSED / VALIDATED
+Checksum/archive preservation:             complete / SHA-256 frozen
 ```
 
-### Required closeout once the sweep finishes
+The remaining checksum/archive step is a **preservation task**, not an open
+numerical-validation question.
 
-Do not replace the pending status above with a final PASS until all of the
-following are observed:
+---
+
+## XXXV.15 Final scientific interpretation of the GUDHI audit
+
+The completed audit supports the following precise claim:
+
+> Given the same finite TTK-extracted `D0` and `D1` persistence points, the
+> project's corrected persistence-diagram bottleneck implementation and its
+> order-2 Wasserstein implementation with `L_infinity` ground metric agree
+> with independent GUDHI implementations across all 8,568 GT-SR comparisons.
+> Aggregate bottleneck distance agrees exactly in every comparison. Aggregate
+> `W_2` differs by at most `1.0178524689763435e-12`, with a mean absolute
+> difference of `9.090871016858297e-15`, and all comparisons pass the fixed
+> numerical tolerances.
+
+This provides a strong independent verification chain:
 
 ```text
-rows in GUDHI CSV:      8,568
-unique (run,sample):    8,568
-MISMATCH rows:          0
-ERROR rows:             0
-OVERALL:                PASS
+PD artifact/schema audit
+    17,136 / 17,136 VTUs valid
+            |
+            v
+analytical synthetic unit tests
+            PASS
+            |
+            v
+custom full canonical sweep
+    8,568 comparisons
+    mathematical invariants PASS
+            |
+            v
+independent GUDHI pilot
+    synthetic cases + CNN sample 0
+            PASS
+            |
+            v
+full GUDHI source preflight
+    8,568 / 8,568 resolved
+            PASS
+            |
+            v
+full independent GUDHI numerical comparison
+    8,568 PASS
+    0 mismatch
+    0 error
+            |
+            v
+independent completed-CSV integrity check
+            PASS
 ```
 
-The exact maximum bottleneck and Wasserstein discrepancies must be copied from
-the completed summary rather than inferred from the pilot.
+The corrected PD **distance-computation layer** can therefore be treated as
+validated and closed for the current project.
 
-After that, run the integrity and SHA256-freeze commands already documented in
-XXXV.8, record their outputs here, and treat the corrected PD
-distance-computation audit as closed.
+### Important scope boundary
+
+This conclusion does **not** convert the historical TTK
+`WassersteinMetric="2"` values into the corrected bottleneck/W2 values. The
+historical metric remains a provenance artifact and should retain its corrected
+historical description.
+
+It also does not claim that GUDHI independently regenerated the persistence
+pairs from the scalar field. In this audit, TTK generated the persistence
+pairs and GUDHI independently validated the distances between those fixed
+pairs. That separation is intentional and scientifically useful because it
+isolates the layer that had been in question.
+
+---
+
+## XXXV.16 Complete clean-room reproduction protocol for the GUDHI validation
+
+The following protocol is the compact future-facing sequence for reproducing
+the independent distance audit from the already-generated fixed TTK PD
+artifacts.
+
+### 1. Define the audit root
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+export PHIRE="$HOME/PhIRE"
+
+test -d "$AUDIT/recompute_pd"
+test -d "$PHIRE/ttk_runs_fixed"
+echo "Audit and PhIRE roots found"
+```
+
+### 2. Verify architecture and micromamba
+
+```bash
+uname -m
+micromamba --version
+micromamba info
+```
+
+Validated platform:
+
+```text
+linux-aarch64
+micromamba 2.3.3
+```
+
+### 3. Create the isolated environment if it does not already exist
+
+```bash
+micromamba create -n gudhi-audit -c conda-forge \
+    python=3.12 \
+    gudhi \
+    pot \
+    numpy \
+    scipy \
+    vtk \
+    -y
+```
+
+### 4. Prevent contamination from unrelated Python environments
+
+If a normal project `.venv` is active:
+
+```bash
+deactivate
+```
+
+Then:
+
+```bash
+unset PYTHONPATH
+unset PYTHONHOME
+```
+
+Use `PYTHONNOUSERSITE=1` for every GUDHI audit Python invocation.
+
+### 5. Verify the isolated environment
+
+```bash
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python - <<'PY'
+import sys
+import platform
+import numpy
+import scipy
+import vtk
+import gudhi
+import ot
+
+print("Python:", sys.executable)
+print("Architecture:", platform.machine())
+print("NumPy:", numpy.__version__)
+print("SciPy:", scipy.__version__)
+print("VTK:", vtk.vtkVersion.GetVTKVersion())
+print("GUDHI:", gudhi.__version__)
+print("POT:", ot.__version__)
+PY
+```
+
+The validated full-sweep environment included:
+
+```text
+Python executable:
+/home/adadhwal/micromamba/envs/gudhi-audit/bin/python
+
+GUDHI: 3.13.0
+NumPy: 2.5.3
+SciPy: 1.18.0
+VTK: 9.7.0
+```
+
+The earlier pilot used slightly older NumPy/SciPy/VTK package revisions in the
+same named environment, but both pilot and full sweep used GUDHI 3.13.0 and
+passed. Preserve the exported environment file/checksums for the exact final
+state.
+
+### 6. Syntax-check the validator
+
+```bash
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python -m py_compile \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.py"
+
+echo "exit status = $?"
+```
+
+Required:
+
+```text
+exit status = 0
+```
+
+### 7. Run source-path preflight
+
+```bash
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    --canonical-csv "$AUDIT/recompute_pd/canonical_pd_full_sweep.csv" \
+    --output "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    --summary "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    --preflight \
+    2>&1 | tee "$AUDIT/recompute_pd/gudhi_crosscheck_full_preflight.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "preflight exit status = $STATUS"
+```
+
+Required:
+
+```text
+Rows: 8568
+Resolved: 8568
+Errors: 0
+PREFLIGHT RESULT: PASS
+preflight exit status = 0
+```
+
+### 8. Run the exhaustive numerical comparison
+
+For a long SSH session, use `tmux`:
+
+```bash
+tmux new -s gudhi_full
+```
+
+Inside the tmux shell:
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+
+unset PYTHONPATH
+unset PYTHONHOME
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    --canonical-csv "$AUDIT/recompute_pd/canonical_pd_full_sweep.csv" \
+    --output "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    --summary "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    --progress-every 10 \
+    2>&1 | tee -a "$AUDIT/recompute_pd/gudhi_crosscheck_full.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "full GUDHI exit status = $STATUS"
+```
+
+Detach from tmux using:
+
+```text
+Ctrl-B, then D
+```
+
+Reattach with:
+
+```bash
+tmux attach -t gudhi_full
+```
+
+### 9. Verify completion
+
+```bash
+wc -l "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv"
+```
+
+Required:
+
+```text
+8569 <path>/gudhi_crosscheck_full.csv
+```
+
+Then:
+
+```bash
+cat "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt"
+```
+
+Required validated result:
+
+```text
+expected comparisons: 8568
+rows in GUDHI CSV:     8568
+unique (run,sample):   8568
+PASS rows:             8568
+MISMATCH rows:         0
+ERROR rows:            0
+max |delta dB_all|:    0
+max |delta W2_all|:    1.0178524689763435e-12
+abs tolerance:         1e-10
+rel tolerance:         1e-12
+OVERALL: PASS
+```
+
+### 10. Run the independent CSV integrity check
+
+Use the exact post-hoc checker recorded in XXXV.12A.
+
+Required result:
+
+```text
+rows: 8568
+unique (run,sample): 8568
+duplicate rows: 0
+statuses: Counter({'PASS': 8568})
+
+abs_diff_bottleneck_all:
+  nonfinite: 0
+  max: 0.0
+  mean: 0.0
+
+abs_diff_w2_all:
+  nonfinite: 0
+  max: 1.0178524689763435e-12
+  mean: 9.090871016858297e-15
+
+INDEPENDENT CSV INTEGRITY CHECK: PASS
+```
+
+### 11. Freeze exact environment and versions — completed
+
+Commands:
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+
+micromamba env export -n gudhi-audit \
+    > "$AUDIT/recompute_pd/gudhi-audit-environment.yml"
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit python - <<'PY' \
+    > "$AUDIT/recompute_pd/gudhi_versions.txt"
+import sys
+import platform
+import numpy
+import scipy
+import vtk
+import gudhi
+import ot
+
+print("Python:", sys.version.replace("\n", " "))
+print("Executable:", sys.executable)
+print("Architecture:", platform.machine())
+print("NumPy:", numpy.__version__)
+print("SciPy:", scipy.__version__)
+print("VTK:", vtk.vtkVersion.GetVTKVersion())
+print("GUDHI:", gudhi.__version__)
+print("POT:", ot.__version__)
+PY
+
+cat "$AUDIT/recompute_pd/gudhi_versions.txt"
+```
+
+Observed final environment:
+
+```text
+Python: 3.12.14 (main, Sep  2 2026, 23:29:55) [GCC 15.3.0]
+Executable: /home/adadhwal/micromamba/envs/gudhi-audit/bin/python
+Architecture: aarch64
+NumPy: 2.5.3
+SciPy: 1.18.0
+VTK: 9.7.0
+GUDHI: 3.13.0
+POT: 0.9.7.post1
+```
+
+This is the environment state associated with the completed 8,568-comparison exhaustive run.
+
+### 12. Freeze SHA-256 checksums — completed
+
+Command:
+
+```bash
+sha256sum \
+    "$AUDIT/recompute_pd/canonical_pd_pilot.py" \
+    "$AUDIT/recompute_pd/canonical_pd_full_sweep.csv" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_pilot.py" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_pilot.log" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.log" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full_preflight.log" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    "$AUDIT/recompute_pd/gudhi-audit-environment.yml" \
+    "$AUDIT/recompute_pd/gudhi_versions.txt" \
+    > "$AUDIT/recompute_pd/gudhi_distance_audit_final_sha256.txt"
+```
+
+Observed SHA-256 values:
+
+```text
+04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6c  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py
+df3b3859db28e45dd4920590deab19468c5f0d36fb572d80a9a7366ed9efae9d  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_full_sweep.csv
+f9697c0e8b95d3c916bf8ed345131dcb528e00220e9890b736ed887b73bb1d91  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_pilot.py
+54a467d30002c456a5e5e65b6eb0bc140b53983c9a6c401ae0d452701206d591  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_pilot.log
+22ced40ddec79e87e97e2ac36776076dbd35a5987c34c18c6a7fca95130d63bc  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full.py
+7336c77277cd4b866f0bfc8ce06754c014f3601774cc383d8d257feb54c9b6d1  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full.csv
+3627b5bd75f3eb898c17040e87cf4462b3c9887fc55fb3a9e06c7c9db5ba2cb7  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full.log
+3b7f3e0d0ae1ad09d52f288472df984ed970f72be287b13fcbc65ae9a72ee884  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full_preflight.log
+17a85d3acabce739f638b7aebb1f26e53927b1304494955523b48567155226c1  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full_summary.txt
+b35f5f0c6c5a3503519fff5984e61204f57960183ab3275d0c3df427610ed04b  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi-audit-environment.yml
+d13ae742d7bddd470ad09e67e1bbaffca67e32386ef84d40a31947b8720ed3c8  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_versions.txt
+```
+
+Checksum manifest:
+
+```text
+$AUDIT/recompute_pd/gudhi_distance_audit_final_sha256.txt
+```
+
+### 13. Create frozen audit archive — completed
+
+Commands:
+
+```bash
+cd "$AUDIT"
+
+tar -czf \
+    gudhi_distance_audit_20260907.tar.gz \
+    recompute_pd/canonical_pd_pilot.py \
+    recompute_pd/canonical_pd_full_sweep.csv \
+    recompute_pd/gudhi_crosscheck_pilot.py \
+    recompute_pd/gudhi_crosscheck_pilot.log \
+    recompute_pd/gudhi_crosscheck_full.py \
+    recompute_pd/gudhi_crosscheck_full.csv \
+    recompute_pd/gudhi_crosscheck_full.log \
+    recompute_pd/gudhi_crosscheck_full_preflight.log \
+    recompute_pd/gudhi_crosscheck_full_summary.txt \
+    recompute_pd/gudhi-audit-environment.yml \
+    recompute_pd/gudhi_versions.txt \
+    recompute_pd/gudhi_distance_audit_final_sha256.txt
+
+sha256sum gudhi_distance_audit_20260907.tar.gz \
+    > gudhi_distance_audit_20260907.tar.gz.sha256
+```
+
+Observed archive SHA-256:
+
+```text
+dcbca5cc3f34fbe54faa809e1ca964c2662976bb624dc30dc0dbd503816ffc8d  gudhi_distance_audit_20260907.tar.gz
+```
+
+Archive paths:
+
+```text
+$AUDIT/gudhi_distance_audit_20260907.tar.gz
+$AUDIT/gudhi_distance_audit_20260907.tar.gz.sha256
+```
+
+Strictly speaking, the archive is not filesystem-immutable merely because it exists. It is a frozen/content-addressable audit snapshot because its exact SHA-256 digest has been recorded; any byte-level modification changes that digest.
+
+### 14. Final verification commands
+
+Verify all individual audit artifacts:
+
+```bash
+sha256sum -c \
+    "$AUDIT/recompute_pd/gudhi_distance_audit_final_sha256.txt"
+```
+
+Expected: every listed artifact reports `OK`.
+
+Verify the archive hash:
+
+```bash
+cd "$AUDIT"
+sha256sum -c gudhi_distance_audit_20260907.tar.gz.sha256
+```
+
+Expected:
+
+```text
+gudhi_distance_audit_20260907.tar.gz: OK
+```
+
+Verify archive readability and inventory:
+
+```bash
+tar -tzf "$AUDIT/gudhi_distance_audit_20260907.tar.gz"
+```
+
+Expected inventory includes all scripts, logs, CSVs, summary, environment/version files, and the checksum manifest listed above.
+
+These checks are mechanical preservation verification. They do not change the scientific conclusion, which was already established by the completed GUDHI sweep and independent CSV integrity check.
+
+---
+
+## XXXV.17 Final takeaway for the corrected PD metric
+
+The historical TTK PD values were not the intended bottleneck metric and should remain clearly separated from the corrected analysis.
+
+The corrected analysis now has the following completed validation and preservation record:
+
+```text
+17,136 / 17,136 PD VTUs structurally valid
+8,568 / 8,568 canonical comparisons valid
+analytic unit tests PASS
+global d_B <= W_2 invariants PASS
+
+independent GUDHI synthetic pilot PASS
+independent GUDHI real sample pilot PASS
+8,568 / 8,568 GUDHI source mappings PASS
+8,568 / 8,568 exhaustive GUDHI numerical comparisons PASS
+
+0 duplicate rows
+0 mismatches
+0 errors
+0 nonfinite discrepancy values
+
+exact aggregate bottleneck agreement
+max aggregate W2 difference = 1.0178524689763435e-12
+mean aggregate W2 difference = 9.090871016858297e-15
+
+independent completed-CSV integrity check PASS
+
+final environment exported
+exact package versions recorded
+11 core artifacts SHA-256 frozen
+audit archive created
+archive SHA-256 =
+dcbca5cc3f34fbe54faa809e1ca964c2662976bb624dc30dc0dbd503816ffc8d
+```
+
+Accordingly, the **corrected persistence-diagram distance-computation audit is numerically complete, independently validated, and preservation-frozen**.
+
+The only recommended final mechanical action is to run the two `sha256sum -c` commands and the `tar -tzf` inventory check above. Once those report cleanly, the preservation closeout is verified in the same manner a future auditor would use.
+
