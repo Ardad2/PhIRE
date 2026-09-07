@@ -1,6 +1,6 @@
 # Dataset Generation and Repair Notes
 
-**Last consolidated update:** July 29, 2026  
+**Last consolidated update:** September 7, 2026  
 **Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. Final human visual review of the six composites, repository commit, and archival/checksum closeout remain to be recorded.
 
 
@@ -13534,19 +13534,312 @@ if __name__ == "__main__":
 
 ---
 
-## XXXV.11 Current status at the time of this update
+## XXXV.11 GUDHI exhaustive-source preflight — completed / PASS
+
+Before launching the exhaustive numerical comparison, the validator was run in
+`--preflight` mode. This stage performs **no GUDHI distance computation**. Its
+purpose is to verify that every frozen canonical `(run, sample)` row resolves
+unambiguously to exactly one GT and one SR TTK persistence-diagram VTU under
+the corresponding authoritative `ttk_runs_fixed/<run>/` root.
+
+The environment was kept isolated from the ordinary project virtual
+environment. A previously active `.venv` caused an unrelated
+`sitecustomize` import of `huggingface_hub`; the audit was therefore run after
+deactivating that environment and clearing inherited Python path variables:
+
+```bash
+deactivate  # only if a regular .venv is currently active
+
+unset PYTHONPATH
+unset PYTHONHOME
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python - <<'PY'
+import sys
+import gudhi
+import numpy
+import scipy
+import vtk
+
+print("Python:", sys.executable)
+print("GUDHI:", gudhi.__version__)
+print("NumPy:", numpy.__version__)
+print("SciPy:", scipy.__version__)
+print("VTK:", vtk.vtkVersion.GetVTKVersion())
+print("Environment OK")
+PY
+```
+
+Observed clean audit environment:
+
+```text
+Python: /home/adadhwal/micromamba/envs/gudhi-audit/bin/python
+GUDHI: 3.13.0
+NumPy: 2.5.3
+SciPy: 1.18.0
+VTK: 9.7.0
+Environment OK
+```
+
+The full validator also passed Python syntax compilation:
+
+```bash
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python -m py_compile \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.py"
+
+echo "exit status = $?"
+```
+
+Observed:
+
+```text
+exit status = 0
+```
+
+### Exact preflight command
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+
+unset PYTHONPATH
+unset PYTHONHOME
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    --canonical-csv "$AUDIT/recompute_pd/canonical_pd_full_sweep.csv" \
+    --output "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    --summary "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    --preflight \
+    2>&1 | tee "$AUDIT/recompute_pd/gudhi_crosscheck_full_preflight.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "preflight exit status = $STATUS"
+```
+
+### Observed preflight result
+
+```text
+Rows: 8568
+preflight 250/8568 resolved=250 errors=0
+...
+preflight 8500/8568 resolved=8500 errors=0
+preflight 8568/8568 resolved=8568 errors=0
+
+Resolved: 8568
+Errors:   0
+Elapsed:  17.24 s
+PREFLIGHT RESULT: PASS
+preflight exit status = 0
+```
+
+### Interpretation
+
+The result establishes deterministic artifact correspondence for the complete
+canonical sweep:
+
+```text
+canonical rows:                 8,568
+resolved GT persistence VTUs:   8,568
+resolved SR persistence VTUs:   8,568
+missing/ambiguous comparisons:  0
+```
+
+Equivalently, every frozen comparison has exactly one GT/SR PD pair available
+for the independent GUDHI check. This is important because the validator is
+designed to fail rather than guess when multiple candidate persistence
+diagrams remain after conservative path filtering.
+
+This preflight does **not** validate the numerical distances by itself. It
+validates the mapping between the frozen canonical comparison manifest and
+the TTK persistence-diagram artifacts that will be supplied to GUDHI.
+
+---
+
+## XXXV.12 Exhaustive 8,568-comparison GUDHI run — launched
+
+After the preflight passed, the exhaustive numerical cross-check was launched
+inside a persistent `tmux` session named:
+
+```text
+gudhi_full
+```
+
+Session creation:
+
+```bash
+tmux new -s gudhi_full
+```
+
+The numerical run uses the same isolated environment and clears inherited
+Python path variables before execution:
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+
+unset PYTHONPATH
+unset PYTHONHOME
+
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    --canonical-csv "$AUDIT/recompute_pd/canonical_pd_full_sweep.csv" \
+    --output "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    --summary "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    --progress-every 10 \
+    2>&1 | tee -a "$AUDIT/recompute_pd/gudhi_crosscheck_full.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "full GUDHI exit status = $STATUS"
+```
+
+The run is resume-safe: already-recorded `(run, sample)` keys are skipped if
+the command is restarted.
+
+### Progress monitoring
+
+The safest lightweight progress checks are:
+
+```bash
+wc -l "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv"
+```
+
+and:
+
+```bash
+tail -40 "$AUDIT/recompute_pd/gudhi_crosscheck_full.log"
+```
+
+Because the CSV has one header row:
+
+```text
+completed comparisons = CSV line count - 1
+```
+
+Final completion should therefore produce:
+
+```text
+8,568 data rows + 1 header = 8,569 lines
+```
+
+### Progress snapshot recorded on September 7, 2026
+
+Shortly after launch:
+
+```text
+103 /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/gudhi_crosscheck_full.csv
+```
+
+Therefore, at this documentation snapshot:
+
+```text
+completed GUDHI comparisons: 102 / 8,568
+full numerical sweep status: running
+final PASS/MISMATCH/ERROR counts: pending
+final maximum numerical discrepancies: pending
+```
+
+No final conclusion should be drawn from this intermediate line count alone.
+The authoritative exhaustive result will be the completed CSV plus
+`gudhi_crosscheck_full_summary.txt` and the independent integrity check.
+
+---
+
+## XXXV.13 Exact role of TTK versus GUDHI in this validation
+
+The exhaustive GUDHI audit **does not recompute persistent homology directly
+from the scalar `.vti` wind-speed fields**.
+
+The data path is:
+
+```text
+scalar wind-speed field (.vti)
+        |
+        | ttkPersistenceDiagramCmd -a wind_speed
+        v
+TTK persistence diagram (.vtu)
+        |
+        | canonical read_pd()
+        | - remove PairIdentifier == -1 display-diagonal cell
+        | - retain finite D0 / D1 persistence pairs
+        | - reconstruct (birth, death)
+        v
+NumPy D0 and D1 arrays of [birth, death] points
+        |
+        +-----------------------------+
+        |                             |
+        v                             v
+custom distance implementation       GUDHI
+        |                             |
+        +---------- compare ----------+
+```
+
+Thus:
+
+1. **TTK supplies the persistence pairs.**
+2. The same finite TTK-extracted `D0` and `D1` point sets are supplied to both
+   distance implementations.
+3. **GUDHI does not read the original `.vti` field in this audit.**
+4. GUDHI is being used specifically as an independent implementation of the
+   distance calculation, not as an independent persistence-diagram extractor.
+
+The question being tested is therefore:
+
+> Given the same finite persistence points, are the project's explicit
+> bottleneck and `W_2` distance calculations numerically correct?
+
+The audit deliberately holds the persistence diagrams fixed so that any
+agreement or disagreement isolates the **distance-computation layer**.
+
+A separate future experiment could run a GUDHI cubical-complex persistence
+pipeline directly from the scalar wind-speed arrays and compare its
+persistence pairs with TTK's pairs. That would answer a different question
+about persistence-diagram extraction and convention matching; it is not
+required for validating the corrected distance implementation itself.
+
+---
+
+## XXXV.14 Current status at the time of this update
 
 ```text
 Historical TTK PD metric audit:            complete
+Historical TTK "2" interpretation:         complete
 Corrected d_B / W2 definitions:            complete
 PD VTU structural audit:                   complete (17,136 / 17,136 valid)
 Custom analytic unit tests:                complete / PASS
 Custom full 8,568-comparison sweep:        complete / frozen
+
 GUDHI isolated ARM64 environment:          complete
+GUDHI environment contamination check:     resolved
+GUDHI syntax check of full validator:       complete / PASS
 GUDHI synthetic cross-check:               complete / PASS
 GUDHI CNN sample-0 D0/D1 cross-check:      complete / PASS
-GUDHI full-source preflight:               next execution step
-GUDHI full 8,568-comparison cross-check:   next execution step
-Full GUDHI checksum/archive closeout:      pending completion of full sweep
+GUDHI full-source preflight:               complete / PASS (8,568 / 8,568)
+GUDHI full 8,568-comparison cross-check:   RUNNING
+Progress snapshot:                         102 / 8,568 comparisons recorded
+
+Final GUDHI summary/integrity check:        pending full-sweep completion
+Full GUDHI checksum/archive closeout:      pending full-sweep completion
 ```
 
+### Required closeout once the sweep finishes
+
+Do not replace the pending status above with a final PASS until all of the
+following are observed:
+
+```text
+rows in GUDHI CSV:      8,568
+unique (run,sample):    8,568
+MISMATCH rows:          0
+ERROR rows:             0
+OVERALL:                PASS
+```
+
+The exact maximum bottleneck and Wasserstein discrepancies must be copied from
+the completed summary rather than inferred from the pilot.
+
+After that, run the integrity and SHA256-freeze commands already documented in
+XXXV.8, record their outputs here, and treat the corrected PD
+distance-computation audit as closed.
