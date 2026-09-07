@@ -12342,3 +12342,1211 @@ Repository commit:                      pending
 Phase 2D archive/checksum preservation: pending
 ```
 
+
+---
+
+# Part XXXV — Persistence-diagram distance correction and independent GUDHI verification
+
+**Audit update date:** September 7, 2026  
+**Audit root:** `/home/adadhwal/phire_runtime_audit_20260809_221548`  
+**Repository root:** `/home/adadhwal/PhIRE`
+
+## XXXV.1 Purpose and relationship to the historical notes
+
+This section records the later persistence-diagram (PD) metric audit that was not yet incorporated into the consolidated notes above. It preserves the historical record while documenting the corrected distance definitions, the independently implemented GUDHI cross-check, and the exact commands used for reproduction.
+
+This section **supersedes earlier descriptions in these notes that treated the historical TTK `pd_distance` as bottleneck distance**. The later source/API audit established that the historical values were produced by TTK's effective `WassersteinMetric="2"` configuration rather than by the explicitly intended bottleneck configuration. Those historical values remain useful for provenance, but they should not be labeled as bottleneck distance in the final scientific results.
+
+The corrected PD metrics are defined explicitly as:
+
+```text
+1. Persistence-diagram bottleneck distance d_B
+   - birth/death ground metric: L_infinity
+   - standard matching to the diagonal
+
+2. Order-2 Wasserstein distance W_2
+   - Wasserstein exponent q = 2
+   - birth/death ground metric: L_infinity
+   - standard matching to the diagonal
+```
+
+For a persistence point `x=(b,d)` and `y=(b',d')`:
+
+```text
+real-to-real cost:
+    c(x,y) = max(|b-b'|, |d-d'|)
+
+real-to-diagonal cost:
+    c(x, Delta) = (d-b)/2
+```
+
+Dimension-wise finite-diagram distances are combined as:
+
+```text
+d_B_all = max(d_B_D0, d_B_D1)
+W_2_all = sqrt(W_2_D0^2 + W_2_D1^2)
+```
+
+The single nonfinite/global min-max pair is excluded from the finite-diagram distances and recorded separately.
+
+---
+
+## XXXV.2 What data enter the corrected distance computation
+
+The corrected metric audit does **not** ask GUDHI to recompute persistence from the scalar `.vti` field.
+
+The data flow is:
+
+```text
+fixed scalar wind-speed field (.vti)
+        |
+        | TTK ttkPersistenceDiagramCmd
+        v
+TTK persistence diagram (.vtu)
+        |
+        | canonical read_pd() parser
+        | - exclude PairIdentifier == -1 synthetic display diagonal
+        | - keep finite PairType 0 and 1 pairs separately
+        | - Birth = Birth array
+        | - Death = Birth + Persistence
+        | - keep the one nonfinite/global pair separate
+        v
+NumPy birth/death arrays
+        |
+        +--------------------------+
+        |                          |
+        v                          v
+custom SciPy implementation       GUDHI implementation
+(d_B and W_2)                     (d_B and W_2)
+        |                          |
+        +------------ compare -----+
+```
+
+Therefore:
+
+- **TTK supplies the persistence pairs.**
+- **GUDHI supplies an independent implementation of the distance between those pairs.**
+- **GUDHI is not reading the `.vti` files in this audit.**
+- **GUDHI is not independently validating TTK's persistence-pair extraction here.**
+
+This is intentional. The purpose of this stage is to isolate and validate the **distance-computation layer** while keeping the persistence diagrams fixed.
+
+The earlier schema audit had already validated the quantitative PD artifacts across:
+
+```text
+51 runs
+168 samples per run
+8,568 GT-SR comparisons
+17,136 GT/SR PD VTU files
+```
+
+The canonical parser used for the distance audit is:
+
+```text
+$AUDIT/recompute_pd/canonical_pd_pilot.py
+```
+
+The frozen full custom-distance sweep is:
+
+```text
+$AUDIT/recompute_pd/canonical_pd_full_sweep.csv
+```
+
+with:
+
+```text
+8,568 data rows + 1 header row = 8,569 lines
+```
+
+---
+
+## XXXV.3 Why GUDHI is an appropriate independent implementation
+
+The GUDHI cross-check intentionally uses algorithms independent of the custom SciPy code.
+
+### Bottleneck
+
+The audit calls:
+
+```python
+gudhi.bottleneck_distance(A, B, e=0.0)
+```
+
+`e=0.0` requests GUDHI's exact bottleneck algorithm. The bottleneck distance is the smallest threshold for which a perfect matching exists when point-to-point distances are measured by the sup norm (`L_infinity`) and diagonal matching is allowed.
+
+This is independent of the custom implementation, which constructs an augmented cost matrix, tests candidate thresholds, and uses SciPy sparse bipartite matching to find the smallest feasible threshold.
+
+### Wasserstein-2 with L-infinity ground metric
+
+The audit calls:
+
+```python
+wasserstein_distance(
+    A,
+    B,
+    matching=False,
+    order=2.0,
+    internal_p=np.inf,
+    keep_essential_parts=False,
+)
+```
+
+Interpretation:
+
+```text
+order=2.0
+    -> Wasserstein exponent q = 2
+
+internal_p=np.inf
+    -> L_infinity ground norm in the birth/death plane
+
+keep_essential_parts=False
+    -> finite persistence points only
+```
+
+GUDHI's Python Wasserstein implementation uses the Python Optimal Transport (POT) backend together with SciPy. This differs from the custom implementation, which explicitly builds the augmented assignment-cost matrix and calls SciPy's `linear_sum_assignment` on squared costs.
+
+Agreement between the two implementations therefore provides an independent numerical check of the selected mathematical convention.
+
+---
+
+## XXXV.4 Python/pip environment diagnosis on Spark
+
+Initial GUDHI import failed:
+
+```text
+ModuleNotFoundError: No module named 'gudhi'
+```
+
+A direct `pip install gudhi` also failed because the shell-level `pip` executable was stale:
+
+```text
+/home/adadhwal/.local/bin/pip: cannot execute: required file not found
+```
+
+The diagnostic command was:
+
+```bash
+cd ~/PhIRE
+
+echo "===== PYTHON ====="
+command -v python3
+readlink -f "$(command -v python3)"
+python3 --version
+
+echo
+echo "===== BROKEN PIP ====="
+command -v pip || true
+ls -l ~/.local/bin/pip 2>/dev/null || true
+head -n 1 ~/.local/bin/pip 2>/dev/null || true
+
+echo
+echo "===== PYTHON-MODULE PIP ====="
+python3 -m pip --version || true
+
+echo
+echo "===== ENVIRONMENT MANAGERS ====="
+command -v conda || true
+command -v mamba || true
+command -v micromamba || true
+
+echo
+echo "===== ARCHITECTURE ====="
+uname -m
+```
+
+Observed result:
+
+```text
+python3:             /usr/bin/python3 -> /usr/bin/python3.12
+Python:              3.12.3
+standalone pip:      /home/adadhwal/.local/bin/pip
+pip shebang:         #!/usr/bin/python
+python3 -m pip:      working, pip 24.0 for Python 3.12
+conda:               absent
+mamba:               absent
+micromamba:          present
+architecture:        aarch64
+```
+
+Interpretation:
+
+- the system `python3` was healthy;
+- the standalone `~/.local/bin/pip` launcher was stale because it referenced `/usr/bin/python`;
+- Python's module-level pip remained healthy;
+- Spark is Linux `aarch64`;
+- `micromamba` was already available and was selected to avoid altering the existing PhIRE/TTK environment.
+
+No system Python symlink or global pip repair was performed.
+
+---
+
+## XXXV.5 Isolated GUDHI environment creation
+
+Micromamba was verified with:
+
+```bash
+micromamba --version
+micromamba info
+```
+
+Observed micromamba version:
+
+```text
+2.3.3
+```
+
+Platform reported by micromamba:
+
+```text
+linux-aarch64
+```
+
+GUDHI availability was checked with:
+
+```bash
+micromamba search -c conda-forge gudhi
+```
+
+The search confirmed native `linux-aarch64` builds, including GUDHI 3.13.0.
+
+The isolated audit environment was created with:
+
+```bash
+micromamba create -n gudhi-audit -c conda-forge \
+    python=3.12 \
+    gudhi \
+    pot \
+    numpy \
+    scipy \
+    vtk \
+    -y
+```
+
+The environment was then validated without activating it globally:
+
+```bash
+micromamba run -n gudhi-audit python - <<'PY'
+import sys
+import platform
+import numpy as np
+import scipy
+import vtk
+import gudhi
+
+from gudhi import bottleneck_distance
+from gudhi.wasserstein import wasserstein_distance
+
+print("Python:", sys.version)
+print("Executable:", sys.executable)
+print("Architecture:", platform.machine())
+print("NumPy:", np.__version__)
+print("SciPy:", scipy.__version__)
+print("VTK:", vtk.vtkVersion.GetVTKVersion())
+print("GUDHI:", gudhi.__version__)
+print("bottleneck_distance: OK")
+print("wasserstein_distance: OK")
+PY
+```
+
+Observed validated environment:
+
+```text
+Python:        3.12.14
+Executable:    /home/adadhwal/micromamba/envs/gudhi-audit/bin/python
+Architecture:  aarch64
+NumPy:         2.4.2
+SciPy:         1.17.1
+VTK:           9.6.0
+GUDHI:         3.13.0
+bottleneck_distance: OK
+wasserstein_distance: OK
+```
+
+The environment is deliberately separate from the Python/TTK environment that produced the original artifacts.
+
+---
+
+## XXXV.6 Independent GUDHI pilot
+
+Pilot script:
+
+```text
+$AUDIT/recompute_pd/gudhi_crosscheck_pilot.py
+```
+
+Pilot log:
+
+```text
+$AUDIT/recompute_pd/gudhi_crosscheck_pilot.log
+```
+
+Execution command:
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+set -o pipefail
+
+micromamba run -n gudhi-audit \
+    python "$AUDIT/recompute_pd/gudhi_crosscheck_pilot.py" \
+    2>&1 | tee "$AUDIT/recompute_pd/gudhi_crosscheck_pilot.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "exit status = $STATUS"
+```
+
+### Synthetic results
+
+All six independent synthetic comparisons agreed exactly between the custom implementation and GUDHI:
+
+```text
+empty / empty            PASS
+single / empty           PASS
+shifted point            PASS
+two points / empty       PASS
+diagonal wins            PASS
+identical diagrams       PASS
+```
+
+Observed exact values included:
+
+```text
+two points / empty:
+    dB = 1
+    W2 = sqrt(2) = 1.4142135623730951
+
+diagonal wins:
+    dB = 2
+    W2 = sqrt(8) = 2.8284271247461903
+```
+
+### Real-data pilot: CNN sample 0
+
+Input PD files:
+
+```text
+GT:
+/home/adadhwal/PhIRE/ttk_runs_fixed/cnn/pd/
+cnn_GT_s0_speed_p160_x0_y0_pd_port_0.vtu
+
+SR:
+/home/adadhwal/PhIRE/ttk_runs_fixed/cnn/pd/
+cnn_SR_s0_speed_p160_x0_y0_pd_port_0.vtu
+```
+
+Finite diagram cardinalities:
+
+```text
+D0: GT=967, SR=703
+D1: GT=871, SR=632
+```
+
+Observed comparison:
+
+```text
+D0 bottleneck:
+    ours   = 2.5131587982177734
+    GUDHI  = 2.5131587982177734
+    |diff| = 0
+    PASS
+
+D0 W2:
+    ours   = 10.890185021667014
+    GUDHI  = 10.890185021667012
+    |diff| = 1.7763568394002505e-15
+    PASS
+
+D1 bottleneck:
+    ours   = 3.0914716720581055
+    GUDHI  = 3.0914716720581055
+    |diff| = 0
+    PASS
+
+D1 W2:
+    ours   = 13.657539176969225
+    GUDHI  = 13.657539176969223
+    |diff| = 1.7763568394002505e-15
+    PASS
+```
+
+Dimension-wise aggregate:
+
+```text
+dB_all:
+    ours          = 3.0914716720581055
+    GUDHI-derived = 3.0914716720581055
+    |diff|        = 0
+    PASS
+
+W2_all:
+    ours          = 17.467813434330864
+    GUDHI-derived = 17.467813434330861
+    |diff|        = 3.5527136788005009e-15
+    PASS
+```
+
+The nonfinite/global pair was intentionally excluded from both finite-diagram implementations:
+
+```text
+GT: (PairType=0, min=0.0518798828125, max=25.159461975097656)
+SR: (PairType=0, min=0.04911082610487938, max=26.29700129851699)
+```
+
+Final pilot status:
+
+```text
+OVERALL GUDHI CROSS-CHECK: PASS
+exit status = 0
+```
+
+Interpretation:
+
+- bottleneck agreed exactly;
+- W2 differed only at approximately `1e-15`, which is floating-point roundoff;
+- both synthetic and high-cardinality real diagrams passed;
+- this is strong independent validation of the custom distance implementation for the tested case.
+
+---
+
+## XXXV.7 Freeze the pilot audit
+
+Preserve the pilot script, log, and environment specification:
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+
+sha256sum \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_pilot.py" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_pilot.log" \
+    > "$AUDIT/recompute_pd/gudhi_crosscheck_pilot_sha256.txt"
+
+micromamba env export -n gudhi-audit \
+    > "$AUDIT/recompute_pd/gudhi-audit-environment.yml"
+
+sha256sum \
+    "$AUDIT/recompute_pd/gudhi-audit-environment.yml" \
+    >> "$AUDIT/recompute_pd/gudhi_crosscheck_pilot_sha256.txt"
+
+micromamba run -n gudhi-audit python - <<'PY' \
+    > "$AUDIT/recompute_pd/gudhi_versions.txt"
+import sys
+import platform
+import numpy
+import scipy
+import vtk
+import gudhi
+import ot
+
+print("Python:", sys.version.replace("\n", " "))
+print("Executable:", sys.executable)
+print("Architecture:", platform.machine())
+print("NumPy:", numpy.__version__)
+print("SciPy:", scipy.__version__)
+print("VTK:", vtk.vtkVersion.GetVTKVersion())
+print("GUDHI:", gudhi.__version__)
+print("POT:", ot.__version__)
+PY
+
+cat "$AUDIT/recompute_pd/gudhi_crosscheck_pilot_sha256.txt"
+cat "$AUDIT/recompute_pd/gudhi_versions.txt"
+```
+
+---
+
+## XXXV.8 Full 8,568-comparison GUDHI cross-check
+
+### Goal
+
+The final distance-layer validation is to independently recompute the corrected GUDHI distances for every row of the frozen custom-distance sweep:
+
+```text
+51 runs x 168 samples = 8,568 GT-SR comparisons
+```
+
+For every `(run, sample)` pair, the validator:
+
+1. reads the same TTK PD VTUs used by the corrected sweep;
+2. extracts finite `D0` and `D1` birth/death arrays through the canonical parser;
+3. computes exact GUDHI bottleneck distance separately for `D0` and `D1`;
+4. computes GUDHI `W2` with `internal_p=inf` separately for `D0` and `D1`;
+5. combines dimensions using the same `max` / Euclidean aggregation definitions;
+6. compares the GUDHI aggregate values against the frozen custom results in `canonical_pd_full_sweep.csv`;
+7. writes a resume-safe per-comparison CSV and final summary.
+
+The exhaustive script is stored as:
+
+```text
+$AUDIT/recompute_pd/gudhi_crosscheck_full.py
+```
+
+A copy of its full source is included at the end of this section.
+
+### Expected canonical CSV fields used by the validator
+
+```text
+run
+sample
+pd_bottleneck_all
+pd_w2_all
+```
+
+The script treats the frozen canonical CSV as the comparison manifest rather than scanning every historical topology artifact globally. For each row, it resolves the PD VTUs only inside:
+
+```text
+~/PhIRE/ttk_runs_fixed/<run>/
+```
+
+This avoids accidental use of legacy/pre-repair copies elsewhere in the repository.
+
+### Step A — install/copy the full validator into the audit root
+
+If the source file is being copied from another trusted location:
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+cp gudhi_crosscheck_full.py "$AUDIT/recompute_pd/gudhi_crosscheck_full.py"
+chmod +x "$AUDIT/recompute_pd/gudhi_crosscheck_full.py"
+```
+
+### Step B — syntax check inside the isolated environment
+
+```bash
+micromamba run -n gudhi-audit \
+    python -m py_compile \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.py"
+```
+
+Expected result: no output and exit status `0`.
+
+### Step C — preflight all 8,568 source-pair resolutions before computing distances
+
+This stage performs no GUDHI distance calculations. It verifies that every canonical `(run,sample)` row resolves to exactly one GT and one SR PD file under the corresponding authoritative fixed run root.
+
+```bash
+set -o pipefail
+
+micromamba run -n gudhi-audit \
+    python "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    --canonical-csv "$AUDIT/recompute_pd/canonical_pd_full_sweep.csv" \
+    --output "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    --summary "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    --preflight \
+    2>&1 | tee "$AUDIT/recompute_pd/gudhi_crosscheck_full_preflight.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "preflight exit status = $STATUS"
+```
+
+Required preflight outcome:
+
+```text
+Rows: 8568
+Resolved: 8568
+Errors: 0
+PREFLIGHT RESULT: PASS
+preflight exit status = 0
+```
+
+If preflight does not pass, do **not** begin the numerical sweep until the path ambiguity is audited. The script intentionally fails rather than guessing among multiple PD sources.
+
+### Step D — run the exhaustive GUDHI comparison
+
+The output CSV is resume-safe for interrupted runs: every already-recorded `(run,sample)` row is skipped on a later rerun, preventing duplicate keys. If a recorded `ERROR` or `MISMATCH` must be recomputed after changing the audit setup, preserve the failed CSV for provenance and start a new output CSV rather than silently overwriting it.
+
+```bash
+set -o pipefail
+
+micromamba run -n gudhi-audit \
+    python "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    --canonical-csv "$AUDIT/recompute_pd/canonical_pd_full_sweep.csv" \
+    --output "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    --summary "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    --progress-every 10 \
+    2>&1 | tee -a "$AUDIT/recompute_pd/gudhi_crosscheck_full.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "full GUDHI exit status = $STATUS"
+```
+
+For a persistent shell session on Spark, the same command can be run inside the user's existing `tmux` workflow. The scientific output remains the CSV/log/summary under `$AUDIT/recompute_pd/`.
+
+### Step E — monitor progress without modifying the run
+
+```bash
+wc -l "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv"
+
+tail -n 40 "$AUDIT/recompute_pd/gudhi_crosscheck_full.log"
+```
+
+At completion the CSV should contain:
+
+```text
+8,568 data rows + 1 header = 8,569 lines
+```
+
+### Step F — inspect the final summary
+
+```bash
+cat "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt"
+```
+
+The desired final state is:
+
+```text
+expected comparisons: 8568
+rows in GUDHI CSV:     8568
+unique (run,sample):   8568
+PASS rows:             8568
+MISMATCH rows:         0
+ERROR rows:            0
+max |delta dB_all|:    approximately floating-point zero
+max |delta W2_all|:    approximately floating-point roundoff
+OVERALL: PASS
+```
+
+Exact maximum differences should be reported from the completed run rather than predicted in advance.
+
+### Step G — independent final integrity checks
+
+```bash
+python3 - <<'PY'
+import csv
+import math
+from pathlib import Path
+import os
+
+AUDIT = Path(os.environ["AUDIT"])
+p = AUDIT / "recompute_pd" / "gudhi_crosscheck_full.csv"
+
+with p.open(newline="") as f:
+    rows = list(csv.DictReader(f))
+
+keys = [(r["run"], int(r["sample"])) for r in rows]
+
+print("rows:", len(rows))
+print("unique keys:", len(set(keys)))
+print("PASS:", sum(r["status"] == "PASS" for r in rows))
+print("MISMATCH:", sum(r["status"] == "MISMATCH" for r in rows))
+print("ERROR:", sum(r["status"] == "ERROR" for r in rows))
+
+for col in ["abs_diff_bottleneck_all", "abs_diff_w2_all"]:
+    vals = [float(r[col]) for r in rows if r[col]]
+    print(col, "max=", max(vals), "mean=", sum(vals)/len(vals))
+
+assert len(rows) == 8568
+assert len(set(keys)) == 8568
+assert all(r["status"] == "PASS" for r in rows)
+print("FINAL INTEGRITY CHECK: PASS")
+PY
+```
+
+### Step H — freeze the completed full GUDHI audit
+
+Only after the full run and integrity check pass:
+
+```bash
+sha256sum \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.py" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.csv" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full.log" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full_preflight.log" \
+    "$AUDIT/recompute_pd/gudhi_crosscheck_full_summary.txt" \
+    "$AUDIT/recompute_pd/gudhi-audit-environment.yml" \
+    "$AUDIT/recompute_pd/gudhi_versions.txt" \
+    > "$AUDIT/recompute_pd/gudhi_crosscheck_full_sha256.txt"
+
+cat "$AUDIT/recompute_pd/gudhi_crosscheck_full_sha256.txt"
+```
+
+---
+
+## XXXV.9 Interpretation standard for the exhaustive result
+
+If all 8,568 comparisons pass within the fixed numerical tolerances, the validated claim is:
+
+> Given the same finite TTK-extracted `D0` and `D1` persistence points, the project's explicit bottleneck-distance implementation and order-2 Wasserstein implementation with `L_infinity` ground metric agree with independent GUDHI implementations across the complete 8,568-comparison evaluation set.
+
+This closes the **PD distance-computation** question to a very strong practical standard.
+
+It does **not** by itself prove:
+
+- that TTK extracted mathematically identical diagrams to every other PH implementation;
+- that the selected scalar wind-speed field is the only scientifically meaningful scalarization of the vector wind field;
+- that TTK and GUDHI would produce identical persistence pairs if both were run independently from the `.vti` field;
+- that the historical TTK `WassersteinMetric="2"` values were equivalent to the corrected metrics.
+
+Those are separate questions.
+
+The value of the GUDHI test is precisely that it isolates one layer:
+
+```text
+TTK persistence pairs are held fixed
+            |
+            v
+Are the final PD distances computed correctly?
+            |
+            v
+custom implementation <-> independent GUDHI implementation
+```
+
+---
+
+## XXXV.10 Full source — `gudhi_crosscheck_full.py`
+
+```python
+#!/usr/bin/env python3
+
+from pathlib import Path
+import argparse
+import csv
+import math
+import sys
+import time
+import traceback
+
+import numpy as np
+import gudhi
+from gudhi.wasserstein import wasserstein_distance
+
+
+ABS_TOL = 1e-10
+REL_TOL = 1e-12
+EXPECTED_COMPARISONS = 8568
+
+
+def close(a, b):
+    return math.isclose(a, b, rel_tol=REL_TOL, abs_tol=ABS_TOL)
+
+
+def gudhi_db(A, B):
+    return float(gudhi.bottleneck_distance(A, B, e=0.0))
+
+
+def gudhi_w2(A, B):
+    return float(
+        wasserstein_distance(
+            A,
+            B,
+            matching=False,
+            order=2.0,
+            internal_p=np.inf,
+            keep_essential_parts=False,
+        )
+    )
+
+
+def _prefer_pd_candidates(candidates, kind):
+    """Resolve a unique PD VTU conservatively without guessing across run roots."""
+    candidates = sorted(set(Path(p).resolve() for p in candidates))
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # Newer candidate topology outputs commonly separate pd/GT and pd/SR.
+    preferred = [
+        p for p in candidates
+        if "pd" in p.parts and kind in p.parts
+    ]
+    if len(preferred) == 1:
+        return preferred[0]
+
+    # Historical CNN/GAN layouts commonly place both files directly under pd/.
+    flat = [p for p in candidates if p.parent.name == "pd"]
+    if len(flat) == 1:
+        return flat[0]
+
+    pretty = "\n    ".join(str(p) for p in candidates)
+    raise RuntimeError(
+        f"Expected exactly one {kind} PD file after conservative filtering; "
+        f"found {len(candidates)} candidates:\n    {pretty}"
+    )
+
+
+def resolve_pd_paths(root, run, sample):
+    run_root = root / "ttk_runs_fixed" / run
+    if not run_root.is_dir():
+        raise FileNotFoundError(f"Run root does not exist: {run_root}")
+
+    gt_pattern = f"*_GT_s{sample}_speed_p160_x0_y0_pd_port_0.vtu"
+    sr_pattern = f"*_SR_s{sample}_speed_p160_x0_y0_pd_port_0.vtu"
+
+    gt_candidates = list(run_root.rglob(gt_pattern))
+    sr_candidates = list(run_root.rglob(sr_pattern))
+
+    if not gt_candidates:
+        raise FileNotFoundError(
+            f"No GT PD found under {run_root} for sample {sample} "
+            f"with pattern {gt_pattern}"
+        )
+    if not sr_candidates:
+        raise FileNotFoundError(
+            f"No SR PD found under {run_root} for sample {sample} "
+            f"with pattern {sr_pattern}"
+        )
+
+    gt = _prefer_pd_candidates(gt_candidates, "GT")
+    sr = _prefer_pd_candidates(sr_candidates, "SR")
+    return gt, sr
+
+
+def read_canonical_rows(path):
+    with path.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    if not rows:
+        raise RuntimeError(f"Canonical CSV is empty: {path}")
+
+    required = {"run", "sample", "pd_bottleneck_all", "pd_w2_all"}
+    missing = required.difference(rows[0].keys())
+    if missing:
+        raise RuntimeError(
+            "Canonical CSV is missing required columns: "
+            + ", ".join(sorted(missing))
+            + "\nObserved columns: "
+            + ", ".join(rows[0].keys())
+        )
+
+    keys = [(r["run"], int(r["sample"])) for r in rows]
+    if len(keys) != len(set(keys)):
+        raise RuntimeError("Canonical CSV contains duplicate (run, sample) rows")
+
+    return rows
+
+
+def preflight(rows, root):
+    print("=" * 80)
+    print("PREFLIGHT — RESOLVE ALL CANONICAL GT/SR PD PATHS")
+    print("=" * 80)
+    print(f"Rows: {len(rows)}")
+
+    errors = []
+    resolved = 0
+    start = time.time()
+
+    for i, row in enumerate(rows, 1):
+        run = row["run"]
+        sample = int(row["sample"])
+        try:
+            resolve_pd_paths(root, run, sample)
+            resolved += 1
+        except Exception as exc:
+            errors.append((run, sample, repr(exc)))
+            print(f"ERROR run={run} sample={sample}: {exc}")
+
+        if i % 250 == 0 or i == len(rows):
+            print(f"preflight {i}/{len(rows)} resolved={resolved} errors={len(errors)}")
+
+    print()
+    print(f"Resolved: {resolved}")
+    print(f"Errors:   {len(errors)}")
+    print(f"Elapsed:  {time.time() - start:.2f} s")
+
+    if len(rows) != EXPECTED_COMPARISONS:
+        print(
+            f"ERROR: expected {EXPECTED_COMPARISONS} canonical rows, "
+            f"found {len(rows)}"
+        )
+        return 1
+
+    if errors:
+        print("PREFLIGHT RESULT: FAIL")
+        return 1
+
+    print("PREFLIGHT RESULT: PASS")
+    return 0
+
+
+def load_recorded(output_csv):
+    if not output_csv.exists() or output_csv.stat().st_size == 0:
+        return set()
+
+    with output_csv.open(newline="") as f:
+        reader = csv.DictReader(f)
+        return {
+            (row["run"], int(row["sample"]))
+            for row in reader
+            if row.get("run") and row.get("sample") not in (None, "")
+        }
+
+
+def summarize(output_csv, summary_path, expected_rows):
+    with output_csv.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    unique = {(r["run"], int(r["sample"])) for r in rows}
+    passes = [r for r in rows if r["status"] == "PASS"]
+    mismatches = [r for r in rows if r["status"] == "MISMATCH"]
+    errors = [r for r in rows if r["status"] == "ERROR"]
+
+    def finite_float_values(column):
+        vals = []
+        for r in rows:
+            text = r.get(column, "")
+            if not text:
+                continue
+            try:
+                v = float(text)
+            except ValueError:
+                continue
+            if math.isfinite(v):
+                vals.append(v)
+        return vals
+
+    db_diffs = finite_float_values("abs_diff_bottleneck_all")
+    w2_diffs = finite_float_values("abs_diff_w2_all")
+
+    max_db = max(db_diffs) if db_diffs else math.nan
+    max_w2 = max(w2_diffs) if w2_diffs else math.nan
+
+    complete = (
+        len(rows) == expected_rows
+        and len(unique) == expected_rows
+        and not mismatches
+        and not errors
+    )
+
+    lines = [
+        "GUDHI FULL-SWEEP CROSS-CHECK SUMMARY",
+        "=" * 80,
+        f"expected comparisons: {expected_rows}",
+        f"rows in GUDHI CSV:     {len(rows)}",
+        f"unique (run,sample):   {len(unique)}",
+        f"PASS rows:             {len(passes)}",
+        f"MISMATCH rows:         {len(mismatches)}",
+        f"ERROR rows:            {len(errors)}",
+        f"max |delta dB_all|:    {max_db:.17g}",
+        f"max |delta W2_all|:    {max_w2:.17g}",
+        f"abs tolerance:         {ABS_TOL}",
+        f"rel tolerance:         {REL_TOL}",
+        "",
+        "OVERALL: " + ("PASS" if complete else "FAIL"),
+    ]
+
+    summary_path.write_text("\n".join(lines) + "\n")
+    print("\n" + "\n".join(lines))
+    return 0 if complete else 1
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--canonical-csv",
+        type=Path,
+        required=True,
+        help="Frozen canonical_pd_full_sweep.csv",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="Resume-safe GUDHI cross-check CSV",
+    )
+    parser.add_argument(
+        "--summary",
+        type=Path,
+        required=True,
+        help="Summary text output",
+    )
+    parser.add_argument(
+        "--root",
+        type=Path,
+        default=Path.home() / "PhIRE",
+        help="PhIRE repository root",
+    )
+    parser.add_argument(
+        "--preflight",
+        action="store_true",
+        help="Resolve all 8,568 GT/SR PD paths but do not compute distances",
+    )
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=10,
+    )
+    args = parser.parse_args()
+
+    audit_dir = args.canonical_csv.resolve().parent
+    sys.path.insert(0, str(audit_dir))
+    import canonical_pd_pilot as canonical
+
+    rows = read_canonical_rows(args.canonical_csv)
+
+    if args.preflight:
+        return preflight(rows, args.root.resolve())
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.summary.parent.mkdir(parents=True, exist_ok=True)
+
+    recorded = load_recorded(args.output)
+
+    fieldnames = [
+        "run",
+        "sample",
+        "gt_pd_path",
+        "sr_pd_path",
+        "gt_d0_count",
+        "sr_d0_count",
+        "gt_d1_count",
+        "sr_d1_count",
+        "gudhi_bottleneck_d0",
+        "gudhi_bottleneck_d1",
+        "gudhi_bottleneck_all",
+        "canonical_bottleneck_all",
+        "abs_diff_bottleneck_all",
+        "gudhi_w2_d0",
+        "gudhi_w2_d1",
+        "gudhi_w2_all",
+        "canonical_w2_all",
+        "abs_diff_w2_all",
+        "bottleneck_match",
+        "w2_match",
+        "status",
+        "error",
+        "seconds",
+    ]
+
+    file_exists = args.output.exists() and args.output.stat().st_size > 0
+    mode = "a" if file_exists else "w"
+
+    print("=" * 80)
+    print("GUDHI FULL-SWEEP CROSS-CHECK")
+    print("=" * 80)
+    print("GUDHI:", gudhi.__version__)
+    print("Canonical CSV:", args.canonical_csv)
+    print("Output CSV:   ", args.output)
+    print("Rows:         ", len(rows))
+    print("Already recorded:", len(recorded))
+    print("Exact dB:     gudhi.bottleneck_distance(..., e=0.0)")
+    print("W2:           order=2, internal_p=inf, finite points only")
+    print()
+
+    start_all = time.time()
+    attempted = 0
+    new_pass = 0
+    new_mismatch = 0
+    new_error = 0
+
+    with args.output.open(mode, newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+            f.flush()
+
+        for index, row in enumerate(rows, 1):
+            run = row["run"]
+            sample = int(row["sample"])
+            key = (run, sample)
+
+            if key in recorded:
+                continue
+
+            attempted += 1
+            t0 = time.time()
+            out = {name: "" for name in fieldnames}
+            out["run"] = run
+            out["sample"] = sample
+
+            try:
+                gt_path, sr_path = resolve_pd_paths(args.root.resolve(), run, sample)
+                out["gt_pd_path"] = str(gt_path)
+                out["sr_pd_path"] = str(sr_path)
+
+                GT, _ = canonical.read_pd(gt_path)
+                SR, _ = canonical.read_pd(sr_path)
+
+                out["gt_d0_count"] = len(GT[0])
+                out["sr_d0_count"] = len(SR[0])
+                out["gt_d1_count"] = len(GT[1])
+                out["sr_d1_count"] = len(SR[1])
+
+                db0 = gudhi_db(GT[0], SR[0])
+                db1 = gudhi_db(GT[1], SR[1])
+                db_all = max(db0, db1)
+
+                w20 = gudhi_w2(GT[0], SR[0])
+                w21 = gudhi_w2(GT[1], SR[1])
+                w2_all = math.hypot(w20, w21)
+
+                canonical_db = float(row["pd_bottleneck_all"])
+                canonical_w2 = float(row["pd_w2_all"])
+
+                diff_db = abs(db_all - canonical_db)
+                diff_w2 = abs(w2_all - canonical_w2)
+
+                db_ok = close(db_all, canonical_db)
+                w2_ok = close(w2_all, canonical_w2)
+
+                out.update({
+                    "gudhi_bottleneck_d0": f"{db0:.17g}",
+                    "gudhi_bottleneck_d1": f"{db1:.17g}",
+                    "gudhi_bottleneck_all": f"{db_all:.17g}",
+                    "canonical_bottleneck_all": f"{canonical_db:.17g}",
+                    "abs_diff_bottleneck_all": f"{diff_db:.17g}",
+                    "gudhi_w2_d0": f"{w20:.17g}",
+                    "gudhi_w2_d1": f"{w21:.17g}",
+                    "gudhi_w2_all": f"{w2_all:.17g}",
+                    "canonical_w2_all": f"{canonical_w2:.17g}",
+                    "abs_diff_w2_all": f"{diff_w2:.17g}",
+                    "bottleneck_match": int(db_ok),
+                    "w2_match": int(w2_ok),
+                    "status": "PASS" if db_ok and w2_ok else "MISMATCH",
+                })
+
+                if db_ok and w2_ok:
+                    new_pass += 1
+                else:
+                    new_mismatch += 1
+                    print(
+                        f"MISMATCH run={run} sample={sample} "
+                        f"dB diff={diff_db:.3e} W2 diff={diff_w2:.3e}"
+                    )
+
+            except Exception as exc:
+                new_error += 1
+                out["status"] = "ERROR"
+                out["error"] = repr(exc)
+                print(f"ERROR run={run} sample={sample}: {exc}")
+                traceback.print_exc()
+
+            out["seconds"] = f"{time.time() - t0:.6f}"
+            writer.writerow(out)
+            f.flush()
+
+            if (
+                attempted % args.progress_every == 0
+                or index == len(rows)
+                or out["status"] != "PASS"
+            ):
+                elapsed = time.time() - start_all
+                print(
+                    f"progress canonical_index={index}/{len(rows)} "
+                    f"attempted={attempted} pass={new_pass} "
+                    f"mismatch={new_mismatch} error={new_error} "
+                    f"elapsed={elapsed:.1f}s",
+                    flush=True,
+                )
+
+    return summarize(args.output, args.summary, EXPECTED_COMPARISONS)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+```
+
+---
+
+## XXXV.11 Current status at the time of this update
+
+```text
+Historical TTK PD metric audit:            complete
+Corrected d_B / W2 definitions:            complete
+PD VTU structural audit:                   complete (17,136 / 17,136 valid)
+Custom analytic unit tests:                complete / PASS
+Custom full 8,568-comparison sweep:        complete / frozen
+GUDHI isolated ARM64 environment:          complete
+GUDHI synthetic cross-check:               complete / PASS
+GUDHI CNN sample-0 D0/D1 cross-check:      complete / PASS
+GUDHI full-source preflight:               next execution step
+GUDHI full 8,568-comparison cross-check:   next execution step
+Full GUDHI checksum/archive closeout:      pending completion of full sweep
+```
+

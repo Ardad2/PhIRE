@@ -1,0 +1,95 @@
+{
+  "ablation_definition": "Ablation = reconstruction-only fine-tuning",
+  "canonical_pd_csv": "/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_full_sweep.csv",
+  "canonical_pd_csv_resolved_columns": {
+    "W2_col": "pd_w2_all",
+    "d_B_col": "pd_bottleneck_all",
+    "method_col": "run",
+    "method_values": {
+      "ablation": "topology_finetuning/candidateUV_expanded2688_topology",
+      "cnn": "cnn",
+      "topology_inspired": "topology_finetuning/candidateC_expanded2688_topology"
+    },
+    "sample_col": "sample"
+  },
+  "caption": "Displayed PD points are thresholded/zoomed for readability; d_B and W2 use the complete finite diagrams.",
+  "crop": {
+    "patch": 160,
+    "x0": 0,
+    "y0": 0
+  },
+  "methods": {
+    "GT": {
+      "artifact_alias": "candidateC_expanded2688",
+      "filtration_convention": "default_sublevel",
+      "n_agreeing_copies": 7,
+      "pair_count": 1863,
+      "pd_source_path": "ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_topology/pd/GT/candidateC_expanded2688_GT_s126_speed_p160_x0_y0_pd_port_0.vtu",
+      "source_family": "topology_finetuning"
+    },
+    "ablation": {
+      "W2": 20.731866410379165,
+      "artifact_alias": "candidateUV_expanded2688",
+      "d_B": 2.7113819122314453,
+      "display_label": "Ablation",
+      "filtration_convention": "default_sublevel",
+      "n_agreeing_copies": 1,
+      "pair_count": 612,
+      "pd_source_path": "ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_topology/pd/SR/candidateUV_expanded2688_SR_s126_speed_p160_x0_y0_pd_port_0.vtu",
+      "psnr_uv": 33.338355805971055,
+      "raw_dataGT": "data_out/wind_finetune_candidateUV_expanded2688/dataGT.npy",
+      "raw_dataSR": "data_out/wind_finetune_candidateUV_expanded2688/dataSR.npy",
+      "raw_idx": "data_out/wind_finetune_candidateUV_expanded2688/idx.npy",
+      "source_family": "topology_finetuning",
+      "ssim_speed": 0.8128185367057662
+    },
+    "cnn": {
+      "W2": 20.813703107955607,
+      "artifact_alias": "cnn",
+      "d_B": 2.8544981479644775,
+      "display_label": "CNN",
+      "filtration_convention": "default_sublevel",
+      "n_agreeing_copies": 1,
+      "pair_count": 1248,
+      "pd_source_path": "ttk_runs_fixed/cnn/pd/cnn_SR_s126_speed_p160_x0_y0_pd_port_0.vtu",
+      "psnr_uv": 30.6097903547661,
+      "raw_dataGT": "data_out_fixed/wind_mrhr_cnn/dataGT.npy",
+      "raw_dataSR": "data_out_fixed/wind_mrhr_cnn/dataSR.npy",
+      "raw_idx": "data_out_fixed/wind_mrhr_cnn/idx.npy",
+      "source_family": "cnn_gan_bicubic_baseline",
+      "ssim_speed": 0.7247003569825754
+    },
+    "topology_inspired": {
+      "W2": 14.807290309503701,
+      "artifact_alias": "candidateC_expanded2688",
+      "d_B": 1.654341220855713,
+      "display_label": "Topology-inspired",
+      "filtration_convention": "default_sublevel",
+      "n_agreeing_copies": 1,
+      "pair_count": 2485,
+      "pd_source_path": "ttk_runs_fixed/topology_finetuning/candidateC_expanded2688_topology/pd/SR/candidateC_expanded2688_SR_s126_speed_p160_x0_y0_pd_port_0.vtu",
+      "psnr_uv": 32.948282869927084,
+      "raw_dataGT": "data_out/wind_finetune_candidateC_expanded2688/dataGT.npy",
+      "raw_dataSR": "data_out/wind_finetune_candidateC_expanded2688/dataSR.npy",
+      "raw_idx": "data_out/wind_finetune_candidateC_expanded2688/idx.npy",
+      "source_family": "topology_finetuning",
+      "ssim_speed": 0.8120333672686828
+    }
+  },
+  "min_persistence": 4.0,
+  "output_paths": {
+    "pdf": "ttk_runs_fixed/poster_qualitative/poster_candidatec_qualitative_s126.pdf",
+    "png": "ttk_runs_fixed/poster_qualitative/poster_candidatec_qualitative_s126.png",
+    "svg": "ttk_runs_fixed/poster_qualitative/poster_candidatec_qualitative_s126.svg"
+  },
+  "psnr_ssim_note": "PSNR is on [u,v]; SSIM and topology are on scalar speed.",
+  "sample_idx": 126,
+  "shared_pd_zoom": {
+    "hi": 19.259867246747017,
+    "lo": -0.729029204249382,
+    "total_displayed_points": 105
+  },
+  "ssim_csv": "/home/adadhwal/PhIRE/ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_per_sample_scale_sweep.csv",
+  "unified_long_csv": "/home/adadhwal/PhIRE/ttk_runs_fixed/unified_candidate_evaluation/unified_primary_per_sample_long.csv",
+  "warnings": []
+}
