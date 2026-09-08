@@ -16044,3 +16044,322 @@ Thus the custom \(W_{2,2}\) computation layer is internally complete and
 strongly sanity-checked. The final independent numerical validation remains
 the exhaustive GUDHI run.
 
+---
+
+## XXXVI.30 Exhaustive GUDHI W_{2,2} numerical cross-check — COMPLETE / PASS
+
+The exhaustive independent GUDHI verification completed successfully over all 8,568 GT-SR persistence-diagram comparisons.
+
+```text
+8569 $W22/gudhi_w22_full.csv
+```
+
+This corresponds to 8,568 data rows plus one header.
+
+Final progress:
+
+```text
+progress index=8568/8568 attempted=8568 pass=8568 mismatch=0 error=0 elapsed=2783.9s
+```
+
+Total runtime was 2783.9 s, approximately 46 min 23.9 s.
+
+Final summary:
+
+```text
+GUDHI W22 FULL-SWEEP CROSS-CHECK
+================================================================================
+expected comparisons:  8568
+rows:                  8568
+unique keys:           8568
+PASS:                  8568
+MISMATCH:              0
+ERROR:                 0
+
+max |delta W22_D0|:    3.5527136788005009e-14
+max |delta W22_D1|:    7.815970093361102e-14
+max |delta W22_all|:   6.3948846218409017e-14
+
+abs tolerance:         1e-10
+rel tolerance:         1e-12
+
+OVERALL: PASS
+```
+
+Process exit status:
+
+```text
+full GUDHI W22 exit status = 0
+```
+
+### Interpretation
+
+Given the same audited finite TTK-extracted D0 and D1 persistence points, the project's explicit standard W_{2,2} implementation agrees with GUDHI across the complete 8,568-comparison evaluation set.
+
+The maximum absolute discrepancies are at ordinary floating-point roundoff scale:
+
+```text
+D0:        3.5527136788005009e-14
+D1:        7.815970093361102e-14
+aggregate: 6.3948846218409017e-14
+```
+
+These are far below the audit tolerances.
+
+This independently validates the W_{2,2} distance-computation layer. It does not independently validate TTK's extraction of the persistence pairs from the original scalar VTI fields.
+
+---
+
+## XXXVI.31 Final status of the explicit PD metrics
+
+The project now has three explicit persistence-diagram metrics:
+
+```text
+d_B:
+    bottleneck distance
+    L_infinity ground metric
+
+W_{2,infinity}:
+    Wasserstein order q=2
+    L_infinity ground metric
+
+W_{2,2}:
+    Wasserstein order q=2
+    Euclidean L2 ground metric
+```
+
+For W_{2,2}, the completed audit now records:
+
+```text
+synthetic analytical tests:             PASS
+real CNN sample-0 GUDHI pilot:           PASS
+full custom sweep:                       8,568 / 8,568 PASS
+cross-norm invariant:                    8,568 / 8,568 PASS
+independent completed-CSV integrity:     PASS
+GUDHI source preflight:                  8,568 / 8,568 PASS
+exhaustive GUDHI numerical cross-check:  8,568 / 8,568 PASS
+mismatches:                              0
+errors:                                  0
+```
+
+Therefore:
+
+```text
+W_{2,2} distance-computation audit:
+    CLOSED / VALIDATED
+```
+
+Final preservation freezing and archival remain as the mechanical closeout step.
+
+---
+
+## XXXVI.32 Relationship to historical TTK "2"
+
+The completed sweep preserves the distinction between standard W_{2,2} and the historical TTK quantity.
+
+```text
+mean historical_TTK2 - W22
+= 3.5061131930586908
+```
+
+The earlier 336-baseline comparison found strong but imperfect correspondence:
+
+```text
+CNN Pearson correlation: 0.954598609419382
+GAN Pearson correlation: 0.9523398098351896
+CNN-vs-GAN winner agreement: 160 / 168
+```
+
+Thus historical TTK "2" remains useful as legacy/robustness evidence but is not numerically interchangeable with standard W_{2,2}.
+
+---
+
+## XXXVI.33 Next scientific stage
+
+With the distance-computation layer validated, the next scientific analysis should compare candidates across:
+
+```text
+d_B
+W_{2,infinity}
+W_{2,2}
+historical TTK "2" as legacy/reference
+```
+
+Priority outputs:
+
+```text
+mean and median distances
+sample-wise wins vs CNN
+sample-wise wins vs GAN
+wins under all three explicit metrics
+metric-convention disagreements
+rank correlations
+```
+
+The strongest qualitative examples should then be selected from cases where traditional metrics such as PSNR/SSIM/MAE are near-tied while multiple PD metrics clearly separate the reconstructions.
+
+---
+
+## XXXVI.34 Independent GUDHI W22 CSV integrity check — COMPLETE / PASS
+
+A separate post-hoc integrity check was run on:
+
+```text
+$W22/gudhi_w22_full.csv
+```
+
+Observed:
+
+```text
+rows: 8568
+unique (run,sample): 8568
+duplicate rows: 0
+statuses: Counter({'PASS': 8568})
+
+abs_diff_w22_d0
+  values: 8568
+  finite: 8568
+  nonfinite: 0
+  max: 3.552713678800501e-14
+  mean: 3.8233240621603485e-15
+
+abs_diff_w22_d1
+  values: 8568
+  finite: 8568
+  nonfinite: 0
+  max: 7.815970093361102e-14
+  mean: 2.4881020576146597e-15
+
+abs_diff_w22_all
+  values: 8568
+  finite: 8568
+  nonfinite: 0
+  max: 6.394884621840902e-14
+  mean: 3.706963152249823e-15
+
+================================================================================
+INDEPENDENT GUDHI W22 CSV INTEGRITY CHECK: PASS
+================================================================================
+```
+
+This confirms that the completed GUDHI output is:
+
+```text
+complete
+duplicate-free
+all PASS
+fully finite
+dimension-wise match flags all true
+aggregate match flags all true
+```
+
+The mean custom-vs-GUDHI discrepancies are on the order of \(10^{-15}\),
+with maxima on the order of \(10^{-14}\).
+
+Therefore the exhaustive W22 numerical validation is independently
+post-checked as complete.
+
+---
+
+## XXXVI.35 W22 GUDHI environment freeze
+
+The exact GUDHI audit environment used for the W22 verification was exported:
+
+```bash
+micromamba env export -n gudhi-audit \
+    > "$W22/gudhi-audit-environment.yml"
+```
+
+A version manifest was also generated:
+
+```bash
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python - <<'PY' \
+    > "$W22/gudhi_versions.txt"
+import sys
+import platform
+import numpy
+import scipy
+import vtk
+import gudhi
+import ot
+
+print("Python:", sys.version)
+print("Executable:", sys.executable)
+print("Architecture:", platform.machine())
+print("NumPy:", numpy.__version__)
+print("SciPy:", scipy.__version__)
+print("VTK:", vtk.vtkVersion.GetVTKVersion())
+print("GUDHI:", gudhi.__version__)
+print("POT:", ot.__version__)
+PY
+```
+
+These files are:
+
+```text
+$W22/gudhi-audit-environment.yml
+$W22/gudhi_versions.txt
+```
+
+The environment export and version manifest are now frozen as part of the W22
+audit workspace.
+
+The final remaining preservation tasks are:
+
+```text
+1. inspect/freeze the exact version manifest;
+2. SHA-256 hash the W22 scripts, CSVs, summaries, logs, and environment files;
+3. create a hash-frozen W22 archive;
+4. verify the per-file manifest;
+5. verify the archive checksum;
+6. verify archive readability/inventory.
+```
+
+---
+
+## XXXVI.36 Current W22 audit status
+
+```text
+analytic validation:
+    PASS
+
+real high-cardinality pilot:
+    PASS
+
+custom full sweep:
+    8,568 / 8,568 PASS
+
+cross-norm invariant:
+    PASS on all 8,568 comparisons
+
+custom CSV integrity:
+    PASS
+
+historical TTK2 comparison:
+    COMPLETE
+
+GUDHI preflight:
+    8,568 / 8,568 PASS
+
+GUDHI exhaustive numerical verification:
+    8,568 / 8,568 PASS
+    0 mismatches
+    0 errors
+
+GUDHI result CSV integrity:
+    PASS
+
+environment export:
+    COMPLETE
+
+version manifest:
+    COMPLETE
+
+numerical audit:
+    CLOSED / VALIDATED
+
+preservation archive:
+    PENDING FINAL SHA-256 / tar.gz closeout
+```
+
