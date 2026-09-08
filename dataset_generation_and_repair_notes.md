@@ -16520,3 +16520,1215 @@ A small TTK-tolerance isolation pilot can be performed later if needed to
 explain the historical discrepancy in an appendix or methods audit. It does
 not need to block candidate analysis or visual case selection.
 
+---
+
+## XXXVI.42 Sample-wise robustness across \(d_B\), \(W_{2,\infty}\), and \(W_{2,2}\)
+
+After closing and preservation-verifying the \(W_{2,2}\) audit, a sample-wise
+robustness analysis was run for four 2688-sample topology-aware candidates
+against both CNN and GAN.
+
+Script:
+
+```text
+$W22/analyze_candidate_pd_robustness.py
+```
+
+Outputs:
+
+```text
+$W22/candidate_pd_robustness_summary.csv
+$W22/candidate_pd_robustness_samples.csv
+$W22/candidate_pd_robustness.log
+```
+
+The three explicit validated PD metrics used in this analysis are:
+
+```text
+d_B
+W_{2,infinity}
+W_{2,2}
+```
+
+Lower is better for all three.
+
+The four candidates are:
+
+```text
+candidateC_expanded2688
+
+candidateB_plus_E2_tf_lowlambda_expanded2688
+
+candidateF_grad_E2_low_expanded2688
+
+candidateF_grad_levelset_E2_low_expanded2688
+```
+
+The primary robustness quantity is the number of benchmark samples on which a
+candidate improves over a baseline under **all three** explicit PD metrics
+simultaneously.
+
+### Loss-design context
+
+The relevant objectives are:
+
+```text
+Candidate C:
+    L_uv
+    + 0.01 L_speed
+    + 0.05 L_grad
+    + 0.25 L_levelset
+    + 0.001 L_crit
+
+B+E2-low:
+    Candidate-B scalar/gradient/level-set scaffold
+    + repaired low-lambda TTK fixed-index losses
+
+F grad+E2-low:
+    L_uv
+    + 0.05 L_grad
+    + 0.004 L_TTKCV
+    + 0.002 L_TTKpers
+
+F grad+levelset+E2-low:
+    L_uv
+    + 0.05 L_grad
+    + 0.25 L_levelset
+    + 0.004 L_TTKCV
+    + 0.002 L_TTKpers
+```
+
+For the Candidate-F variants:
+
+```text
+L_speed = 0
+L_crit = 0
+```
+
+and for `grad_E2_low`:
+
+```text
+L_levelset = 0
+```
+
+Thus the Candidate-F comparison directly tests whether combining the
+PD-oriented gradient signal with repaired E2 fixed-index topology supervision
+is sufficient, and whether adding the soft level-set term materially changes
+the result.
+
+---
+
+## XXXVI.43 Candidate C-2688 robustness
+
+### Candidate C vs CNN
+
+```text
+dB improved:      137 / 168
+W2inf improved:   158 / 168
+W22 improved:     160 / 168
+ALL THREE:        133 / 168
+all 3 worsened:     5 / 168
+
+Wassersteins improve, dB worse: 25
+dB improves, Wassersteins worse: 3
+W2inf/W22 direction disagreements: 2
+
+mean deltas, candidate - CNN:
+    dB:    -0.629592
+    W2inf: -3.284923
+    W22:   -4.845302
+
+median deltas:
+    dB:    -0.583447
+    W2inf: -3.568931
+    W22:   -5.129514
+```
+
+Consensus all-three improvement rate:
+
+```text
+133 / 168 = 79.17%
+```
+
+Thus the earlier Candidate-C result remains robust under the newly added
+Euclidean-ground \(W_{2,2}\) convention. Both the mean and median deltas are
+negative for all three metrics.
+
+### Candidate C vs GAN
+
+```text
+dB improved:      143 / 168
+W2inf improved:    44 / 168
+W22 improved:      31 / 168
+ALL THREE:         29 / 168
+all 3 worsened:    23 / 168
+
+W2inf/W22 direction disagreements: 17
+
+mean deltas:
+    dB:    -2.564055
+    W2inf: +1.190528
+    W22:   +2.248646
+
+median deltas:
+    dB:    -1.868901
+    W2inf: +1.085059
+    W22:   +2.072676
+```
+
+Candidate C therefore strongly improves the worst-case persistent discrepancy
+relative to GAN under bottleneck, but GAN remains stronger on aggregate
+Wasserstein agreement for most samples.
+
+---
+
+## XXXVI.44 Candidate B+E2-low-2688 robustness
+
+### B+E2-low vs CNN
+
+```text
+dB improved:      148 / 168
+W2inf improved:   166 / 168
+W22 improved:     166 / 168
+ALL THREE:        147 / 168
+all 3 worsened:     1 / 168
+
+Wassersteins improve, dB worse: 19
+dB improves, Wassersteins worse: 1
+W2inf/W22 direction disagreements: 0
+
+mean deltas:
+    dB:    -0.954974
+    W2inf: -4.674857
+    W22:   -6.509711
+
+median deltas:
+    dB:    -0.898481
+    W2inf: -4.654992
+    W22:   -6.522403
+```
+
+Consensus all-three improvement rate:
+
+```text
+147 / 168 = 87.50%
+```
+
+The two order-2 Wasserstein conventions agree in improvement direction on
+**all 168 samples** for this CNN comparison.
+
+### B+E2-low vs GAN
+
+```text
+dB improved:      161 / 168
+W2inf improved:    82 / 168
+W22 improved:      61 / 168
+ALL THREE:         61 / 168
+all 3 worsened:     7 / 168
+
+W2inf/W22 direction disagreements: 21
+
+mean deltas:
+    dB:    -2.889438
+    W2inf: -0.199406
+    W22:   +0.584238
+
+median deltas:
+    dB:    -2.226290
+    W2inf: +0.021033
+    W22:   +0.835538
+```
+
+This is a convention-sensitive near-tie against GAN: the candidate is slightly
+better on mean \(W_{2,\infty}\) but slightly worse on mean \(W_{2,2}\).
+
+---
+
+## XXXVI.45 Candidate F grad+E2-low-2688 robustness
+
+### F grad+E2-low vs CNN
+
+```text
+dB improved:      151 / 168
+W2inf improved:   167 / 168
+W22 improved:     166 / 168
+ALL THREE:        150 / 168
+all 3 worsened:     1 / 168
+
+Wassersteins improve, dB worse: 16
+dB improves, Wassersteins worse: 0
+W2inf/W22 direction disagreements: 1
+
+mean deltas:
+    dB:    -0.974364
+    W2inf: -4.826469
+    W22:   -6.720253
+
+median deltas:
+    dB:    -0.912582
+    W2inf: -4.790556
+    W22:   -6.599013
+```
+
+Consensus all-three improvement rate:
+
+```text
+150 / 168 = 89.29%
+```
+
+This is the strongest all-three sample-wise consensus against CNN among the
+four candidates examined.
+
+### F grad+E2-low vs GAN
+
+```text
+dB improved:      157 / 168
+W2inf improved:    88 / 168
+W22 improved:      68 / 168
+ALL THREE:         67 / 168
+all 3 worsened:    10 / 168
+
+W2inf/W22 direction disagreements: 20
+
+mean deltas:
+    dB:    -2.908828
+    W2inf: -0.351019
+    W22:   +0.373695
+
+median deltas:
+    dB:    -2.278444
+    W2inf: -0.128777
+    W22:   +0.639629
+```
+
+The candidate beats GAN on all three metrics simultaneously on:
+
+```text
+67 / 168 = 39.88%
+```
+
+samples.
+
+At the mean level it beats GAN under \(d_B\) and \(W_{2,\infty}\), but remains
+slightly worse under \(W_{2,2}\).
+
+---
+
+## XXXVI.46 Candidate F grad+levelset+E2-low-2688 robustness
+
+### F grad+levelset+E2-low vs CNN
+
+```text
+dB improved:      148 / 168
+W2inf improved:   167 / 168
+W22 improved:     166 / 168
+ALL THREE:        147 / 168
+all 3 worsened:     1 / 168
+
+Wassersteins improve, dB worse: 19
+dB improves, Wassersteins worse: 0
+W2inf/W22 direction disagreements: 1
+
+mean deltas:
+    dB:    -0.947615
+    W2inf: -4.856852
+    W22:   -6.788077
+
+median deltas:
+    dB:    -0.872122
+    W2inf: -4.803865
+    W22:   -6.661632
+```
+
+Consensus all-three improvement rate:
+
+```text
+147 / 168 = 87.50%
+```
+
+### F grad+levelset+E2-low vs GAN
+
+```text
+dB improved:      157 / 168
+W2inf improved:    92 / 168
+W22 improved:      68 / 168
+ALL THREE:         67 / 168
+all 3 worsened:    10 / 168
+
+W2inf/W22 direction disagreements: 24
+
+mean deltas:
+    dB:    -2.882079
+    W2inf: -0.381402
+    W22:   +0.305872
+
+median deltas:
+    dB:    -2.229155
+    W2inf: -0.196365
+    W22:   +0.585805
+```
+
+As with the simpler grad+E2 variant, this candidate beats GAN on all three
+metrics on:
+
+```text
+67 / 168 = 39.88%
+```
+
+samples.
+
+---
+
+## XXXVI.47 Cross-candidate interpretation
+
+### Robustness against CNN
+
+All four candidates improve substantially relative to CNN, but the consensus
+counts distinguish them:
+
+| Candidate | dB improved | W2inf improved | W22 improved | all 3 improved |
+|---|---:|---:|---:|---:|
+| Candidate C-2688 | 137 | 158 | 160 | 133 |
+| B+E2-low-2688 | 148 | 166 | 166 | 147 |
+| F grad+E2-low-2688 | **151** | **167** | 166 | **150** |
+| F grad+levelset+E2-low-2688 | 148 | **167** | 166 | 147 |
+
+The strongest sample-wise all-metric robustness is therefore:
+
+```text
+F grad+E2-low:
+150 / 168 = 89.29%
+```
+
+This is especially important because that objective is comparatively simple:
+
+```text
+L_uv
++ L_grad
++ repaired E2 fixed-index supervision
+```
+
+with no \(L_{\text{speed}}\), \(L_{\text{levelset}}\), or \(L_{\text{crit}}\).
+
+This provides evidence that the combination of gradient supervision and
+repaired E2 constraints is sufficient to obtain strong persistence-diagram
+improvement relative to CNN in this benchmark.
+
+### Effect of reintroducing the level-set loss
+
+Relative to `F grad+E2-low`, adding \(L_{\text{levelset}}\):
+
+```text
+slightly improves mean W2inf
+slightly improves mean W22
+slightly worsens mean dB
+reduces all-three CNN consensus from 150 to 147
+```
+
+Against GAN, it increases W2inf wins:
+
+```text
+88 -> 92
+```
+
+but leaves:
+
+```text
+W22 wins: 68 -> 68
+all-three wins: 67 -> 67
+```
+
+Thus \(L_{\text{levelset}}\) provides a small aggregate-Wasserstein benefit but
+does not improve overall three-metric consensus. The simpler `grad+E2-low`
+variant is therefore a particularly clean primary candidate, while the
+level-set version is useful as an interaction ablation.
+
+### W2inf vs W22 convention stability
+
+Against CNN, the two Wasserstein conventions almost always agree in direction:
+
+```text
+Candidate C:           2 disagreements
+B+E2-low:              0 disagreements
+F grad+E2-low:         1 disagreement
+F grad+levelset+E2:    1 disagreement
+```
+
+This is strong evidence that the conclusion "the topology-aware candidates
+improve aggregate PD correspondence relative to CNN" is not an artifact of
+choosing \(L_\infinity\) versus Euclidean \(L_2\) ground geometry.
+
+Against GAN, however, disagreements are substantially more common:
+
+```text
+Candidate C:          17
+B+E2-low:             21
+F grad+E2-low:        20
+F grad+levelset+E2:   24
+```
+
+This is scientifically interpretable because GAN is already a strong
+aggregate-PD baseline. Near that stronger baseline, the birth-death-plane
+ground norm can change which reconstruction is preferred on individual
+samples.
+
+### Bottleneck versus Wasserstein interpretation
+
+The candidates often outperform GAN under bottleneck while remaining close to
+or worse than GAN under aggregate Wasserstein metrics.
+
+For example, both Candidate-F variants beat GAN in bottleneck on:
+
+```text
+157 / 168
+```
+
+samples, but beat GAN in \(W_{2,2}\) on only:
+
+```text
+68 / 168
+```
+
+samples.
+
+This supports the distinction:
+
+```text
+d_B:
+    worst persistent mismatch
+
+W_{2,infinity}, W_{2,2}:
+    accumulated mismatch across the finite diagram
+```
+
+A candidate can therefore remove or reduce the most severe persistent error
+while GAN remains better in total diagram-wide agreement.
+
+---
+
+## XXXVI.48 Updated primary scientific result
+
+The new multi-metric robustness analysis supports the following stronger
+statement:
+
+> Topology-aware fine-tuning improves persistence-diagram agreement relative
+> to the pretrained CNN under bottleneck distance and under two independently
+> validated order-2 Wasserstein conventions. The strongest Candidate-F
+> grad+E2 variant improves all three metrics simultaneously on 150/168
+> benchmark samples. The two Wasserstein ground-metric conventions almost
+> never disagree on improvement direction relative to CNN, indicating that
+> the result is robust to the \(L_\infinity\)- versus \(L_2\)-ground choice.
+
+The GAN comparison provides a complementary result:
+
+> The topology-aware candidates strongly outperform GAN under bottleneck,
+> while GAN remains highly competitive under aggregate Wasserstein distance.
+> For the strongest Candidate-F variants, mean \(W_{2,\infinity}\) is slightly
+> better than GAN while mean \(W_{2,2}\) remains slightly worse, demonstrating
+> that the ground-metric convention can matter when comparing methods whose
+> aggregate PD performance is already close.
+
+---
+
+## XXXVI.49 Next analysis priority
+
+The next priority is qualitative case selection under a predeclared
+traditional-metric near-tie rule.
+
+The preferred candidate for the primary analysis is:
+
+```text
+candidateF_grad_E2_low_expanded2688
+```
+
+because it has:
+
+```text
+the highest all-three consensus vs CNN: 150/168
+the strongest dB win count vs CNN:       151/168
+near-universal W2inf improvement:         167/168
+near-universal W22 improvement:           166/168
+a simpler objective than the level-set variant
+```
+
+The `grad+levelset+E2` variant should remain as an important ablation because
+it has slightly stronger mean aggregate Wasserstein performance.
+
+For qualitative visualization, first select samples using only conventional
+fidelity criteria, for example:
+
+```text
+small PSNR difference
+small SSIM difference, if available
+small speed-MAE difference
+```
+
+Then, within that preselected subset, rank cases by topology separation and
+prefer examples where:
+
+```text
+d_B favors Candidate F
+W2inf favors Candidate F
+W22 favors Candidate F
+```
+
+This avoids selecting examples after looking at the images and provides a
+principled basis for demonstrating that persistence-based metrics can
+distinguish structural differences when conventional reconstruction metrics
+are nearly tied.
+
+---
+
+## XXXVI.50 Candidate-F conventional near-tie / PD-separation study
+
+After the full \(W_{2,2}\) audit and the three-metric sample-wise robustness
+analysis were completed, the next stage was designed to identify qualitative
+case studies without selecting images retrospectively.
+
+The primary comparison is:
+
+```text
+CNN
+vs
+candidateF_grad_E2_low_expanded2688
+```
+
+This candidate was selected because the preceding robustness analysis found
+that it improved all three validated PD metrics simultaneously on:
+
+```text
+150 / 168 = 89.29%
+```
+
+of the corrected 168-sample benchmark relative to CNN.
+
+The purpose of the new study is:
+
+> First identify samples for which CNN and Candidate F are relatively close
+> under conventional reconstruction metrics, using no PD information in the
+> selection step. Only after that conventional subset is frozen, use the three
+> validated PD metrics to identify samples with large, consistent topology
+> separation.
+
+This ordering is intended to reduce retrospective case selection and make the
+later visual examples defensible as preselected near-tie cases.
+
+---
+
+## XXXVI.51 Conventional evaluation artifact and schema audit
+
+Candidate-F conventional metrics were read from:
+
+```text
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_eval/
+all_sample_metrics_candidateF_grad_E2_low_expanded2688.csv
+```
+
+The evaluation directory contains:
+
+```text
+adjacent_cluster_table_candidateF_grad_E2_low_expanded2688.csv
+all_sample_metrics_candidateF_grad_E2_low_expanded2688.csv
+pairwise_cnn_vs_candidateF_grad_E2_low_expanded2688.csv
+winner_counts_candidateF_grad_E2_low_expanded2688.csv
+```
+
+The all-sample CSV contains:
+
+```text
+672 rows
+```
+
+corresponding to:
+
+```text
+4 methods x 168 samples
+```
+
+with methods:
+
+```text
+bicubic
+cnn
+gan
+candidateF_grad_E2_low_expanded2688
+```
+
+The relevant conventional fields are:
+
+```text
+sample_idx
+psnruv
+speed_mae
+speed_rmse
+```
+
+The CSV also contains an `ssim` field, but every SSIM value is:
+
+```text
+nan
+```
+
+Therefore SSIM is explicitly excluded from the near-tie definition rather than
+being silently approximated or replaced.
+
+The legacy `pd_distance` and `mt_distance` columns in this evaluation CSV are
+also not used for the new topology ranking. The topology side of the study uses
+only the explicitly defined and independently validated metrics from the new
+distance audit:
+
+```text
+d_B
+W_{2,infinity}
+W_{2,2}
+```
+
+---
+
+## XXXVI.52 Predeclared conventional-closeness rule
+
+For each sample \(i\), CNN and Candidate F are compared using three conventional
+gaps.
+
+### PSNRuv gap
+
+```text
+abs_delta_psnruv
+=
+|PSNRuv_F - PSNRuv_CNN|
+```
+
+### Relative speed-MAE gap
+
+```text
+relative_gap_speed_mae
+=
+|MAE_F - MAE_CNN| / MAE_CNN
+```
+
+### Relative speed-RMSE gap
+
+```text
+relative_gap_speed_rmse
+=
+|RMSE_F - RMSE_CNN| / RMSE_CNN
+```
+
+MAE and RMSE are expressed relatively because their natural scale varies across
+samples, whereas PSNRuv is already represented in dB.
+
+Each of these three gaps is converted independently to an ascending percentile
+rank across the 168 samples:
+
+```text
+0 = smallest / closest gap
+1 = largest / least-close gap
+```
+
+The final conventional-closeness score is:
+
+```text
+C_i = max(
+    PSNR-gap percentile,
+    MAE-gap percentile,
+    RMSE-gap percentile
+)
+```
+
+The maximum is used rather than the mean so that a sample is considered
+conventionally close only when it is reasonably close under all three
+conventional metrics.
+
+A secondary mean-percentile score is used only as a deterministic tie-breaker.
+
+The complete conventional ordering is then frozen using:
+
+```text
+1. conventional_closeness_score ascending
+2. conventional_mean_percentile ascending
+3. sample index ascending
+```
+
+No PD quantity appears in this ordering key.
+
+---
+
+## XXXVI.53 Predeclared near-tie tiers
+
+Three nested conventional near-tie tiers were defined strictly by the frozen
+conventional rank:
+
+```text
+STRICT 10%:
+    ranks 1-17
+    17 samples
+
+PRIMARY 20%:
+    ranks 1-34
+    34 samples
+
+BROAD 30%:
+    ranks 1-51
+    51 samples
+```
+
+These are rank-based subsets, not literal conditions such as
+`C_i <= 0.10`, `C_i <= 0.20`, or `C_i <= 0.30`.
+
+The primary analysis tier is:
+
+```text
+PRIMARY 20%
+```
+
+The strict and broad tiers are retained as sensitivity views.
+
+---
+
+## XXXVI.54 Topology-separation rule applied only after conventional selection
+
+After the conventional ordering and near-tie subsets are fixed, topology is
+evaluated using the three validated lower-is-better PD distances.
+
+For each metric:
+
+```text
+relative improvement
+=
+(CNN distance - Candidate-F distance)
+/
+CNN distance
+```
+
+Positive values favor Candidate F.
+
+A sample is eligible for the primary visual-topology ranking only if:
+
+```text
+d_B Candidate F < d_B CNN
+AND
+W2inf Candidate F < W2inf CNN
+AND
+W22 Candidate F < W22 CNN
+```
+
+The conservative topology-consensus score is:
+
+```text
+T_i = min(
+    relative d_B improvement,
+    relative W2inf improvement,
+    relative W22 improvement
+)
+```
+
+The minimum is used so that a sample cannot rank highly because of one unusually
+large improvement while another PD metric shows only a weak gain.
+
+Within each already-frozen conventional tier, eligible samples are ranked by:
+
+```text
+1. topology_consensus_score descending
+2. mean three-metric relative improvement descending
+3. conventional rank ascending
+4. sample index ascending
+```
+
+Thus the workflow is explicitly:
+
+```text
+conventional metrics only
+        |
+        v
+freeze near-tie set
+        |
+        v
+require all-three PD improvement
+        |
+        v
+rank by conservative PD separation
+        |
+        v
+only then inspect images
+```
+
+---
+
+## XXXVI.55 Near-tie selection implementation
+
+Script:
+
+```text
+$W22/select_near_tie_visual_cases.py
+```
+
+The script passed compilation:
+
+```text
+exit status = 0
+```
+
+Outputs:
+
+```text
+$W22/near_tie_candidateF_grad_E2_vs_cnn_master.csv
+
+$W22/near_tie_candidateF_grad_E2_vs_cnn_topology_ranked.csv
+
+$W22/near_tie_candidateF_grad_E2_vs_cnn_summary.txt
+
+$W22/near_tie_candidateF_grad_E2_vs_cnn.log
+```
+
+The master CSV contains the complete 168-sample conventional ordering plus
+topology values.
+
+The topology-ranked CSV contains only the all-three-PD-improved cases inside
+each predeclared tier, with tier-specific topology ranks.
+
+---
+
+## XXXVI.56 Near-tie study result: every selected conventional case improves under all three PD metrics
+
+The resulting tier counts are:
+
+```text
+STRICT 10%
+    conventional cases:         17
+    all-three-PD-improved:      17
+
+PRIMARY 20%
+    conventional cases:         34
+    all-three-PD-improved:      34
+
+BROAD 30%
+    conventional cases:         51
+    all-three-PD-improved:      51
+```
+
+Therefore:
+
+```text
+STRICT:
+    17 / 17 = 100%
+
+PRIMARY:
+    34 / 34 = 100%
+
+BROAD:
+    51 / 51 = 100%
+```
+
+of the conventionally closest selected cases also favor Candidate F
+simultaneously under:
+
+```text
+d_B
+W_{2,infinity}
+W_{2,2}
+```
+
+This is a notably stronger result than the already-high whole-benchmark
+three-metric consensus of:
+
+```text
+150 / 168 = 89.29%
+```
+
+However, this should not yet be interpreted as a visual or physical result.
+At this point it establishes only that the preselected conventional near-tie
+subsets are uniformly separated in Candidate F's favor by all three validated
+PD metrics.
+
+The visual question remains open until the fields are inspected.
+
+---
+
+## XXXVI.57 Primary 20% topology-ranked cases
+
+The top 20 cases within the predeclared PRIMARY 20% conventional near-tie set
+are:
+
+| topo rank | sample | conventional rank | \(|\Delta PSNRuv|\) | rel. MAE gap | rel. RMSE gap | \(d_B\) gain | \(W_{2,\infty}\) gain | \(W_{2,2}\) gain | minimum PD gain |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 78 | 13 | 0.5595 | 9.47% | 3.55% | 37.68% | 32.07% | 34.10% | **32.07%** |
+| 2 | 71 | 8 | 0.6064 | 8.64% | 3.29% | 41.38% | 31.91% | 33.95% | **31.91%** |
+| 3 | 69 | 27 | 0.7746 | 9.50% | 4.71% | 59.79% | 31.46% | 34.18% | **31.46%** |
+| 4 | 70 | 14 | 0.6449 | 8.60% | 3.25% | 33.20% | 30.89% | 32.48% | **30.89%** |
+| 5 | 80 | 2 | 0.5443 | 8.13% | 3.17% | 57.93% | 30.14% | 32.57% | **30.14%** |
+| 6 | 79 | 4 | 0.5730 | 8.93% | 3.56% | 49.58% | 29.86% | 31.89% | **29.86%** |
+| 7 | 87 | 24 | 0.7050 | 10.26% | 4.91% | 35.76% | 29.51% | 30.39% | **29.51%** |
+| 8 | 81 | 7 | 0.5954 | 9.26% | 3.76% | 47.45% | 29.40% | 31.82% | **29.40%** |
+| 9 | 84 | 20 | 0.6341 | 10.04% | 4.35% | 55.17% | 29.02% | 29.75% | **29.02%** |
+| 10 | 76 | 6 | 0.5861 | 9.10% | 3.44% | 43.70% | 29.00% | 30.71% | **29.00%** |
+| 11 | 72 | 17 | 0.6702 | 9.49% | 4.22% | 38.40% | 28.84% | 30.91% | **28.84%** |
+| 12 | 82 | 9 | 0.5559 | 9.32% | 3.84% | 62.21% | 28.47% | 29.66% | **28.47%** |
+| 13 | 75 | 11 | 0.6146 | 8.78% | 3.51% | 43.57% | 28.34% | 29.03% | **28.34%** |
+| 14 | 63 | 1 | 0.4628 | 8.43% | 3.26% | 49.01% | 27.47% | 29.50% | **27.47%** |
+| 15 | 109 | 33 | 0.8257 | 10.56% | 5.08% | 28.35% | 27.20% | 29.61% | **27.20%** |
+| 16 | 59 | 10 | 0.5582 | 9.01% | 4.09% | 31.47% | 26.99% | 29.31% | **26.99%** |
+| 17 | 58 | 19 | 0.5969 | 9.64% | 4.65% | 31.93% | 26.74% | 29.58% | **26.74%** |
+| 18 | 103 | 16 | 0.6633 | 9.35% | 4.21% | 45.30% | 26.28% | 27.47% | **26.28%** |
+| 19 | 83 | 22 | 0.6584 | 10.21% | 4.64% | 51.18% | 25.68% | 26.24% | **25.68%** |
+| 20 | 104 | 29 | 0.7720 | 10.66% | 5.08% | 43.23% | 25.39% | 26.74% | **25.39%** |
+
+All 20 listed cases satisfy the all-three-PD improvement requirement by
+construction.
+
+---
+
+## XXXVI.58 Particularly strong visual-study candidates before image inspection
+
+Several samples have complementary reasons to be informative.
+
+### Sample 78
+
+```text
+conventional rank: 13
+topology rank:      1
+
+|delta PSNRuv|:     0.5595 dB
+relative MAE gap:   9.47%
+relative RMSE gap:  3.55%
+
+dB gain:            37.68%
+W2inf gain:         32.07%
+W22 gain:           34.10%
+minimum PD gain:    32.07%
+```
+
+This is the strongest conservative three-metric topology separation within the
+primary near-tie subset.
+
+### Sample 71
+
+```text
+conventional rank: 8
+topology rank:      2
+
+|delta PSNRuv|:     0.6064 dB
+relative MAE gap:   8.64%
+relative RMSE gap:  3.29%
+
+dB gain:            41.38%
+W2inf gain:         31.91%
+W22 gain:           33.95%
+minimum PD gain:    31.91%
+```
+
+This combines stronger conventional closeness than sample 78 with almost the
+same conservative topology separation.
+
+### Sample 80
+
+```text
+conventional rank: 2
+topology rank:      5
+
+|delta PSNRuv|:     0.5443 dB
+relative MAE gap:   8.13%
+relative RMSE gap:  3.17%
+
+dB gain:            57.93%
+W2inf gain:         30.14%
+W22 gain:           32.57%
+minimum PD gain:    30.14%
+```
+
+This is particularly attractive because it is the second-closest conventional
+case in the entire benchmark while still showing a minimum topology improvement
+above 30%.
+
+### Sample 63
+
+```text
+conventional rank: 1
+topology rank:      14
+
+|delta PSNRuv|:     0.4628 dB
+relative MAE gap:   8.43%
+relative RMSE gap:  3.26%
+
+dB gain:            49.01%
+W2inf gain:         27.47%
+W22 gain:           29.50%
+minimum PD gain:    27.47%
+```
+
+This is the single conventionally closest case in the benchmark and still
+shows large consistent PD gains.
+
+### Sample 69
+
+```text
+conventional rank: 27
+topology rank:      3
+
+|delta PSNRuv|:     0.7746 dB
+relative MAE gap:   9.50%
+relative RMSE gap:  4.71%
+
+dB gain:            59.79%
+W2inf gain:         31.46%
+W22 gain:           34.18%
+minimum PD gain:    31.46%
+```
+
+This is less conventionally close than samples 63/71/80 but has one of the
+strongest topology separations and an especially large bottleneck improvement.
+
+These observations are based only on the frozen quantitative tables. No
+field-image interpretation has yet been used to choose among them.
+
+---
+
+## XXXVI.59 Strict and broad sensitivity results
+
+The top strict-tier cases include:
+
+```text
+78
+71
+70
+80
+79
+81
+76
+72
+82
+75
+```
+
+with minimum three-metric PD gains of approximately:
+
+```text
+28.34% to 32.07%
+```
+
+among the reported top ten.
+
+The broad 30% tier adds samples with even larger topology separation, including:
+
+```text
+sample 67:
+    conventional rank = 49
+    minimum PD gain   = 34.69%
+
+sample 68:
+    conventional rank = 35
+    minimum PD gain   = 33.31%
+```
+
+These broad-tier cases are useful sensitivity examples but are not preferred
+over the PRIMARY 20% cases for the main visual argument because their
+conventional closeness is weaker.
+
+---
+
+## XXXVI.60 Current scientific interpretation before visualization
+
+The near-tie stage currently supports the following quantitative statement:
+
+> Among the samples where CNN and Candidate F are most similar under the
+> predeclared conventional-fidelity ranking, all selected strict, primary, and
+> broad near-tie cases favor Candidate F simultaneously under bottleneck
+> distance, \(W_{2,\infinity}\), and \(W_{2,2}\). Within the primary 20% subset,
+> the strongest cases retain minimum improvements of roughly 25-32% across all
+> three PD metrics despite relatively small differences in PSNRuv, speed MAE,
+> and speed RMSE.
+
+This is evidence of metric complementarity, but the following claim is
+**not yet justified**:
+
+```text
+Candidate F visibly preserves the physically important structure better.
+```
+
+That stronger statement requires image/field inspection and, ideally, linking
+the PD difference to identifiable persistent structures.
+
+For that reason, the visual stage should preserve the following wording until
+the images are inspected:
+
+```text
+persistent topological structure
+```
+
+rather than:
+
+```text
+physically important structure
+```
+
+unless physical importance is independently established.
+
+---
+
+## XXXVI.61 Required freeze before visual inspection
+
+Before opening or rendering the selected fields, the following artifacts should
+be hash-frozen:
+
+```text
+$W22/select_near_tie_visual_cases.py
+
+$W22/near_tie_candidateF_grad_E2_vs_cnn_master.csv
+
+$W22/near_tie_candidateF_grad_E2_vs_cnn_topology_ranked.csv
+
+$W22/near_tie_candidateF_grad_E2_vs_cnn_summary.txt
+
+$W22/near_tie_candidateF_grad_E2_vs_cnn.log
+
+$W22/candidate_pd_robustness_samples.csv
+
+$W22/candidate_pd_robustness_summary.csv
+```
+
+This freeze will document that:
+
+```text
+the conventional selection rule
+the near-tie membership
+the topology ranking
+```
+
+were all fixed before visual inspection.
+
+After that freeze, the recommended initial visual candidates are:
+
+```text
+78
+71
+80
+63
+69
+```
+
+This set deliberately spans:
+
+```text
+strongest topology consensus
+very high conventional closeness
+large bottleneck improvement
+different positions within the primary near-tie ranking
+```
+
+The initial figure design should compare, using identical scalar ranges:
+
+```text
+GT speed
+CNN speed
+Candidate-F speed
+
+|CNN - GT|
+|Candidate-F - GT|
+```
+
+followed by persistence-diagram views for the same sample.
+
+No visual sample should be replaced merely because another sample "looks
+better" unless that replacement is documented as a separate exploratory
+example rather than part of the predeclared primary case set.
+
