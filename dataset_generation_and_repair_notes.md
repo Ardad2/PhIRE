@@ -19106,3 +19106,1122 @@ samples 71 / 63:
 The initial figure batch should still be generated from the already predeclared
 set without substituting samples based on visual appearance.
 
+---
+
+## XXXVI.80 Sample-78 matched-control figure generation — COMPLETE / PASS
+
+The redesigned matched-control figure generator completed successfully for
+predeclared sample 78.
+
+All real-data alignment and topology guards passed:
+
+```text
+GT array alignment:
+    CNN vs UV = 0
+    CNN vs F  = 0
+
+GT positive-persistence equality across:
+    CNN
+    Ablation
+    Candidate F
+PASS
+```
+
+Positive-persistence model-pair counts for sample 78:
+
+```text
+CNN:
+    D0 = 547
+    D1 = 485
+
+Ablation:
+    D0 = 317
+    D1 = 279
+
+Candidate F:
+    D0 = 656
+    D1 = 558
+```
+
+Figure-time W22 recomputation agreed exactly with the frozen audit:
+
+```text
+CNN:
+    recomputed = 30.5681180963627
+    frozen     = 30.5681180963627
+    diff       = 0
+
+Ablation:
+    recomputed = 31.1638744304913
+    frozen     = 31.1638744304913
+    diff       = 0
+
+Candidate F:
+    recomputed = 20.1448098608268
+    frozen     = 20.1448098608268
+    diff       = 0
+```
+
+Therefore:
+
+```text
+W22 audit consistency: PASS
+```
+
+Generated files:
+
+```text
+sample_078_uv_control_overview.png
+sample_078_uv_control_overview.pdf
+
+sample_078_uv_control_w22_matching.png
+sample_078_uv_control_w22_matching.pdf
+```
+
+### Visual assessment
+
+The revised overview is scientifically clearer than the earlier CNN-vs-F-only
+version because it places:
+
+```text
+CNN
+matched L_uv-only control
+Candidate F
+```
+
+side-by-side in both the PD and scalar-field views.
+
+The persistence-survival panel gives a particularly direct qualitative signal:
+Candidate F remains much closer to the GT high-persistence tail than either CNN
+or the matched control.
+
+The 2x3 W22 matching figure is also useful because it separates D0 and D1 and
+shows the matched control explicitly. For sample 78:
+
+```text
+D0 W22:
+    CNN      = 22.8875
+    Ablation = 22.8386
+    F        = 15.8415
+
+D1 W22:
+    CNN      = 20.2625
+    Ablation = 21.2035
+    F        = 12.4443
+```
+
+Thus the L_uv-only control is approximately tied with CNN in D0 and worse in
+D1, whereas Candidate F is substantially better in both dimensions.
+
+The current artwork is considered adequate for exploratory generation of the
+remaining predeclared cases. Minor publication-layout refinements can be
+deferred until the strongest cases are chosen.
+
+---
+
+## XXXVI.81 Remaining predeclared matched-control figures
+
+The remaining already-frozen Candidate-F-vs-CNN cases are:
+
+```text
+71
+80
+63
+69
+```
+
+Together with sample 78, they should be rendered using the same fixed script and
+display threshold before any final visual-case choice.
+
+Samples 71 and 63 are especially useful matched-control cases because the
+L_uv-only control is worse than CNN under all three validated PD metrics while
+Candidate F is better than both.
+
+The visual batch therefore remains:
+
+```text
+78
+71
+80
+63
+69
+```
+
+No sample should be replaced solely because another case looks more visually
+dramatic.
+
+---
+
+## XXXVI.82 Reintroducing merge-tree results after the corrected PD audit
+
+The project already contains a substantial PD-versus-MT analysis from the
+earlier unified-candidate Phase 2C. That analysis used the historical TTK PD
+distance together with the TTK merge-tree distance.
+
+It found substantial descriptor disagreement:
+
+```text
+Across method means:
+    Pearson  = -0.3725
+    Spearman = -0.4283
+
+Within-method median across fields:
+    Pearson  = +0.3883
+    Spearman = +0.2991
+
+Within-sample median across methods:
+    Pearson  = -0.2623
+    Spearman = -0.1538
+
+Two-way-centered residual:
+    Pearson  = +0.0526
+    Spearman = +0.1027
+
+Mean pairwise descriptor agreement:
+    0.4384
+
+Mean pairwise descriptor disagreement:
+    0.5616
+```
+
+These old numeric PD/MT relationship results should not be promoted to final
+claims because the PD side used the historical TTK distance that has now been
+superseded.
+
+However, the analysis design remains highly valuable.
+
+The next topology-integration stage should therefore reuse the same conceptual
+structure while replacing the historical PD metric with the three validated
+distances:
+
+```text
+d_B
+W2inf
+W22
+```
+
+and retaining the existing TTK merge-tree distance as the complementary
+tree-structure descriptor.
+
+The corrected analysis should explicitly ask:
+
+```text
+1. Do PD and MT improve together?
+
+2. How often do all three corrected PD metrics improve while MT worsens?
+
+3. How often does MT improve while one or more PD metrics worsen?
+
+4. How strongly do sample-wise PD deltas correlate with MT deltas?
+
+5. Which methods lie on a corrected PD/MT Pareto front?
+
+6. Are there conventionally close samples where PD and MT disagree strongly?
+```
+
+---
+
+## XXXVI.83 Why merge trees can add information beyond persistence diagrams
+
+Persistence diagrams record birth/death coordinates and feature lifetimes, but
+they discard much of the hierarchical attachment structure of the underlying
+topological tree.
+
+Merge trees retain information about:
+
+```text
+which branches/features merge into which other branches
+the hierarchy/order of those merges
+the scalar levels at which the branching structure changes
+```
+
+Therefore two reconstructions can have similar persistence values while
+arranging those persistent structures differently in the merge hierarchy.
+
+This motivates four sample archetypes:
+
+```text
+A. PD improves + MT improves
+   -> broad topology improvement
+
+B. PD improves + MT worsens
+   -> persistence lifetimes improve but tree hierarchy/branching may degrade
+
+C. PD worsens + MT improves
+   -> tree hierarchy improves despite poorer PD matching
+
+D. PD worsens + MT worsens
+   -> broad topology degradation
+```
+
+The most scientifically informative visual follow-up will likely be B and C,
+because these cases can reveal what the merge-tree descriptor captures that the
+PD representation loses.
+
+Merge-tree visual interpretation must still respect the exact filtration/tree
+convention used by the current TTK pipeline. The TTK MT distance is an existing
+Wasserstein-type merge-tree distance and has strong internal source/audit
+coverage, but it has not received the same independent custom-vs-GUDHI-style
+cross-implementation validation as the corrected PD distances.
+
+---
+
+## XXXVI.84 Existing aggregate MT signal for Candidate F
+
+Existing TTK MT means already suggest that Candidate F does not exhibit a simple
+PD-versus-MT tradeoff at the aggregate level:
+
+```text
+CNN MT:
+    5.8678
+
+Candidate UV expanded-2688 MT:
+    6.0119
+
+Candidate F grad+E2-low MT:
+    5.6566
+```
+
+Thus Candidate F is better than both CNN and the L_uv-only control in mean MT
+distance, while also being substantially better under d_B, W2inf, and W22.
+
+This makes Candidate F a promising joint PD/MT solution rather than merely a
+PD-specialized model.
+
+Other methods may still show genuine PD/MT tradeoffs. In particular, the
+existing unified analysis identified a topology-only Pareto set containing
+multiple methods with distinct descriptor preferences. The corrected PD+MT
+analysis should revisit that Pareto structure using the validated PD trio.
+
+---
+
+## XXXVI.85 Corrected-PD / audited-MT integration source policy
+
+Before beginning the new PD-versus-MT tradeoff analysis, the source-of-truth
+policy is frozen as follows.
+
+### Persistence-diagram metrics
+
+The historical PD fields contained in the unified candidate-evaluation artifacts
+must **not** be used for any new quantitative PD analysis:
+
+```text
+unified_primary_per_sample_long.csv:
+    pd_distance
+
+method_inventory.csv:
+    topology_mean_pd
+    expected_pd
+
+raw legacy topology CSV fields:
+    pd_distance_*
+```
+
+Those values correspond to the historical TTK `"2"` distance path. That path
+has been retained only for provenance and is no longer treated as a corrected
+persistence-diagram metric.
+
+All new PD/MT integration must obtain persistence-diagram distances exclusively
+from the frozen corrected sweep:
+
+```text
+$W22/w22_full_sweep.csv
+```
+
+using only:
+
+```text
+bottleneck_all
+w2inf_all
+w22_all
+```
+
+These correspond to:
+
+```text
+d_B
+W_{2,infinity}
+W_{2,2}
+```
+
+and have already passed the custom/GUDHI validation described earlier in these
+notes.
+
+### Merge-tree metric
+
+The TTK merge-tree distances remain valid for the new analysis.
+
+The authoritative per-sample MT field may be read from:
+
+```text
+ttk_runs_fixed/unified_candidate_evaluation/
+unified_primary_per_sample_long.csv
+
+column:
+    mt_distance
+```
+
+The unified table contains:
+
+```text
+19 methods x 168 samples = 3192 rows
+```
+
+with bicubic lacking topology and the remaining 18 primary topology-bearing
+methods carrying MT values.
+
+The corresponding method inventory provides the mapping between:
+
+```text
+method_id
+original_method_name
+topology_results_csv
+topology_mt_source_column
+topology_mean_mt
+```
+
+and records 168 topology rows for the topology-bearing methods.
+
+### Join key
+
+The corrected integration will join the two independent sources using:
+
+```text
+method identity
+sample_idx in 0..167
+```
+
+For W22 sweep lookup:
+
+```text
+cnn -> run "cnn"
+gan -> run "gan"
+
+all learned primary candidates:
+    topology_finetuning/<original_method_name>_topology
+```
+
+### Required validation
+
+The new script must hard-fail unless:
+
+```text
+1. every included method has exactly samples 0..167;
+2. every d_B / W2inf / W22 / MT value is finite and nonnegative;
+3. every expected corrected W22 run is found exactly once per sample;
+4. every unified MT method has exactly 168 samples;
+5. the recomputed MT mean agrees with method_inventory.csv topology_mean_mt;
+6. bicubic is excluded because it has no MT topology result;
+7. no historical PD field is read into any analysis quantity.
+```
+
+The script should print an explicit source-policy line confirming:
+
+```text
+historical TTK PD used: NO
+corrected PD source: w22_full_sweep.csv
+MT source: unified_primary_per_sample_long.csv::mt_distance
+```
+
+This separation is essential because the earlier Phase-2C PD/MT analysis design
+remains useful, while its historical PD numerical input must now be replaced.
+
+---
+
+## XXXVI.86 Planned corrected PD / MT analyses
+
+The new analysis should reproduce the useful structural questions from the old
+Phase 2C framework with the corrected PD trio:
+
+```text
+d_B vs MT
+W2inf vs MT
+W22 vs MT
+```
+
+at several levels:
+
+```text
+A. Across method means
+   Do the descriptors favor the same methods on average?
+
+B. Within each method across the 168 samples
+   Are fields that are difficult under PD also difficult under MT?
+
+C. Across methods within each sample
+   For one fixed wind field, do PD and MT rank reconstructions similarly?
+
+D. Two-way-centered residual relationship
+   After removing additive method and sample effects, is there remaining
+   PD/MT association?
+
+E. Paired improvement quadrants vs CNN
+   PD improves + MT improves
+   PD improves + MT worsens
+   PD worsens + MT improves
+   PD worsens + MT worsens
+
+F. All-three-PD consensus vs MT
+   all d_B/W2inf/W22 improve + MT improves
+   all d_B/W2inf/W22 improve + MT worsens
+   all PD worsen + MT improves
+   mixed-PD cases
+
+G. Corrected PD/MT Pareto fronts
+   separate 2D fronts for each corrected PD metric with MT
+   plus a 4D front over d_B, W2inf, W22, and MT
+
+H. Discordant sample discovery
+   rank samples where persistence agreement improves strongly while MT worsens,
+   and samples where MT improves while persistence agreement worsens.
+```
+
+The most scientifically valuable visual follow-up will focus on descriptor
+discordance, because merge trees preserve hierarchical branch/merge structure
+that persistence diagrams do not encode explicitly.
+
+---
+
+## XXXVI.87 Corrected PD / audited MT tradeoff analysis — COMPLETE
+
+The corrected integration script:
+
+```text
+$W22/analyze_corrected_pd_mt_tradeoff.py
+```
+
+completed successfully under the frozen source policy:
+
+```text
+historical TTK PD used:
+    NO
+
+corrected PD source:
+    $W22/w22_full_sweep.csv
+    bottleneck_all
+    w2inf_all
+    w22_all
+
+audited MT source:
+    unified_primary_per_sample_long.csv::mt_distance
+
+bicubic:
+    excluded because no MT topology result exists
+```
+
+Coverage passed exactly:
+
+```text
+topology-bearing primary methods:
+    18
+
+samples per method:
+    168
+
+joined rows:
+    3024 = 18 x 168
+```
+
+### Across method means
+
+Corrected PD-versus-MT correlations:
+
+```text
+d_B:
+    Pearson  = +0.8515
+    Spearman = +0.5851
+
+W2inf:
+    Pearson  = -0.1267
+    Spearman = +0.2982
+
+W22:
+    Pearson  = -0.1759
+    Spearman = +0.2095
+```
+
+Thus method-level d_B and MT are substantially more aligned than the two
+order-2 Wasserstein PD metrics and MT.
+
+The weak/negative Pearson coefficients for W2inf/W22 should not be interpreted
+as a simple inverse relationship without further sensitivity analysis because
+there are only 18 method means and method-level outliers/tradeoff methods can
+strongly influence Pearson correlation.
+
+### Within each method across 168 samples
+
+Median correlations across the 18 methods:
+
+```text
+d_B:
+    median Pearson  = +0.3226
+    median Spearman = +0.2379
+
+W2inf:
+    median Pearson  = +0.3891
+    median Spearman = +0.2424
+
+W22:
+    median Pearson  = +0.3896
+    median Spearman = +0.2503
+```
+
+Therefore field difficulty under PD and MT is only moderately aligned within a
+fixed reconstruction method.
+
+### Across methods within each sample
+
+Median cross-method correlations across the 168 samples:
+
+```text
+d_B:
+    median Pearson  = +0.7004
+    median Spearman = +0.4480
+
+W2inf:
+    median Pearson  = -0.0209
+    median Spearman = +0.2064
+
+W22:
+    median Pearson  = -0.0704
+    median Spearman = +0.1589
+```
+
+For a fixed wind field, d_B and MT tend to rank methods more similarly than
+either accumulated order-2 Wasserstein PD metric and MT.
+
+### Two-way-centered residual relationship
+
+After removing additive method and sample effects:
+
+```text
+d_B vs MT:
+    Pearson  = +0.7323
+    Spearman = +0.4355
+
+W2inf vs MT:
+    Pearson  = +0.1833
+    Spearman = +0.1384
+
+W22 vs MT:
+    Pearson  = +0.1394
+    Spearman = +0.1186
+```
+
+The residual-centering numerical margins were near machine precision.
+
+This is strong evidence that the descriptors are not interchangeable.
+Bottleneck distance shares a considerably stronger residual relationship with
+the current MT distance than the accumulated Wasserstein metrics do.
+
+A plausible interpretation is that d_B and MT are both comparatively sensitive
+to dominant/worst structural discrepancies, whereas W2inf/W22 accumulate many
+pairwise persistence discrepancies. This is a hypothesis about descriptor
+behavior, not yet a proved mechanistic explanation.
+
+---
+
+## XXXVI.88 All-three corrected-PD consensus versus MT
+
+For Candidate F1 (`f1_grad_e2`) relative to CNN:
+
+```text
+all three PD improve + MT improves:
+    91 / 168
+
+all three PD improve + MT worsens:
+    59 / 168
+
+all three PD worsen + MT improves:
+    0 / 168
+
+all three PD worsen + MT worsens:
+    1 / 168
+
+mixed corrected-PD directions:
+    17 / 168
+```
+
+Candidate F therefore improves all three corrected PD metrics on:
+
+```text
+150 / 168
+```
+
+samples, consistent with the earlier robustness analysis.
+
+Among those 150 all-three-PD improvements:
+
+```text
+91 / 150 = 60.7%
+```
+
+also improve MT, while:
+
+```text
+59 / 150 = 39.3%
+```
+
+worsen MT.
+
+This is an important result:
+
+> Candidate F is jointly better under PD and MT for a majority of its
+> all-three-PD-improvement samples, but a substantial 39.3% of those samples
+> exhibit descriptor disagreement: persistence-diagram agreement improves while
+> merge-tree distance worsens.
+
+Thus Candidate F does not exhibit a simple aggregate PD-versus-MT tradeoff, but
+sample-level tradeoffs are common enough to warrant direct visualization.
+
+Other methods show even stronger disagreement. Examples:
+
+```text
+Candidate C:
+    all-three PD improve = 133
+    PD improve + MT worsen = 88
+    -> 66.2% of all-three-PD improvements disagree with MT
+
+Candidate F3 grad+crit:
+    all-three PD improve = 138
+    PD improve + MT worsen = 83
+    -> 60.1% disagreement among all-three-PD improvements
+
+F2 grad+levelset+E2:
+    all-three PD improve = 147
+    PD improve + MT worsen = 53
+    -> 36.1%
+
+UV+E2:
+    all-three PD improve = 148
+    PD improve + MT worsen = 48
+    -> 32.4%
+```
+
+This supports treating PD and MT as complementary descriptors rather than
+alternative implementations of the same topological notion.
+
+---
+
+## XXXVI.89 Corrected PD / MT Pareto structure
+
+Method-mean Pareto fronts are:
+
+```text
+d_B + MT:
+    f1_grad_e2
+    uv_e2
+
+W2inf + MT:
+    f1_grad_e2
+    f2_grad_levelset_e2
+    uv_e2
+
+W22 + MT:
+    f1_grad_e2
+    f2_grad_levelset_e2
+    gan
+    uv_e2
+
+4D d_B + W2inf + W22 + MT:
+    f1_grad_e2
+    f2_grad_levelset_e2
+    gan
+    uv_e2
+```
+
+Candidate F1 is on every corrected PD/MT Pareto front.
+
+This strengthens its role as the primary balanced topology-aware candidate.
+
+`uv_e2` is also on every front, indicating that the repaired E2 signal alone
+remains an important MT/PD-balanced objective.
+
+GAN enters the W22/MT and 4D fronts because its accumulated W22 is extremely
+strong despite weak MT, illustrating a genuine descriptor tradeoff rather than
+an across-the-board topology advantage.
+
+---
+
+## XXXVI.90 Strong Candidate-F PD/MT-discordant samples
+
+For F1 versus CNN, the strongest cases where all three corrected PD metrics
+improve while MT worsens include:
+
+```text
+sample 67:
+    d_B gain    = +56.39%
+    W2inf gain  = +34.69%
+    W22 gain    = +38.58%
+    MT gain     =  -6.51%
+
+sample 114:
+    d_B gain    = +32.02%
+    W2inf gain  = +21.49%
+    W22 gain    = +23.88%
+    MT gain     = -19.20%
+
+sample 11:
+    d_B gain    = +26.41%
+    W2inf gain  = +35.88%
+    W22 gain    = +36.60%
+    MT gain     = -14.18%
+
+sample 165:
+    d_B gain    = +31.28%
+    W2inf gain  =  +9.00%
+    W22 gain    =  +7.88%
+    MT gain     = -31.77%
+
+sample 47:
+    d_B gain    = +35.23%
+    W2inf gain  = +33.17%
+    W22 gain    = +38.24%
+    MT gain     =  -5.06%
+
+sample 84:
+    d_B gain    = +55.17%
+    W2inf gain  = +29.02%
+    W22 gain    = +29.75%
+    MT gain     =  -7.98%
+```
+
+Sample 84 is particularly interesting because it was already inside the
+previously frozen primary-20%-conventional-closeness Candidate-F-vs-CNN subset.
+
+Therefore sample 84 is a strong candidate for a **secondary, explicitly
+PD/MT-discordance visualization study**:
+
+```text
+conventional metrics relatively close
+all three corrected PD metrics strongly improve
+MT worsens
+```
+
+This secondary selection must remain labeled separately from the original
+predeclared five visual cases (78, 71, 80, 63, 69).
+
+Before looking at MT visualizations, the PD/MT-discordance sample-selection rule
+should be frozen explicitly to avoid appearance-driven cherry-picking.
+
+---
+
+## XXXVI.91 Interpretation of what MT may be adding
+
+The corrected results support the following descriptor distinction:
+
+```text
+Persistence diagrams:
+    preserve the multiset of birth/death coordinates and feature lifetimes
+
+Merge trees:
+    additionally preserve hierarchical branch/merge organization
+```
+
+Therefore a reconstruction can improve:
+
+```text
+feature persistence values / birth-death agreement
+```
+
+while still worsening:
+
+```text
+which branches merge into which,
+their hierarchical organization,
+or the scalar ordering of merge structure
+```
+
+The 59 F1 samples with all-three corrected-PD improvement but MT worsening are
+exactly the cases where this hypothesis can be investigated visually.
+
+The stronger relationship between d_B and MT than between W2inf/W22 and MT also
+suggests that the worst individual persistent mismatch may track important tree
+structure more closely than accumulated PD discrepancy does.
+
+This remains a descriptor-level empirical observation. It should not yet be
+interpreted as proof of a particular merge-tree structural mechanism until
+actual merge-tree visualizations are inspected.
+
+---
+
+## XXXVI.92 Next analyses
+
+Recommended immediate next steps:
+
+```text
+1. Preserve the corrected PD/MT outputs and SHA-freeze them.
+
+2. Compute Candidate-F-vs-UV matched-control PD/MT quadrants, not only
+   Candidate-F-vs-CNN quadrants.
+
+3. Freeze a secondary PD/MT-discordance visual-case rule before inspecting
+   merge-tree images.
+
+4. Prioritize sample 84 for the near-tie + PD-improves + MT-worsens category.
+
+5. Also retain samples 67 / 114 / 11 / 165 as high-discordance candidates,
+   depending on the desired conventional-fidelity constraint.
+
+6. Generate merge-tree visualizations for selected discordant samples and
+   compare them against:
+       GT
+       CNN
+       L_uv-only control
+       Candidate F
+
+7. Add method-mean scatter plots:
+       d_B vs MT
+       W2inf vs MT
+       W22 vs MT
+   with Pareto-front methods labeled.
+
+8. Add bootstrap confidence intervals / leave-one-method-out sensitivity for
+   method-mean correlations because n=18 is small and Pearson is outlier-sensitive.
+```
+
+---
+
+## XXXVI.93 Corrected PD/MT preservation-manifest verification issue
+
+The first attempt to verify:
+
+```text
+$W22/corrected_pd_mt/corrected_pd_mt_final_sha256.txt
+```
+
+failed even though the underlying analysis files were present.
+
+Cause:
+
+```text
+the manifest stored relative paths such as:
+
+    ./corrected_pd_mt_joined.csv
+
+but `sha256sum -c` was executed from ~/PhIRE rather than from the
+$W22/corrected_pd_mt directory.
+```
+
+In addition, shell redirection created the manifest before `find` executed, so
+the manifest itself was included in the file inventory. This produced 15
+entries instead of the intended 14 analysis artifacts.
+
+This is a preservation-command issue only and does not affect any PD/MT result.
+
+The corrected preservation procedure is:
+
+```bash
+rm -f "$PDMT/corrected_pd_mt_final_sha256.txt"
+
+(
+    cd "$PDMT" || exit 1
+
+    find . \
+        -maxdepth 1 \
+        -type f \
+        ! -name 'corrected_pd_mt_final_sha256.txt' \
+        -print0 \
+        | sort -z \
+        | xargs -0 sha256sum
+) > "$PDMT/corrected_pd_mt_final_sha256.txt"
+
+(
+    cd "$PDMT" || exit 1
+    sha256sum -c corrected_pd_mt_final_sha256.txt
+)
+```
+
+Expected manifest inventory:
+
+```text
+14 analysis/result files
+```
+
+The separately generated script/log manifest:
+
+```text
+$W22/corrected_pd_mt_analysis_sha256.txt
+```
+
+already verified successfully:
+
+```text
+analyze_corrected_pd_mt_tradeoff.py: OK
+corrected_pd_mt_tradeoff.log: OK
+```
+
+---
+
+## XXXVI.94 Candidate F versus matched L_uv-only control in corrected PD + MT space
+
+The focal corrected PD/MT table was used to compare:
+
+```text
+Candidate F1:
+    f1_grad_e2
+
+against:
+
+matched L_uv-only control:
+    uv
+```
+
+across all 168 benchmark samples.
+
+Results:
+
+```text
+all three corrected PD metrics improve + MT improves:
+    119 / 168
+
+all three corrected PD metrics improve + MT worsens:
+     37 / 168
+
+mixed corrected-PD directions + MT improves:
+      5 / 168
+
+mixed corrected-PD directions + MT worsens:
+      7 / 168
+```
+
+Because Candidate F improves all three corrected PD metrics relative to UV on:
+
+```text
+156 / 168
+```
+
+samples, the MT split among those all-three-PD-improvement cases is:
+
+```text
+MT also improves:
+    119 / 156 = 76.28%
+
+MT worsens:
+     37 / 156 = 23.72%
+```
+
+Across the full benchmark, Candidate F therefore achieves simultaneous:
+
+```text
+d_B improvement
+W2inf improvement
+W22 improvement
+MT improvement
+```
+
+relative to the matched L_uv-only control on:
+
+```text
+119 / 168 = 70.83%
+```
+
+of samples.
+
+This is stronger joint PD/MT agreement than the corresponding Candidate-F-vs-CNN
+all-three-PD subset, where MT improved on 91/150 = 60.7% of all-three-PD
+improvement samples.
+
+Interpretation:
+
+> Candidate F's topology advantage over the matched reconstruction-only
+> fine-tuning control is not confined to persistence diagrams. On most samples
+> where all three corrected PD metrics improve, the audited merge-tree distance
+> also improves.
+
+However, the 37 all-three-PD-improve / MT-worsen samples remain important
+descriptor-disagreement cases, showing that even the matched-control comparison
+does not make PD and MT interchangeable.
+
+---
+
+## XXXVI.95 Predeclared visual samples under matched-control PD + MT comparison
+
+All five already-predeclared Candidate-F-vs-CNN visual samples improve over the
+matched L_uv-only control under:
+
+```text
+d_B
+W2inf
+W22
+MT
+```
+
+simultaneously.
+
+### Sample 63
+
+```text
+F vs UV:
+    d_B gain   = +49.38%
+    W2inf gain = +31.46%
+    W22 gain   = +33.98%
+    MT gain    = +13.01%
+```
+
+### Sample 69
+
+```text
+F vs UV:
+    d_B gain   = +49.37%
+    W2inf gain = +34.54%
+    W22 gain   = +38.11%
+    MT gain    =  +0.57%
+```
+
+### Sample 71
+
+```text
+F vs UV:
+    d_B gain   = +50.23%
+    W2inf gain = +37.15%
+    W22 gain   = +39.71%
+    MT gain    = +15.74%
+```
+
+### Sample 78
+
+```text
+F vs UV:
+    d_B gain   = +28.68%
+    W2inf gain = +33.34%
+    W22 gain   = +35.36%
+    MT gain    = +12.08%
+```
+
+### Sample 80
+
+```text
+F vs UV:
+    d_B gain   = +49.79%
+    W2inf gain = +31.65%
+    W22 gain   = +34.46%
+    MT gain    = +11.38%
+```
+
+Among the five, sample 71 is the strongest matched-control topology example by
+the combination of large corrected-PD gains and the largest MT gain.
+
+Sample 78 should still remain the principal original conventional-near-tie
+example because that role was frozen before the matched-control analysis.
+
+Sample 69 has only a +0.57% MT improvement relative to UV; therefore any MT
+visual difference there may be subtle even though the corrected PD gains are
+large.
+
+Recommended visual roles:
+
+```text
+sample 78:
+    original conventionally-close PD story
+
+sample 71:
+    especially strong matched-control PD + MT improvement story
+
+sample 84:
+    secondary PD-improves / MT-worsens descriptor-disagreement story
+```
+
+The latter remains a separately defined secondary study and must not be
+retroactively inserted into the original predeclared five.
+
