@@ -16363,3 +16363,160 @@ preservation archive:
     PENDING FINAL SHA-256 / tar.gz closeout
 ```
 
+---
+
+## XXXVI.37 Exact frozen W22 environment versions
+
+The final W22 version manifest records:
+
+```text
+Python: 3.12.14 (main, Sep  2 2026, 23:29:55) [GCC 15.3.0]
+Executable: /home/adadhwal/micromamba/envs/gudhi-audit/bin/python
+Architecture: aarch64
+NumPy: 2.5.3
+SciPy: 1.18.0
+VTK: 9.6.0
+GUDHI: 3.13.0
+POT: 0.9.7.post1
+```
+
+Important correction for the audit record: the exact W22 environment used here
+contains VTK 9.6.0. This frozen manifest is authoritative for the W22 audit.
+
+---
+
+## XXXVI.38 Final W22 per-artifact SHA-256 manifest
+
+All intended audit artifacts were confirmed present and nonempty before hashing.
+
+The final SHA-256 manifest is:
+
+```text
+04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py
+df3b3859db28e45dd4920590deab19468c5f0d36fb572d80a9a7366ed9efae9d  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_full_sweep.csv
+a0c6438ac8243fb82829fd92f8ef06b69d21fc48777f5e1fcab3da67856c84fe  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_gudhi_pilot.py
+b5f8bc643a5c8ce5c79bbba3b58417158893948aa7b3ef636ca9de8b24279e91  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_gudhi_pilot.log
+bef5a1f8347b2f95facdb3044606a206331393c50c066bc58d56e8d44fa1d20a  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/compare_ttk2_vs_w22_baselines.py
+daddaf8f9dfcdcb93d4d507cc32032f8eeb279cb117fe4eeb5b2f8cbde85ea15  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/ttk2_vs_w22_baselines.csv
+e3b20d3bcf088177fd465b95e1ec956d2fedfc263992c8f65cb09e7be8549ae7  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/ttk2_vs_w22_baselines.log
+caec2e58e5591b9580a318f638d050680b5cd81fdcc4defb1e98e20bf1b3a82a  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_full_sweep.py
+71d6af21ba74729d8165c2ed3bf30dbf44a47159814434382ab6443aba7356f0  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_full_sweep.csv
+741066caa37a1a94724e5a045fe7af1bbaf3cc31fdd8121b4f562a045ab4fbe6  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_full_sweep.log
+0342a91c99a59c432bed04aa75ddafd36f8c18299e84c46d640f4465bd5c9fe4  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_full_sweep_summary.txt
+9012fdd013fa0d6317948625eae4ad17d77dd3bf76c9e8b8411fcd77b326b4ce  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_run_summary.csv
+1ef8202d76f05ab07c45f9032449711fdfe6e482f59d414d77edb93d9bce5658  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/gudhi_w22_crosscheck_full.py
+38a4b5d9e67022d238e02d7bc955956f6ad182f5283457a8e4c0686d76ca362c  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/gudhi_w22_full.csv
+630d6cc444a93e65269e4004e1563e36e8113912eb856d37925349d16ead2d36  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/gudhi_w22_full.log
+47ebf2dbf256a4695edaeb4186928ac6df156208771fcab739e9df7bf7c8c148  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/gudhi_w22_preflight.log
+0d5c91ae71bd44dde5ee598ab0fef21b63b1c5f7ccd01be60952091c02211013  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/gudhi_w22_full_summary.txt
+b35f5f0c6c5a3503519fff5984e61204f57960183ab3275d0c3df427610ed04b  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/gudhi-audit-environment.yml
+b5539b2473d9c34c599b85f03150b2aacc9fe29e82606ef0bd970653095acb5d  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/gudhi_versions.txt
+```
+
+Verification with `sha256sum -c` returned `OK` for every artifact.
+
+---
+
+## XXXVI.39 Final W22 archive and preservation verification
+
+Archive:
+
+```text
+$AUDIT/w22_distance_audit_20260908.tar.gz
+```
+
+Archive SHA-256:
+
+```text
+11f898411ecb67123488e4a871766289e7e79e30ace981975d46eeb5fcae6f7d
+```
+
+Sidecar:
+
+```text
+$AUDIT/w22_distance_audit_20260908.tar.gz.sha256
+```
+
+The archive checksum verification returned:
+
+```text
+w22_distance_audit_20260908.tar.gz: OK
+```
+
+The tarball was also successfully listed with `tar -tzf`, confirming archive
+readability and the expected inventory.
+
+The archive contains the two frozen upstream dependencies:
+
+```text
+recompute_pd/canonical_pd_pilot.py
+recompute_pd/canonical_pd_full_sweep.csv
+```
+
+plus the W22 pilot, TTK-comparison, full-sweep, GUDHI-validation, summary,
+environment, version, and SHA-manifest artifacts.
+
+The archive is therefore a hash-frozen/content-addressed preservation snapshot.
+It should not be described as literally immutable unless filesystem or storage
+controls separately enforce immutability.
+
+---
+
+## XXXVI.40 Final W22 audit conclusion
+
+The standard \(W_{2,2}\) persistence-diagram distance layer is now:
+
+```text
+analytically tested
+real-data pilot tested
+full-sweep complete
+cross-norm sanity checked
+independently GUDHI-validated
+independently CSV-integrity checked
+environment/version frozen
+per-artifact SHA-256 verified
+archive SHA-256 verified
+archive readability/inventory verified
+```
+
+Final status:
+
+```text
+W_{2,2} AUDIT:
+CLOSED / VALIDATED / PRESERVATION-VERIFIED
+```
+
+Scientific scope statement:
+
+> Given the same finite TTK-extracted D0 and D1 persistence points, the
+> project's explicit order-2 Wasserstein implementation with Euclidean L2
+> ground metric agrees with GUDHI across all 8,568 GT-SR comparisons.
+
+This validates the distance-computation layer. It does not independently
+validate TTK's upstream persistence-pair extraction from the original scalar
+fields.
+
+---
+
+## XXXVI.41 Priority after audit closure
+
+The historical TTK `Tolerance=1.0` question remains a useful implementation
+forensics experiment, but it is not required for the project's primary
+scientific claims because historical TTK `"2"` is now treated only as a
+legacy/reference metric.
+
+The priority should now move to scientific robustness analysis across the
+three explicit validated metrics:
+
+```text
+d_B
+W_{2,infinity}
+W_{2,2}
+```
+
+with historical TTK `"2"` retained only as supporting legacy evidence.
+
+A small TTK-tolerance isolation pilot can be performed later if needed to
+explain the historical discrepancy in an appendix or methods audit. It does
+not need to block candidate analysis or visual case selection.
+
