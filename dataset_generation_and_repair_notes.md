@@ -14539,3 +14539,1508 @@ Accordingly, the **corrected persistence-diagram distance-computation audit is n
 
 The only recommended final mechanical action is to run the two `sha256sum -c` commands and the `tar -tzf` inventory check above. Once those report cleanly, the preservation closeout is verified in the same manner a future auditor would use.
 
+
+---
+
+# Part XXXVI — Standard W2,2 persistence-diagram audit and metric-convention study
+
+## XXXVI.1 Motivation and relationship to the frozen d_B/W2,infinity audit
+
+The previously completed persistence-diagram distance audit is frozen and must not be modified. That audit validated:
+
+```text
+d_B:
+    bottleneck distance
+    L_infinity ground metric
+    standard diagonal matching
+
+W2,infinity:
+    Wasserstein order q = 2
+    L_infinity ground metric
+    standard diagonal matching
+```
+
+across all 8,568 GT-SR comparisons against GUDHI.
+
+A new sibling audit was therefore created for a second, explicitly defined Wasserstein convention:
+
+```text
+$AUDIT/recompute_pd_w22/
+```
+
+The purpose is to evaluate the standard order-2 Wasserstein distance with an Euclidean ground norm in the birth-death plane:
+
+```text
+W2,2
+```
+
+This is a sensitivity / robustness extension, not a replacement of the frozen d_B/W2,infinity audit.
+
+The broader scientific goal is to determine whether method-level persistence improvements are robust to reasonable persistence-diagram distance conventions:
+
+```text
+d_B
+W2,infinity
+W2,2
+historical TTK "2" (legacy/reference only)
+```
+
+The central principle remains:
+
+> The mathematical definition, ground norm, diagonal cost, homological dimension handling, essential-pair handling, and persistence filtering must all be stated explicitly rather than inferred from a software default.
+
+---
+
+## XXXVI.2 Definition of standard W2,2
+
+For persistence points
+
+```text
+x = (b_x, d_x)
+y = (b_y, d_y)
+```
+
+the Euclidean birth-death-plane ground cost is
+
+```text
+c_2(x,y)
+    = sqrt((b_x-b_y)^2 + (d_x-d_y)^2).
+```
+
+The orthogonal projection of x=(b,d) onto the diagonal is
+
+```text
+Delta(x) = ((b+d)/2, (b+d)/2).
+```
+
+Therefore the standard Euclidean point-to-diagonal cost is
+
+```text
+c_2(x,Delta) = (d-b)/sqrt(2).
+```
+
+This differs from the previously validated L_infinity convention:
+
+```text
+c_infinity(x,Delta) = (d-b)/2.
+```
+
+The order-2 Wasserstein objective is
+
+```text
+W2,2(D,E)
+    = min_gamma sqrt(sum_x c_2(x,gamma(x))^2).
+```
+
+As with the previous audit, D0 and D1 are evaluated separately and combined as
+
+```text
+W22_all = sqrt(W22_D0^2 + W22_D1^2).
+```
+
+No finite D0 point is allowed to match a finite D1 point. The single nonfinite/global pair is excluded from this finite-diagram metric and retained separately.
+
+---
+
+## XXXVI.3 GUDHI definition and reproducibility lesson about defaults
+
+The independent reference implementation is GUDHI:
+
+```python
+wasserstein_distance(
+    A,
+    B,
+    matching=False,
+    order=2.0,
+    internal_p=2.0,
+    keep_essential_parts=False,
+)
+```
+
+Here:
+
+```text
+order=2      -> Wasserstein aggregation exponent q = 2
+internal_p=2 -> Euclidean L2 ground norm in R^2
+```
+
+An important reproducibility lesson emerged while reviewing GUDHI documentation:
+
+```text
+Current GUDHI 3.13:
+    default order      = 1
+    default internal_p = infinity
+
+Older GUDHI 3.1 / 3.2 documentation:
+    default order      = 2
+    default internal_p = 2
+```
+
+Therefore even an established library's defaults can change across versions. This strongly supports the project's policy of always specifying both parameters explicitly and freezing the exact software environment.
+
+For this project, no scientific statement should rely on the phrase "default Wasserstein distance" without explicitly writing the Wasserstein order and birth-death-plane ground norm.
+
+---
+
+## XXXVI.4 Audit workspace creation
+
+Commands:
+
+```bash
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+export W22="$AUDIT/recompute_pd_w22"
+mkdir -p "$W22"
+echo "AUDIT=$AUDIT"
+echo "W22=$W22"
+```
+
+Observed:
+
+```text
+AUDIT=/home/adadhwal/phire_runtime_audit_20260809_221548
+W22=/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22
+```
+
+This sibling directory intentionally leaves the frozen audit under `$AUDIT/recompute_pd/` untouched.
+
+---
+
+## XXXVI.5 Pilot implementation
+
+Pilot script:
+
+```text
+$W22/w22_gudhi_pilot.py
+```
+
+The pilot reuses only the already-audited VTU parser from `$AUDIT/recompute_pd/canonical_pd_pilot.py`. Thus TTK continues to supply the persistence pairs, while the new distance layer is independent.
+
+The custom W2,2 implementation uses Euclidean real-real costs and persistence/sqrt(2) diagonal costs, then solves the order-2 assignment with SciPy's `linear_sum_assignment(C*C)`.
+
+---
+
+## XXXVI.6 Pilot syntax validation
+
+Commands:
+
+```bash
+unset PYTHONPATH
+unset PYTHONHOME
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python -m py_compile \
+    "$W22/w22_gudhi_pilot.py"
+
+echo "exit status = $?"
+```
+
+Observed:
+
+```text
+exit status = 0
+```
+
+---
+
+## XXXVI.7 Synthetic analytical W2,2 tests — PASS
+
+Command:
+
+```bash
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python "$W22/w22_gudhi_pilot.py" \
+    2>&1 | tee "$W22/w22_gudhi_pilot.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "pilot exit status = $STATUS"
+```
+
+Environment reported by the pilot:
+
+```text
+Python: 3.12.14 (main, Sep  2 2026, 23:29:55) [GCC 15.3.0]
+Executable: /home/adadhwal/micromamba/envs/gudhi-audit/bin/python
+NumPy: 2.5.3
+GUDHI: 3.13.0
+```
+
+Metric definition printed by the script:
+
+```text
+Wasserstein order q = 2
+ground norm p = 2 (Euclidean)
+diagonal cost = persistence/sqrt(2)
+D0 and D1 evaluated separately
+W22_all = hypot(W22_D0, W22_D1)
+```
+
+Observed synthetic results:
+
+| Test | Analytic W2,2 | Custom | GUDHI | Result |
+|---|---:|---:|---:|---|
+| empty / empty | 0 | 0 | 0 | PASS |
+| single [0,2] / empty | sqrt(2) | 1.4142135623730949 | 1.4142135623730951 | PASS |
+| [0,2] vs [1,3] | sqrt(2) | 1.4142135623730951 | 1.4142135623730951 | PASS |
+| two persistence-2 points / empty | 2 | 1.9999999999999998 | 2 | PASS |
+| [0,4] vs [100,104], diagonal wins | 4 | 3.9999999999999996 | 4 | PASS |
+| identical diagrams | 0 | 0 | 0 | PASS |
+| single-coordinate shift | 1 | 1 | 1 | PASS |
+
+Final synthetic status:
+
+```text
+ALL W22 SYNTHETIC TESTS: PASSED
+```
+
+These cases genuinely test the new ground geometry. For example, [0,2] to the diagonal costs 1 under L_infinity but sqrt(2) under L2.
+
+---
+
+## XXXVI.8 Real high-cardinality pilot — CNN sample 0 — PASS
+
+Audited input persistence diagrams:
+
+```text
+GT:
+ttk_runs_fixed/cnn/pd/cnn_GT_s0_speed_p160_x0_y0_pd_port_0.vtu
+
+SR:
+ttk_runs_fixed/cnn/pd/cnn_SR_s0_speed_p160_x0_y0_pd_port_0.vtu
+```
+
+Finite diagram cardinalities:
+
+```text
+D0: GT=967, SR=703
+D1: GT=871, SR=632
+```
+
+Observed D0:
+
+```text
+W22 ours  = 13.21641593231981
+W22 GUDHI = 13.216415932319807
+|diff|    = 3.5527136788005009e-15
+status    = PASS
+```
+
+Observed D1:
+
+```text
+W22 ours  = 16.351320797766874
+W22 GUDHI = 16.351320797766878
+|diff|    = 3.5527136788005009e-15
+status    = PASS
+```
+
+Combined finite-diagram result:
+
+```text
+W22_all ours  = 21.024731673140575
+W22_all GUDHI = 21.024731673140575
+|diff|        = 0
+status        = PASS
+```
+
+The single nonfinite/global pair remained excluded:
+
+```text
+GT: (0, 0.0518798828125, 25.159461975097656)
+SR: (0, 0.04911082610487938, 26.29700129851699)
+```
+
+Final pilot status:
+
+```text
+OVERALL STANDARD W22 GUDHI PILOT: PASS
+pilot exit status = 0
+```
+
+### Interpretation
+
+This pilot establishes that the Euclidean-ground cost and diagonal formula agree with analytically known cases, and that the custom implementation agrees with independent GUDHI computation to floating-point precision on a nontrivial high-cardinality real example. It does not yet establish full 8,568-comparison validation.
+
+---
+
+## XXXVI.9 Relationship to the supplied literature/metric discussion
+
+A separate archived discussion, `Chat Regarding Distance 1.pdf`, was reviewed. Several conceptual points in that discussion are useful and consistent with the current audit.
+
+### A. There is not one universally unique "W2 persistence-diagram distance"
+
+The phrase `2-Wasserstein distance` is incomplete unless the birth-death-plane ground norm is specified. The current project now distinguishes W2,infinity and W2,2 explicitly.
+
+### B. The Euclidean-ground convention is meaningful in the relevant literature
+
+The supplied discussion reviews Kissi et al. and related Tierny/Sorbonne-line work as using Euclidean birth-death-plane geometry for Wasserstein PD comparison. This makes W2,2 particularly useful for literature comparability. The project should nevertheless avoid calling either L2 or L_infinity the uniquely canonical Wasserstein ground norm.
+
+### C. The Euclidean diagonal derivation is correct
+
+For persistence `d-b`, the L2 distance to the diagonal is `(d-b)/sqrt(2)`. For persistence 4, this gives `2*sqrt(2) ~= 2.828`, whereas the L_infinity diagonal cost is 2. This is exactly the distinction implemented and tested in the new pilot.
+
+### D. Historical TTK "2" should not automatically be renamed W2,2
+
+The source audit found Euclidean-like birth/death real-real geometry for TTK "2", but the historical pipeline also has implementation-specific diagonal handling, critical-pair-family behavior, and default persistence filtering. Therefore standard explicit W2,2 and historical TTK "2" must remain distinct unless empirical reproduction establishes otherwise.
+
+### E. Kissi-style normalized Wasserstein is a separate convention
+
+The supplied discussion notes that Kissi et al. report a normalized Wasserstein quantity for cross-dataset comparison. It should not be silently mixed with raw W2,2. Raw W2,2 is still natural here because competing methods are evaluated on the same wind dataset and physical scalar units. A normalized variant can be added later as a separately named sensitivity metric if useful.
+
+### F. Persistence pruning during training is not the same as the evaluation metric
+
+Some topology-aware learning methods prune low-persistence features during optimization for computational reasons. That does not imply the final evaluation metric must use the same threshold. The current evaluation policy remains all audited finite pairs, no hidden sample-dependent threshold, and separate essential/global handling unless an explicitly named thresholded sensitivity experiment is introduced.
+
+---
+
+## XXXVI.10 Important caution about "stability"
+
+Wasserstein stability theory is useful motivation, but the project should avoid saying that W2,2 is universally more stable than W2,infinity or bottleneck. Stability bounds depend on the precise metric, function norm, filtration/model assumptions, and theorem. A safer statement is that Wasserstein PD distances have established stability results under suitable assumptions, and this work evaluates robustness across explicit conventions rather than treating a software default as uniquely authoritative.
+
+---
+
+## XXXVI.11 Scientific value of the metric-convention study
+
+If a candidate improves over CNN under d_B, W2,infinity, and W2,2, then the persistence conclusion is substantially stronger because it is not an artifact of one aggregate ground norm or of a worst-case versus aggregate summary.
+
+Disagreement is also informative:
+
+```text
+d_B improves, W2 does not:
+    one dominant persistent mismatch may have been repaired while many smaller mismatches remain.
+
+W2 improves, d_B does not:
+    broad diagram agreement may improve while one large mismatch remains.
+
+W2,2 and W2,infinity disagree:
+    the geometric weighting of simultaneous birth/death displacement affects the ranking.
+```
+
+---
+
+## XXXVI.12 Planned full protocol
+
+```text
+1. W22 analytic tests
+       COMPLETE / PASS
+
+2. W22 real CNN sample-0 GUDHI pilot
+       COMPLETE / PASS
+
+3. historical TTK "2" comparison pilot
+       NEXT
+
+4. full custom W22 sweep
+       pending
+
+5. exhaustive GUDHI W22 cross-check over 8,568 comparisons
+       pending
+
+6. independent completed-CSV integrity check
+       pending
+
+7. per-method metric-convention robustness analysis:
+       d_B
+       W2,infinity
+       W2,2
+       historical TTK "2" as legacy/reference
+
+8. automatically selected traditional-metric-near-tie / PD-separated qualitative cases
+
+9. final version manifest, SHA-256 freeze, and archive
+```
+
+The frozen earlier PD audit remains untouched throughout this extension.
+
+---
+
+## XXXVI.13 Next diagnostic: inspect historical TTK "2" result schemas
+
+Before writing the historical-comparison script, inspect authoritative baseline CSV schemas and sample-0 rows rather than guessing field names.
+
+Recommended command:
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import csv
+from pathlib import Path
+
+paths = [
+    Path("ttk_runs_fixed/cnn/phase_c_final/phase_c_results.csv"),
+    Path("ttk_runs_fixed/cnn/phase_c_final/pd_pairwise_distances.csv"),
+    Path("ttk_runs_fixed/combined/phase_c_results.csv"),
+]
+
+for p in paths:
+    print("=" * 100)
+    print(p)
+
+    if not p.exists():
+        print("MISSING")
+        continue
+
+    with p.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    print("rows:", len(rows))
+    if not rows:
+        continue
+
+    cols = list(rows[0].keys())
+    print("columns:")
+    for c in cols:
+        print("   ", c)
+
+    sample_cols = [
+        c for c in cols
+        if ("sample" in c.lower() or c.lower() in {"idx", "index", "id"})
+    ]
+
+    pd_cols = [
+        c for c in cols
+        if (
+            "pd" in c.lower()
+            or "wasser" in c.lower()
+            or "bottleneck" in c.lower()
+            or "distance" in c.lower()
+        )
+    ]
+
+    print("sample-like columns:", sample_cols)
+    print("PD/distance-like columns:", pd_cols)
+
+    print("first three rows:")
+    for r in rows[:3]:
+        print(r)
+
+    if sample_cols:
+        s = sample_cols[0]
+        zero = [r for r in rows if str(r.get(s, "")).strip() in {"0", "0.0"}]
+        print("sample-0 rows:")
+        for r in zero[:5]:
+            print(r)
+
+print("=" * 100)
+PY
+```
+
+The purpose of the next pilot is to test, rather than assume:
+
+```text
+historical TTK "2"
+        ?=
+standard W2,2
+        =
+GUDHI(order=2, internal_p=2)
+```
+
+The standard custom/GUDHI equality already passed for CNN sample 0. The remaining question is the exact numerical and structural relationship to the historical TTK quantity.
+
+---
+
+## XXXVI.14 Cross-convention norm inequality — additional sanity check
+
+Because both standard Wasserstein variants use the same order q=2 and differ only in the birth-death-plane norm, the standard norm inequality in R^2 gives
+
+```text
+||v||_infinity <= ||v||_2 <= sqrt(2) ||v||_infinity.
+```
+
+The same relationship holds for standard diagonal costs:
+
+```text
+persistence/2 <= persistence/sqrt(2) <= sqrt(2)*(persistence/2).
+```
+
+Therefore, for the same finite diagrams and the same dimension-preserving matching framework,
+
+```text
+W2,infinity(D,E) <= W2,2(D,E) <= sqrt(2) * W2,infinity(D,E).
+```
+
+This provides a useful mathematical invariant for the future full W2,2 sweep.
+
+For CNN sample 0, the already-frozen W2,infinity audit reported:
+
+```text
+D0 W2,infinity  = 10.890185021667014
+D1 W2,infinity  = 13.657539176969225
+all W2,infinity = 17.467813434330864
+```
+
+The new pilot reported:
+
+```text
+D0 W2,2  = 13.21641593231981
+D1 W2,2  = 16.351320797766874
+all W2,2 = 21.024731673140575
+```
+
+All satisfy the expected inequalities.
+
+In particular:
+
+```text
+17.467813434330864
+    <= 21.024731673140575
+    <= sqrt(2) * 17.467813434330864.
+```
+
+This is not an independent implementation check like the GUDHI comparison, but it is a strong cross-convention mathematical sanity check. The full W2,2 sweep should explicitly verify this inequality for every D0, D1, and combined comparison where the corresponding frozen W2,infinity values are available.
+
+---
+
+## XXXVI.15 Historical TTK `"2"` schema inspection
+
+Before comparing the historical TTK metric against the newly validated standard
+\(W_{2,2}\), the authoritative baseline CSV schemas were inspected directly.
+
+Command:
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import csv
+from pathlib import Path
+
+paths = [
+    Path("ttk_runs_fixed/cnn/phase_c_final/phase_c_results.csv"),
+    Path("ttk_runs_fixed/cnn/phase_c_final/pd_pairwise_distances.csv"),
+    Path("ttk_runs_fixed/combined/phase_c_results.csv"),
+]
+
+for p in paths:
+    print("=" * 100)
+    print(p)
+
+    if not p.exists():
+        print("MISSING")
+        continue
+
+    with p.open(newline="") as f:
+        rows = list(csv.DictReader(f))
+
+    print("rows:", len(rows))
+
+    if not rows:
+        continue
+
+    cols = list(rows[0].keys())
+
+    print("columns:")
+    for c in cols:
+        print("   ", c)
+
+    sample_cols = [
+        c for c in cols
+        if (
+            "sample" in c.lower()
+            or c.lower() in {"idx", "index", "id"}
+        )
+    ]
+
+    pd_cols = [
+        c for c in cols
+        if (
+            "pd" in c.lower()
+            or "wasser" in c.lower()
+            or "bottleneck" in c.lower()
+            or "distance" in c.lower()
+        )
+    ]
+
+    print("sample-like columns:", sample_cols)
+    print("PD/distance-like columns:", pd_cols)
+
+    print("first three rows:")
+    for r in rows[:3]:
+        print(r)
+
+print("=" * 100)
+PY
+```
+
+Observed authoritative CNN baseline values include:
+
+```text
+ttk_runs_fixed/cnn/phase_c_final/phase_c_results.csv
+rows: 168
+columns:
+    key
+    method
+    pd_distance
+    mt_distance
+    error
+
+first row:
+key         = cnn_s0_speed_p160_x0_y0
+method      = cnn
+pd_distance = 24.384505325565424
+mt_distance = 5.051645278930664
+```
+
+The dedicated historical PD table is:
+
+```text
+ttk_runs_fixed/cnn/phase_c_final/pd_pairwise_distances.csv
+```
+
+with:
+
+```text
+rows: 168
+columns:
+    key
+    method
+    pd_distance
+```
+
+The combined CNN/GAN historical table is:
+
+```text
+ttk_runs_fixed/combined/phase_c_results.csv
+```
+
+with 336 rows.
+
+The sample index is encoded inside the `key` field, e.g.:
+
+```text
+cnn_s0_speed_p160_x0_y0
+```
+
+so the later comparison script extracts `s0`, `s1`, ..., `s167` from the key.
+
+---
+
+## XXXVI.16 Immediate sample-0 result: historical TTK `"2"` is not standard \(W_{2,2}\)
+
+For CNN sample 0:
+
+```text
+historical TTK "2":
+24.384505325565424
+
+standard W2,2:
+21.024731673140575
+```
+
+Difference:
+
+```text
+TTK2 - W22
+= 3.359773652424849
+```
+
+This difference is far larger than numerical roundoff.
+
+Therefore:
+
+```text
+historical TTK "2" != standard W2,2
+```
+
+for this real high-cardinality persistence-diagram comparison.
+
+This confirms that the historical TTK quantity must continue to be labeled
+explicitly as:
+
+```text
+TTK PD distance (WassersteinMetric="2")
+```
+
+or:
+
+```text
+historical TTK "2" PD dissimilarity
+```
+
+rather than being silently renamed \(W_{2,2}\).
+
+---
+
+## XXXVI.17 Why historical TTK `"2"` differs from standard \(W_{2,2}\)
+
+The deeper source audit and the archived metric discussion identify several
+implementation-level differences.
+
+### Real-to-real finite-pair geometry
+
+For compatible critical-pair categories, TTK `"2"` is Euclidean-like in the
+birth-death coordinates:
+
+```text
+sqrt((Delta birth)^2 + (Delta death)^2)
+```
+
+which resembles the standard \(L_2\) ground cost used by \(W_{2,2}\).
+
+### Diagonal cost
+
+Standard \(W_{2,2}\):
+
+```text
+c_2(x, Delta) = persistence / sqrt(2)
+```
+
+Historical TTK `"2"` source behavior was audited as using a persistence-based
+diagonal penalty closer to:
+
+```text
+persistence
+```
+
+under the relevant default weighting.
+
+Thus the diagonal convention alone can materially enlarge the historical TTK
+quantity relative to standard \(W_{2,2}\).
+
+### Critical-point-family decomposition
+
+TTK separates compatible critical-point categories and does not permit
+arbitrary cross-index matches. Its internal decomposition is expressed using
+cost families such as:
+
+```text
+MinSaddleCost
+SaddleSaddleCost
+SaddleMaxCost
+```
+
+The explicit project metrics instead work in the mathematically transparent
+homological decomposition:
+
+```text
+D0
+D1
+```
+
+with no cross-dimensional finite matching.
+
+### Persistence filtering
+
+The historical TTK distance filter used its default:
+
+```text
+Tolerance = 1.0
+```
+
+which produced a sample-dependent low-persistence threshold of approximately
+1% of the persistence range.
+
+The explicit \(W_{2,2}\), \(W_{2,\infinity}\), and bottleneck evaluation instead
+uses all audited finite pairs, with no hidden low-persistence pruning.
+
+### Aggregate behavior
+
+For CNN sample 0, the earlier source/runtime audit recorded component costs of
+approximately:
+
+```text
+MinSaddleCost  ~ 17.1633
+SaddleMaxCost  ~ 17.3213
+```
+
+with:
+
+```text
+sqrt(17.1633^2 + 17.3213^2)
+    ~ 24.3845
+```
+
+which is consistent with a \(p=2\)-style aggregation inside TTK, but not enough
+to make the whole implementation mathematically identical to standard
+\(W_{2,2}\).
+
+The clean terminology should therefore remain:
+
+```text
+standard W2,2:
+    q = 2
+    L2 ground norm
+    standard Euclidean diagonal projection
+    all finite D0/D1 pairs
+    no hidden threshold
+
+historical TTK "2":
+    TTK WassersteinMetric="2"
+    Euclidean-like finite-pair geometry
+    TTK-specific diagonal/category handling
+    default persistence filtering
+```
+
+---
+
+## XXXVI.18 Full baseline comparison: 336 historical TTK `"2"` vs standard \(W_{2,2}\) values
+
+A dedicated baseline comparison was run across:
+
+```text
+CNN: 168 samples
+GAN: 168 samples
+total: 336 comparisons
+```
+
+Script:
+
+```text
+$W22/compare_ttk2_vs_w22_baselines.py
+```
+
+Syntax validation:
+
+```bash
+unset PYTHONPATH
+unset PYTHONHOME
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python -m py_compile \
+    "$W22/compare_ttk2_vs_w22_baselines.py"
+
+echo "exit status = $?"
+```
+
+Observed:
+
+```text
+exit status = 0
+```
+
+Execution:
+
+```bash
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python "$W22/compare_ttk2_vs_w22_baselines.py" \
+    2>&1 | tee "$W22/ttk2_vs_w22_baselines.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "comparison exit status = $STATUS"
+```
+
+Observed:
+
+```text
+comparison exit status = 0
+```
+
+Output CSV:
+
+```text
+$W22/ttk2_vs_w22_baselines.csv
+```
+
+---
+
+## XXXVI.19 CNN historical TTK `"2"` vs standard \(W_{2,2}\)
+
+Summary:
+
+```text
+TTK2 mean:             27.406283078086062
+W22 mean:              24.552150603046844
+mean TTK2-W22:          2.8541324750392127
+max |difference|:       9.11207885412064
+mean TTK2/W22:          1.1686970917240564
+Pearson correlation:    0.954598609419382
+
+TTK2 > W22:           142 / 168
+TTK2 < W22:            26 / 168
+TTK2 == W22:            0 / 168
+```
+
+Interpretation:
+
+- the two quantities are strongly correlated;
+- they are not numerically interchangeable;
+- historical TTK `"2"` is larger on most CNN samples, but not all;
+- the relationship is not a fixed multiplicative rescaling.
+
+Representative samples:
+
+```text
+sample   0: TTK2=24.384505326 W22=21.024731673 diff=+3.359773652
+sample  20: TTK2=21.979236560 W22=19.270603900 diff=+2.708632660
+sample  80: TTK2=30.086252753 W22=29.627014373 diff=+0.459238380
+sample 140: TTK2=26.928885116 W22=26.888892206 diff=+0.039992909
+sample 160: TTK2=21.188537318 W22=15.415763302 diff=+5.772774016
+```
+
+---
+
+## XXXVI.20 GAN historical TTK `"2"` vs standard \(W_{2,2}\)
+
+Summary:
+
+```text
+TTK2 mean:             20.864090023128007
+W22 mean:              17.458202167482856
+mean TTK2-W22:          3.4058878556451515
+max |difference|:       8.686428533541555
+mean TTK2/W22:          1.2876135674067202
+Pearson correlation:    0.9523398098351896
+
+TTK2 > W22:           144 / 168
+TTK2 < W22:            24 / 168
+TTK2 == W22:            0 / 168
+```
+
+Interpretation is similar to CNN:
+
+- high correlation;
+- systematic but nonuniform numerical differences;
+- no equality on any of the 168 samples;
+- TTK2 is usually larger but can also be smaller.
+
+Representative examples where TTK2 is smaller than standard W22 include:
+
+```text
+sample  40:
+TTK2=20.447367624
+W22 =21.016567583
+diff =-0.569199959
+
+sample 160:
+TTK2=20.140275276
+W22 =20.536649871
+diff =-0.396374595
+```
+
+These negative differences are especially useful evidence that historical
+TTK `"2"` is not simply standard \(W_{2,2}\) multiplied by a constant scale
+factor.
+
+---
+
+## XXXVI.21 CNN-vs-GAN ranking robustness
+
+Historical TTK `"2"` winner counts:
+
+```text
+CNN wins:   2 / 168
+GAN wins: 166 / 168
+```
+
+Standard \(W_{2,2}\) winner counts:
+
+```text
+CNN wins:  10 / 168
+GAN wins: 158 / 168
+```
+
+Direct winner agreement:
+
+```text
+agreement:    160 / 168
+disagreement:   8 / 168
+ties:           0
+```
+
+Agreement rate:
+
+```text
+160 / 168 = 95.238095... %
+```
+
+All eight disagreements have the same direction:
+
+```text
+historical TTK "2" favors GAN
+standard W2,2 favors CNN
+```
+
+Disagreement samples:
+
+```text
+sample=0
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 CNN-GAN delta = +1.843963524
+    W22  CNN-GAN delta = -0.669845822
+
+sample=1
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 delta = +2.223774350
+    W22  delta = -0.472413106
+
+sample=3
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 delta = +1.480697986
+    W22  delta = -0.518216488
+
+sample=4
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 delta = +1.900219978
+    W22  delta = -0.674549145
+
+sample=160
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 delta = +1.048262042
+    W22  delta = -5.120886569
+
+sample=161
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 delta = +0.307576616
+    W22  delta = -3.077804203
+
+sample=165
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 delta = +2.389142759
+    W22  delta = -1.354994730
+
+sample=166
+    TTK2 winner = GAN
+    W22 winner  = CNN
+    TTK2 delta = +3.093811126
+    W22  delta = -0.893580978
+```
+
+### Interpretation
+
+The high 95.24% winner agreement indicates that the historical TTK `"2"`
+measure and standard \(W_{2,2}\) often carry a similar broad aggregate
+topology signal on the CNN-vs-GAN baseline comparison.
+
+However, the eight ranking reversals show that the metric convention can
+matter at the individual-sample level.
+
+Therefore the historical TTK metric is useful as:
+
+```text
+legacy / robustness evidence
+```
+
+but should not be treated as numerically equivalent to standard
+\(W_{2,2}\).
+
+The scientifically useful conclusion is:
+
+> The broad GAN-vs-CNN aggregate persistence trend survives the move from the
+> historical TTK `"2"` quantity to an explicitly defined standard
+> \(W_{2,2}\), but the two metrics are not interchangeable and disagree on
+> eight individual samples.
+
+---
+
+## XXXVI.22 Mean-level baseline result under standard \(W_{2,2}\)
+
+The new baseline means are:
+
+```text
+CNN W22 mean = 24.552150603046844
+GAN W22 mean = 17.458202167482856
+```
+
+Thus GAN has lower mean standard \(W_{2,2}\) by:
+
+```text
+24.552150603046844 - 17.458202167482856
+= 7.093948435563988
+```
+
+Relative to CNN:
+
+```text
+7.093948435563988 / 24.552150603046844
+≈ 28.89% lower
+```
+
+This provides a useful robustness result:
+
+```text
+historical TTK "2":
+CNN mean 27.4063
+GAN mean 20.8641
+-> GAN better
+
+standard W2,2:
+CNN mean 24.5522
+GAN mean 17.4582
+-> GAN better
+
+standard W2,infinity:
+previous audit also showed GAN better in aggregate
+```
+
+Thus the broad baseline conclusion that GAN has stronger aggregate
+persistence-diagram correspondence is robust across multiple aggregate PD
+distance conventions.
+
+This should be contrasted with bottleneck distance, where CNN can be better in
+worst-case persistent-feature mismatch. That difference is scientifically
+informative rather than contradictory.
+
+---
+
+## XXXVI.23 Terminology correction carried forward
+
+The earlier project shorthand used the word:
+
+```text
+canonical W2
+```
+
+for the explicit \(L_\infinity\)-ground order-2 Wasserstein metric.
+
+That shorthand should be avoided in the manuscript because it can suggest that
+one ground norm is uniquely authoritative.
+
+Use the following explicit names:
+
+```text
+W_{2,infinity}:
+    order-2 Wasserstein distance
+    L_infinity ground metric
+
+W_{2,2}:
+    order-2 Wasserstein distance
+    Euclidean L2 ground metric
+
+d_B:
+    bottleneck distance
+    L_infinity ground metric
+
+historical TTK "2":
+    TTK PD distance with WassersteinMetric="2"
+```
+
+The word "canonical" may remain in private audit filenames as historical
+shorthand, but the manuscript should state the actual mathematical convention.
+
+---
+
+## XXXVI.24 Updated audit status
+
+```text
+Frozen d_B / W2,infinity audit:
+    COMPLETE / independently GUDHI-validated / archived
+
+Standard W2,2 analytic tests:
+    COMPLETE / PASS
+
+Standard W2,2 CNN sample-0 custom-vs-GUDHI pilot:
+    COMPLETE / PASS
+
+Historical TTK "2" schema inspection:
+    COMPLETE
+
+TTK2 vs W22 baseline comparison:
+    COMPLETE
+    336 / 336 comparisons
+    CNN Pearson r = 0.954598609419382
+    GAN Pearson r = 0.9523398098351896
+    CNN/GAN winner agreement = 160 / 168
+    ranking disagreements = 8 / 168
+
+Conclusion that TTK2 == W22:
+    REJECTED
+
+Conclusion that broad CNN/GAN aggregate trend is robust:
+    SUPPORTED
+
+Full standard W2,2 sweep over 8,568 comparisons:
+    NEXT
+
+Exhaustive GUDHI W2,2 verification:
+    pending
+
+Cross-metric candidate robustness analysis:
+    pending
+
+Traditional-metric-near-tie / topology-separated visual case selection:
+    pending
+
+Final W22 checksum/archive closeout:
+    pending
+```
+
+The next numerical stage should compute standard \(W_{2,2}\) for the entire
+frozen 8,568-comparison manifest, validate the cross-norm inequality against
+the already-frozen \(W_{2,\infinity}\) values, and then independently
+cross-check the full sweep with GUDHI.
+
+---
+
+## XXXVI.25 Full standard \(W_{2,2}\) sweep — COMPLETE / internal validation PASS
+
+The full custom \(W_{2,2}\) sweep completed successfully over the exact frozen
+8,568-row manifest.
+
+Output:
+
+```text
+$W22/w22_full_sweep.csv
+```
+
+Line count:
+
+```text
+8569
+```
+
+corresponding to 8,568 comparison rows plus one header.
+
+Recorded summary:
+
+```text
+STANDARD W_{2,2} FULL-SWEEP SUMMARY
+================================================================================
+expected comparisons:          8568
+rows in W22 CSV:               8568
+unique (run,sample):           8568
+PASS rows:                     8568
+INVARIANT_FAIL rows:           0
+ERROR rows:                    0
+count mismatches:              0
+
+Cross-norm invariant:
+    W2_inf <= W2_2 <= sqrt(2) * W2_inf
+max lower-bound violation:     0
+max upper-bound violation:     0
+min W22/W2inf ratio:           1.1108209537045188
+max W22/W2inf ratio:           1.3519058515617817
+mean W22/W2inf ratio:          1.2656120581039576
+mean W22-W2inf:                4.7853472835572894
+
+mean historical_TTK2-W22:      3.5061131930586908
+
+abs tolerance:                 1e-10
+rel tolerance:                 1e-12
+
+OVERALL INTERNAL CHECK: PASS
+```
+
+The process exited successfully:
+
+```text
+full W22 exit status = 0
+```
+
+### Interpretation
+
+Every one of the 8,568 comparisons satisfies:
+
+```text
+W_{2,infinity} <= W_{2,2} <= sqrt(2) W_{2,infinity}
+```
+
+at the \(D_0\), \(D_1\), and aggregate levels under the audit tolerances.
+
+The observed aggregate ratio range is:
+
+```text
+1.1108209537045188
+<= W22 / W2inf <=
+1.3519058515617817
+```
+
+which is safely inside the theoretical interval:
+
+```text
+[1, sqrt(2)]
+```
+
+with:
+
+```text
+sqrt(2) = 1.4142135623730951
+```
+
+The mean aggregate increase from the \(L_\infinity\)-ground convention was:
+
+```text
+mean(W22 - W2inf)
+= 4.7853472835572894
+```
+
+The historical TTK `"2"` value was, on average:
+
+```text
+mean(TTK2 - W22)
+= 3.5061131930586908
+```
+
+but this is only an aggregate descriptive statistic. The earlier 336-case
+baseline analysis established that TTK2-W22 can change sign and is not a
+constant rescaling.
+
+---
+
+## XXXVI.26 Independent completed-CSV integrity check — PASS
+
+A separate post-hoc CSV integrity check was run against:
+
+```text
+$W22/w22_full_sweep.csv
+```
+
+Observed:
+
+```text
+rows: 8568
+unique keys: 8568
+duplicates: 0
+statuses: Counter({'PASS': 8568})
+
+lower_ok_d0 bad: 0
+upper_ok_d0 bad: 0
+lower_ok_d1 bad: 0
+upper_ok_d1 bad: 0
+lower_ok_all bad: 0
+upper_ok_all bad: 0
+count_match bad: 0
+
+ratio min: 1.1108209537045188
+ratio mean: 1.2656120581039576
+ratio max: 1.3519058515617817
+sqrt(2): 1.4142135623730951
+
+================================================================================
+W22 INDEPENDENT CSV INTEGRITY CHECK: PASS
+================================================================================
+```
+
+Therefore the custom full-sweep artifact is complete, duplicate-free,
+cardinality-consistent, and internally consistent with the expected norm
+inequalities.
+
+This check is intentionally separate from GUDHI. It validates the completed
+custom output file as an artifact but does not provide an independent
+implementation of the numerical distance.
+
+---
+
+## XXXVI.27 Exhaustive GUDHI \(W_{2,2}\) validator — script and syntax validation
+
+A new independent validator was created:
+
+```text
+$W22/gudhi_w22_crosscheck_full.py
+```
+
+It evaluates the same audited finite \(D_0/D_1\) persistence pairs using
+GUDHI:
+
+```python
+wasserstein_distance(
+    A,
+    B,
+    matching=False,
+    order=2.0,
+    internal_p=2.0,
+    keep_essential_parts=False,
+)
+```
+
+and compares the custom dimension-wise and aggregate values with GUDHI.
+
+The script passed Python compilation:
+
+```text
+exit status = 0
+```
+
+---
+
+## XXXVI.28 Exhaustive GUDHI \(W_{2,2}\) preflight — PASS
+
+Preflight command:
+
+```bash
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+    python "$W22/gudhi_w22_crosscheck_full.py" \
+    --input "$W22/w22_full_sweep.csv" \
+    --output "$W22/gudhi_w22_full.csv" \
+    --summary "$W22/gudhi_w22_full_summary.txt" \
+    --preflight \
+    2>&1 | tee "$W22/gudhi_w22_preflight.log"
+
+STATUS=${PIPESTATUS[0]}
+echo "preflight exit status = $STATUS"
+```
+
+Observed progress reached:
+
+```text
+preflight 8568/8568 errors=0
+```
+
+Final result:
+
+```text
+Rows: 8568
+Errors: 0
+PREFLIGHT RESULT: PASS
+preflight exit status = 0
+```
+
+### What this proves
+
+The GUDHI validator can resolve and access every GT/SR persistence-diagram pair
+referenced by the completed \(W_{2,2}\) sweep:
+
+```text
+8,568 / 8,568 source mappings resolved
+0 missing GT files
+0 missing SR files
+```
+
+The preflight does **not** yet numerically validate the custom distances.
+That requires the exhaustive GUDHI execution.
+
+---
+
+## XXXVI.29 Current \(W_{2,2}\) audit status
+
+```text
+analytic synthetic tests:
+    PASS
+
+real CNN sample-0 custom-vs-GUDHI pilot:
+    PASS
+
+historical TTK2-vs-W22 baseline comparison:
+    COMPLETE / 336 comparisons
+
+custom full W22 sweep:
+    8,568 / 8,568 PASS
+
+cross-norm inequality:
+    8,568 / 8,568 PASS
+    no D0/D1/aggregate violations
+
+frozen-cardinality reproduction:
+    8,568 / 8,568 PASS
+
+independent completed-CSV integrity check:
+    PASS
+
+GUDHI exhaustive validator syntax:
+    PASS
+
+GUDHI exhaustive source preflight:
+    8,568 / 8,568 resolved
+    0 errors
+    PASS
+
+exhaustive GUDHI numerical W22 comparison:
+    NEXT / pending
+```
+
+Thus the custom \(W_{2,2}\) computation layer is internally complete and
+strongly sanity-checked. The final independent numerical validation remains
+the exhaustive GUDHI run.
+
