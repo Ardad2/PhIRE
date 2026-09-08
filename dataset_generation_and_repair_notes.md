@@ -18295,3 +18295,814 @@ before image inspection, is within the strict conventional-near-tie subset,
 ranks first by conservative three-metric topology separation within the primary
 subset, and now also yields a visually interpretable real-data comparison.
 
+---
+
+## XXXVI.71 Real-data figure-generator cleanup
+
+After the first successful sample-78 render, the plotting code was revised for
+clarity and publication-oriented presentation without changing any frozen
+sample selection, persistence-diagram data, or metric computation.
+
+Cleaned script:
+
+```text
+generate_candidateF_near_tie_figures_clean.py
+```
+
+The revised overview makes the following changes:
+
+```text
+1. D0 and D1 persistence diagrams are displayed separately.
+2. CNN and Candidate-F PD panels use shared axis limits within each homology
+   dimension.
+3. The combined D0+D1 survival curve remains as the aggregate tail summary.
+4. Main title wording is softened to:
+      Topological Improvement Within a Conventionally Close Case
+   rather than implying absolute metric equivalence.
+5. Summary-box headings are rendered as ordinary bold text rather than math
+   text, preventing missing spaces.
+6. Figure spacing is increased around titles/subtitles and reduced where there
+   was unused whitespace.
+7. Scalar field and error-map panels are enlarged and retain shared scales.
+8. The footer now states explicitly that displayed PD points are thresholded
+   only for readability while numerical distances use all strictly positive
+   finite pairs.
+```
+
+The revised W22 matching diagnostic makes the following changes:
+
+```text
+1. D0 and D1 use shared axis limits between CNN and Candidate F.
+2. Assignment line weight uses one shared absolute cost scale across all four
+   panels, so line thickness is comparable across methods and dimensions.
+3. Real-to-real assignments are drawn as solid segments.
+4. Assignments to the diagonal are drawn as dashed segments and use a distinct
+   diagonal-projection marker.
+5. A common legend explains GT points, CNN points, Candidate-F points,
+   real-to-real assignments, and diagonal assignments.
+6. Each panel reports the fraction of W22^2 represented by the displayed
+   highest-cost assignments.
+7. The footer/aggregate summary is moved away from the x-axis labels.
+```
+
+These are visualization-only changes. The following remain unchanged:
+
+```text
+frozen near-tie selection
+predeclared sample set
+positive-persistence canonicalization rule
+custom W22 assignment computation
+figure-time W22 vs frozen-audit consistency check
+```
+
+The next validation step is to rerender sample 78 with the cleaned script,
+confirm the W22 audit-consistency check still passes exactly, and inspect the
+cleaned PNGs. If successful, the same script can then be applied to the
+predeclared additional samples:
+
+```text
+78
+71
+80
+63
+69
+```
+
+without changing the selection based on visual appearance.
+
+---
+
+## XXXVI.72 Matched \(L_{uv}\)-only control added to the topology interpretation
+
+The visual and quantitative analysis is extended to include the matched
+reconstruction-only fine-tuning control:
+
+```text
+candidateUV_expanded2688
+```
+
+Objective:
+
+```text
+L = L_uv
+```
+
+This control uses the same 2,688-sample training scale and is intended to
+separate:
+
+```text
+ordinary fine-tuning / data-volume effects
+```
+
+from:
+
+```text
+the additional effect associated with Candidate F's auxiliary
+gradient + repaired E2 supervision
+```
+
+The three principal methods for this matched-control analysis are therefore:
+
+```text
+CNN:
+    pretrained baseline; no fine-tuning
+
+Ablation / Candidate UV:
+    matched fine-tuning with L_uv only
+
+Candidate F grad+E2-low:
+    L_uv
+    + 0.05 L_grad
+    + 0.004 L_TTKCV
+    + 0.002 L_TTKpers
+```
+
+The Candidate-F-vs-CNN analyses already completed remain valid as direct
+performance comparisons. Adding Candidate UV does not invalidate those results.
+
+What changes is the interpretation:
+
+```text
+Candidate F < CNN
+```
+
+shows improvement relative to the pretrained model, whereas:
+
+```text
+Candidate F < Candidate UV
+```
+
+is the comparison that more directly tests whether the auxiliary objective
+improves topology beyond ordinary matched fine-tuning.
+
+---
+
+## XXXVI.73 Existing mean-level control signal from the W22 sweep
+
+The existing W22 run-summary table already contains the 2,688-sample
+Candidate-UV control.
+
+Mean corrected PD distances are:
+
+```text
+                    CNN          Candidate UV      Candidate F grad+E2
+d_B               3.124108        3.287864            2.149744
+W2inf            19.152145       21.062447           14.325676
+W22              24.552151       27.508675           17.831897
+```
+
+Thus the matched \(L_{uv}\)-only control is, on average, worse than the
+pretrained CNN under all three corrected PD metrics:
+
+```text
+d_B:
+    UV vs CNN = +5.24% distance
+
+W2inf:
+    UV vs CNN = +9.97% distance
+
+W22:
+    UV vs CNN = +12.04% distance
+```
+
+where positive percentage change means worse because lower is better.
+
+Candidate F then improves substantially relative to the matched control:
+
+```text
+d_B:
+    F vs UV = -34.62%
+
+W2inf:
+    F vs UV = -31.98%
+
+W22:
+    F vs UV = -35.18%
+```
+
+and relative to CNN:
+
+```text
+d_B:
+    F vs CNN = -31.19%
+
+W2inf:
+    F vs CNN = -25.20%
+
+W22:
+    F vs CNN = -27.37%
+```
+
+This preliminary mean-level pattern is important:
+
+> Ordinary \(L_{uv}\)-only fine-tuning does not explain Candidate F's mean PD
+> improvement; the matched control actually moves the three corrected topology
+> metrics in the opposite direction on average.
+
+A simple additive decomposition of the observed mean distance change gives:
+
+```text
+observed CNN -> F improvement
+=
+(CNN - UV)
++
+(UV - F)
+```
+
+For the three metrics, the ordinary fine-tuning component is negative while the
+increment beyond UV is positive. Consequently, a descriptive "share beyond UV"
+can exceed 100%.
+
+This must **not** be described as a literal causal percentage. A value above
+100% means only that Candidate F both:
+
+```text
+1. overcomes the topology degradation seen in the L_uv-only control, and
+2. improves beyond the original CNN baseline.
+```
+
+The next script computes the exact sample-wise matched-control result.
+
+---
+
+## XXXVI.74 New matched-control quantitative script
+
+A dedicated analysis script was prepared:
+
+```text
+analyze_candidateF_vs_uv_control.py
+```
+
+Inputs:
+
+```text
+$W22/w22_full_sweep.csv
+
+ttk_runs_fixed/topology_finetuning/
+candidateUV_expanded2688_eval/
+all_sample_metrics_candidateUV_expanded2688.csv
+
+ttk_runs_fixed/topology_finetuning/
+candidateF_grad_E2_low_expanded2688_eval/
+all_sample_metrics_candidateF_grad_E2_low_expanded2688.csv
+```
+
+Outputs:
+
+```text
+$W22/candidateF_vs_uv_control_summary.txt
+
+$W22/candidateF_vs_uv_control_samples.csv
+
+$W22/candidateF_vs_uv_control_metric_summary.csv
+```
+
+The analysis reports:
+
+```text
+per-metric CNN / UV / Candidate-F means and medians
+
+UV-vs-CNN sample win counts
+
+Candidate-F-vs-UV sample win counts
+
+Candidate-F-vs-CNN sample win counts
+
+all-three consensus counts
+
+mean-distance decomposition:
+    CNN -> UV
+    UV  -> Candidate F
+    CNN -> Candidate F
+
+descriptive share of observed change
+
+Candidate-F-vs-UV conventional gaps:
+    |delta PSNRuv|
+    relative speed-MAE gap
+    relative speed-RMSE gap
+
+the matched-control status of the already predeclared visual cases:
+    78, 71, 80, 63, 69
+```
+
+The script explicitly labels the decomposition as descriptive rather than a
+formal causal attribution.
+
+---
+
+## XXXVI.75 Figure redesign with the matched fine-tuning control
+
+A new figure generator was prepared:
+
+```text
+generate_candidateF_with_uv_control_figures.py
+```
+
+The overview is redesigned to resemble the earlier poster more closely while
+using the corrected audited metrics.
+
+### Top row
+
+```text
+CNN vs GT persistence diagram
+
+Ablation (L_uv only) vs GT persistence diagram
+
+Candidate F vs GT persistence diagram
+
+GT / CNN / Ablation / Candidate-F persistence-survival curves
+```
+
+For readability, the overview PD panels combine D0 and D1 spatially but encode
+the homology dimension using different marker shapes.
+
+The default display-only persistence threshold is reduced from:
+
+```text
+5.0
+```
+
+to:
+
+```text
+3.0
+```
+
+Numerical topology distances remain based on every strictly positive finite
+persistence pair.
+
+### Scalar-field row
+
+Four tightly aligned panels:
+
+```text
+GT
+CNN
+Ablation
+Candidate F
+```
+
+using one shared wind-speed color scale.
+
+### Error row
+
+Three aligned error maps directly underneath:
+
+```text
+|CNN - GT|
+
+|Ablation - GT|
+
+|Candidate F - GT|
+```
+
+using one shared error scale.
+
+### Summary band
+
+The floating rounded annotation boxes are replaced with one fixed horizontal
+summary band containing:
+
+```text
+topology chain:
+    CNN -> Ablation -> Candidate F
+
+conventional-fidelity gaps:
+    Candidate F vs CNN
+    Candidate F vs Ablation
+
+matched-control interpretation
+```
+
+This eliminates the box/text overlap seen in the earlier layout.
+
+### W22 matching diagnostic
+
+The detail figure becomes a 2 x 3 matrix:
+
+```text
+              CNN       Ablation      Candidate F
+D0
+D1
+```
+
+with:
+
+```text
+shared axes within each homology dimension
+
+one shared absolute assignment-cost scale across all six panels
+
+solid real-to-real assignments
+
+dashed assignments to the diagonal
+
+fraction of W22^2 represented by the displayed high-cost assignments
+
+figure-time W22 recomputation checked against the frozen audit for
+CNN, Ablation, and Candidate F
+```
+
+The predeclared visual samples remain:
+
+```text
+78
+71
+80
+63
+69
+```
+
+The addition of the ablation does not retroactively change their original
+Candidate-F-vs-CNN selection. It adds a matched-control interpretation to those
+already frozen cases.
+
+A separate ablation-focused case-selection study may be defined later if needed;
+such cases should be labeled as a separate secondary analysis rather than as
+part of the originally frozen near-tie selection.
+
+---
+
+## XXXVI.76 Matched-control quantitative analysis — COMPLETE
+
+The dedicated matched-control script:
+
+```text
+$W22/analyze_candidateF_vs_uv_control.py
+```
+
+completed successfully for the full 168-sample benchmark.
+
+Compared methods:
+
+```text
+CNN:
+    pretrained baseline
+
+Candidate UV expanded-2688:
+    matched L_uv-only fine-tuning control
+
+Candidate F grad+E2-low expanded-2688:
+    L_uv + L_grad + repaired low-lambda E2 supervision
+```
+
+The analysis confirms that ordinary \(L_{uv}\)-only fine-tuning does not explain
+the Candidate-F PD improvements.
+
+### d_B
+
+```text
+mean:
+    CNN = 3.124108
+    UV  = 3.287864
+    F   = 2.149744
+
+median:
+    CNN = 2.912511
+    UV  = 3.188247
+    F   = 1.934064
+
+UV vs CNN mean change:
+    +5.24%  (worse)
+
+F vs UV mean change:
+    -34.62% (better)
+
+F vs CNN mean change:
+    -31.19% (better)
+
+sample wins:
+    UV < CNN:  62 / 168
+    F < UV:   156 / 168
+    F < CNN:  151 / 168
+```
+
+Additive mean-distance decomposition:
+
+```text
+total CNN -> F improvement:
+    +0.974364
+
+ordinary fine-tuning component, CNN -> UV:
+    -0.163755
+
+extra F improvement beyond UV:
+    +1.138120
+```
+
+### W2inf
+
+```text
+mean:
+    CNN = 19.152145
+    UV  = 21.062447
+    F   = 14.325676
+
+median:
+    CNN = 18.815892
+    UV  = 21.289925
+    F   = 14.122292
+
+UV vs CNN mean change:
+    +9.97%  (worse)
+
+F vs UV mean change:
+    -31.98% (better)
+
+F vs CNN mean change:
+    -25.20% (better)
+
+sample wins:
+    UV < CNN:  22 / 168
+    F < UV:   168 / 168
+    F < CNN:  167 / 168
+```
+
+Additive mean-distance decomposition:
+
+```text
+total CNN -> F improvement:
+    +4.826469
+
+ordinary fine-tuning component, CNN -> UV:
+    -1.910301
+
+extra F improvement beyond UV:
+    +6.736770
+```
+
+### W22
+
+```text
+mean:
+    CNN = 24.552151
+    UV  = 27.508675
+    F   = 17.831897
+
+median:
+    CNN = 24.056543
+    UV  = 27.841107
+    F   = 17.531404
+
+UV vs CNN mean change:
+    +12.04% (worse)
+
+F vs UV mean change:
+    -35.18% (better)
+
+F vs CNN mean change:
+    -27.37% (better)
+
+sample wins:
+    UV < CNN:  17 / 168
+    F < UV:   168 / 168
+    F < CNN:  166 / 168
+```
+
+Additive mean-distance decomposition:
+
+```text
+total CNN -> F improvement:
+    +6.720253
+
+ordinary fine-tuning component, CNN -> UV:
+    -2.956524
+
+extra F improvement beyond UV:
+    +9.676778
+```
+
+### Three-metric consensus
+
+```text
+UV better than CNN under all three:
+    11 / 168
+
+Candidate F better than UV under all three:
+    156 / 168 = 92.86%
+
+Candidate F better than CNN under all three:
+    150 / 168 = 89.29%
+```
+
+Therefore Candidate F's topology improvement is not adequately explained by
+ordinary matched reconstruction-only fine-tuning.
+
+The strongest matched-control statement supported by these results is:
+
+> Candidate F outperforms the matched \(L_{uv}\)-only fine-tuning control under
+> all three validated persistence-diagram metrics on 156/168 benchmark samples.
+> Under the two order-2 Wasserstein conventions, Candidate F outperforms the
+> control on all 168 samples. In contrast, \(L_{uv}\)-only fine-tuning worsens
+> the mean PD distance relative to the pretrained CNN under all three metrics.
+
+---
+
+## XXXVI.77 Interpreting the additive decomposition
+
+The initially reported descriptive shares are:
+
+```text
+d_B:
+    ordinary fine-tuning share = -16.81%
+    beyond-UV share            = +116.81%
+
+W2inf:
+    ordinary fine-tuning share = -39.58%
+    beyond-UV share            = +139.58%
+
+W22:
+    ordinary fine-tuning share = -43.99%
+    beyond-UV share            = +143.99%
+```
+
+These values above 100% are not literal causal percentages.
+
+They arise because the matched \(L_{uv}\)-only control moves the topology metric
+in the wrong direction relative to CNN. Candidate F must therefore first
+recover that degradation and then improve beyond the pretrained baseline.
+
+A more intuitive descriptive partition of the Candidate-F-vs-UV gain is:
+
+```text
+d_B:
+    ~14.4% of the F-vs-UV gap reverses the UV degradation relative to CNN
+    ~85.6% corresponds to the final improvement below the CNN distance
+
+W2inf:
+    ~28.4% reverses the UV degradation
+    ~71.6% corresponds to improvement below CNN
+
+W22:
+    ~30.6% reverses the UV degradation
+    ~69.4% corresponds to improvement below CNN
+```
+
+These percentages are still descriptive geometry of the mean distances, not
+formal causal attribution.
+
+Preferred manuscript wording:
+
+> Reconstruction-only fine-tuning did not improve the corrected PD metrics on
+> average. Candidate F not only recovered that degradation but improved beyond
+> the pretrained CNN, indicating that its topology gains are associated with the
+> auxiliary gradient/E2 objective rather than fine-tuning alone.
+
+---
+
+## XXXVI.78 Conventional-fidelity relationship to the matched control
+
+Candidate F and the \(L_{uv}\)-only control are not conventionally near-tied in
+the same sense as the originally selected Candidate-F-vs-CNN cases.
+
+Across the 168-sample benchmark, the median absolute/relative gaps are:
+
+```text
+|delta PSNRuv|:
+    1.291121 dB
+
+relative speed-MAE gap:
+    18.847%
+
+relative speed-RMSE gap:
+    15.695%
+```
+
+Thus the matched-control analysis should not be framed as:
+
+```text
+Candidate F and UV have essentially identical conventional fidelity.
+```
+
+Instead it should be framed as:
+
+```text
+UV is a matched training control that isolates ordinary reconstruction-only
+fine-tuning, while the original Candidate-F-vs-CNN near-tie analysis separately
+demonstrates topological separation among conventionally close cases.
+```
+
+These are complementary experimental questions.
+
+A useful next conventional-metric diagnostic is to report the *direction* of the
+Candidate-F-vs-UV PSNR, speed-MAE, and speed-RMSE differences, not only their
+absolute gaps, so that the topology improvement can be interpreted alongside
+the fidelity trade-off.
+
+---
+
+## XXXVI.79 Predeclared visual cases under the matched control
+
+All five predeclared Candidate-F-vs-CNN visual samples also satisfy:
+
+```text
+Candidate F < Candidate UV
+```
+
+under all three validated PD metrics.
+
+### Sample 78
+
+```text
+d_B:
+    CNN 4.150 -> UV 3.626 -> F 2.586
+
+W2inf:
+    CNN 23.701 -> UV 24.152 -> F 16.101
+
+W22:
+    CNN 30.568 -> UV 31.164 -> F 20.145
+
+F vs UV conventional gaps:
+    |delta PSNRuv| = 1.2979 dB
+    relative MAE   = 18.35%
+    relative RMSE  = 16.19%
+```
+
+Here UV improves d_B slightly relative to CNN but worsens both Wasserstein
+metrics. Candidate F is lower than both under all three metrics.
+
+### Sample 71
+
+```text
+d_B:
+    CNN 2.696 -> UV 3.175 -> F 1.580
+
+W2inf:
+    CNN 17.140 -> UV 18.569 -> F 11.670
+
+W22:
+    CNN 21.906 -> UV 24.000 -> F 14.469
+```
+
+UV is worse than CNN under all three metrics, while Candidate F is better than
+both. This is an especially clean matched-control example.
+
+### Sample 80
+
+```text
+d_B:
+    CNN 4.296 -> UV 3.600 -> F 1.808
+
+W2inf:
+    CNN 22.770 -> UV 23.272 -> F 15.907
+
+W22:
+    CNN 29.627 -> UV 30.484 -> F 19.978
+```
+
+UV improves d_B but worsens the two Wasserstein metrics; Candidate F improves
+all three.
+
+### Sample 63
+
+```text
+d_B:
+    CNN 4.000 -> UV 4.028 -> F 2.039
+
+W2inf:
+    CNN 18.124 -> UV 19.181 -> F 13.145
+
+W22:
+    CNN 23.745 -> UV 25.359 -> F 16.741
+```
+
+As for sample 71, UV is worse than CNN under all three while Candidate F is
+better than both, making sample 63 another especially clean matched-control
+example.
+
+### Sample 69
+
+```text
+d_B:
+    CNN 3.067 -> UV 2.436 -> F 1.233
+
+W2inf:
+    CNN 14.572 -> UV 15.256 -> F 9.987
+
+W22:
+    CNN 18.722 -> UV 19.913 -> F 12.323
+```
+
+UV improves d_B but worsens both Wasserstein metrics; Candidate F improves all
+three.
+
+For the ablation-inclusive visual story, samples 71 and 63 are especially clean
+because the matched \(L_{uv}\)-only control moves all three PD metrics away from
+GT whereas Candidate F moves all three closer.
+
+This does not replace sample 78 as the original rank-defined near-tie case.
+Rather:
+
+```text
+sample 78:
+    strongest original near-tie topology-separation example
+
+samples 71 / 63:
+    particularly clean matched-control mechanistic examples
+```
+
+The initial figure batch should still be generated from the already predeclared
+set without substituting samples based on visual appearance.
+
