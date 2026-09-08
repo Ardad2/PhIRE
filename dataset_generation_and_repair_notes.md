@@ -17732,3 +17732,566 @@ No visual sample should be replaced merely because another sample "looks
 better" unless that replacement is documented as a separate exploratory
 example rather than part of the predeclared primary case set.
 
+---
+
+## XXXVI.62 Near-tie visual-selection freeze — COMPLETE / VERIFIED
+
+Before any real-data visual inspection, the quantitative case-selection artifacts
+were frozen with SHA-256.
+
+Manifest:
+
+```text
+$W22/near_tie_visual_selection_sha256.txt
+```
+
+Frozen hashes:
+
+```text
+1660651385e1ebf18fea93c93176b6293f0ab355fb0acde41971e29bdf03bc0c  select_near_tie_visual_cases.py
+b782f841475ba0ebf7ba3f732e144094a689d411e5bc46d0c7421be7b92a4f84  near_tie_candidateF_grad_E2_vs_cnn_master.csv
+9712ac21affc7b5586cf8f2fda9650b09dafa35a31f3778c33a285e783b4131d  near_tie_candidateF_grad_E2_vs_cnn_topology_ranked.csv
+35d6da2b397f57618afd44565d22f9f00c265973d7e09aa9ff32cf9695b2a231  near_tie_candidateF_grad_E2_vs_cnn_summary.txt
+55c4639c150f2b34a5fb7fed1fc774f7fc0b8c4aeee7378cd8d98331a02d52c6  near_tie_candidateF_grad_E2_vs_cnn.log
+745f0d70449997d7c022e49dc5343e4f8affbe31eec9911b1e544050fb87d3ae  candidate_pd_robustness_samples.csv
+aac2ae7e4cfde2a81f71140ee4ae90bdefd4ffe0e493e89ddd04b68c3d8e453f  candidate_pd_robustness_summary.csv
+```
+
+`sha256sum -c` returned `OK` for every artifact.
+
+Therefore the following were fixed before visual inspection:
+
+```text
+conventional closeness rule
+near-tie tier membership
+topology consensus requirement
+topology ranking
+predeclared initial samples: 78, 71, 80, 63, 69
+```
+
+---
+
+## XXXVI.63 Real-data figure-generation implementation
+
+A real-data figure generator was created:
+
+```text
+$W22/generate_candidateF_near_tie_figures.py
+```
+
+The script is explicitly designed to use:
+
+```text
+actual CNN benchmark arrays
+actual Candidate-F benchmark arrays
+actual audited TTK persistence-diagram VTUs
+frozen W22 audit tables
+frozen near-tie/robustness tables
+```
+
+rather than illustrative or AI-generated scientific content.
+
+Planned outputs per sample:
+
+```text
+1. poster-style overview:
+   actual GT/CNN/Candidate-F scalar-speed fields
+   actual scalar-speed error maps
+   actual PD overlays
+   actual persistence-survival curves
+   frozen metric summaries
+
+2. detailed W22 matching diagnostic:
+   D0 and D1 separately
+   largest actual W22 assignment costs highlighted
+```
+
+The script passed syntax compilation.
+
+Figure-environment versions observed in the interactive Python environment:
+
+```text
+NumPy:      2.4.2
+SciPy:      1.17.1
+Matplotlib: 3.10.8
+VTK:        9.6.0
+```
+
+A Matplotlib warning about inability to import `Axes3D` appeared, but the planned
+figures are two-dimensional, so that warning is not itself a blocker.
+
+---
+
+## XXXVI.64 Visual preflight uncovered a GT-PD reproducibility discrepancy
+
+The first real-data figure-generation attempt was made for predeclared sample 78.
+
+Before plotting, the script verified that the CNN and Candidate-F stored GT
+vector arrays are exactly aligned:
+
+```text
+CNN/Candidate-F GT max abs difference: 0.0
+```
+
+However, the independently stored TTK GT persistence-diagram VTUs were not
+identical.
+
+GT PD paths:
+
+```text
+CNN:
+ttk_runs_fixed/cnn/pd/cnn_GT_s78_speed_p160_x0_y0_pd_port_0.vtu
+
+Candidate F:
+ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology/pd/GT/candidateF_grad_E2_low_expanded2688_GT_s78_speed_p160_x0_y0_pd_port_0.vtu
+```
+
+Their file hashes differ, which by itself is not scientifically meaningful
+because serialization/order can differ.
+
+A semantic diagram comparison showed:
+
+```text
+D0:
+    CNN shape: (997, 2)
+    Candidate-F GT shape: (997, 2)
+    raw array equality: False
+    sorted array equality: True
+    sorted max abs difference: 0.0
+
+D1:
+    CNN shape: (864, 2)
+    Candidate-F GT shape: (863, 2)
+    cardinality mismatch
+```
+
+The global/nonfinite pair is identical:
+
+```text
+CNN: (0, 0.1098632737994194, 20.883819572627544)
+F:   (0, 0.1098632737994194, 20.883819572627544)
+```
+
+Interpretation:
+
+```text
+D0 difference = ordering/serialization only
+D1 difference = one finite-pair discrepancy and must be investigated
+```
+
+Because the underlying GT vector arrays are exactly identical, this mismatch
+does not appear to be caused by model/data alignment. Possible causes include
+a zero- or near-zero-persistence pair, TTK tie-breaking, VTI/offset metadata,
+or another extraction-level difference.
+
+The figure-generation script was intentionally left fail-closed and did not
+generate a scientific figure using inconsistent stored GT diagrams.
+
+Current status:
+
+```text
+real-data image generation:
+    BLOCKED pending GT D1 consistency audit
+
+near-tie quantitative selection:
+    remains frozen and valid
+
+distance audits:
+    unchanged
+
+no scientific visual result has yet been accepted
+```
+
+This is an upstream persistence-extraction reproducibility question, not a
+failure of the already completed custom-vs-GUDHI distance validation, which
+conditions on the supplied finite TTK diagrams.
+
+---
+
+## XXXVI.65 Sample-78 GT D1 discrepancy resolved as a zero-persistence diagonal point
+
+The sample-78 CNN-GT versus Candidate-F-GT D1 mismatch was isolated exactly.
+
+Observed finite D1 counts:
+
+```text
+CNN GT:         864
+Candidate-F GT: 863
+```
+
+Exact multiset comparison found:
+
+```text
+exact common multiplicity: 863
+CNN-only multiplicity:     1
+Candidate-F-only:          0
+```
+
+The single CNN-only D1 point is:
+
+```text
+birth       = 3.6164398193359375
+death       = 3.6164398193359375
+persistence = 0
+Linf diagonal cost = 0
+L2 diagonal cost   = 0
+```
+
+After removing nonpositive-persistence points:
+
+```text
+eps=0:
+CNN=862
+Candidate-F=862
+equal=True
+```
+
+and equality remains true for progressively larger tiny thresholds through
+`1e-4` in the diagnostic.
+
+Therefore the stored GT diagrams differ only by one explicitly represented
+zero-persistence point on the diagonal.
+
+For standard persistence-diagram distances, diagonal points have zero cost and
+the diagonal is treated as available with arbitrary multiplicity. Consequently
+this extra point has no effect on bottleneck distance, W2-infinity, or W2,2.
+
+This resolves the sample-78 GT mismatch at the mathematical distance level.
+The mismatch is best understood as an extraction/serialization-level diagonal
+representation difference rather than a substantive topological difference.
+
+The visual pipeline should nevertheless continue to fail closed until the same
+property is checked across all 168 benchmark samples.
+
+---
+
+## XXXVI.66 All-168 GT persistence-diagram consistency audit — COMPLETE / PASS
+
+After sample 78 revealed a stored zero-persistence D1 discrepancy, the CNN-GT
+and Candidate-F-GT persistence diagrams were compared over the complete
+168-sample benchmark.
+
+The audit compared:
+
+```text
+raw parser arrays
+exact finite-point multisets
+strictly positive-persistence finite-point multisets
+nonfinite/global pairs
+```
+
+### D0 results
+
+```text
+raw array equal:                         0 / 168
+exact multiset equal:                   55 / 168
+positive-persistence multiset equal:   168 / 168
+cardinality mismatches:                 95
+zero-only representation differences: 113
+positive-persistence mismatches:         0
+```
+
+### D1 results
+
+```text
+raw array equal:                         0 / 168
+exact multiset equal:                   68 / 168
+positive-persistence multiset equal:   168 / 168
+cardinality mismatches:                 85
+zero-only representation differences: 100
+positive-persistence mismatches:         0
+```
+
+### Global/nonfinite pairs
+
+```text
+nonfinite mismatches: 0
+```
+
+Final result:
+
+```text
+OVERALL GT PD CONSISTENCY AFTER REMOVING
+ZERO-PERSISTENCE DIAGONAL POINTS: PASS
+```
+
+### Interpretation
+
+The independently stored CNN-GT and Candidate-F-GT VTUs are not bytewise or
+rowwise reproducible, and many samples contain different numbers of explicit
+zero-persistence finite pairs.
+
+However, after removing only points satisfying:
+
+```text
+death - birth == 0
+```
+
+the positive-persistence D0 and D1 finite diagrams are exactly the same
+multisets for all 168 samples, and all global/nonfinite pairs also agree.
+
+Therefore the extraction difference is confined to:
+
+```text
+row/cell ordering
++
+explicit representation of zero-persistence diagonal points
+```
+
+and does not change the standard persistence-diagram distances used in this
+project.
+
+This is an important reproducibility distinction:
+
+```text
+stored TTK VTU representation:
+    can vary in zero-persistence bookkeeping
+
+positive-persistence persistence diagram:
+    fully reproducible across the two GT extraction runs
+```
+
+---
+
+## XXXVI.67 Figure-time PD canonicalization rule
+
+The real-data figure generator should now canonicalize finite persistence
+diagrams as follows:
+
+```text
+1. reject any negative-persistence point;
+2. remove only exact zero-persistence points;
+3. retain every strictly positive-persistence pair;
+4. sort retained pairs lexicographically by birth then death.
+```
+
+For GT, the canonicalized CNN-GT and Candidate-F-GT diagrams must be exactly
+equal in both D0 and D1 before plotting proceeds.
+
+The CNN and Candidate-F reconstruction diagrams should be canonicalized by the
+same zero-only rule for cleaner matching/visualization.
+
+No positive persistence threshold is applied to the numerical W22 matching
+computation.
+
+The existing display-only threshold:
+
+```text
+persistence >= 5
+```
+
+may still be used for PD scatter readability, provided the figure explicitly
+states that reported distances use the complete positive-persistence finite
+diagrams.
+
+Finally, the figure-time W22 recomputation must still agree with the frozen
+audit values within the predeclared numerical tolerance. This acts as an
+end-to-end guard that removing explicit diagonal points has not changed the
+audited metric.
+
+---
+
+## XXXVI.68 Real-data figure generator schema fix
+
+After the all-168 GT positive-persistence consistency audit passed, sample 78
+advanced successfully through GT and model PD canonicalization:
+
+```text
+GT positive-persistence semantic equality D0: PASS
+GT positive-persistence semantic equality D1: PASS
+
+CNN D0: positive_pairs=547, zero_removed=0
+CNN D1: positive_pairs=485, zero_removed=0
+
+Candidate F D0: positive_pairs=656, zero_removed=0
+Candidate F D1: positive_pairs=558, zero_removed=0
+```
+
+The figure then stopped before rendering because the overview code attempted to
+read:
+
+```text
+db_relative_improvement
+w2inf_relative_improvement
+w22_relative_improvement
+```
+
+from `candidate_pd_robustness_samples.csv`.
+
+Those precomputed relative-improvement fields actually belong to the frozen
+near-tie master table:
+
+```text
+near_tie_candidateF_grad_E2_vs_cnn_master.csv
+```
+
+while the robustness table stores the underlying baseline/candidate distances.
+
+This is a figure-script schema/reference bug only; it does not affect any
+frozen quantitative result.
+
+The figure generator was corrected so the three displayed percentage gains are
+read from the already-frozen near-tie record, while the robustness record
+continues to supply the frozen absolute W22 baseline/candidate values used for
+the end-to-end recomputation check.
+
+No sample selection, topology ranking, or audited metric value was changed.
+
+---
+
+## XXXVI.69 Sample-78 real-data figure generation — COMPLETE / AUDIT-CONSISTENT
+
+The first predeclared real-data visual case, sample 78, completed successfully.
+
+The figure generator verified:
+
+```text
+CNN/Candidate-F GT max abs difference: 0.0
+
+GT positive-persistence semantic equality D0: PASS
+GT positive-persistence semantic equality D1: PASS
+
+CNN D0: positive_pairs=547, zero_removed=0
+CNN D1: positive_pairs=485, zero_removed=0
+
+Candidate F D0: positive_pairs=656, zero_removed=0
+Candidate F D1: positive_pairs=558, zero_removed=0
+```
+
+The figure-time W22 recomputation then matched the frozen audit exactly:
+
+```text
+CNN:
+    recomputed = 30.5681180963627
+    frozen     = 30.5681180963627
+    diff       = 0.000e+00
+
+Candidate F:
+    recomputed = 20.1448098608268
+    frozen     = 20.1448098608268
+    diff       = 0.000e+00
+```
+
+Therefore:
+
+```text
+W22 audit consistency: PASS
+```
+
+Generated outputs:
+
+```text
+/home/adadhwal/PhIRE/figures/candidateF_near_tie_real/
+    sample_078_overview.png
+    sample_078_overview.pdf
+    sample_078_w22_matching.png
+    sample_078_w22_matching.pdf
+    figure_manifest.csv
+```
+
+The aggregate W22 improvement is:
+
+```text
+34.10%
+```
+
+which exactly agrees with the frozen near-tie table.
+
+The W22 matching diagnostic also reports:
+
+```text
+D0:
+    CNN         = 22.8875
+    Candidate F = 15.8415
+    relative reduction ≈ 30.79%
+
+D1:
+    CNN         = 20.2625
+    Candidate F = 12.4443
+    relative reduction ≈ 38.58%
+```
+
+Thus both homology dimensions contribute materially to the aggregate W22
+improvement.
+
+---
+
+## XXXVI.70 Sample-78 first visual review
+
+The real-data overview is qualitatively promising.
+
+Observed visual pattern:
+
+```text
+GT:
+    contains sharper localized wind-speed structure
+
+CNN:
+    visibly smoother / more diffuse in several fine-scale regions
+
+Candidate F:
+    visually recovers more of the GT-like fine-scale texture
+    while remaining close to CNN under the frozen conventional-closeness ranking
+```
+
+The absolute-speed error maps also suggest lower and more localized Candidate-F
+error in parts of the field, although the figure should not be used to claim
+physical importance without an independent physical interpretation.
+
+The persistence-survival plot is especially useful because Candidate F tracks
+the GT high-persistence tail substantially more closely than CNN over much of
+the displayed threshold range.
+
+The W22 matching diagnostic is also promising: the largest CNN assignment
+segments are visibly more extensive in both D0 and D1, while Candidate F has
+lower dimension-wise W22 values.
+
+### Figure-design issues to fix before paper/poster use
+
+The current figures should be treated as scientifically valid diagnostics but
+not yet final publication artwork.
+
+Recommended fixes:
+
+```text
+1. Overview survival-panel title/subtitle overlap.
+2. Bottom summary-box headings lose spaces because they are rendered in math mode.
+3. Reduce excess whitespace and enlarge the scalar/error maps.
+4. In the overview PD overlay, avoid visually conflating D0 and D1 because
+   matching is dimension-preserving; either separate D0/D1 or encode dimension
+   explicitly.
+5. Enforce shared PD axis limits between CNN and Candidate-F comparisons.
+6. In the W22 matching figure, use a shared assignment-cost visual scale rather
+   than independently normalizing line thickness within each panel.
+7. Distinguish real-to-real matches from matches to the diagonal so that a
+   diagonal projection is not mistaken for an actual GT/model persistence point.
+8. Add a legend explaining GT points, model points, real-real assignments, and
+   diagonal assignments.
+9. Move the W22 footer/caption lower or increase the bottom margin to prevent
+   overlap with the bottom x-axis labels.
+10. Consider reporting what fraction of W22^2 is represented by the displayed
+    high-cost assignments, or use a cumulative-cost criterion instead of an
+    arbitrary fixed top-30 count.
+```
+
+The primary scientific wording should remain:
+
+```text
+Candidate F shows stronger agreement with persistent topological structure
+under the validated PD metrics.
+```
+
+Avoid upgrading this to:
+
+```text
+Candidate F preserves physically important structure better
+```
+
+unless the relevant persistent structures are independently tied to a physical
+interpretation.
+
+Sample 78 remains a strong primary visual candidate because it was selected
+before image inspection, is within the strict conventional-near-tie subset,
+ranks first by conservative three-metric topology separation within the primary
+subset, and now also yields a visually interpretable real-data comparison.
+
