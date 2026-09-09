@@ -20738,3 +20738,444 @@ for example:
 
 without replacing or modifying the already-frozen selection.
 
+---
+
+## XXXVI.103 Sample-69 authoritative MT visualization inputs — PASS
+
+For the frozen PRIMARY-20% descriptor-discordance case, sample 69, new
+authoritative qualitative inputs were generated directly from the validated
+CNN, matched \(L_{uv}\)-only, and Candidate-F arrays.
+
+All three methods use the same sample index and the same 160x160 top-left
+topology crop.
+
+GT identity check:
+
+```text
+CNN GT vs UV:
+    exact = True
+    max_abs_diff = 0
+
+CNN GT vs Candidate F:
+    exact = True
+    max_abs_diff = 0
+
+GT identity across CNN / UV / Candidate F:
+    PASS
+```
+
+The new VTI files use the corrected C-order convention:
+
+```text
+VTK dimensions:
+    160 x 160 x 1
+
+scalar:
+    wind_speed = sqrt(u^2 + v^2)
+
+flattening:
+    ravel(order="C")
+```
+
+Round-trip validation passed for GT, CNN, UV, and Candidate F:
+
+```text
+C-order exact:
+    True
+
+C-order max difference:
+    0
+
+F-order exact:
+    False
+```
+
+The authoritative VTI files and JSON provenance manifest were SHA-256 checked
+successfully.
+
+This explicitly avoids the historical F-order/C-order ambiguity that affected
+older qualitative MT panels.
+
+---
+
+## XXXVI.104 GT-only merge-tree display-threshold sweep
+
+Before viewing any CNN / UV / Candidate-F tree geometry, the GT field alone was
+processed through the corrected qualitative pipeline:
+
+```text
+authoritative C-order GT VTI
+    ->
+absolute persistence simplification
+    ->
+FTM Join Tree
+    ->
+arc sampling = 10
+    ->
+geometry sanitizer
+```
+
+The tested display-only persistence thresholds were frozen in advance:
+
+```text
+0
+1
+2
+3
+```
+
+Observed GT complexity:
+
+```text
+threshold   node points   arc points   rendered arc cells
+0              2186          5346             5345
+1               298          1710             1709
+2               114           845              844
+3                58           446              445
+```
+
+The sanitizer preserved the geometry at every threshold and validated:
+
+```text
+finite coordinates
+valid cell types
+valid point references
+bounds within the 160x160 input domain
+```
+
+These thresholds are for **qualitative display simplification only**.
+They do not modify the already-audited numerical merge-tree distance, whose
+audited persistence threshold remains 0.
+
+---
+
+## XXXVI.105 Sample-69 MT qualitative display threshold — FROZEN at 3.0
+
+The display threshold is frozen at:
+
+```text
+3.0
+```
+
+based only on GT complexity, before inspection of CNN / UV / Candidate-F tree
+geometry.
+
+Rationale:
+
+```text
+threshold 0:
+    2186 nodes / 5345 rendered arc segments
+    clearly too dense for a comparative figure
+
+threshold 1:
+    298 nodes / 1709 arc segments
+    still very dense
+
+threshold 2:
+    114 nodes / 844 arc segments
+    substantially simplified but likely crowded in a four-method panel
+
+threshold 3:
+     58 nodes / 445 arc segments
+    remains structurally nontrivial while providing the best chance of readable
+    side-by-side comparison
+```
+
+Relative to threshold 2, threshold 3 roughly halves the remaining node and arc
+geometry while retaining dozens of critical nodes.
+
+This choice is not based on whether CNN, UV, or Candidate F looks favorable at
+threshold 3.
+
+Frozen interpretation:
+
+```text
+sample:
+    69
+
+qualitative MT display persistence threshold:
+    3.0
+
+selection basis:
+    GT tree complexity only
+
+numerical MT distance:
+    unchanged / audited threshold 0
+```
+
+The next stage is to extract CNN, UV, and Candidate-F Join Tree geometry at this
+single frozen threshold, summarize their node/arc complexity without visual
+inspection, and only then render the four-way GT/CNN/UV/F comparison.
+
+---
+
+## XXXVI.106 Sample-69 fixed-threshold MT extraction — COMPLETE
+
+After freezing the qualitative display persistence threshold at:
+
+```text
+3.0
+```
+
+the same corrected pipeline was run for:
+
+```text
+CNN
+matched L_uv-only control
+Candidate F1
+```
+
+using the already-generated GT threshold-3 tree as the reference.
+
+All authoritative input and threshold-selection SHA checks passed before
+extraction.
+
+The qualitative extraction pipeline was identical across all four fields:
+
+```text
+C-order 160x160 wind-speed VTI
+    ->
+absolute persistence simplification threshold = 3.0
+    ->
+FTM Join Tree
+    ->
+arc sampling = 10
+    ->
+geometry sanitizer
+```
+
+All three learned-method extractions completed successfully and all sanitizer
+checks passed.
+
+Observed fixed-threshold geometry counts:
+
+```text
+method   nodes   arc points   rendered arc cells
+GT          58       446              445
+CNN         12       122              121
+UV          18       175              174
+F1          38       374              373
+```
+
+The display geometry counts were identical to the raw geometry counts after
+sanitization, confirming that the sanitizer preserved points/cells while
+stripping arrays.
+
+### Initial structural observation
+
+At the frozen threshold, Candidate F preserves substantially more of the GT
+join-tree complexity than either CNN or the matched L_uv-only control:
+
+```text
+nodes:
+    GT  = 58
+    F1  = 38
+    UV  = 18
+    CNN = 12
+```
+
+This count alone is **not** a merge-tree distance and must not be interpreted as
+proof that F1 is closer to GT in the audited MT metric.
+
+Indeed, sample 69 is intentionally a descriptor-discordance case:
+
+```text
+relative to CNN:
+    all three corrected PD metrics improve strongly
+    audited MT distance worsens slightly
+```
+
+while relative to the matched UV control:
+
+```text
+F1 improves all three corrected PD metrics
+F1 also improves MT slightly
+```
+
+The count pattern therefore motivates direct visual inspection of the spatially
+embedded branch hierarchy.
+
+A plausible hypothesis to test visually is:
+
+```text
+Candidate F recovers more persistent branches/features than CNN/UV,
+but some recovered branches may attach or merge through a hierarchy that differs
+from GT enough to keep the audited MT distance slightly worse than CNN.
+```
+
+This is a hypothesis only. The next figure should be used to inspect branch
+placement and hierarchy rather than infer from counts alone.
+
+No further threshold changes are permitted for the sample-69 primary
+discordance study.
+
+---
+
+## XXXVI.107 Next visualization target
+
+The next figure should use the frozen threshold-3 sanitized geometry and the
+authoritative scalar fields to produce a four-way comparison:
+
+```text
+GT | CNN | L_uv-only control | Candidate F
+```
+
+Recommended views:
+
+```text
+1. wind-speed field with spatially embedded Join Tree overlaid;
+2. tree-only spatial embedding on a clean background.
+```
+
+All panels must use:
+
+```text
+identical x/y limits
+identical image orientation
+identical wind-speed color limits
+identical tree line width
+identical node size
+identical threshold = 3.0
+```
+
+Because the sanitizer intentionally removed the TTK arrays, the qualitative
+renderer should use geometry only and must not attempt to color nodes/arcs by
+stripped TTK attributes.
+
+---
+
+## XXXVI.108 Sample-69 regenerated MT visualizations — first interpretation
+
+Two regenerated qualitative figures were produced from the authoritative
+C-order sample-69 scalar fields and the frozen threshold-3 sanitized Join-Tree
+geometry:
+
+```text
+sample_069_mt_t3_field_overlay.png
+sample_069_mt_t3_tree_only.png
+```
+
+The rendering completed successfully. The Matplotlib Axes3D warning is
+irrelevant to these 2D figures and does not affect the output.
+
+### What is directly visible
+
+The threshold-3 complexity ordering is:
+
+```text
+GT  : 58 nodes / 445 rendered arc segments
+F1  : 38 nodes / 373 rendered arc segments
+UV  : 18 nodes / 174 rendered arc segments
+CNN : 12 nodes / 121 rendered arc segments
+```
+
+The spatially embedded geometry reflects the same qualitative ordering:
+
+```text
+CNN:
+    strongly simplified relative to GT
+
+UV:
+    somewhat richer than CNN but still sparse
+
+Candidate F:
+    substantially richer than CNN/UV and occupies many more of the spatial
+    regions containing surviving GT tree structure
+```
+
+This supports the statement that Candidate F restores substantially more
+persistent Join-Tree structure at the frozen visualization threshold.
+
+### What the figures do NOT establish
+
+The visual density, node count, and sampled arc-segment count are not the
+audited merge-tree distance.
+
+For sample 69:
+
+```text
+relative to CNN:
+    Candidate F improves all three corrected PD metrics strongly
+    but audited MT distance is slightly worse (~3.61%)
+
+relative to matched UV:
+    Candidate F improves all three corrected PD metrics
+    and MT is only slightly better (~0.57%)
+```
+
+Therefore the figure must not be described as showing that Candidate F is
+"closer to GT in MT" merely because it has 38 nodes versus CNN's 12.
+
+A likely explanation to investigate is that Candidate F restores more
+persistent branches but differs in:
+
+```text
+branch-to-branch correspondence
+parent/child attachment
+merge ordering
+merge scalar levels
+or spatial placement of critical structure
+```
+
+The current spatial embeddings cannot by themselves distinguish these
+possibilities.
+
+### Important rendering semantics
+
+The shown curves are spatially embedded sampled superarc geometry.
+
+Consequently:
+
+```text
+line crossings are NOT necessarily merge-tree junctions;
+only actual tree nodes/junction connectivity defines the tree;
+arc_segments are sampled rendering segments, not logical tree-branch counts.
+```
+
+This is especially important because the tree-only panel can visually resemble
+a graph with many crossings even though the underlying object is a tree.
+
+### Scientific value of the current figures
+
+The overlay is useful as a spatial diagnostic:
+
+> Candidate F recovers much more of the persistent spatial tree geometry than
+> CNN or the matched control, but the audited MT metric does not reward simple
+> branch-count similarity. Sample 69 therefore illustrates that preserving the
+> number and broad spatial distribution of persistent features is not sufficient
+> to guarantee closer merge-tree hierarchy.
+
+This is a useful qualitative result, but it is not yet the cleanest way to
+explain *why* the audited MT distance is worse than CNN.
+
+---
+
+## XXXVI.109 Recommended next MT diagnostic: validated abstract hierarchy
+
+The next visualization should target the actual hierarchy rather than only the
+spatial embedding.
+
+Because the historical audit found suspicious raw TTK arc attribute arrays, the
+raw up/down-node IDs or scalar attributes must not be assumed valid.
+
+Before constructing an abstract dendrogram/tree layout, perform a targeted
+sample-69 array audit on:
+
+```text
+GT threshold-3 raw nodes.vtu / arcs.vtu
+CNN threshold-3 raw nodes.vtu / arcs.vtu
+UV threshold-3 raw nodes.vtu / arcs.vtu
+F1 threshold-3 raw nodes.vtu / arcs.vtu
+```
+
+The audit should inventory every point/cell/field array and verify candidate
+connectivity/scalar arrays against geometry and the authoritative VTI.
+
+Only arrays passing these checks should be used to reconstruct an abstract
+tree.
+
+If reliable hierarchy arrays cannot be validated, the spatial embedding should
+remain the qualitative MT visualization and the paper should avoid making
+specific branch-parent claims from it.
+
+
