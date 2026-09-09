@@ -20225,3 +20225,516 @@ sample 84:
 The latter remains a separately defined secondary study and must not be
 retroactively inserted into the original predeclared five.
 
+---
+
+## XXXVI.96 Corrected PD / audited MT result preservation — VERIFIED
+
+The corrected PD/MT result directory was hash-frozen successfully.
+
+Directory:
+
+```text
+$W22/corrected_pd_mt
+```
+
+Final manifest:
+
+```text
+$W22/corrected_pd_mt/corrected_pd_mt_final_sha256.txt
+```
+
+Manifest entry count:
+
+```text
+14
+```
+
+Verification:
+
+```text
+corrected_pd_mt_all3_consensus_vs_cnn.csv: OK
+corrected_pd_mt_cross_method_correlations_by_sample.csv: OK
+corrected_pd_mt_cross_method_summary.csv: OK
+corrected_pd_mt_focal_comparisons.csv: OK
+corrected_pd_mt_joined.csv: OK
+corrected_pd_mt_method_mean_correlations.csv: OK
+corrected_pd_mt_method_means.csv: OK
+corrected_pd_mt_pareto_membership.csv: OK
+corrected_pd_mt_quadrants_vs_cnn.csv: OK
+corrected_pd_mt_sample_archetypes_vs_cnn.csv: OK
+corrected_pd_mt_summary.txt: OK
+corrected_pd_mt_two_way_residual_correlations.csv: OK
+corrected_pd_mt_within_method_correlations.csv: OK
+corrected_pd_mt_within_method_summary.csv: OK
+```
+
+Therefore the complete 14-file corrected PD/MT result set is now
+content-addressed by SHA-256 and mechanically verification-tested.
+
+The separate script/log preservation manifest had already passed:
+
+```text
+analyze_corrected_pd_mt_tradeoff.py: OK
+corrected_pd_mt_tradeoff.log: OK
+```
+
+Current status:
+
+```text
+CORRECTED PD / AUDITED MT ANALYSIS:
+    COMPLETE
+    VALIDATED
+    PRESERVATION-VERIFIED
+```
+
+As elsewhere in these notes, "preservation-verified" means hash-frozen /
+content-addressed. It does not imply filesystem-level immutability unless
+separate filesystem permissions or archival controls are applied.
+
+---
+
+## XXXVI.97 Immediate next-stage priority
+
+With the corrected PD/MT quantitative layer now closed and preserved, the next
+priority shifts from metric forensics to scientific visualization.
+
+Recommended sequence:
+
+```text
+1. Generate the remaining already-predeclared matched-control figures:
+       71
+       80
+       63
+       69
+
+2. Keep sample 78 as the original conventionally-close primary example.
+
+3. Treat sample 71 as a particularly strong matched-control PD+MT improvement
+   example.
+
+4. Define and freeze a separate secondary PD/MT-discordance sample-selection
+   rule before viewing merge-tree images.
+
+5. Use that rule to identify cases such as sample 84 where:
+       conventional fidelity is relatively close,
+       d_B improves,
+       W2inf improves,
+       W22 improves,
+       MT worsens.
+
+6. Generate merge-tree visualizations with identical simplification and
+   rendering settings for:
+       GT
+       CNN
+       L_uv-only matched control
+       Candidate F
+
+7. Compare those tree structures against the already-corrected PD diagnostics
+   to determine what hierarchy/branch organization is being captured by MT
+   that the persistence diagrams do not encode explicitly.
+```
+
+---
+
+## XXXVI.98 Secondary corrected-PD / MT discordance study — selection rule frozen
+
+With the corrected PD/MT quantitative layer preservation-verified, the next
+scientific stage is a secondary descriptor-discordance visualization study.
+
+This study is explicitly separate from the original predeclared visual set:
+
+```text
+78
+71
+80
+63
+69
+```
+
+and does not retroactively alter that selection.
+
+The secondary discordance rule is:
+
+```text
+1. retain membership in an already-frozen conventional-near-tie tier;
+
+2. require Candidate F to improve all three corrected PD metrics vs CNN:
+       d_B
+       W2inf
+       W22
+
+3. require the audited MT distance to worsen vs CNN;
+
+4. rank qualifying samples by:
+       minimum relative PD improvement across d_B/W2inf/W22
+   in descending order;
+
+5. tie-break by:
+       MT worsening magnitude descending,
+       original conventional rank ascending,
+       sample index ascending.
+```
+
+The primary tier for interpretation remains:
+
+```text
+PRIMARY 20%
+```
+
+while STRICT 10% and BROAD 30% are reported for context.
+
+The matched L_uv-only control is included only as secondary context in this
+selection script and is not part of the qualification rule.
+
+Historical TTK `"2"` PD distances remain forbidden.
+
+Script:
+
+```text
+select_candidateF_pd_mt_discordant_cases.py
+```
+
+Expected outputs:
+
+```text
+$W22/corrected_pd_mt/
+    candidateF_pd_mt_discordance_master.csv
+    candidateF_pd_mt_discordance_ranked.csv
+    candidateF_pd_mt_discordance_summary.txt
+```
+
+After this table is generated, its contents should be frozen before any
+merge-tree image inspection.
+
+The highest-ranked PRIMARY-20% discordant case should be visualized first,
+without appearance-based substitution.
+
+---
+
+## XXXVI.99 Secondary corrected-PD / MT discordance selection — COMPLETE / FROZEN
+
+The secondary descriptor-discordance selection script completed successfully.
+
+Source policy:
+
+```text
+historical TTK "2" PD:
+    NOT USED
+
+corrected PD + audited MT:
+    corrected_pd_mt_sample_archetypes_vs_cnn.csv
+
+conventional-near-tie membership:
+    near_tie_candidateF_grad_E2_vs_cnn_topology_ranked.csv
+
+matched L_uv-only control:
+    context only; not part of qualification/ranking rule
+```
+
+The previously frozen selection rule was applied without visual inspection.
+
+### Strict 10% conventional-near-tie tier
+
+```text
+frozen cases:
+    17
+
+all-three corrected PD improve + MT worsens:
+    5
+```
+
+Top cases:
+
+```text
+sample 76:
+    conventional rank = 6
+    minimum PD gain   = +29.00%
+    mean PD gain      = +34.47%
+    d_B gain          = +43.70%
+    W2inf gain        = +29.00%
+    W22 gain          = +30.71%
+    MT gain           =  -4.62%
+
+sample 75:
+    conventional rank = 11
+    minimum PD gain   = +28.34%
+    MT gain           =  -3.40%
+
+sample 103:
+    conventional rank = 16
+    minimum PD gain   = +26.28%
+    MT gain           =  -4.58%
+```
+
+### Primary 20% conventional-near-tie tier
+
+```text
+frozen cases:
+    34
+
+all-three corrected PD improve + MT worsens:
+    12
+```
+
+Frozen ranking:
+
+```text
+1. sample 69
+   conventional rank = 27
+   minimum PD gain   = +31.46%
+   mean PD gain      = +41.81%
+   d_B gain          = +59.79%
+   W2inf gain        = +31.46%
+   W22 gain          = +34.18%
+   MT gain           =  -3.61%
+
+2. sample 84
+   conventional rank = 20
+   minimum PD gain   = +29.02%
+   mean PD gain      = +37.98%
+   d_B gain          = +55.17%
+   W2inf gain        = +29.02%
+   W22 gain          = +29.75%
+   MT gain           =  -7.98%
+
+3. sample 76
+   conventional rank = 6
+   minimum PD gain   = +29.00%
+   MT gain           =  -4.62%
+
+4. sample 75
+   conventional rank = 11
+   minimum PD gain   = +28.34%
+   MT gain           =  -3.40%
+
+5. sample 109
+   conventional rank = 33
+   minimum PD gain   = +27.20%
+   MT gain           =  -2.21%
+
+6. sample 103
+   conventional rank = 16
+   minimum PD gain   = +26.28%
+   MT gain           =  -4.58%
+
+7. sample 86
+   conventional rank = 25
+   minimum PD gain   = +24.83%
+   MT gain           = approximately -0.0013%
+
+8. sample 99
+   conventional rank = 28
+   minimum PD gain   = +23.92%
+   MT gain           =  -0.84%
+
+9. sample 61
+   conventional rank = 15
+   minimum PD gain   = +21.55%
+   MT gain           =  -1.96%
+
+10. sample 73
+    conventional rank = 23
+    minimum PD gain   = +20.82%
+    MT gain           = -16.55%
+
+11. sample 74
+    conventional rank = 18
+    minimum PD gain   = +10.46%
+    MT gain           =  -5.19%
+
+12. sample 60
+    conventional rank = 5
+    minimum PD gain   =  +9.46%
+    MT gain           = -12.35%
+```
+
+Under the frozen rule:
+
+```text
+PRIMARY secondary-study case:
+    sample 69
+```
+
+This replaces the earlier expectation that sample 84 might rank first.
+Sample 84 remains second because the selection intentionally prioritizes the
+minimum corrected-PD improvement before MT-worsening magnitude.
+
+### Broad 30% tier
+
+```text
+frozen cases:
+    51
+
+all-three corrected PD improve + MT worsens:
+    23
+```
+
+The top broad-tier case is sample 67:
+
+```text
+sample 67:
+    conventional rank = 49
+    minimum PD gain   = +34.69%
+    mean PD gain      = +43.22%
+    d_B gain          = +56.39%
+    W2inf gain        = +34.69%
+    W22 gain          = +38.58%
+    MT gain           =  -6.51%
+```
+
+---
+
+## XXXVI.100 Critical matched-control interpretation of the discordant cases
+
+The matched \(L_{uv}\)-only context substantially sharpens the interpretation of
+the CNN-referenced PD+/MT- cases.
+
+For the highest-ranked PRIMARY-20% cases, Candidate F is generally **better**
+than the matched \(L_{uv}\)-only control in MT even though it remains worse than
+the original pretrained CNN in MT.
+
+Examples:
+
+```text
+sample 69:
+    F vs CNN MT gain = -3.61%
+    F vs UV  MT gain = +0.57%
+
+sample 84:
+    F vs CNN MT gain = -7.98%
+    F vs UV  MT gain = +3.96%
+
+sample 76:
+    F vs CNN MT gain = -4.62%
+    F vs UV  MT gain = +11.66%
+
+sample 75:
+    F vs CNN MT gain = -3.40%
+    F vs UV  MT gain = +15.14%
+
+sample 73:
+    F vs CNN MT gain = -16.55%
+    F vs UV  MT gain = +5.01%
+```
+
+Therefore these cases should **not** be described as showing that Candidate F's
+auxiliary topology-aware losses directly damage MT.
+
+A more accurate interpretation is:
+
+> Relative to the pretrained CNN, Candidate F can strongly improve all three
+> corrected PD metrics while the merge-tree distance remains worse. However,
+> relative to the matched \(L_{uv}\)-only fine-tuning control, Candidate F often
+> improves the merge-tree distance as well. Thus ordinary fine-tuning may move
+> the reconstruction away from the pretrained CNN in merge-tree space, while
+> Candidate F partially recovers that MT degradation and simultaneously improves
+> persistence agreement much more strongly.
+
+This is especially clear for sample 69:
+
+```text
+vs CNN:
+    PD improves strongly
+    MT worsens 3.61%
+
+vs matched UV:
+    all three PD improve
+    MT improves slightly, 0.57%
+```
+
+So sample 69 is a descriptor-discordance example relative to CNN, but **not** a
+matched-control PD/MT tradeoff example.
+
+---
+
+## XXXVI.101 Two complementary MT visualization questions
+
+The project should now distinguish two different visualization questions.
+
+### A. Descriptor disagreement relative to the pretrained baseline
+
+Use the frozen PRIMARY-20% rule.
+
+First case:
+
+```text
+sample 69
+```
+
+Question:
+
+> Why can Candidate F have much better persistence-diagram agreement than CNN
+> while retaining a slightly worse merge-tree distance than CNN?
+
+Because sample 69 was also in the original predeclared visual set, its existing
+real-data field/PD figures can be reused and augmented with MT views.
+
+Recommended follow-ups:
+
+```text
+sample 84:
+    larger MT worsening (-7.98%) while retaining strong PD gains
+
+sample 73:
+    very large MT worsening (-16.55%) with still-positive all-three PD gains
+```
+
+These are sensitivity/mechanism cases after sample 69, not replacements for the
+frozen primary case.
+
+### B. Auxiliary-loss PD/MT tradeoff relative to the matched control
+
+A separate selection should later examine the 37 samples where:
+
+```text
+Candidate F improves all three corrected PD metrics vs UV
+but MT worsens vs UV
+```
+
+This is the more direct test of whether the auxiliary Candidate-F objective can
+trade persistence agreement against merge-tree agreement.
+
+The broad near-tie table already contains examples such as:
+
+```text
+sample 67:
+    F vs UV MT gain = -3.58%
+
+sample 56:
+    F vs UV MT gain = -4.93%
+
+sample 51:
+    F vs UV MT gain = -2.93%
+```
+
+These should not be conflated with the CNN-referenced discordance study.
+
+---
+
+## XXXVI.102 Numerical-sensitivity note
+
+The frozen qualification rule treats any strictly negative MT gain as
+"MT worsens."
+
+This admits numerically negligible cases such as:
+
+```text
+sample 86:
+    MT gain vs CNN ≈ -0.0013%
+```
+
+The frozen ranking is retained unchanged for reproducibility, and this issue
+does not affect the leading cases.
+
+For scientific interpretation, a later sensitivity table should additionally
+report results after requiring a practically meaningful MT-worsening magnitude,
+for example:
+
+```text
+> 0.5%
+> 1%
+> 5%
+```
+
+without replacing or modifying the already-frozen selection.
+
