@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tda-toolkit"
+version = "0.1.0"
+description = "Topological Data Analysis (TDA) toolkit: persistence, merge trees, Mapper, and utilities."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [{name = "Yu (Demi) Qin"}]
+keywords = ["TDA", "topology", "persistence", "merge trees", "mapper", "visualization"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Information Analysis"
+]
+dependencies = [
+  "numpy>=1.23",
+  "matplotlib>=3.7",
+  "scikit-learn>=1.3",
+]
+
+[project.optional-dependencies]
+persistence = ["gudhi>=3.10.1", "POT>=0.9"]
+merge_tree = ["gudhi>=3.10.1", "networkx>=3.0"]
+mapper = ["kmapper>=2.0.1"]
+ripser = ["ripser>=0.6.5", "persim>=0.3.1"]
+ui = ["flask>=3.0", "networkx>=3.0"]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+  "ruff>=0.5.0"
+]
+full = ["tda-toolkit[persistence,merge_tree,mapper,ripser,ui,dev]"]
+
+[project.scripts]
+tda-toolkit = "tda_toolkit.cli:main"
+tda-toolkit-ui = "tda_toolkit.app.server:main"
+
+[tool.ruff]
+line-length = 100
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tda_toolkit"]

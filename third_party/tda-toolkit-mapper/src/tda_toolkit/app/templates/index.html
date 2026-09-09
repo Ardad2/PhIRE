@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TDA Toolkit UI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">localhost topological debugging</p>
+          <h1>TDA Toolkit Studio</h1>
+          <p class="lede">
+            Upload a numeric CSV, point to a local file path, or fetch a remote dataset URL.
+            Then compute persistence, Mapper, and merge-tree views in one place.
+          </p>
+        </div>
+        <div class="hero-note">
+          <p>Best current fit:</p>
+          <ul>
+            <li><code>point_cloud</code> for Mapper plus persistence</li>
+            <li><code>point_cloud</code> or <code>scalar_field</code> for merge trees</li>
+            <li><code>graph</code> for edge-list persistence</li>
+          </ul>
+          <p class="sample-note">
+            Sample CSV: <code>examples/data.csv</code>
+          </p>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="control-panel card">
+          <h2>Compute</h2>
+          <form method="post" enctype="multipart/form-data" class="control-form">
+            <label>
+              <span>Input interpretation</span>
+              <select name="data_kind">
+                <option value="point_cloud" {% if defaults.data_kind == "point_cloud" %}selected{% endif %}>Point cloud / feature table</option>
+                <option value="scalar_field" {% if defaults.data_kind == "scalar_field" %}selected{% endif %}>Scalar field (1D or 2D)</option>
+                <option value="graph" {% if defaults.data_kind == "graph" %}selected{% endif %}>Graph edge list</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Data source</span>
+              <select name="source_mode">
+                <option value="upload" {% if defaults.source_mode == "upload" %}selected{% endif %}>Upload file</option>
+                <option value="path" {% if defaults.source_mode == "path" %}selected{% endif %}>Local file path</option>
+                <option value="url" {% if defaults.source_mode == "url" %}selected{% endif %}>Remote URL</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Upload CSV or NPY</span>
+              <input type="file" name="data_file" accept=".csv,.txt,.npy">
+            </label>
+
+            <label>
+              <span>Local file path</span>
+              <input type="text" name="data_path" placeholder="/absolute/path/to/examples/data.csv">
+            </label>
+
+            <label>
+              <span>Remote dataset URL</span>
+              <input type="url" name="data_url" placeholder="https://example.com/data.csv">
+            </label>
+
+            <div class="inline-grid">
+              <label>
+                <span>Delimiter</span>
+                <select name="delimiter">
+                  <option value="comma" {% if defaults.delimiter == "comma" %}selected{% endif %}>Comma</option>
+                  <option value="tab" {% if defaults.delimiter == "tab" %}selected{% endif %}>Tab</option>
+                  <option value="space" {% if defaults.delimiter == "space" %}selected{% endif %}>Whitespace</option>
+                  <option value="semicolon" {% if defaults.delimiter == "semicolon" %}selected{% endif %}>Semicolon</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Max homology dimension</span>
+                <input type="number" name="max_dim" min="0" max="5" value="{{ defaults.max_dim }}">
+              </label>
+            </div>
+
+            <label class="checkbox-row">
+              <input type="checkbox" name="skip_header" {% if defaults.skip_header %}checked{% endif %}>
+              <span>Skip first row as header</span>
+            </label>
+
+            <div class="section-label">Mapper controls</div>
+            <label class="checkbox-row">
+              <input type="checkbox" name="compute_mapper" {% if defaults.compute_mapper %}checked{% endif %}>
+              <span>Compute Mapper when input is a point cloud</span>
+            </label>
+
+            <div class="inline-grid">
+              <label>
+                <span>Lens</span>
+                <select name="lens">
+                  <option value="coordinate" {% if defaults.lens == "coordinate" %}selected{% endif %}>Coordinate</option>
+                  <option value="pca" {% if defaults.lens == "pca" %}selected{% endif %}>PCA</option>
+                  <option value="eccentricity" {% if defaults.lens == "eccentricity" %}selected{% endif %}>Eccentricity</option>
+                  <option value="norm" {% if defaults.lens == "norm" %}selected{% endif %}>Norm</option>
+                  <option value="knn_distance" {% if defaults.lens == "knn_distance" %}selected{% endif %}>KNN distance</option>
+                  <option value="density" {% if defaults.lens == "density" %}selected{% endif %}>Density</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Lens components</span>
+                <input type="number" name="lens_components" min="1" value="{{ defaults.lens_components }}">
+              </label>
+
+              <label>
+                <span>Intervals</span>
+                <input type="number" name="n_cubes" min="2" value="{{ defaults.n_cubes }}">
+              </label>
+
+              <label>
+                <span>Overlap</span>
+                <input type="number" name="overlap" min="0" max="0.95" step="0.05" value="{{ defaults.overlap }}">
+              </label>
+
+              <label>
+                <span>Scale</span>
+                <select name="scale">
+                  <option value="none" {% if defaults.scale == "none" %}selected{% endif %}>None</option>
+                  <option value="standard" {% if defaults.scale == "standard" %}selected{% endif %}>Standard</option>
+                  <option value="minmax" {% if defaults.scale == "minmax" %}selected{% endif %}>Min-max</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Projection</span>
+                <select name="projection">
+                  <option value="none" {% if defaults.projection == "none" %}selected{% endif %}>None</option>
+                  <option value="pca" {% if defaults.projection == "pca" %}selected{% endif %}>PCA</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Projection components</span>
+                <input type="number" name="projection_components" min="1" value="{{ defaults.projection_components }}">
+              </label>
+
+              <label>
+                <span>Clusterer</span>
+                <select name="clusterer">
+                  <option value="dbscan" {% if defaults.clusterer == "dbscan" %}selected{% endif %}>DBSCAN</option>
+                  <option value="kmeans" {% if defaults.clusterer == "kmeans" %}selected{% endif %}>KMeans</option>
+                  <option value="agglomerative" {% if defaults.clusterer == "agglomerative" %}selected{% endif %}>Agglomerative</option>
+                </select>
+              </label>
+
+              <label>
+                <span>DBSCAN eps</span>
+                <input type="number" name="dbscan_eps" min="0.01" step="0.01" value="{{ defaults.dbscan_eps }}">
+              </label>
+
+              <label>
+                <span>DBSCAN min samples</span>
+                <input type="number" name="dbscan_min_samples" min="1" value="{{ defaults.dbscan_min_samples }}">
+              </label>
+
+              <label>
+                <span>KMeans / Agglomerative clusters</span>
+                <input type="number" name="n_clusters" min="2" value="{{ defaults.n_clusters }}">
+              </label>
+            </div>
+
+            <div class="section-label">Merge-tree controls</div>
+            <label class="checkbox-row">
+              <input type="checkbox" name="compute_merge_tree" {% if defaults.compute_merge_tree %}checked{% endif %}>
+              <span>Compute merge tree for scalar fields or point clouds</span>
+            </label>
+
+            <label>
+              <span>Merge direction</span>
+              <select name="merge_direction">
+                <option value="1" {% if defaults.merge_direction == 1 %}selected{% endif %}>Merge tree</option>
+                <option value="-1" {% if defaults.merge_direction == -1 %}selected{% endif %}>Split tree</option>
+              </select>
+            </label>
+            <p class="helper-copy">
+              For point clouds, the merge tree is computed on a kNN graph using the selected lens as the scalar function.
+            </p>
+
+            <button type="submit" class="action-button">Run Analysis</button>
+          </form>
+        </section>
+
+        <section class="results-panel">
+          {% if error %}
+          <div class="card error-card">
+            <h2>Run Error</h2>
+            <p>{{ error }}</p>
+          </div>
+          {% endif %}
+
+          {% if results %}
+          <div class="card summary-card">
+            <div class="summary-heading">
+              <div>
+                <p class="eyebrow">dataset summary</p>
+                <h2>{{ results.source_label }}</h2>
+              </div>
+              <div class="pill">shape {{ results.shape }}</div>
+            </div>
+            <div class="summary-grid">
+              <div>
+                <span class="metric-label">Input kind</span>
+                <strong>{{ results.summary.kind }}</strong>
+              </div>
+              <div>
+                <span class="metric-label">Backend</span>
+                <strong>{{ results.summary.backend }}</strong>
+              </div>
+              <div>
+                <span class="metric-label">Dimensions</span>
+                <strong>{{ results.summary.dimensions }}</strong>
+              </div>
+              <div>
+                <span class="metric-label">Pairs</span>
+                <strong>{{ results.summary.num_pairs }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="card visualization-card featured-card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">always computed</p>
+                <h2>Persistence Diagram</h2>
+              </div>
+              <div class="badge">Core descriptor</div>
+            </div>
+            <img src="{{ results.persistence_image }}" alt="Persistence Diagram" class="viz-image">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Dim</th>
+                    <th>Birth</th>
+                    <th>Death</th>
+                    <th>Persistence</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in results.top_pairs %}
+                  <tr>
+                    <td>{{ row.dimension }}</td>
+                    <td>{{ "%.4f"|format(row.birth) }}</td>
+                    <td>{% if row.death is not none %}{{ "%.4f"|format(row.death) }}{% else %}inf{% endif %}</td>
+                    <td>{% if row.persistence is not none %}{{ "%.4f"|format(row.persistence) }}{% else %}inf{% endif %}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {% if results.mapper %}
+          <div class="card visualization-card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">point cloud view</p>
+                <h2>Mapper Graph</h2>
+              </div>
+              {% if results.mapper.html_url or results.mapper.json_url %}
+              <div class="link-row">
+                {% if results.mapper.html_url %}
+                <a href="{{ results.mapper.html_url }}" target="_blank">Open interactive HTML</a>
+                {% endif %}
+                {% if results.mapper.json_url %}
+                <a href="{{ results.mapper.json_url }}" target="_blank">Download JSON</a>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+            <div class="summary-grid compact">
+              <div><span class="metric-label">Nodes</span><strong>{{ results.mapper.summary.num_nodes }}</strong></div>
+              <div><span class="metric-label">Edges</span><strong>{{ results.mapper.summary.num_edges }}</strong></div>
+              <div><span class="metric-label">Covered points</span><strong>{{ results.mapper.summary.num_points_covered }}</strong></div>
+              <div><span class="metric-label">Largest node</span><strong>{{ results.mapper.summary.largest_node_size }}</strong></div>
+            </div>
+            {% if results.mapper.warning %}
+            <div class="inline-warning">
+              <strong>Mapper tuning note.</strong>
+              <p>{{ results.mapper.warning }}</p>
+              <ul>
+                {% for suggestion in results.mapper.suggestions %}
+                <li>{{ suggestion }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
+            {% if results.mapper.image %}
+            <img src="{{ results.mapper.image }}" alt="Mapper Graph" class="viz-image">
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if results.merge_tree %}
+          <div class="card visualization-card">
+            <div class="card-head">
+              <div>
+                <p class="eyebrow">scalar field view</p>
+                <h2>{{ results.merge_tree.title }}</h2>
+              </div>
+            </div>
+            <img src="{{ results.merge_tree.image }}" alt="Merge Tree" class="viz-image">
+          </div>
+          {% endif %}
+          {% endif %}
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

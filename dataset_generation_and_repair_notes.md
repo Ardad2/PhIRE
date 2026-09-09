@@ -24080,3 +24080,2106 @@ For the spatial diagnostic:
 The Matplotlib Axes3D warning is irrelevant to these 2D figures and did not
 affect the outputs.
 
+---
+
+## XXXVI.147 Colleague-toolkit PD compatibility Phase A — first run diagnosed
+
+A sample-69 PD compatibility harness was run against the unmodified colleague
+`tda-toolkit` source under the isolated `gudhi-audit` environment.
+
+Environment:
+
+```text
+Python 3.12.14
+NumPy 2.5.3
+SciPy 1.18.0
+GUDHI 3.13.0
+POT 0.9.7.post1
+VTK 9.6.0
+PYTHONNOUSERSITE=1
+```
+
+The colleague toolkit imported successfully as version `0.1.0`.
+
+### First-run result
+
+For the point sets parsed by the compatibility harness itself, the colleague
+wrapper agreed with the reference GUDHI distance implementation:
+
+```text
+CNN:
+    native bottleneck vs exact: ~4.4e-16
+    native W2inf vs exact:       0
+
+UV:
+    native bottleneck vs exact:  0
+    native W2inf vs exact:       0
+
+F1:
+    native bottleneck vs exact:  0
+    native W2inf vs exact:       0
+```
+
+Therefore the colleague distance wrapper did **not** fail metric parity.
+
+However, the harness's reference W2inf/W22 values were slightly larger than the
+frozen corrected PhIRE values, while bottleneck remained identical.
+
+Observed:
+
+```text
+CNN:
+    harness W2inf = 14.6999434966
+    frozen  W2inf = 14.5722672911
+
+UV:
+    harness W2inf = 15.4059407400
+    frozen  W2inf = 15.2562312172
+
+F1:
+    harness W2inf = 10.0170955642
+    frozen  W2inf =  9.9873127944
+```
+
+### Root cause
+
+The compatibility harness duplicated the TTK-VTU parsing logic instead of
+calling the already frozen canonical parser.
+
+Its local parser excluded:
+
+```text
+PairIdentifier == -1
+non-D0/D1 PairType
+nonfinite Birth/Persistence coordinates
+```
+
+but this is insufficient for the TTK global min-max pair because that pair can
+have finite numeric Birth/Persistence coordinates while still being the
+global/nonfinite/essential pair that the frozen canonical parser stores
+separately.
+
+The numerical signature confirms the diagnosis. The extra squared W2inf
+contribution corresponds to a single global-pair mismatch; its inferred
+L-infinity magnitudes are:
+
+```text
+CNN: sqrt(14.6999434966^2 - 14.5722672911^2) = 1.9332265
+UV:  sqrt(15.4059407400^2 - 15.2562312172^2) = 2.1425263
+F1:  sqrt(10.0170955642^2 -  9.9873127944^2) = 0.7718722
+```
+
+These agree with the previously audited sample-69 GT-vs-SR global range
+differences. Bottleneck remained unchanged because the global-pair mismatch was
+smaller than the already-dominant finite bottleneck discrepancy.
+
+Thus the first-run Phase-A failure is a **compatibility-harness parser bug**,
+not a disagreement between the colleague's PD distance implementation and
+PhIRE.
+
+### Fix policy
+
+The revised compatibility harness must:
+
+```text
+1. import and call the exact frozen:
+       $AUDIT/recompute_pd/canonical_pd_pilot.py
+
+2. never duplicate finite/global-pair classification logic;
+
+3. read frozen dB/W2inf/W22 values directly from:
+       $W22/w22_full_sweep.csv
+
+4. preserve the failed v1 output as an audit artifact;
+
+5. require both:
+       same-diagram colleague metric parity
+   and
+       exact frozen corrected-PD reproduction
+   before Phase B is interpreted.
+```
+
+A revised `run_sample69_pd_compatibility_v2.py` was prepared accordingly.
+
+Phase B must remain uninterpreted until revised Phase A passes.
+
+---
+
+## XXXVI.148 Colleague-toolkit PD compatibility — sample-69 Phase A PASS
+
+The revised compatibility harness now imports the exact frozen
+`canonical_pd_pilot.py` parser and reads the authoritative corrected distances
+directly from `$W22/w22_full_sweep.csv`.
+
+Result:
+
+```text
+PHASE A SAME-DIAGRAM METRIC PARITY + FROZEN REPRODUCTION: PASS
+```
+
+All three focal comparisons passed.
+
+### CNN
+
+```text
+reference exact:
+    dB     = 3.06704616546631
+    W2inf  = 14.57226729106
+    W22    = 18.7224189780594
+
+frozen audit:
+    exact same values
+
+colleague wrapper:
+    dB     = 3.06704616546631
+    W2inf  = 14.57226729106
+
+native dB difference vs reference:
+    4.441e-16
+
+native W2inf difference vs reference:
+    0
+```
+
+### Matched UV control
+
+```text
+reference/frozen:
+    dB     = 2.43620783090591
+    W2inf  = 15.2562312172225
+    W22    = 19.9125812541732
+
+colleague:
+    dB     = 2.43620783090591
+    W2inf  = 15.2562312172225
+
+differences:
+    dB     = 0
+    W2inf  = 0
+```
+
+### Candidate F1
+
+```text
+reference/frozen:
+    dB     = 1.23333263397217
+    W2inf  = 9.98731279438054
+    W22    = 12.3229624979698
+
+colleague:
+    dB     = 1.23333263397217
+    W2inf  = 9.98731279438053
+
+differences:
+    dB     = 0
+    W2inf  = 0
+```
+
+Therefore:
+
+> Given the same canonical finite TTK-extracted persistence points, the
+> colleague toolkit's GUDHI bottleneck and order-2/L-infinity Wasserstein
+> wrappers agree with the corrected PhIRE conventions to floating-point
+> precision for sample 69.
+
+The colleague wrapper's default Wasserstein call remains W1-infinity and is not
+one of the project's primary corrected PD metrics.
+
+The wrapper currently does not expose `internal_p=2`, so native W22 parity
+requires a small explicit extension if desired.
+
+---
+
+## XXXVI.149 Independent cubical descriptor construction — sample-69 Phase B COMPLETE
+
+Using the colleague toolkit's actual GUDHI CubicalComplex persistence
+construction on the same authoritative sample-69 scalar fields produced
+different PD cardinalities, as expected from the different filtered-complex
+representation.
+
+Cubical finite counts:
+
+```text
+GT:
+    D0 = 850
+    D1 = 1148
+
+CNN:
+    D0 = 469
+    D1 = 640
+
+UV:
+    D0 = 312
+    D1 = 403
+
+F1:
+    D0 = 578
+    D1 = 1325
+```
+
+The absolute PD distances therefore differ numerically from the TTK-derived
+ones, but the complete three-method ranking is preserved for all three primary
+metrics.
+
+### Bottleneck
+
+TTK:
+
+```text
+F1 < UV < CNN
+1.23333 < 2.43621 < 3.06705
+```
+
+GUDHI cubical:
+
+```text
+F1 < UV < CNN
+1.23333 < 2.21717 < 3.06705
+```
+
+### W2-infinity
+
+TTK:
+
+```text
+F1 < CNN < UV
+9.98731 < 14.57227 < 15.25623
+```
+
+GUDHI cubical:
+
+```text
+F1 < CNN < UV
+9.96331 < 14.44284 < 15.06693
+```
+
+### W2,2
+
+TTK:
+
+```text
+F1 < CNN < UV
+12.32296 < 18.72242 < 19.91258
+```
+
+GUDHI cubical:
+
+```text
+F1 < CNN < UV
+12.26620 < 18.49835 < 19.68672
+```
+
+Thus sample 69 shows exact ranking consistency across independent PD
+construction conventions despite substantial diagram-cardinality differences.
+
+Candidate-F gain vs CNN is also very stable:
+
+```text
+metric     TTK gain      cubical gain
+dB         +59.79%       +59.79%
+W2inf      +31.46%       +31.02%
+W22        +34.18%       +33.69%
+```
+
+Candidate-F gain vs the matched UV control remains large under both
+constructions:
+
+```text
+metric     TTK gain      cubical gain
+dB         +49.37%       +44.37%
+W2inf      +34.54%       +33.87%
+W22        +38.11%       +37.69%
+```
+
+Preferred interpretation:
+
+> The independent GUDHI cubical construction does not reproduce TTK's exact
+> persistence diagrams, but for sample 69 it reproduces the same method ranking
+> under bottleneck, W2-infinity, and W2,2. Candidate F remains the best of CNN,
+> reconstruction-only fine-tuning, and Candidate F under every tested PD
+> convention.
+
+This is a descriptor-robustness result, not evidence that TTK and GUDHI produce
+identical persistence diagrams.
+
+---
+
+## XXXVI.150 Next PD compatibility stage — all-168 Phase B
+
+Prepared:
+
+```text
+run_all168_pd_descriptor_compatibility.py
+```
+
+The planned full benchmark uses the same authoritative scalar fields and
+compares frozen TTK-derived dB/W2inf/W22 against independently constructed
+colleague/GUDHI cubical PD metrics for:
+
+```text
+CNN
+matched L_uv-only control
+Candidate F1
+```
+
+over all 168 samples.
+
+Required summaries:
+
+```text
+method means and medians under both backends
+sample-wise Pearson/Spearman association
+F1-vs-CNN winner agreement
+F1-vs-UV winner agreement
+UV-vs-CNN winner agreement
+exact three-method ranking agreement per sample
+predeclared visual cases: 78,71,80,63,69
+```
+
+This is now the highest-value PD consistency experiment.
+
+---
+
+## XXXVI.151 All-168 colleague/GUDHI cubical PD compatibility — COMPLETE
+
+The full 168-sample Phase-B descriptor-construction comparison completed for:
+
+```text
+CNN
+matched L_uv-only control
+Candidate F1
+```
+
+using:
+
+```text
+authoritative corrected TTK-derived PD metrics
+vs.
+independently constructed colleague/GUDHI CubicalComplex PD metrics
+```
+
+The study contains:
+
+```text
+168 samples x 3 methods = 504 per-method rows
+```
+
+and compares:
+
+```text
+d_B
+W2inf
+W22
+```
+
+### Method-level agreement
+
+CNN:
+
+```text
+d_B:
+    mean TTK      = 3.1241084
+    mean cubical  = 3.1360975
+    Pearson       = +0.9981
+    Spearman      = +0.9958
+
+W2inf:
+    mean TTK      = 19.152145
+    mean cubical  = 18.910633
+    Pearson       = +0.9992
+    Spearman      = +0.9991
+
+W22:
+    mean TTK      = 24.552151
+    mean cubical  = 24.198508
+    Pearson       = +0.9989
+    Spearman      = +0.9990
+```
+
+Matched UV:
+
+```text
+d_B:
+    mean TTK      = 3.2878639
+    mean cubical  = 3.2914014
+    Pearson       = +0.9974
+    Spearman      = +0.9971
+
+W2inf:
+    mean TTK      = 21.062447
+    mean cubical  = 20.828135
+    Pearson       = +0.9993
+    Spearman      = +0.9984
+
+W22:
+    mean TTK      = 27.508675
+    mean cubical  = 27.172101
+    Pearson       = +0.9992
+    Spearman      = +0.9986
+```
+
+Candidate F1:
+
+```text
+d_B:
+    mean TTK      = 2.1497440
+    mean cubical  = 2.1489835
+    Pearson       = +0.9954
+    Spearman      = +0.9907
+
+W2inf:
+    mean TTK      = 14.325676
+    mean cubical  = 14.163525
+    Pearson       = +0.9985
+    Spearman      = +0.9973
+
+W22:
+    mean TTK      = 17.831897
+    mean cubical  = 17.610810
+    Pearson       = +0.9981
+    Spearman      = +0.9964
+```
+
+Thus sample-wise backend association is extremely strong for every
+method/metric combination.
+
+### Pairwise winner agreement
+
+```text
+d_B:
+    F1 vs CNN: 166 agree / 2 disagree = 98.81%
+    F1 vs UV:  166 agree / 2 disagree = 98.81%
+    UV vs CNN: 160 agree / 3 disagree / 5 ties = 98.16% among nonties
+
+W2inf:
+    F1 vs CNN: 168 / 168 = 100%
+    F1 vs UV:  168 / 168 = 100%
+    UV vs CNN: 165 agree / 3 disagree = 98.21%
+
+W22:
+    F1 vs CNN: 167 agree / 1 disagree = 99.40%
+    F1 vs UV:  168 / 168 = 100%
+    UV vs CNN: 165 agree / 3 disagree = 98.21%
+```
+
+The strongest Candidate-F conclusions are therefore nearly invariant to the PD
+construction convention.
+
+### Exact three-method ranking agreement
+
+```text
+d_B:
+    161 / 168 = 95.83%
+
+W2inf:
+    165 / 168 = 98.21%
+
+W22:
+    164 / 168 = 97.62%
+```
+
+### Candidate-F all-three-PD consensus
+
+Relative to CNN:
+
+```text
+TTK:
+    F1 improves all three metrics on 150 / 168
+
+cubical:
+    F1 improves all three metrics on 151 / 168
+
+classification agreement:
+    both say all-three improve = 149
+    TTK only                  =   1
+    cubical only              =   2
+    neither                   =  16
+```
+
+Only samples:
+
+```text
+35
+39
+163
+```
+
+change all-three-improvement classification between TTK and cubical.
+
+Relative to matched UV:
+
+```text
+TTK:
+    F1 improves all three metrics on 156 / 168
+
+cubical:
+    F1 improves all three metrics on 154 / 168
+
+classification agreement:
+    both say all-three improve = 154
+    TTK only                  =   2
+    cubical only              =   0
+    neither                   =  12
+```
+
+Only samples:
+
+```text
+51
+131
+```
+
+change the all-three classification.
+
+### F1-vs-CNN pairwise disagreements
+
+The only F1-vs-CNN backend winner flips are:
+
+```text
+d_B:
+    sample 35
+    sample 39
+
+W2inf:
+    none
+
+W22:
+    sample 163
+```
+
+The sample-163 W22 flip is very small:
+
+```text
+TTK F1-vs-CNN relative gap:
+    approximately +0.57% worse
+
+cubical:
+    approximately -1.11% better
+```
+
+This supports treating the very small number of backend disagreements as
+boundary/near-tie cases rather than a broad change in method behavior.
+
+### F1-vs-UV pairwise disagreements
+
+```text
+d_B:
+    samples 51 and 131
+
+W2inf:
+    none
+
+W22:
+    none
+```
+
+Thus F1 beats the matched control under W2inf and W22 on all 168 samples in
+both descriptor constructions.
+
+### Predeclared visual cases
+
+All five predeclared visual cases preserve the Candidate-F-vs-CNN topology
+advantage under the independent cubical construction.
+
+```text
+sample 78:
+    d_B gain      TTK +37.68% / cubical +37.68%
+    W2inf gain    TTK +32.07% / cubical +32.86%
+    W22 gain      TTK +34.10% / cubical +35.15%
+
+sample 71:
+    d_B gain      TTK +41.38% / cubical +41.70%
+    W2inf gain    TTK +31.91% / cubical +30.70%
+    W22 gain      TTK +33.95% / cubical +32.99%
+
+sample 80:
+    d_B gain      TTK +57.93% / cubical +58.51%
+    W2inf gain    TTK +30.14% / cubical +30.38%
+    W22 gain      TTK +32.57% / cubical +32.95%
+
+sample 63:
+    d_B gain      TTK +49.01% / cubical +49.01%
+    W2inf gain    TTK +27.47% / cubical +28.00%
+    W22 gain      TTK +29.50% / cubical +29.59%
+
+sample 69:
+    d_B gain      TTK +59.79% / cubical +59.79%
+    W2inf gain    TTK +31.46% / cubical +31.02%
+    W22 gain      TTK +34.18% / cubical +33.69%
+```
+
+Therefore the already frozen visual case set is independently supported by the
+colleague/GUDHI cubical PD construction.
+
+### Scientific interpretation
+
+Preferred wording:
+
+> Although TTK and GUDHI CubicalComplex construct persistence diagrams using
+> different filtered-complex conventions and therefore do not produce
+> identical diagrams or absolute distances, their sample-wise PD distances are
+> extremely strongly associated and their method rankings are highly
+> consistent. Candidate F's improvement over both the pretrained CNN and the
+> matched reconstruction-only control is therefore robust to this independent
+> persistence-construction convention.
+
+This should be described as:
+
+```text
+cross-construction robustness
+```
+
+not:
+
+```text
+identical persistence diagrams
+```
+
+or:
+
+```text
+formal validation of TTK extraction by GUDHI
+```
+
+because the underlying descriptor constructions are intentionally different.
+
+### Recommended manuscript role
+
+This result is strong enough for:
+
+```text
+main-text robustness paragraph
++
+small summary table
+```
+
+while the full 504-row table and disagreement-case inventory can remain in
+supplementary material / audit records.
+
+The five predeclared visual examples become stronger because their topology
+advantage is reproduced independently by the cubical construction rather than
+being specific to the TTK persistence pipeline.
+
+---
+
+## XXXVI.152 Four-phase cross-toolkit topology consistency study — current status
+
+A four-phase comparison was defined to separate metric implementation,
+descriptor construction, merge-tree semantics, and scientific conclusion
+consistency.
+
+The phases are:
+
+```text
+Phase A — metric parity
+    Give both implementations the exact same canonical finite TTK D0/D1 point
+    arrays and compare d_B, W2inf, and W22 under explicitly aligned defaults.
+
+Phase B — descriptor-construction parity / robustness
+    Independently construct persistence diagrams from the same authoritative
+    160x160 scalar fields using the TTK-derived pipeline and the colleague's
+    GUDHI CubicalComplex pipeline, then compare cardinalities and distances.
+
+Phase C — merge-tree semantics
+    Determine whether the colleague toolkit's scalar-field graph is genuinely
+    comparable to the audited TTK Join Tree. If not, restrict it to a
+    persistence/H0 interpretation unless a true Join-Tree implementation is
+    added.
+
+Phase D — conclusion consistency
+    Compare method rankings / winner decisions across implementations, including
+    CNN vs F1, F1 vs matched UV, the corrected PD+/MT+ and PD+/MT- cohorts,
+    and the frozen near-tie visual cohorts.
+```
+
+Current status:
+
+| Phase | Status | Current conclusion |
+|---|---|---|
+| A | **Almost complete** | Same-diagram `d_B` and `W2inf` parity passed to floating-point precision and the frozen PhIRE values reproduce exactly. The colleague wrapper does not currently expose `internal_p=2`, so one explicit native-wrapper `W22` parity extension remains if the original checklist is followed literally. |
+| B | **Complete** | Sample 69 and all 168 samples were evaluated using an independent GUDHI CubicalComplex construction. Absolute values differ slightly, but sample-wise associations and method rankings are extremely consistent. |
+| C | **Semantic audit complete; independent MT parity not available** | The colleague toolkit's current 2D scalar-field graph is an H0 persistence-pair graph, not the same hierarchical Join Tree used by TTK's audited merge-tree distance. It should not be called an independent MT-distance implementation. A true cross-toolkit MT validation would require adding a genuine Join-Tree construction and compatible distance. |
+| D | **Broad PD consistency complete; requested PD/MT subgroup check still pending** | All-168 CNN/F1/UV winner and ranking consistency is complete, and all five frozen visual cases preserve F1's PD advantage. The specifically requested `91 PD+/MT+` and `59 PD+/MT-` F1-vs-CNN cohorts have not yet been summarized separately under the cubical construction. |
+
+Therefore the full four-phase plan is **not literally closed yet**. The remaining
+small items are:
+
+```text
+1. optional but clean Phase-A closeout:
+       expose internal_p=2 in a local compatibility adapter and verify native
+       colleague-wrapper W22 on the same canonical points;
+
+2. Phase-D subgroup closeout:
+       explicitly evaluate the independent cubical PD conclusions on the
+       91 F1 PD+/MT+ and 59 F1 PD+/MT- cohorts, plus the frozen near-tie tiers;
+
+3. Phase C requires no further work if the intended conclusion is only that the
+   colleague H0 graph is not a comparable MT metric. A new true Join-Tree
+   implementation would be a separate extension, not a prerequisite for the PD
+   robustness result.
+```
+
+---
+
+## XXXVI.153 Phase A — same-diagram metric parity findings
+
+The corrected sample-69 compatibility harness imports the exact frozen canonical
+TTK-PD parser and feeds the same finite D0/D1 point arrays to the project
+reference implementation and the colleague toolkit.
+
+Result:
+
+```text
+PHASE A SAME-DIAGRAM METRIC PARITY + FROZEN REPRODUCTION: PASS
+```
+
+For the three focal methods:
+
+```text
+CNN:
+    d_B:
+        colleague vs reference difference ~ 4.44e-16
+    W2inf:
+        colleague vs reference difference = 0
+
+Matched UV:
+    d_B:
+        difference = 0
+    W2inf:
+        difference = 0
+
+Candidate F1:
+    d_B:
+        difference = 0
+    W2inf:
+        difference = 0
+```
+
+The exact corrected PhIRE sample-69 values also reproduce the frozen audit:
+
+```text
+CNN:
+    d_B    = 3.06704616546631
+    W2inf  = 14.57226729106
+    W22    = 18.7224189780594
+
+UV:
+    d_B    = 2.43620783090591
+    W2inf  = 15.2562312172225
+    W22    = 19.9125812541732
+
+F1:
+    d_B    = 1.23333263397217
+    W2inf  = 9.98731279438054
+    W22    = 12.3229624979698
+```
+
+The current colleague wrapper's native Wasserstein helper supports `order=2`
+with GUDHI's default L-infinity ground metric, so it directly reproduces
+`W2inf`. It does not currently expose `internal_p=2`.
+
+Important distinction:
+
+```text
+project W22:
+    already independently validated against GUDHI over all 8,568 frozen
+    comparisons;
+
+colleague-wrapper native W22:
+    not yet exposed as a public wrapper option.
+```
+
+Thus there is no evidence of a distance-formula disagreement. The only remaining
+Phase-A item is an API-level parity extension if desired.
+
+---
+
+## XXXVI.154 Phase B — all-168 independent descriptor-construction consistency
+
+The all-168 comparison contains:
+
+```text
+168 samples x 3 methods = 504 method/sample comparisons
+```
+
+for:
+
+```text
+CNN
+matched L_uv-only control
+Candidate F1
+```
+
+using:
+
+```text
+corrected metrics on TTK-derived finite persistence diagrams
+vs.
+the same explicit metrics on independently constructed GUDHI CubicalComplex
+persistence diagrams
+```
+
+### Mean distances
+
+| Method | Metric | TTK-derived PD | GUDHI cubical PD | Signed mean change | Relative mean change |
+|---|---:|---:|---:|---:|---:|
+| CNN | d_B | 3.124108 | 3.136098 | +0.011989 | +0.38% |
+| CNN | W2inf | 19.152145 | 18.910633 | -0.241512 | -1.26% |
+| CNN | W22 | 24.552151 | 24.198508 | -0.353642 | -1.44% |
+| UV | d_B | 3.287864 | 3.291401 | +0.003537 | +0.11% |
+| UV | W2inf | 21.062447 | 20.828135 | -0.234311 | -1.11% |
+| UV | W22 | 27.508675 | 27.172101 | -0.336574 | -1.22% |
+| F1 | d_B | 2.149744 | 2.148983 | -0.000761 | -0.04% |
+| F1 | W2inf | 14.325676 | 14.163525 | -0.162151 | -1.13% |
+| F1 | W22 | 17.831897 | 17.610810 | -0.221087 | -1.24% |
+
+Therefore the independent cubical construction changes the mean Wasserstein
+distance scale only modestly, generally reducing it by about 1-1.5%, while
+mean bottleneck distances remain nearly unchanged.
+
+### Typical sample-wise magnitude difference
+
+Mean absolute differences over the 168 samples for each method are:
+
+| Method | Metric | Mean absolute difference | Mean absolute relative difference |
+|---|---:|---:|---:|
+| CNN | d_B | 0.02557 | 0.95% |
+| CNN | W2inf | 0.26348 | 1.32% |
+| CNN | W22 | 0.38290 | 1.49% |
+| UV | d_B | 0.02024 | 0.69% |
+| UV | W2inf | 0.26436 | 1.21% |
+| UV | W22 | 0.37780 | 1.32% |
+| F1 | d_B | 0.03430 | 1.75% |
+| F1 | W2inf | 0.21319 | 1.39% |
+| F1 | W22 | 0.29510 | 1.53% |
+
+Thus the agreement is not merely directional. The absolute distance scales are
+also close despite the different descriptor construction.
+
+Bottleneck occasionally shows larger relative deviations on individual cases
+because it is governed by a worst matched discrepancy, but its mean-level
+backend shift remains very small.
+
+### Sample-wise correlation
+
+All method/metric combinations have very strong TTK-vs-cubical association:
+
+```text
+CNN:
+    d_B      Pearson +0.9981 / Spearman +0.9958
+    W2inf    Pearson +0.9992 / Spearman +0.9991
+    W22      Pearson +0.9989 / Spearman +0.9990
+
+UV:
+    d_B      Pearson +0.9974 / Spearman +0.9971
+    W2inf    Pearson +0.9993 / Spearman +0.9984
+    W22      Pearson +0.9992 / Spearman +0.9986
+
+F1:
+    d_B      Pearson +0.9954 / Spearman +0.9907
+    W2inf    Pearson +0.9985 / Spearman +0.9973
+    W22      Pearson +0.9981 / Spearman +0.9964
+```
+
+This supports a strong **cross-construction robustness** claim.
+
+It does **not** imply that the TTK and CubicalComplex persistence diagrams are
+identical.
+
+---
+
+## XXXVI.155 Relationship to the historical TTK `"2"` PD quantity
+
+The new cross-construction result should be kept separate from the old built-in
+TTK `"2"` PD distance.
+
+Historical mean TTK `"2"` values are approximately:
+
+```text
+CNN = 27.4063
+UV  = 29.6121
+F1  = 23.8382
+```
+
+Standard corrected W22 means are:
+
+```text
+CNN = 24.5522
+UV  = 27.5087
+F1  = 17.8319
+```
+
+Independent cubical W22 means are:
+
+```text
+CNN = 24.1985
+UV  = 27.1721
+F1  = 17.6108
+```
+
+The historical TTK `"2"` quantity is therefore substantially more different
+from standard W22 than the TTK-derived-vs-cubical standard-W22 comparison is.
+
+Approximate historical-TTK2 excess relative to standard W22:
+
+```text
+CNN:
+    +2.8541
+    ~11.6% larger
+
+UV:
+    +2.1034
+    ~7.6% larger
+
+F1:
+    +6.0064
+    ~33.7% larger
+```
+
+The relationship is not a fixed scale factor.
+
+The apparent mean F1 improvement also illustrates this distinction.
+
+F1 relative to CNN:
+
+```text
+historical TTK "2":
+    ~13.0% lower
+
+standard W22 on TTK-derived PDs:
+    ~27.4% lower
+
+standard W22 on independent cubical PDs:
+    ~27.2% lower
+```
+
+F1 relative to matched UV:
+
+```text
+historical TTK "2":
+    ~19.5% lower
+
+standard W22 on TTK-derived PDs:
+    ~35.2% lower
+
+standard W22 on independent cubical PDs:
+    ~35.2% lower
+```
+
+Therefore:
+
+> The two explicit standard-W22 pipelines agree much more closely with each
+> other than either agrees numerically with the historical TTK `"2"` quantity.
+> The historical metric remains useful as legacy robustness evidence, but it is
+> not numerically interchangeable with standard W22.
+
+---
+
+## XXXVI.156 Phase D — conclusion consistency completed so far
+
+The broad all-168 ranking study is complete.
+
+Pairwise winner agreement between the corrected TTK-derived and independent
+cubical PD constructions is:
+
+```text
+d_B:
+    F1 vs CNN: 98.81%
+    F1 vs UV:  98.81%
+    UV vs CNN: 98.16% among nonties
+
+W2inf:
+    F1 vs CNN: 100%
+    F1 vs UV:  100%
+    UV vs CNN: 98.21%
+
+W22:
+    F1 vs CNN: 99.40%
+    F1 vs UV:  100%
+    UV vs CNN: 98.21%
+```
+
+Exact three-method ranking agreement:
+
+```text
+d_B:
+    161 / 168 = 95.83%
+
+W2inf:
+    165 / 168 = 98.21%
+
+W22:
+    164 / 168 = 97.62%
+```
+
+All-three-PD consensus for F1 vs CNN:
+
+```text
+TTK-derived:
+    150 / 168 all-three improvements
+
+cubical:
+    151 / 168 all-three improvements
+
+both classify as all-three improvement:
+    149 / 168
+```
+
+Only samples:
+
+```text
+35
+39
+163
+```
+
+change the all-three-improvement classification.
+
+For F1 vs matched UV:
+
+```text
+TTK-derived:
+    156 / 168 all-three improvements
+
+cubical:
+    154 / 168 all-three improvements
+
+both classify as all-three improvement:
+    154 / 168
+```
+
+Only samples:
+
+```text
+51
+131
+```
+
+change classification.
+
+### Frozen visual cases
+
+The predeclared visual cases:
+
+```text
+78
+71
+80
+63
+69
+```
+
+all preserve a substantial F1-vs-CNN PD advantage under the independent cubical
+construction.
+
+Examples:
+
+```text
+sample 78:
+    d_B      TTK +37.68% / cubical +37.68%
+    W2inf    TTK +32.07% / cubical +32.86%
+    W22      TTK +34.10% / cubical +35.15%
+
+sample 69:
+    d_B      TTK +59.79% / cubical +59.79%
+    W2inf    TTK +31.46% / cubical +31.02%
+    W22      TTK +34.18% / cubical +33.69%
+```
+
+This is particularly useful because these figures were selected from
+conventional-fidelity near-tie logic before this cross-construction result was
+known.
+
+The visual interpretation can therefore be strengthened carefully:
+
+> In conventionally close reconstruction cases, Candidate F preserves sharper
+> localized structures that are visibly present in GT but attenuated by CNN,
+> while its persistence-diagram improvement is reproduced by two independent PD
+> construction conventions.
+
+This should not be upgraded to a claim of physical importance for every
+individual feature without separate physical validation.
+
+### Remaining Phase-D subgroup check
+
+The corrected PD/MT study established for F1 vs CNN:
+
+```text
+all-three PD improve + MT improves:
+    91 / 168
+
+all-three PD improve + MT worsens:
+    59 / 168
+```
+
+The next Phase-D closeout should ask whether the independent cubical PD
+construction preserves the F1-vs-CNN PD advantage inside each of these two
+already-frozen MT-defined cohorts.
+
+Required output:
+
+```text
+for the 91 PD+/MT+ cases:
+    cubical d_B F1<CNN count
+    cubical W2inf F1<CNN count
+    cubical W22 F1<CNN count
+    cubical all-three-PD-improve count
+    mean TTK-vs-cubical F1 gain by metric
+
+for the 59 PD+/MT- cases:
+    same quantities
+
+for frozen near-tie tiers:
+    strict 10%
+    primary 20%
+    broad 30%
+    same cubical consistency counts
+```
+
+This will complete the original Phase-D scope without changing any frozen sample
+selection.
+
+---
+
+## XXXVI.157 Phase C — colleague merge-tree semantic boundary
+
+The current colleague scalar-field graph must not be treated as an independent
+implementation of the project's merge-tree distance.
+
+The semantic distinction is:
+
+```text
+TTK project MT:
+    true Join Tree / merge hierarchy
+    retains parent-child merge organization
+    compared with audited TTK MergeTreeDistance
+
+colleague current 2D scalar-field graph:
+    constructed from finite H0 persistence-pair information
+    birth/death-pair graph
+    does not reconstruct the same hierarchical Join Tree
+    no scalar-field MT distance equivalent to audited TTK MergeTreeDistance
+```
+
+Therefore the scientifically safe conclusion is:
+
+> The colleague toolkit provides a useful independent persistence construction
+> for Phase B, but its current scalar-field graph is not a drop-in independent
+> merge-tree implementation.
+
+This closes the **semantic** part of Phase C.
+
+A genuine cross-toolkit MT numerical validation would require a separate
+extension implementing:
+
+```text
+same grid connectivity
+same Join-Tree convention
+compatible simplification / persistence handling
+explicitly documented branch-decomposition semantics
+a mathematically comparable tree distance
+```
+
+That is optional future work and is not necessary for the already strong PD
+cross-construction robustness result.
+
+---
+
+## XXXVI.158 Overall cross-toolkit interpretation and next order of work
+
+The current evidence is encouraging for two independent reasons.
+
+First, when the same canonical finite persistence points are supplied, the
+distance implementations agree to floating-point precision for the metrics that
+the colleague wrapper currently exposes directly.
+
+Second, when the persistence diagrams themselves are independently reconstructed
+using a different cubical-complex convention:
+
+```text
+absolute distance means remain close;
+sample-wise correlations remain approximately 0.99;
+winner decisions remain approximately 98-100% consistent;
+the five predeclared visual cases retain their topology advantage.
+```
+
+This means the main Candidate-F persistence conclusion is not fragile to one
+specific persistence-diagram construction pipeline.
+
+Preferred paper-facing wording:
+
+> Persistence-diagram conclusions were robust to an independent construction
+> based on GUDHI CubicalComplex. Although this construction produced different
+> diagram cardinalities and slightly different absolute distances from the
+> TTK-derived diagrams, sample-wise distances were extremely strongly
+> correlated and pairwise method rankings agreed in approximately 98-100% of
+> comparisons across bottleneck and two order-2 Wasserstein conventions.
+
+Do not say:
+
+```text
+TTK and GUDHI produce identical diagrams
+```
+
+or:
+
+```text
+GUDHI formally validates TTK extraction
+```
+
+because neither statement is supported.
+
+### Recommended next order
+
+Before starting the proposed three-way historical-TTK2 vs standard-W22 distance
+visualization study, close the two small remaining checklist items:
+
+```text
+1. native colleague-wrapper W22 parity extension on the same canonical points;
+
+2. Phase-D cohort consistency:
+       91 F1 PD+/MT+
+       59 F1 PD+/MT-
+       strict / primary / broad frozen near-tie tiers.
+```
+
+After those are complete, proceed to the three-way distance-behavior analysis:
+
+```text
+historical TTK "2"
+vs.
+standard W22 on TTK-derived PDs
+vs.
+standard W22 on colleague/GUDHI cubical PDs
+```
+
+with:
+
+```text
+scatter plots
+relative-bias distributions
+correlations
+difference / Bland-Altman-style plots
+method-specific mean and median bias
+F1-vs-CNN and F1-vs-UV effect-size comparison
+```
+
+That will distinguish three different questions cleanly:
+
+```text
+distance-formula consistency
+descriptor-construction robustness
+legacy TTK-metric convention differences
+```
+
+without conflating them.
+
+---
+
+## XXXVI.159 Phase A W22 colleague-adapter parity closeout — PASS / PHASE A CLOSED
+
+The final remaining Phase-A item was completed by evaluating standard
+\(W_{2,2}\) through the GUDHI Wasserstein callable imported inside the
+colleague toolkit's persistence module, using:
+
+```text
+order = 2
+internal_p = 2
+keep_essential_parts = False
+```
+
+on the exact same canonical finite TTK D0/D1 persistence points used by the
+frozen PhIRE audit.
+
+The colleague source tree was not modified.
+
+Results for sample 69:
+
+```text
+CNN:
+    colleague-adapter W22 = 18.722418978059373
+    frozen PhIRE W22      = 18.722418978059380
+    absolute difference   = 7.105e-15
+    PASS
+
+Matched UV control:
+    colleague-adapter W22 = 19.912581254173229
+    frozen PhIRE W22      = 19.912581254173233
+    absolute difference   = 3.553e-15
+    PASS
+
+Candidate F1:
+    colleague-adapter W22 = 12.322962497969835
+    frozen PhIRE W22      = 12.322962497969836
+    absolute difference   = 1.776e-15
+    PASS
+```
+
+Final status:
+
+```text
+PHASE A W22 PARITY CLOSEOUT: PASS
+```
+
+Therefore Phase A is now fully closed.
+
+Same-diagram parity status:
+
+```text
+d_B:
+    PASS to floating-point precision
+
+W2inf:
+    PASS exactly / to floating-point precision
+
+W22:
+    PASS to floating-point precision
+```
+
+Interpretation:
+
+> When supplied the same canonical finite persistence diagrams and explicitly
+> aligned mathematical parameters, the PhIRE/reference implementation and the
+> colleague-toolkit/GUDHI distance path produce numerically identical
+> bottleneck and order-2 Wasserstein distances up to floating-point roundoff.
+
+This establishes distance-formula / implementation parity independently from
+the descriptor-construction comparison in Phase B.
+
+The Phase-A output is preserved under:
+
+```text
+$W22/pd_colleague_compatibility/phaseA_w22_closeout/
+```
+
+including:
+
+```text
+phaseA_colleague_adapter_W22_parity.csv
+phaseA_colleague_adapter_W22_parity_summary.txt
+```
+
+### Four-phase status after Phase-A closeout
+
+```text
+Phase A:
+    COMPLETE / CLOSED
+
+Phase B:
+    COMPLETE
+
+Phase C:
+    semantic boundary COMPLETE
+    (no independent comparable MT distance exists in the colleague toolkit)
+
+Phase D:
+    broad consistency COMPLETE
+    frozen PD+/MT cohort and near-tie subgroup closeout NEXT
+```
+
+The next required execution is:
+
+```text
+phaseD_closeout_cohorts.py
+```
+
+followed by:
+
+```text
+three_way_w22_analysis.py
+```
+
+---
+
+## XXXVI.160 Phase D frozen-cohort consistency closeout — COMPLETE / PASS
+
+The remaining Phase-D subgroup analysis was completed using the independent
+colleague/GUDHI CubicalComplex persistence construction.
+
+Frozen cohorts were preserved exactly. No samples were reselected.
+
+### F1 all-three-PD-improve + MT-improve cohort
+
+Frozen size:
+
+```text
+91 / 168
+```
+
+Results:
+
+```text
+d_B:
+    TTK-derived F1 wins     91 / 91
+    cubical F1 wins         91 / 91
+    mean gain TTK           +38.53%
+    mean gain cubical       +38.75%
+
+W2inf:
+    TTK-derived F1 wins     91 / 91
+    cubical F1 wins         91 / 91
+    mean gain TTK           +27.66%
+    mean gain cubical       +27.61%
+
+W22:
+    TTK-derived F1 wins     91 / 91
+    cubical F1 wins         91 / 91
+    mean gain TTK           +29.89%
+    mean gain cubical       +29.84%
+
+all three:
+    TTK-derived             91 / 91
+    cubical                 91 / 91
+```
+
+Thus the entire PD+/MT+ cohort is preserved by the independent cubical PD
+construction under all three explicit PD metrics.
+
+### F1 all-three-PD-improve + MT-worsen cohort
+
+Frozen size:
+
+```text
+59 / 168
+```
+
+Results:
+
+```text
+d_B:
+    TTK-derived F1 wins     59 / 59
+    cubical F1 wins         58 / 59
+    mean gain TTK           +26.76%
+    mean gain cubical       +27.09%
+
+W2inf:
+    TTK-derived F1 wins     59 / 59
+    cubical F1 wins         59 / 59
+    mean gain TTK           +23.19%
+    mean gain cubical       +22.82%
+
+W22:
+    TTK-derived F1 wins     59 / 59
+    cubical F1 wins         59 / 59
+    mean gain TTK           +25.15%
+    mean gain cubical       +24.65%
+
+all three:
+    TTK-derived             59 / 59
+    cubical                 58 / 59
+```
+
+Therefore only one of the 59 PD+/MT- cases changes all-three-PD classification,
+and the change occurs only through bottleneck. The two Wasserstein conclusions
+remain 59/59.
+
+This strengthens the interpretation that the previously observed PD-vs-MT
+discordance is not primarily an artifact of the TTK-derived persistence
+construction.
+
+### Frozen near-tie cohorts
+
+Strict 10% tier:
+
+```text
+n = 17
+
+d_B:
+    TTK 17/17
+    cubical 17/17
+
+W2inf:
+    TTK 17/17
+    cubical 17/17
+
+W22:
+    TTK 17/17
+    cubical 17/17
+
+all three:
+    TTK 17/17
+    cubical 17/17
+
+mean F1 gains:
+    d_B:
+        TTK     +39.88%
+        cubical +39.38%
+
+    W2inf:
+        TTK     +28.33%
+        cubical +28.36%
+
+    W22:
+        TTK     +30.28%
+        cubical +30.28%
+```
+
+Primary 20% tier:
+
+```text
+n = 34
+
+all three:
+    TTK 34/34
+    cubical 34/34
+
+mean F1 gains:
+    d_B:
+        TTK     +37.01%
+        cubical +37.66%
+
+    W2inf:
+        TTK     +27.03%
+        cubical +26.96%
+
+    W22:
+        TTK     +28.87%
+        cubical +28.79%
+```
+
+Broad 30% tier:
+
+```text
+n = 51
+
+all three:
+    TTK 51/51
+    cubical 51/51
+
+mean F1 gains:
+    d_B:
+        TTK     +35.91%
+        cubical +35.95%
+
+    W2inf:
+        TTK     +26.71%
+        cubical +26.56%
+
+    W22:
+        TTK     +28.79%
+        cubical +28.57%
+```
+
+Thus every frozen near-tie case remains an all-three-PD F1 improvement under
+the independent cubical construction.
+
+### Five predeclared visual cases
+
+Frozen:
+
+```text
+78
+71
+80
+63
+69
+```
+
+Results:
+
+```text
+all three:
+    TTK      5 / 5
+    cubical  5 / 5
+
+mean F1 gain:
+    d_B:
+        TTK     +49.16%
+        cubical +49.34%
+
+    W2inf:
+        TTK     +30.61%
+        cubical +30.59%
+
+    W22:
+        TTK     +32.86%
+        cubical +32.88%
+```
+
+These five examples therefore have independent numerical support under both
+persistence-construction conventions.
+
+### Phase-D conclusion
+
+Preferred interpretation:
+
+> Candidate F's persistence-diagram advantage is robust not only in aggregate,
+> but also within the predeclared conventional near-tie cohorts and within the
+> corrected PD+/MT+ and PD+/MT- subgroups. The entire 91-case PD+/MT+ cohort and
+> all strict, primary, and broad near-tie cohorts retain the F1 advantage under
+> the independent cubical construction. Only one of the 59 PD+/MT- cases loses
+> all-three-PD consensus, through bottleneck alone.
+
+This is especially useful for the PD+/MT- scientific story because it shows that
+the PD-versus-MT disagreement generally survives a different persistence
+construction.
+
+### Four-phase study status
+
+```text
+Phase A — metric parity:
+    COMPLETE / CLOSED
+
+Phase B — descriptor-construction robustness:
+    COMPLETE / CLOSED
+
+Phase C — merge-tree semantic audit:
+    COMPLETE at the intended semantic-boundary level
+    colleague H0 graph is not a comparable TTK Join-Tree distance implementation
+
+Phase D — conclusion consistency:
+    COMPLETE / CLOSED
+```
+
+Therefore the original four-phase cross-toolkit consistency plan is now
+complete.
+
+The next analysis is no longer required to close the four phases. It is the
+planned follow-up:
+
+```text
+historical TTK "2"
+vs.
+standard W22 on TTK-derived PDs
+vs.
+standard W22 on independent GUDHI cubical PDs
+```
+
+to quantify legacy-metric bias and cross-construction distance behavior.
+
+---
+
+## XXXVI.161 Phase-D disagreement audit — sample 35
+
+The single frozen `PD+/MT-` case that loses all-three-PD consensus under the
+independent cubical construction is:
+
+```text
+sample 35
+```
+
+For bottleneck:
+
+```text
+TTK-derived:
+    F1 wins
+    relative F1 gain = +5.5755%
+
+cubical:
+    F1 does not win
+    relative F1 gain = -0.6107%
+```
+
+Thus sample 35 is a construction-sensitive bottleneck boundary case.
+
+Importantly, this does **not** affect the two Wasserstein conclusions for the
+59-case `PD+/MT-` cohort:
+
+```text
+W2inf:
+    cubical F1 wins 59 / 59
+
+W22:
+    cubical F1 wins 59 / 59
+```
+
+The safe interpretation is:
+
+> The only subgroup-level loss of all-three-PD consensus is driven by one
+> bottleneck reversal in sample 35. The Wasserstein-based PD advantage remains
+> unchanged across all 59 PD+/MT- cases.
+
+---
+
+## XXXVI.162 Three-way W22 distance-behavior analysis — COMPLETE
+
+The planned three-way comparison is complete for:
+
+```text
+historical TTK "2" PD dissimilarity
+vs.
+standard W22 on corrected TTK-derived finite PDs
+vs.
+standard W22 on independently constructed GUDHI CubicalComplex PDs
+```
+
+for:
+
+```text
+CNN
+matched L_uv-only control
+Candidate F1
+```
+
+### Method-level means
+
+```text
+CNN:
+    historical TTK "2" = 27.406283
+    corrected W22      = 24.552151
+    cubical W22        = 24.198508
+
+Matched UV:
+    historical TTK "2" = 29.612120
+    corrected W22      = 27.508675
+    cubical W22        = 27.172101
+
+Candidate F1:
+    historical TTK "2" = 23.838249
+    corrected W22      = 17.831897
+    cubical W22        = 17.610810
+```
+
+### Historical TTK "2" versus standard corrected W22
+
+CNN:
+
+```text
+mean signed bias:
+    +2.8541325
+
+mean absolute bias:
+    4.0143319
+
+mean sample-wise relative bias:
+    +16.870%
+
+Pearson:
+    +0.9546
+
+Spearman:
+    +0.9456
+```
+
+Matched UV:
+
+```text
+mean signed bias:
+    +2.1034452
+
+mean absolute bias:
+    3.7389348
+
+mean sample-wise relative bias:
+    +12.950%
+
+Pearson:
+    +0.9722
+
+Spearman:
+    +0.9570
+```
+
+Candidate F1:
+
+```text
+mean signed bias:
+    +6.0063521
+
+mean absolute bias:
+    6.0313594
+
+mean sample-wise relative bias:
+    +39.921%
+
+Pearson:
+    +0.9631
+
+Spearman:
+    +0.9401
+```
+
+Therefore historical TTK `"2"` remains strongly associated with standard W22
+but differs substantially in numerical scale, with a strongly method-dependent
+bias. The discrepancy is especially large for Candidate F1.
+
+This further supports the earlier conclusion:
+
+```text
+historical TTK "2" != standard W22
+```
+
+and shows that the difference is not merely a fixed multiplicative rescaling.
+
+### Independent cubical W22 versus corrected TTK-derived W22
+
+CNN:
+
+```text
+mean signed bias:
+    -0.3536421
+
+mean absolute bias:
+    0.3829037
+
+mean sample-wise relative bias:
+    -1.359%
+
+Pearson:
+    +0.9989
+
+Spearman:
+    +0.9990
+```
+
+Matched UV:
+
+```text
+mean signed bias:
+    -0.3365739
+
+mean absolute bias:
+    0.3777988
+
+mean sample-wise relative bias:
+    -1.137%
+
+Pearson:
+    +0.9992
+
+Spearman:
+    +0.9986
+```
+
+Candidate F1:
+
+```text
+mean signed bias:
+    -0.2210872
+
+mean absolute bias:
+    0.2950974
+
+mean sample-wise relative bias:
+    -1.085%
+
+Pearson:
+    +0.9981
+
+Spearman:
+    +0.9964
+```
+
+Thus, despite independent persistence-diagram construction and different
+diagram cardinalities, standard W22 changes only modestly:
+
+```text
+approximately 1.1% to 1.4% mean sample-wise relative bias
+```
+
+while maintaining near-perfect sample-wise association.
+
+This is a much tighter numerical correspondence than historical TTK `"2"`
+versus standard W22.
+
+### Pairwise method effects
+
+#### Candidate F1 versus CNN
+
+```text
+historical TTK "2":
+    mean relative F1 gain = +13.063%
+    median relative gain  = +13.398%
+    F1 wins               = 166 / 168
+
+corrected standard W22:
+    mean relative F1 gain = +27.100%
+    median relative gain  = +28.401%
+    F1 wins               = 166 / 168
+
+independent cubical W22:
+    mean relative F1 gain = +26.886%
+    median relative gain  = +28.141%
+    F1 wins               = 167 / 168
+```
+
+The two explicit standard-W22 pipelines therefore give nearly the same F1
+effect size, while historical TTK `"2"` substantially attenuates the apparent
+size of the F1 advantage.
+
+#### Candidate F1 versus matched UV control
+
+```text
+historical TTK "2":
+    mean relative F1 gain = +19.536%
+    median relative gain  = +19.287%
+    F1 wins               = 168 / 168
+
+corrected standard W22:
+    mean relative F1 gain = +35.044%
+    median relative gain  = +34.940%
+    F1 wins               = 168 / 168
+
+independent cubical W22:
+    mean relative F1 gain = +35.012%
+    median relative gain  = +35.102%
+    F1 wins               = 168 / 168
+```
+
+Again, the two standard-W22 pipelines are nearly indistinguishable at the
+effect-size level.
+
+#### Matched UV versus CNN
+
+```text
+historical TTK "2":
+    mean relative UV gain = -8.104%
+    UV wins               = 9 / 168
+
+corrected standard W22:
+    mean relative UV gain = -12.452%
+    UV wins               = 17 / 168
+
+independent cubical W22:
+    mean relative UV gain = -12.712%
+    UV wins               = 18 / 168
+```
+
+Thus reconstruction-only fine-tuning remains worse than CNN on average under
+all three conventions. The two standard-W22 pipelines again agree more closely
+with each other than with historical TTK `"2"`.
+
+---
+
+## XXXVI.163 Final cross-toolkit scientific interpretation
+
+The complete audit now separates three distinct sources of possible variation.
+
+### 1. Distance implementation
+
+When exactly the same canonical finite TTK persistence points are supplied:
+
+```text
+d_B:
+    PhIRE/reference vs colleague/GUDHI:
+    equal to floating-point precision
+
+W2inf:
+    equal to floating-point precision
+
+W22:
+    equal to floating-point precision
+```
+
+Therefore the explicit distance formulas are not a source of disagreement.
+
+### 2. Persistence-diagram construction
+
+When the persistence diagrams are independently constructed from the same
+authoritative scalar fields:
+
+```text
+TTK-derived finite PDs
+vs.
+GUDHI CubicalComplex PDs
+```
+
+the diagrams differ in cardinality, but standard distances remain very close:
+
+```text
+W22 mean sample-wise relative bias:
+    CNN  -1.359%
+    UV   -1.137%
+    F1   -1.085%
+
+sample-wise Pearson:
+    approximately 0.998 to 0.999
+```
+
+and the method conclusions are preserved at very high rates.
+
+### 3. Legacy TTK metric convention
+
+Historical TTK `"2"` remains correlated with standard W22 but has a much larger
+and method-dependent numerical bias:
+
+```text
+mean sample-wise relative bias versus corrected W22:
+    CNN  +16.870%
+    UV   +12.950%
+    F1   +39.921%
+```
+
+Therefore the largest observed source of numerical discrepancy in this
+three-way comparison is the **legacy metric convention**, not the independent
+cubical descriptor construction.
+
+This should be phrased carefully as an empirical finding for this dataset and
+implementation configuration, not as a universal property of TTK or GUDHI.
+
+---
+
+## XXXVI.164 Final status of the four-phase consistency study
+
+```text
+Phase A — metric parity:
+    COMPLETE / CLOSED
+
+Phase B — descriptor-construction robustness:
+    COMPLETE / CLOSED
+
+Phase C — merge-tree semantics:
+    COMPLETE at the intended semantic-boundary level
+    colleague H0 graph is not a comparable independent TTK Join-Tree distance
+
+Phase D — conclusion consistency:
+    COMPLETE / CLOSED
+
+Three-way historical-TTK2 vs standard-W22 follow-up:
+    COMPLETE
+```
+
+### Strongest overall result
+
+Preferred concise wording:
+
+> The persistence-based conclusions are robust across independent
+> implementations and persistence constructions. With identical canonical
+> persistence points, the explicit bottleneck and Wasserstein implementations
+> agree to floating-point precision. Independently reconstructed GUDHI cubical
+> diagrams differ from the TTK-derived diagrams in cardinality, but standard
+> W22 distances remain within roughly 1% on average and are correlated at about
+> 0.998-0.999 across samples. Candidate F's advantage is preserved in nearly all
+> samples, in all frozen near-tie cohorts, and throughout the full 91-case
+> PD+/MT+ cohort. By contrast, the historical TTK `"2"` quantity exhibits a
+> larger, method-dependent numerical bias, confirming that it should be retained
+> only as a legacy/reference measure rather than treated as standard W22.
+
+### Paper-facing robustness table candidate
+
+| Comparison | CNN | UV | F1 |
+|---|---:|---:|---:|
+| Cubical-vs-corrected W22 mean relative bias | -1.359% | -1.137% | -1.085% |
+| Cubical-vs-corrected W22 Pearson | 0.9989 | 0.9992 | 0.9981 |
+| Historical-TTK2-vs-corrected mean relative bias | +16.870% | +12.950% | +39.921% |
+| Historical-TTK2-vs-corrected Pearson | 0.9546 | 0.9722 | 0.9631 |
+
+Additional conclusion-consistency summary:
+
+```text
+F1 vs CNN:
+    corrected W22 wins    166 / 168
+    cubical W22 wins      167 / 168
+
+F1 vs UV:
+    corrected W22 wins    168 / 168
+    cubical W22 wins      168 / 168
+
+frozen near-tie cohorts:
+    strict 17 / 17 all-three PD improvement under both
+    primary 34 / 34 under both
+    broad  51 / 51 under both
+
+PD+/MT+ cohort:
+    91 / 91 all-three PD improvement under both
+
+PD+/MT- cohort:
+    TTK-derived 59 / 59
+    cubical     58 / 59
+    sole all-three disagreement: sample 35 bottleneck
+```
+
+The full cross-toolkit consistency study can now be treated as scientifically
+closed unless a future project adds a genuinely comparable independent
+Join-Tree implementation for merge-tree distance validation.
+
