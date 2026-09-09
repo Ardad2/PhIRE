@@ -21178,4 +21178,863 @@ If reliable hierarchy arrays cannot be validated, the spatial embedding should
 remain the qualitative MT visualization and the paper should avoid making
 specific branch-parent claims from it.
 
+---
+
+## XXXVI.110 Sample-69 raw TTK hierarchy-array audit — NEXT
+
+The regenerated sample-69 spatially embedded Join-Tree figures are useful
+qualitative diagnostics, but they do not directly expose the abstract
+parent/child hierarchy.
+
+Because the historical audit found suspicious raw TTK arc attributes, no
+specific hierarchy array will be trusted based on its name alone.
+
+A new targeted script has been prepared:
+
+```text
+audit_sample69_mt_raw_arrays.py
+```
+
+It audits the raw threshold-3:
+
+```text
+nodes.vtu
+arcs.vtu
+```
+
+for:
+
+```text
+GT
+CNN
+UV
+F1
+```
+
+against the authoritative C-order scalar VTIs.
+
+The audit inventories every point/cell/field array and evaluates:
+
+```text
+finite values
+numeric ranges
+integer-likeness
+candidate ID arrays
+candidate up/down/node arrays
+node-coordinate grid alignment
+node coordinates against authoritative VTI bounds
+scalar-like node arrays against authoritative wind_speed at node locations
+raw VTK line-cell validity
+duplicate segment pairs
+segment-graph connected components
+whether each segment-graph component is acyclic/tree-like
+critical-node coordinate matches to arc points
+```
+
+Decision rule:
+
+```text
+Do not construct an abstract hierarchy from raw TTK attributes unless
+candidate endpoint/node-ID and scalar arrays pass explicit structural and
+field-consistency checks across all four methods.
+```
+
+If reliable hierarchy arrays cannot be validated, the spatial embedding remains
+the defensible qualitative MT visualization and no specific branch-parent claims
+should be made from the raw TTK metadata.
+
+---
+
+## XXXVI.111 Sample-69 raw TTK array audit — promising hierarchy metadata, scalar caveat
+
+The targeted threshold-3 raw-array audit completed successfully for:
+
+```text
+GT
+CNN
+UV
+F1
+```
+
+Important structural findings were consistent across all four methods.
+
+### Node identity arrays
+
+Each raw `nodes.vtu` contains:
+
+```text
+NodeId
+Scalar
+VertexId
+CriticalType
+RegionSize
+RegionSpan
+```
+
+For every method:
+
+```text
+NodeId:
+    finite
+    integer-valued
+    unique
+    exactly spans 0..N-1
+```
+
+Examples:
+
+```text
+GT:
+    NodeId 0..57, 58 unique values
+
+CNN:
+    NodeId 0..11, 12 unique values
+
+UV:
+    NodeId 0..17, 18 unique values
+
+F1:
+    NodeId 0..37, 38 unique values
+```
+
+The node geometry itself remains well behaved:
+
+```text
+all node XY coordinates lie exactly on integer grid positions
+all nodes are inside the 160x160 domain
+all critical nodes coincide exactly with at least one raw arc point
+```
+
+### Arc hierarchy arrays
+
+Each `arcs.vtu` contains the cell arrays:
+
+```text
+SegmentationId
+upNodeId
+downNodeId
+RegionSize
+RegionSpan
+```
+
+The cardinality pattern is strongly consistent with logical tree arcs.
+
+For example, GT has:
+
+```text
+58 nodes
+57 unique SegmentationId values
+57 unique downNodeId values
+```
+
+and similarly:
+
+```text
+CNN:
+    12 nodes
+    11 unique SegmentationId
+    11 unique downNodeId
+
+UV:
+    18 nodes
+    17 unique SegmentationId
+    17 unique downNodeId
+
+F1:
+    38 nodes
+    37 unique SegmentationId
+    37 unique downNodeId
+```
+
+This is exactly the expected N nodes / N-1 logical-arc signature of a rooted
+tree and is much more encouraging than the previously suspicious historical
+raw-array observations.
+
+The sampled VTK arc geometry is also:
+
+```text
+finite
+valid
+free of duplicate segment pairs
+one connected component
+acyclic/tree-like as a sampled segment graph
+```
+
+for all four methods.
+
+### Scalar caveat
+
+The TTK node `Scalar` array does **not** equal the authoritative original
+wind-speed magnitude evaluated at the node's spatial coordinates.
+
+Maximum differences:
+
+```text
+GT:
+    0.671409
+
+CNN:
+    2.86760
+
+UV:
+    1.10869
+
+F1:
+    2.19387
+```
+
+Therefore the raw `Scalar` array must not yet be labeled as the original
+wind-speed value at the displayed node coordinate.
+
+A plausible explanation is that the tree is being extracted after persistence
+simplification and the output `Scalar` values correspond to the simplified
+field / internal tree representation. This remains a hypothesis until internal
+consistency is explicitly validated.
+
+### Current decision
+
+The first raw-array audit is promising enough to continue, but under the
+predeclared conservative decision policy an abstract hierarchy should not yet
+be rendered from the raw arrays.
+
+A second-stage logical-hierarchy validation is required.
+
+---
+
+## XXXVI.112 Second-stage logical-hierarchy validation — prepared
+
+A new script has been prepared:
+
+```text
+validate_sample69_mt_logical_hierarchy.py
+```
+
+It performs stronger tests that do not require raw TTK `Scalar` to equal the
+original field.
+
+For each of GT/CNN/UV/F1 it will verify:
+
+```text
+1. NodeId is unique and exactly 0..N-1.
+
+2. VertexId agrees with the corrected C-order spatial mapping:
+       VertexId == x + y*W
+
+3. Unique SegmentationId count equals N-1.
+
+4. Every sampled cell belonging to one SegmentationId has one constant:
+       (downNodeId, upNodeId)
+
+5. Every logical SegmentationId forms one simple sampled path.
+
+6. The endpoints of that sampled path geometrically coincide with the nodes
+   referenced by downNodeId/upNodeId.
+
+7. Collapsing sampled geometry to N-1 logical arcs produces one connected,
+   acyclic graph.
+
+8. Exactly one node is absent from downNodeId and every other node occurs once,
+   validating a rooted parent relationship.
+
+9. TTK node Scalar agrees internally with the Scalar stored at coincident raw
+   arc points.
+
+10. The TTK scalar is monotone in the declared down->up direction.
+```
+
+The original-field scalar comparison remains a diagnostic rather than a hard
+hierarchy requirement.
+
+If all structural checks pass, an abstract **topology/depth-based** tree
+rendering is considered allowed.
+
+This avoids making an unsupported claim that the raw TTK node `Scalar` is
+identical to the original wind-speed field.
+
+---
+
+## XXXVI.113 Sample-69 logical hierarchy validation — PASS
+
+The second-stage logical hierarchy validation completed successfully for all
+four frozen threshold-3 trees:
+
+```text
+GT
+CNN
+UV
+F1
+```
+
+For every method, the following structural conditions passed:
+
+```text
+NodeId is unique and contiguous 0..N-1
+
+VertexId == x + y*W under the corrected C-order convention
+
+unique SegmentationId count == N-1
+
+all sampled cells in one SegmentationId share one constant:
+    (downNodeId, upNodeId)
+
+each logical superarc is represented by one simple sampled path
+
+the sampled path endpoints coincide with the referenced critical nodes
+
+the collapsed logical graph is connected and acyclic
+
+there is exactly one root candidate
+
+every non-root node occurs exactly once as downNodeId
+
+up-node Scalar >= down-node Scalar on every logical arc
+```
+
+The validated logical sizes are:
+
+```text
+GT:
+    58 nodes
+    57 logical arcs
+    root NodeId = 57
+
+CNN:
+    12 nodes
+    11 logical arcs
+    root NodeId = 11
+
+UV:
+    18 nodes
+    17 logical arcs
+    root NodeId = 17
+
+F1:
+    38 nodes
+    37 logical arcs
+    root NodeId = 37
+```
+
+Therefore:
+
+```text
+ABSTRACT HIERARCHY RECONSTRUCTION:
+    ALLOWED
+```
+
+### Scalar caveat remains
+
+The hierarchy passes even though raw TTK `Scalar` does not equal the original
+authoritative wind-speed field at the node coordinates.
+
+TTK node Scalar also disagrees with coincident raw arc Scalar for:
+
+```text
+GT
+UV
+F1
+```
+
+while CNN happens to match internally exactly.
+
+Therefore the first abstract tree renderer must **not** use either original
+wind speed or raw TTK Scalar as an unqualified vertical scalar coordinate.
+
+The first defensible abstract layout is instead:
+
+```text
+vertical coordinate:
+    topological depth from the validated root
+
+horizontal coordinate:
+    deterministic readability-only tree layout
+```
+
+This renders only the validated rooted hierarchy.
+
+---
+
+## XXXVI.114 Abstract sample-69 hierarchy renderer — prepared
+
+A new script has been prepared:
+
+```text
+render_sample69_mt_abstract_hierarchy.py
+```
+
+SHA-256 at creation:
+
+```text
+8cacd9b1939b46e5c32ffd8d613f2fb173e00ebc78ec3f5c70384b99b5cc4786
+```
+
+It reads only:
+
+```text
+sample69_mt_logical_nodes.csv
+sample69_mt_logical_arcs.csv
+```
+
+and re-validates the required structural flags before rendering.
+
+The layout semantics are intentionally conservative:
+
+```text
+root:
+    top
+
+vertical position:
+    integer topological depth from root
+
+horizontal position:
+    tidy-tree spacing only
+    no physical-coordinate meaning
+    no scalar meaning
+    no metric meaning
+
+node roles:
+    root
+    internal node
+    leaf
+```
+
+The main output is a four-column abstract hierarchy comparison:
+
+```text
+GT | CNN | L_uv-only | Candidate F
+```
+
+with a common depth axis.
+
+It also writes:
+
+```text
+sample_069_mt_t3_abstract_hierarchy.png
+sample_069_mt_t3_abstract_hierarchy.pdf
+sample_069_mt_t3_abstract_hierarchy_node_ids.png
+sample69_mt_abstract_layout.csv
+sample69_mt_abstract_hierarchy_summary.txt
+```
+
+The NodeId-labeled figure is an audit/debug view, not intended as the primary
+publication figure.
+
+This abstract hierarchy view complements the already-generated spatially
+embedded Join-Tree view:
+
+```text
+spatial embedding:
+    answers WHERE surviving tree structure occurs in the domain
+
+abstract hierarchy:
+    answers HOW surviving components are parented and merged
+```
+
+The combination is intended to investigate why sample 69 can recover many more
+persistent branches under Candidate F while still having a slightly worse
+audited MT distance than CNN.
+
+---
+
+## XXXVI.115 Sample-69 abstract Join-Tree hierarchy visualization — COMPLETE
+
+The validated logical hierarchy was rendered successfully for the frozen
+threshold-3 sample-69 trees.
+
+The renderer used:
+
+```text
+vertical position:
+    topological depth from validated root
+
+horizontal position:
+    deterministic tidy-tree placement for readability only
+
+raw TTK Scalar:
+    NOT used for placement
+
+original wind_speed:
+    NOT used for placement
+```
+
+The resulting abstract hierarchy sizes are:
+
+```text
+GT:
+    root NodeId = 57
+    58 nodes
+    57 logical arcs
+    29 leaves
+    28 internal non-root nodes
+    maximum depth = 19
+    child-count histogram = {0:29, 1:1, 2:28}
+
+CNN:
+    root NodeId = 11
+    12 nodes
+    11 logical arcs
+    6 leaves
+    5 internal non-root nodes
+    maximum depth = 6
+    child-count histogram = {0:6, 1:1, 2:5}
+
+UV:
+    root NodeId = 17
+    18 nodes
+    17 logical arcs
+    9 leaves
+    8 internal non-root nodes
+    maximum depth = 9
+    child-count histogram = {0:9, 1:1, 2:8}
+
+Candidate F:
+    root NodeId = 37
+    38 nodes
+    37 logical arcs
+    19 leaves
+    18 internal non-root nodes
+    maximum depth = 16
+    child-count histogram = {0:19, 1:1, 2:18}
+```
+
+Relative to GT, the retained threshold-3 hierarchy ratios are:
+
+```text
+CNN:
+    nodes/leaves ≈ 20.7% of GT
+    max depth    ≈ 31.6% of GT
+
+UV:
+    nodes/leaves ≈ 31.0% of GT
+    max depth    ≈ 47.4% of GT
+
+Candidate F:
+    nodes/leaves ≈ 65.5% of GT
+    max depth    ≈ 84.2% of GT
+```
+
+Thus Candidate F is much closer to GT in coarse combinatorial complexity than
+CNN or the matched UV control.
+
+### Important structural observation
+
+All four threshold-3 trees have the same degree-pattern family:
+
+```text
+one node with one child
+all other non-leaf branching nodes have two children
+```
+
+Therefore the major visual differences are not unusual node valences, but:
+
+```text
+how many merge events survive;
+how deeply they are nested;
+where major subtree bifurcations occur in the rooted hierarchy.
+```
+
+The abstract figure shows that CNN and UV are comparatively shallow and heavily
+simplified, while Candidate F recovers a much deeper nested hierarchy.
+
+However, Candidate F is not simply a scaled copy of GT. The location of larger
+subtree splits in depth/nesting differs, which is a plausible source of
+merge-tree distance even when Candidate F recovers many more persistent
+features.
+
+This remains a qualitative hierarchy observation until exact cross-tree
+matchings are recovered from the audited merge-tree distance implementation.
+
+### Rendering cleanup note
+
+The current renderer allows Matplotlib's default line-color cycle to assign
+different colors to separate edges. Those colors have **no semantic meaning**.
+
+For publication polishing, edges should use one neutral style unless an actual
+validated matching/categorical encoding is added. Node role (root/internal/leaf)
+should remain the only encoded categorical distinction in the hierarchy-only
+view.
+
+The NodeId-labeled version remains an audit/debug view only.
+
+---
+
+## XXXVI.116 TTK documentation cross-check for hierarchy semantics
+
+TTK documentation confirms that for `ttkMergeTree`:
+
+```text
+Join Tree leaves correspond to minima of the scalar field.
+
+downNodeId:
+    starting node of an arc, toward the leaves
+
+upNodeId:
+    ending node of an arc, toward the root
+
+SetWithNormalize(True):
+    makes NodeId ordering deterministic between executions
+
+SuperArcSamplingLevel:
+    controls spatial sampling of superarcs;
+    intermediate points are placed at barycenters of the corresponding
+    vertex portions.
+```
+
+This independently supports the direction used by the validated abstract
+renderer:
+
+```text
+downNodeId -> upNodeId
+child       -> parent/root
+```
+
+It also reinforces that the many line segments in the spatial embedding are
+sampling geometry, not logical tree-edge counts.
+
+---
+
+## XXXVI.117 Next target: recover audited MT matchings if available
+
+The most informative next analysis is not another ad-hoc structural metric.
+
+The key scientific question is:
+
+```text
+Why does Candidate F recover substantially more GT-like hierarchy complexity
+at threshold 3, yet have a slightly worse audited MT distance than CNN for
+sample 69?
+```
+
+To answer this faithfully, the preferred next step is to determine whether the
+TTK 1.3.0 merge-tree-distance implementation can expose the **actual matching**
+used by the audited distance.
+
+TTK's developer documentation indicates that the underlying
+`MergeTreeDistance` class contains a `computeMatching()` function, while
+`ttkMergeTreeVisualization` contains matching-output support.
+
+Before attempting to reconstruct or infer matches manually, inspect the exact
+local TTK 1.3.0 source/API used by the audit.
+
+The next preflight should therefore inspect:
+
+```text
+MergeTreeDistance
+MergeTreeDistanceMatrix
+ttkMergeTreeDistanceMatrix
+ttkMergeTreeVisualization
+```
+
+for:
+
+```text
+computeMatching
+matching return/output types
+execute signatures
+branch-decomposition matching conversion
+whether the VTK DistanceMatrix wrapper discards pairwise matchings
+whether the base C++ class can be called directly with the already-audited
+parameter configuration
+```
+
+If exact matchings can be recovered, they should be used for any cross-tree
+branch correspondence figure instead of visual proximity or NodeId heuristics.
+
+---
+
+## XXXVI.118 Exact TTK merge-tree matching source path identified
+
+The local TTK 1.3.0 source inspection established that the audited merge-tree
+distance implementation does compute a node-to-node matching internally.
+
+The VTK `ttkMergeTreeDistanceMatrix` wrapper calls the base
+`MergeTreeDistanceMatrix::executePara()` path. For each pair of input trees,
+that code creates:
+
+```cpp
+std::vector<std::tuple<ftm::idNode, ftm::idNode>> outputMatching;
+```
+
+and calls:
+
+```cpp
+distanceMatrix[i][j] =
+    mergeTreeDistance.execute<dataType>(
+        trees[i], trees[j], outputMatching);
+```
+
+The wrapper then keeps only the scalar distance and discards
+`outputMatching`.
+
+Therefore the pairwise VTK distance-matrix wrapper does **not** expose the
+matching, even though the exact same underlying distance computation produces
+one.
+
+### Base-class matching representation
+
+`MergeTreeDistance` has an overload using:
+
+```cpp
+std::vector<
+    std::tuple<ftm::idNode, ftm::idNode, double>
+> outputMatching
+```
+
+where each emitted tuple contains:
+
+```text
+tree-1 node ID
+tree-2 node ID
+relabel cost
+```
+
+The matching is reconstructed by backtracking the dynamic-programming
+`treeBackTable` and `forestBackTable`.
+
+For a matched pair, the cost stored in the tuple is obtained from:
+
+```cpp
+relabelCost(tree1, tree1Node, tree2, tree2Node)
+```
+
+The scalar tree distance itself is read from the root/root dynamic-programming
+entry before the matching is reconstructed.
+
+### Important unmatched-node caveat
+
+The assignment formulation has a dummy row and dummy column for deletion /
+insertion (non-assignment) costs.
+
+The exported `outputMatching` contains only explicit real-to-real matched node
+pairs. Dummy/deletion/insertion assignments are not emitted as ordinary
+matching tuples.
+
+Therefore:
+
+```text
+sum(exported tuple costs) != necessarily the total merge-tree distance
+```
+
+and an eventual matching visualization must distinguish:
+
+```text
+explicit matched node pairs
+vs.
+unmatched/deleted/inserted structure inferred from nodes absent from matching
+```
+
+rather than interpreting the tuple list as a complete additive decomposition of
+the distance.
+
+### Postprocessing caveat
+
+The `MergeTreeDistanceMatrix` pairwise loop explicitly sets:
+
+```cpp
+mergeTreeDistance.setSaveTree(true);
+mergeTreeDistance.setCleanTree(true);
+mergeTreeDistance.setIsCalled(true);
+mergeTreeDistance.setPostprocess(false);
+```
+
+before calling the distance.
+
+By contrast, the base `MergeTreeDistance` class defaults to postprocessing
+enabled. When postprocessing is enabled, after the numerical distance and raw
+matching have been computed, it runs:
+
+```cpp
+postprocessingPipeline(...)
+convertBranchDecompositionMatching(...)
+```
+
+when branch decomposition is active.
+
+Thus the numerical distance is computed before postprocessing, while the
+matching representation may be converted afterward.
+
+This creates a promising route for a dual validation:
+
+```text
+Run A:
+    reproduce the DistanceMatrix behavior exactly
+    postprocess = false
+
+Run B:
+    identical distance parameters
+    postprocess = true
+    obtain converted matching
+
+Required invariant:
+    distance(A) == distance(B) == frozen audited MT distance
+```
+
+The exact semantics of `convertBranchDecompositionMatching()` must still be
+inspected before treating the converted node IDs as original/display-tree
+NodeIds.
+
+---
+
+## XXXVI.119 TTK's own matching visualization path identified
+
+`ttkMergeTreeVisualization` directly accepts:
+
+```cpp
+std::vector<std::tuple<idNode, idNode, double>>
+```
+
+through `setOutputMatching()`.
+
+Its `makeMatchingOutput()` routine writes one VTK line for every explicit
+matched pair and attaches cell-data arrays including:
+
+```text
+MatchingID
+MatchingType
+MeanMatchedPersistence
+Cost
+tree1NodeId
+tree2NodeId
+MatchingPercentMatch   (when available)
+```
+
+The matching type is classified as:
+
+```text
+1 = saddle-to-saddle
+2 = leaf-to-leaf
+3 = root-to-root
+0 = other
+```
+
+This confirms that an exact TTK-supported cross-tree matching visualization is
+possible in principle.
+
+However the custom abstract-tree figure should not yet draw these
+correspondences, because:
+
+```text
+1. the DistanceMatrix wrapper discards them;
+2. the wrapper disables postprocessing;
+3. the mapping from preprocessed / branch-decomposition node IDs back to the
+   original logical tree must be verified;
+4. the threshold-3 tree is a display simplification and must not automatically
+   be assumed to be the same representation used by the audited distance.
+```
+
+### Next preflight
+
+Before implementing the matching extractor, inspect:
+
+```text
+MergeTreeDistanceMatrix::executePara() lines 125-195 in full
+MergeTreeBase parameter defaults
+VTK wrapper / XML property defaults
+convertBranchDecompositionMatching()
+postprocessingPipeline()
+the exact project audit code that instantiated ttkMergeTreeDistanceMatrix
+```
+
+The goal is to freeze every parameter required to reproduce the already-audited
+`mt_distance` exactly, then recover matching information without changing the
+distance semantics.
 
