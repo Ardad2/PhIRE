@@ -1,7 +1,7 @@
 # Dataset Generation and Repair Notes
 
-**Last consolidated update:** September 7, 2026  
-**Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. The corrected persistence-diagram distance layer has now also completed an independent GUDHI audit across all 8,568 GT-SR comparisons with 8,568 PASS, zero mismatches/errors, exact bottleneck agreement, and maximum aggregate W2 discrepancy 1.0178524689763435e-12. The GUDHI persistence-distance audit is now fully preserved with an exported environment, version manifest, per-artifact SHA-256 manifest, and a hash-frozen archive. Final human visual review of the six composites and any separate repository/figure archival tasks should still be recorded independently.
+**Last consolidated update:** September 14, 2026  
+**Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. The corrected persistence-diagram distance layer has now also completed an independent GUDHI audit across all 8,568 GT-SR comparisons with 8,568 PASS, zero mismatches/errors, exact bottleneck agreement, and maximum aggregate W2 discrepancy 1.0178524689763435e-12. The GUDHI persistence-distance audit is now fully preserved with an exported environment, version manifest, per-artifact SHA-256 manifest, and a hash-frozen archive.  Final human visual review of the six composites and any separate repository/figure archival tasks should still be recorded independently. On September 14, 2026, the clean-environment SSIM audit for the current topology-inspired model was also closed: the exact historical SSIM implementation reproduced the frozen CNN and reconstruction-only controls to floating-point precision, and the accepted topology-inspired means are speed SSIM = 0.793188243 and mean-u/v SSIM = 0.827230145. Poster-preparation figures and their TikZ sources were also regenerated and preserved as a separate design-artifact bundle.
 
 
 ## Purpose
@@ -26182,4 +26182,1128 @@ PD+/MT- cohort:
 The full cross-toolkit consistency study can now be treated as scientifically
 closed unless a future project adds a genuinely comparable independent
 Join-Tree implementation for merge-tree distance validation.
+
+
+---
+
+# Part XXXVII — September 14, 2026 SSIM closeout and poster-analysis refresh
+
+This section records the exact commands, diagnostics, accepted outputs, and poster-preparation artifacts produced during the September 14, 2026 analysis pass. It is intentionally verbose so that the SSIM closeout and the figures used for the TopoInVis / IEEE VIS poster can be reconstructed later without relying on chat history.
+
+## XXXVII.1 Goal of the SSIM refresh
+
+The active Spark evaluation reports had left SSIM unavailable because of the known NumPy / scikit-image binary incompatibility in the main environment. A separate clean SSIM environment had previously produced frozen reference means for:
+
+```text
+pretrained CNN:
+    speed SSIM = 0.741175
+    mean u/v SSIM = 0.771031
+
+reconstruction-only 2688 control:
+    speed SSIM = 0.813443
+    mean u/v SSIM = 0.853551
+```
+
+The September 14 objective was to compute SSIM for the current topology-inspired model while preserving the exact historical SSIM convention, rather than silently introducing a new convention.
+
+Public-facing names used in the poster refresh:
+
+```text
+pretrained_cnn        -> pretrained CNN
+reconstruction_only   -> matched L_uv-only / reconstruction-only fine-tuning
+                         internal artifact: candidateUV_expanded2688
+topology_inspired     -> current topology-inspired fine-tuning
+                         internal artifact: candidateF_grad_E2_low_expanded2688
+```
+
+## XXXVII.2 Initial diagnostic SSIM recomputation
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 .venv_ssim/bin/python \
+  scripts/recompute_topology_inspired_ssim.py \
+  --repo "$HOME/PhIRE" \
+  2>&1 | tee logs/ssim_current_topology_inspired.log
+```
+
+### Observed output
+
+```text
+Evaluating pretrained_cnn: /home/adadhwal/PhIRE/data_out_fixed/wind_mrhr_cnn
+Evaluating reconstruction_only: /home/adadhwal/PhIRE/data_out/wind_finetune_candidateUV_expanded2688
+Evaluating topology_inspired: /home/adadhwal/PhIRE/data_out/wind_finetune_candidateF_grad_E2_low_expanded2688
+
+SUMMARY
+pretrained_cnn           n=168 speed=0.737013 uv_mean=0.768058
+  frozen target: speed=0.741175 uv_mean=0.771031
+  abs diff:      speed=4.162e-03 uv_mean=2.973e-03
+reconstruction_only      n=168 speed=0.813075 uv_mean=0.853425
+  frozen target: speed=0.813443 uv_mean=0.853551
+  abs diff:      speed=3.675e-04 uv_mean=1.261e-04
+topology_inspired        n=168 speed=0.790688 uv_mean=0.825274
+
+Wrote: /home/adadhwal/PhIRE/ttk_runs_fixed/ssim_recomputed_current_topology_inspired/ssim_per_sample_current_topology_inspired.csv
+Wrote: /home/adadhwal/PhIRE/ttk_runs_fixed/ssim_recomputed_current_topology_inspired/ssim_summary_current_topology_inspired.csv
+
+IMPORTANT: only use the topology-inspired SSIM on the poster if the CNN/control
+sanity-check means reproduce the frozen values closely. If they do not, recover
+the original clean-SSIM helper/convention rather than tuning this script to fit.
+```
+
+### Interpretation
+
+The control nearly reproduced its frozen mean, but the CNN discrepancy was too large to accept the new topology-inspired SSIM for the poster. The provisional values above were therefore treated as a diagnostic only.
+
+## XXXVII.3 Diagnostic helper implementation used in the first run
+
+The standalone helper used a per-sample GT-only dynamic range. The exact helper source used in the diagnostic run is preserved below.
+
+```python
+#!/usr/bin/env python3
+"""Recompute SSIM for the current topology-inspired model on the fixed 168-sample benchmark.
+
+Public method names:
+  pretrained_cnn
+  reconstruction_only
+  topology_inspired
+
+This script is intentionally standalone and does not touch training or topology outputs.
+It expects saved physical-unit [u,v] arrays in dataGT.npy/dataSR.npy.
+
+The earlier clean SSIM audit recorded these mean values:
+  pretrained CNN:        speed=0.741175, uv_mean=0.771031
+  reconstruction-only:   speed=0.813443, uv_mean=0.853551
+
+Because the exact earlier helper script is not present in the supplied audit bundle, this
+script computes the standard skimage SSIM convention with per-sample GT dynamic range and
+prints the frozen means beside the newly computed values. If CNN/control reproduce the
+frozen values to the displayed precision, the convention is confirmed; otherwise stop and
+recover the original helper before using the topology-inspired SSIM in the poster.
+"""
+from pathlib import Path
+import argparse
+import csv
+import numpy as np
+from skimage.metrics import structural_similarity
+
+EXPECTED = {
+    "pretrained_cnn": (0.741175, 0.771031),
+    "reconstruction_only": (0.813443, 0.853551),
+}
+
+def ssim2d(gt, sr):
+    gt = np.asarray(gt, dtype=np.float64)
+    sr = np.asarray(sr, dtype=np.float64)
+    dr = float(np.max(gt) - np.min(gt))
+    if not np.isfinite(dr) or dr <= 0:
+        dr = 1.0
+    return float(structural_similarity(gt, sr, data_range=dr))
+
+def load_pair(root: Path):
+    gt = np.load(root / "dataGT.npy")
+    sr = np.load(root / "dataSR.npy")
+    if gt.shape != sr.shape:
+        raise ValueError(f"shape mismatch in {root}: GT={gt.shape}, SR={sr.shape}")
+    if gt.ndim != 4 or gt.shape[-1] != 2:
+        raise ValueError(f"expected [N,H,W,2] arrays in {root}, got {gt.shape}")
+    if not (np.isfinite(gt).all() and np.isfinite(sr).all()):
+        raise ValueError(f"non-finite values in {root}")
+    return gt, sr
+
+def evaluate(name, root):
+    gt, sr = load_pair(root)
+    rows = []
+    for i in range(gt.shape[0]):
+        gu, gv = gt[i, ..., 0], gt[i, ..., 1]
+        su, sv = sr[i, ..., 0], sr[i, ..., 1]
+        gspeed = np.hypot(gu, gv)
+        sspeed = np.hypot(su, sv)
+        su_ssim = ssim2d(gu, su)
+        sv_ssim = ssim2d(gv, sv)
+        rows.append({
+            "method": name,
+            "sample_idx": i,
+            "ssim_speed": ssim2d(gspeed, sspeed),
+            "ssim_u": su_ssim,
+            "ssim_v": sv_ssim,
+            "ssim_uv_mean": 0.5 * (su_ssim + sv_ssim),
+        })
+    return rows
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--repo", default=str(Path.home() / "PhIRE"))
+    ap.add_argument("--cnn", default="data_out_fixed/wind_mrhr_cnn")
+    ap.add_argument("--control", default="data_out/wind_finetune_candidateUV_expanded2688")
+    ap.add_argument("--topology", default="data_out/wind_finetune_candidateF_grad_E2_low_expanded2688")
+    ap.add_argument("--outdir", default="ttk_runs_fixed/ssim_recomputed_current_topology_inspired")
+    args = ap.parse_args()
+
+    repo = Path(args.repo).expanduser().resolve()
+    paths = {
+        "pretrained_cnn": repo / args.cnn,
+        "reconstruction_only": repo / args.control,
+        "topology_inspired": repo / args.topology,
+    }
+    outdir = repo / args.outdir
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    all_rows = []
+    for name, path in paths.items():
+        print(f"Evaluating {name}: {path}")
+        all_rows.extend(evaluate(name, path))
+
+    per_sample = outdir / "ssim_per_sample_current_topology_inspired.csv"
+    fields = ["method", "sample_idx", "ssim_speed", "ssim_u", "ssim_v", "ssim_uv_mean"]
+    with per_sample.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields)
+        w.writeheader(); w.writerows(all_rows)
+
+    summary = []
+    for name in paths:
+        rr = [r for r in all_rows if r["method"] == name]
+        speed = float(np.mean([r["ssim_speed"] for r in rr]))
+        uv = float(np.mean([r["ssim_uv_mean"] for r in rr]))
+        row = {"method": name, "n": len(rr), "ssim_speed_mean": speed, "ssim_uv_mean": uv}
+        if name in EXPECTED:
+            es, euv = EXPECTED[name]
+            row["frozen_speed_mean"] = es
+            row["frozen_uv_mean"] = euv
+            row["abs_diff_speed"] = abs(speed-es)
+            row["abs_diff_uv"] = abs(uv-euv)
+        else:
+            row["frozen_speed_mean"] = ""
+            row["frozen_uv_mean"] = ""
+            row["abs_diff_speed"] = ""
+            row["abs_diff_uv"] = ""
+        summary.append(row)
+
+    summary_csv = outdir / "ssim_summary_current_topology_inspired.csv"
+    sf = ["method","n","ssim_speed_mean","ssim_uv_mean","frozen_speed_mean","frozen_uv_mean","abs_diff_speed","abs_diff_uv"]
+    with summary_csv.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=sf); w.writeheader(); w.writerows(summary)
+
+    print("\nSUMMARY")
+    for r in summary:
+        print(f"{r['method']:24s} n={r['n']:3d} speed={r['ssim_speed_mean']:.6f} uv_mean={r['ssim_uv_mean']:.6f}")
+        if r["method"] in EXPECTED:
+            print(f"  frozen target: speed={r['frozen_speed_mean']:.6f} uv_mean={r['frozen_uv_mean']:.6f}")
+            print(f"  abs diff:      speed={r['abs_diff_speed']:.3e} uv_mean={r['abs_diff_uv']:.3e}")
+
+    print(f"\nWrote: {per_sample}")
+    print(f"Wrote: {summary_csv}")
+    print("\nIMPORTANT: only use the topology-inspired SSIM on the poster if the CNN/control")
+    print("sanity-check means reproduce the frozen values closely. If they do not, recover")
+    print("the original clean-SSIM helper/convention rather than tuning this script to fit.")
+
+if __name__ == "__main__":
+    main()
+```
+
+The key convention in this helper was:
+
+```python
+dr = float(np.max(gt) - np.min(gt))
+structural_similarity(gt, sr, data_range=dr)
+```
+
+This later proved to differ from the historical audited helper.
+
+## XXXVII.4 Locate the historical SSIM implementation
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+echo
+echo "===== POSSIBLE SSIM SCRIPTS ====="
+find . -maxdepth 4 -type f \
+  \( -iname '*ssim*.py' -o -iname '*ssim*.sh' \) \
+  -print | sort
+```
+
+### Output
+
+```text
+===== POSSIBLE SSIM SCRIPTS =====
+./scripts/add_ssim_to_merged.py
+./scripts/recompute_scale_sweep_ssim.py
+./scripts/recompute_topology_inspired_ssim.py
+```
+
+The historical clean-SSIM source was therefore recovered as:
+
+```text
+scripts/recompute_scale_sweep_ssim.py
+```
+
+## XXXVII.5 Inspect the historical SSIM helper
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+echo "===== ORIGINAL SSIM SCRIPT: SETUP / PATHS / FUNCTIONS ====="
+sed -n '1,220p' scripts/recompute_scale_sweep_ssim.py
+```
+
+### Crucial recovered implementation
+
+```python
+def safe_range(a: np.ndarray, b: np.ndarray) -> float:
+    """Use combined dynamic range, with a small fallback for constant fields."""
+    lo = float(min(np.nanmin(a), np.nanmin(b)))
+    hi = float(max(np.nanmax(a), np.nanmax(b)))
+    r = hi - lo
+    if not np.isfinite(r) or r <= 1e-12:
+        r = 1.0
+    return r
+
+
+def compute_sample_ssim(gt_uv: np.ndarray, sr_uv: np.ndarray):
+    gt_u = np.asarray(gt_uv[..., 0], dtype=np.float64)
+    gt_v = np.asarray(gt_uv[..., 1], dtype=np.float64)
+    sr_u = np.asarray(sr_uv[..., 0], dtype=np.float64)
+    sr_v = np.asarray(sr_uv[..., 1], dtype=np.float64)
+
+    gt_speed = np.sqrt(gt_u * gt_u + gt_v * gt_v)
+    sr_speed = np.sqrt(sr_u * sr_u + sr_v * sr_v)
+
+    u_val = ssim(gt_u, sr_u, data_range=safe_range(gt_u, sr_u))
+    v_val = ssim(gt_v, sr_v, data_range=safe_range(gt_v, sr_v))
+    speed_val = ssim(gt_speed, sr_speed,
+                     data_range=safe_range(gt_speed, sr_speed))
+    uv_val = 0.5 * (u_val + v_val)
+
+    return float(u_val), float(v_val), float(uv_val), float(speed_val)
+```
+
+### Root cause of the first discrepancy
+
+The historical helper uses the **combined GT + SR dynamic range** per sample:
+
+```text
+R_historical = max(max(GT), max(SR)) - min(min(GT), min(SR))
+```
+
+The provisional helper used a **GT-only** range:
+
+```text
+R_diagnostic = max(GT) - min(GT)
+```
+
+Therefore the first topology-inspired SSIM result was not directly comparable to the frozen historical analysis and was not used as the authoritative poster value.
+
+## XXXVII.6 Verify GT arrays are identical across the three methods
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+python3 - <<'PY'
+import numpy as np
+from pathlib import Path
+
+paths = {
+    "CNN": Path("data_out_fixed/wind_mrhr_cnn"),
+    "Reconstruction-only": Path("data_out/wind_finetune_candidateUV_expanded2688"),
+    "Topology-inspired": Path("data_out/wind_finetune_candidateF_grad_E2_low_expanded2688"),
+}
+
+arr = {k: np.load(v/"dataGT.npy", mmap_mode="r") for k,v in paths.items()}
+
+for k,v in arr.items():
+    print(k, v.shape, v.dtype)
+
+names = list(arr)
+for i in range(len(names)):
+    for j in range(i+1, len(names)):
+        a,b = names[i], names[j]
+        x,y = arr[a], arr[b]
+        print(
+            f"{a} vs {b}:",
+            "equal =", np.array_equal(x,y),
+            "max_abs =", float(np.max(np.abs(x-y)))
+        )
+PY
+```
+
+### Output
+
+```text
+CNN (168, 500, 500, 2) float64
+Reconstruction-only (168, 500, 500, 2) float64
+Topology-inspired (168, 500, 500, 2) float64
+CNN vs Reconstruction-only: equal = True max_abs = 0.0
+CNN vs Topology-inspired: equal = True max_abs = 0.0
+Reconstruction-only vs Topology-inspired: equal = True max_abs = 0.0
+```
+
+### Conclusion
+
+All three methods use bit-for-bit identical GT arrays. The SSIM discrepancy was therefore not caused by different GT data, cropping, sample ordering, or GT precision.
+
+
+## XXXVII.7 Compare old and provisional SSIM sample-by-sample
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 .venv_ssim/bin/python - <<'PY'
+import pandas as pd
+import numpy as np
+
+old = pd.read_csv(
+    "ttk_runs_fixed/ssim_recomputed_scale_sweep/"
+    "ssim_per_sample_scale_sweep.csv"
+)
+
+new = pd.read_csv(
+    "ttk_runs_fixed/ssim_recomputed_current_topology_inspired/"
+    "ssim_per_sample_current_topology_inspired.csv"
+)
+
+pairs = [
+    ("cnn", "pretrained_cnn"),
+    ("candidateUV_2688", "reconstruction_only"),
+]
+
+for old_name, new_name in pairs:
+    a = old[old["method"] == old_name].sort_values("sample_idx")
+    b = new[new["method"] == new_name].sort_values("sample_idx")
+
+    assert len(a) == len(b) == 168
+    assert np.array_equal(
+        a["sample_idx"].to_numpy(),
+        b["sample_idx"].to_numpy()
+    )
+
+    print("\n====================================")
+    print(old_name, "vs", new_name)
+    print("====================================")
+
+    for metric in ["ssim_speed", "ssim_u", "ssim_v", "ssim_uv_mean"]:
+        x = a[metric].to_numpy(float)
+        y = b[metric].to_numpy(float)
+        d = y - x
+
+        print(f"\n{metric}")
+        print(f"old mean     = {x.mean():.9f}")
+        print(f"new mean     = {y.mean():.9f}")
+        print(f"mean delta   = {d.mean():+.9e}")
+        print(f"median delta = {np.median(d):+.9e}")
+        print(f"max abs diff = {np.max(np.abs(d)):.9e}")
+        print(f"correlation  = {np.corrcoef(x,y)[0,1]:.9f}")
+
+    print("\nfirst 10 speed SSIM:")
+    out = pd.DataFrame({
+        "sample": a["sample_idx"].to_numpy()[:10],
+        "old": a["ssim_speed"].to_numpy()[:10],
+        "new": b["ssim_speed"].to_numpy()[:10],
+        "delta": (
+            b["ssim_speed"].to_numpy()[:10]
+            - a["ssim_speed"].to_numpy()[:10]
+        ),
+    })
+    print(out.to_string(index=False))
+PY
+```
+
+### Output — CNN
+
+```text
+====================================
+cnn vs pretrained_cnn
+====================================
+
+ssim_speed
+old mean     = 0.741175159
+new mean     = 0.737012735
+mean delta   = -4.162423689e-03
+median delta = -5.585507783e-04
+max abs diff = 5.058444235e-02
+correlation  = 0.983333827
+
+ssim_u
+old mean     = 0.774743263
+new mean     = 0.771286060
+mean delta   = -3.457203010e-03
+median delta = +0.000000000e+00
+max abs diff = 4.279831431e-02
+correlation  = 0.984641532
+
+ssim_v
+old mean     = 0.767317934
+new mean     = 0.764828973
+mean delta   = -2.488960892e-03
+median delta = +0.000000000e+00
+max abs diff = 2.979648802e-02
+correlation  = 0.995430177
+
+ssim_uv_mean
+old mean     = 0.771030598
+new mean     = 0.768057516
+mean delta   = -2.973081951e-03
+median delta = -1.297855530e-03
+max abs diff = 2.576691860e-02
+correlation  = 0.993333772
+
+first 10 speed SSIM:
+ sample      old      new     delta
+      0 0.791639 0.764657 -0.026982
+      1 0.782171 0.769903 -0.012267
+      2 0.780057 0.769403 -0.010654
+      3 0.770474 0.768537 -0.001936
+      4 0.769506 0.763108 -0.006398
+      5 0.761516 0.755908 -0.005608
+      6 0.756205 0.754032 -0.002173
+      7 0.752477 0.746003 -0.006473
+      8 0.746446 0.746250 -0.000196
+      9 0.744682 0.737915 -0.006767
+```
+
+### Output — reconstruction-only control
+
+```text
+====================================
+candidateUV_2688 vs reconstruction_only
+====================================
+
+ssim_speed
+old mean     = 0.813442828
+new mean     = 0.813075482
+mean delta   = -3.673455780e-04
+median delta = -1.299627302e-04
+max abs diff = 8.184887189e-03
+correlation  = 0.999625395
+
+ssim_u
+old mean     = 0.855590198
+new mean     = 0.855517269
+mean delta   = -7.292887142e-05
+median delta = +0.000000000e+00
+max abs diff = 4.003471831e-03
+correlation  = 0.999894671
+
+ssim_v
+old mean     = 0.851510832
+new mean     = 0.851332494
+mean delta   = -1.783377198e-04
+median delta = +0.000000000e+00
+max abs diff = 4.931768596e-03
+correlation  = 0.999877837
+
+ssim_uv_mean
+old mean     = 0.853550515
+new mean     = 0.853424882
+mean delta   = -1.256332956e-04
+median delta = +0.000000000e+00
+max abs diff = 2.465884298e-03
+correlation  = 0.999921423
+
+first 10 speed SSIM:
+ sample      old      new         delta
+      0 0.834634 0.834590 -4.444049e-05
+      1 0.837765 0.837666 -9.941238e-05
+      2 0.834098 0.834005 -9.364174e-05
+      3 0.833125 0.832498 -6.274159e-04
+      4 0.827488 0.826911 -5.768358e-04
+      5 0.828119 0.827805 -3.136335e-04
+      6 0.828899 0.828730 -1.688585e-04
+      7 0.820467 0.819804 -6.626099e-04
+      8 0.817872 0.817872  8.770762e-15
+      9 0.814067 0.813668 -3.986832e-04
+```
+
+The sample-wise comparison confirmed that the close reconstruction-only mean was not enough to validate the provisional convention. The CNN discrepancy was systematic and much larger.
+
+## XXXVII.8 Exact historical-convention recomputation for the current topology-inspired model
+
+The final closeout imported the historical helper directly from `scripts/recompute_scale_sweep_ssim.py`, eliminating any reimplementation ambiguity.
+
+### Command
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 .venv_ssim/bin/python - <<'PY'
+from pathlib import Path
+import importlib.util
+import numpy as np
+import pandas as pd
+
+ROOT = Path.cwd()
+
+script_path = ROOT / "scripts" / "recompute_scale_sweep_ssim.py"
+
+spec = importlib.util.spec_from_file_location(
+    "historical_ssim",
+    script_path
+)
+hist = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(hist)
+
+print("Using historical function from:")
+print(script_path)
+print()
+
+METHODS = {
+    "pretrained_cnn":
+        ROOT / "data_out_fixed" / "wind_mrhr_cnn",
+
+    "reconstruction_only":
+        ROOT / "data_out" /
+        "wind_finetune_candidateUV_expanded2688",
+
+    "topology_inspired":
+        ROOT / "data_out" /
+        "wind_finetune_candidateF_grad_E2_low_expanded2688",
+}
+
+rows = []
+
+for method, d in METHODS.items():
+    idx, gt, sr = hist.load_arrays(d)
+    print(f"[compute] {method}: {d}")
+
+    for i in range(len(idx)):
+        u_s, v_s, uv_s, speed_s = hist.compute_sample_ssim(
+            gt[i], sr[i]
+        )
+
+        rows.append({
+            "sample_idx": int(idx[i]),
+            "method": method,
+            "ssim_u": u_s,
+            "ssim_v": v_s,
+            "ssim_uv_mean": uv_s,
+            "ssim_speed": speed_s,
+        })
+
+df = pd.DataFrame(rows)
+
+old_path = (
+    ROOT /
+    "ttk_runs_fixed" /
+    "ssim_recomputed_scale_sweep" /
+    "ssim_per_sample_scale_sweep.csv"
+)
+old = pd.read_csv(old_path)
+
+checks = [
+    ("cnn", "pretrained_cnn"),
+    ("candidateUV_2688", "reconstruction_only"),
+]
+
+print("\n" + "=" * 72)
+print("EXACT HISTORICAL-CONVENTION PARITY CHECK")
+print("=" * 72)
+
+all_pass = True
+
+for old_name, new_name in checks:
+    a = (
+        old[old["method"] == old_name]
+        .sort_values("sample_idx")
+        .reset_index(drop=True)
+    )
+
+    b = (
+        df[df["method"] == new_name]
+        .sort_values("sample_idx")
+        .reset_index(drop=True)
+    )
+
+    assert len(a) == len(b) == 168
+    assert np.array_equal(
+        a["sample_idx"].to_numpy(),
+        b["sample_idx"].to_numpy(),
+    )
+
+    print(f"\n{old_name} -> {new_name}")
+
+    for metric in [
+        "ssim_speed",
+        "ssim_u",
+        "ssim_v",
+        "ssim_uv_mean",
+    ]:
+        x = a[metric].to_numpy(float)
+        y = b[metric].to_numpy(float)
+
+        maxdiff = float(np.max(np.abs(x - y)))
+        passed = maxdiff < 1e-12
+        all_pass &= passed
+
+        print(
+            f"{metric:14s} "
+            f"old_mean={x.mean():.9f} "
+            f"new_mean={y.mean():.9f} "
+            f"max_abs_diff={maxdiff:.3e} "
+            f"{'PASS' if passed else 'FAIL'}"
+        )
+
+print("\n" + "=" * 72)
+print("CURRENT THREE-METHOD SSIM SUMMARY")
+print("=" * 72)
+
+summary = (
+    df.groupby("method", sort=False)
+      .agg(
+          n=("sample_idx", "size"),
+          speed_ssim=("ssim_speed", "mean"),
+          uv_ssim=("ssim_uv_mean", "mean"),
+          u_ssim=("ssim_u", "mean"),
+          v_ssim=("ssim_v", "mean"),
+      )
+      .reset_index()
+)
+
+print(summary.to_string(index=False, float_format=lambda x: f"{x:.9f}"))
+
+means = summary.set_index("method")
+
+print("\n" + "=" * 72)
+print("PAIRWISE MEAN DIFFERENCES")
+print("=" * 72)
+
+for metric in ["speed_ssim", "uv_ssim"]:
+    cnn = means.loc["pretrained_cnn", metric]
+    recon = means.loc["reconstruction_only", metric]
+    topo = means.loc["topology_inspired", metric]
+
+    print(f"\n{metric}:")
+    print(f"  topology-inspired - pretrained CNN     = {topo-cnn:+.9f}")
+    print(f"  topology-inspired - reconstruction-only = {topo-recon:+.9f}")
+
+outdir = (
+    ROOT /
+    "ttk_runs_fixed" /
+    "ssim_recomputed_topology_inspired_historical_convention"
+)
+outdir.mkdir(parents=True, exist_ok=True)
+
+df.to_csv(outdir / "ssim_per_sample.csv", index=False)
+summary.to_csv(outdir / "ssim_summary.csv", index=False)
+
+print("\n" + "=" * 72)
+print(
+    "HISTORICAL CONVENTION PARITY:",
+    "PASS" if all_pass else "FAIL"
+)
+print("=" * 72)
+
+print("\nWrote:")
+print(outdir / "ssim_per_sample.csv")
+print(outdir / "ssim_summary.csv")
+PY
+```
+
+### Output
+
+```text
+Using historical function from:
+/home/adadhwal/PhIRE/scripts/recompute_scale_sweep_ssim.py
+
+[compute] pretrained_cnn: /home/adadhwal/PhIRE/data_out_fixed/wind_mrhr_cnn
+[compute] reconstruction_only: /home/adadhwal/PhIRE/data_out/wind_finetune_candidateUV_expanded2688
+[compute] topology_inspired: /home/adadhwal/PhIRE/data_out/wind_finetune_candidateF_grad_E2_low_expanded2688
+
+========================================================================
+EXACT HISTORICAL-CONVENTION PARITY CHECK
+========================================================================
+
+cnn -> pretrained_cnn
+ssim_speed     old_mean=0.741175159 new_mean=0.741175159 max_abs_diff=0.000e+00 PASS
+ssim_u         old_mean=0.774743263 new_mean=0.774743263 max_abs_diff=0.000e+00 PASS
+ssim_v         old_mean=0.767317934 new_mean=0.767317934 max_abs_diff=0.000e+00 PASS
+ssim_uv_mean   old_mean=0.771030598 new_mean=0.771030598 max_abs_diff=0.000e+00 PASS
+
+candidateUV_2688 -> reconstruction_only
+ssim_speed     old_mean=0.813442828 new_mean=0.813442828 max_abs_diff=1.110e-16 PASS
+ssim_u         old_mean=0.855590198 new_mean=0.855590198 max_abs_diff=1.110e-16 PASS
+ssim_v         old_mean=0.851510832 new_mean=0.851510832 max_abs_diff=1.110e-16 PASS
+ssim_uv_mean   old_mean=0.853550515 new_mean=0.853550515 max_abs_diff=1.110e-16 PASS
+
+========================================================================
+CURRENT THREE-METHOD SSIM SUMMARY
+========================================================================
+             method   n  speed_ssim     uv_ssim      u_ssim      v_ssim
+     pretrained_cnn 168 0.741175159 0.771030598 0.774743263 0.767317934
+reconstruction_only 168 0.813442828 0.853550515 0.855590198 0.851510832
+  topology_inspired 168 0.793188243 0.827230145 0.832138914 0.822321375
+
+========================================================================
+PAIRWISE MEAN DIFFERENCES
+========================================================================
+
+speed_ssim:
+  topology-inspired - pretrained CNN     = +0.052013084
+  topology-inspired - reconstruction-only = -0.020254585
+
+uv_ssim:
+  topology-inspired - pretrained CNN     = +0.056199546
+  topology-inspired - reconstruction-only = -0.026320370
+
+========================================================================
+HISTORICAL CONVENTION PARITY: PASS
+========================================================================
+
+Wrote:
+/home/adadhwal/PhIRE/ttk_runs_fixed/ssim_recomputed_topology_inspired_historical_convention/ssim_per_sample.csv
+/home/adadhwal/PhIRE/ttk_runs_fixed/ssim_recomputed_topology_inspired_historical_convention/ssim_summary.csv
+```
+
+## XXXVII.9 Accepted SSIM values and interpretation
+
+| Method | Speed SSIM | Mean u/v SSIM | Mean u SSIM | Mean v SSIM |
+|---|---:|---:|---:|---:|
+| Pretrained CNN | 0.741175159 | 0.771030598 | 0.774743263 | 0.767317934 |
+| Reconstruction-only fine-tuning | **0.813442828** | **0.853550515** | **0.855590198** | **0.851510832** |
+| Topology-inspired fine-tuning | 0.793188243 | 0.827230145 | 0.832138914 | 0.822321375 |
+
+Pairwise mean differences:
+
+```text
+speed SSIM:
+    topology-inspired - pretrained CNN      = +0.052013084
+    topology-inspired - reconstruction-only = -0.020254585
+
+mean u/v SSIM:
+    topology-inspired - pretrained CNN      = +0.056199546
+    topology-inspired - reconstruction-only = -0.026320370
+```
+
+Relative to reconstruction-only fine-tuning:
+
+```text
+speed SSIM change for topology-inspired:
+    approximately -2.49%
+
+mean u/v SSIM change for topology-inspired:
+    approximately -3.08%
+```
+
+Relative to the pretrained CNN:
+
+```text
+speed SSIM gain for topology-inspired:
+    approximately +7.02%
+
+mean u/v SSIM gain for topology-inspired:
+    approximately +7.29%
+```
+
+Preferred interpretation:
+
+> Reconstruction-only fine-tuning remains strongest on SSIM, while topology-inspired fine-tuning retains a substantial SSIM improvement over the pretrained CNN and shifts performance toward stronger structural, distributional, connectivity, and persistence agreement.
+
+This is a trade-off result, not universal dominance.
+
+The provisional GT-only-range SSIM run preserved the same ordering:
+
+```text
+CNN < topology-inspired < reconstruction-only
+```
+
+for both speed SSIM and mean-u/v SSIM. This supports the qualitative robustness of the ordering to the `data_range` convention, while the historical combined-range convention remains the authoritative one for poster/paper continuity.
+
+## XXXVII.10 Poster broader-metric refresh
+
+| Metric | Direction | Pretrained CNN | Reconstruction-only | Topology-inspired | Topology-inspired vs control |
+|---|---|---:|---:|---:|---:|
+| PSNRuv (dB) | higher | 31.1925 | **33.7892** | 32.4949 | report absolute dB, not % |
+| Speed SSIM | higher | 0.741175 | **0.813443** | 0.793188 | -2.49% |
+| Speed MAE (m/s) | lower | 0.6941 | **0.4958** | 0.5899 | -18.98% oriented improvement |
+| Speed RMSE (m/s) | lower | 1.1078 | **0.8555** | 0.9891 | -15.62% oriented improvement |
+| WPD MAE | lower | 231.6709 | **158.9769** | 190.6897 | -19.95% oriented improvement |
+| WPD Wasserstein-1 | lower | 45.2713 | 39.3927 | **24.7322** | +37.22% |
+| WPD absolute bias | lower | 35.3439 | 31.3033 | **22.6377** | +27.68% |
+| Gradient MAE | lower | 0.3491 | 0.3247 | **0.3125** | +3.76% |
+| Gradient Wasserstein-1 | lower | 0.2329 | 0.2496 | **0.1381** | +44.67% |
+| Component-count curve L1 | lower | 115.5278 | 141.9157 | **81.1815** | +42.80% |
+| Bottleneck d_B | lower | 3.124108 | 3.287864 | **2.149744** | +34.62% |
+| W2,infinity | lower | 19.152145 | 21.062447 | **14.325676** | +31.98% |
+| W2,2 | lower | 24.552151 | 27.508675 | **17.831897** | +35.18% |
+
+Notes:
+
+- `topology-inspired vs control` above uses the poster convention where positive means topology-inspired is better; negative means reconstruction-only is better.
+- PSNR is logarithmic, so the poster reports dB values directly instead of a percentage.
+- The concise narrative is a **multi-metric trade-off**: reconstruction-only fine-tuning maximizes pure conventional fidelity, whereas topology-inspired fine-tuning retains substantial fidelity gains over CNN while improving several structural/distributional measures and all three corrected PD distances.
+- The gains are not universal and should not be described as such.
+
+# Part XXXVIII — Poster TikZ artifact refresh, September 14, 2026
+
+The poster-preparation pass also generated a reusable TikZ artifact set. These are design/reproducibility artifacts rather than scientific evidence, but they are recorded here so the poster can be regenerated later.
+
+Generated source/output families:
+
+```text
+controlled_finetuning.tikz / .tex / .pdf / .png
+broader_effects.tikz       / .tex / .pdf / .png
+pd_mt_vertical.tikz        / .tex / .pdf / .png
+wind_sr_overlay.tikz       / .tex / .pdf / .png
+poster_tikz_refresh_20260914.zip
+figure_montage.png
+```
+
+The wind-SR schematic overlays grid lines directly on resampled wind-field imagery to save space and make the resolution concept visually concrete. It is explicitly labeled as schematic resampling rather than a literal experimental output.
+
+## XXXVIII.1 Controlled fine-tuning TikZ source
+
+```latex
+\begin{tikzpicture}[
+  font=\sffamily,
+  >={Latex[length=2.2mm]},
+  box/.style={rounded corners=3pt, draw=linegray, line width=.6pt, align=center, inner sep=6pt, minimum height=1.12cm},
+  arrow/.style={->, line width=1.0pt, draw=linegray}
+]
+
+\node[font=\bfseries\Large, text=tugreen] (title) at (0,0) {Controlled fine-tuning experiment};
+\node[font=\small, text=linegray] at (0,-0.55) {same pretrained initialization \;\textbullet\; same training data \;\textbullet\; same held-out benchmark};
+
+\node[box, fill=grayfill, text width=5.0cm] (pre) at (0,-1.85)
+{\textbf{Pretrained CNN}\\[-1pt]\small wind-field SR baseline};
+
+\node[box, fill=goldfill, text width=5.25cm] (recon) at (-3.5,-4.15)
+{\textbf{Reconstruction-only fine-tuning}\\[-1pt]\small reconstruction objective only};
+
+\node[box, fill=greenfill, text width=5.25cm] (topo) at (3.5,-4.15)
+{\textbf{Topology-inspired fine-tuning}\\[-1pt]\small reconstruction + gradient + TTK-derived supervision};
+
+\node[box, fill=grayfill, text width=5.1cm] (bench) at (0,-6.45)
+{\textbf{Same held-out benchmark}\\[-1pt]\small identical GT fields for every method};
+
+\node[box, fill=bluefill, text width=3.1cm] (fid) at (-4.25,-8.55)
+{\textbf{Fidelity}\\[-1pt]\small PSNR, SSIM, MAE/RMSE};
+\node[box, fill=goldfill, text width=3.5cm] (dom) at (0,-8.55)
+{\textbf{Domain / structure}\\[-1pt]\small WPD, gradients,\\[-1pt]\small thresholds};
+\node[box, fill=greenfill, text width=3.1cm] (tda) at (4.25,-8.55)
+{\textbf{Topology}\\[-1pt]\small PD and MT distances};
+
+\draw[arrow] (pre.south) -- ++(0,-.45) -| (recon.north);
+\draw[arrow] (pre.south) -- ++(0,-.45) -| (topo.north);
+\draw[arrow] (recon.south) -- ++(0,-.35) -| (bench.north);
+\draw[arrow] (topo.south) -- ++(0,-.35) -| (bench.north);
+\draw[arrow] (bench.south) -- (fid.north);
+\draw[arrow] (bench.south) -- (dom.north);
+\draw[arrow] (bench.south) -- (tda.north);
+
+\node[font=\small, text=linegray, align=center, text width=12.8cm] at (0,-9.9)
+{\textbf{Only the training objective changes.} The matched reconstruction-only branch tests whether gains arise from the auxiliary objective rather than continued fine-tuning alone.};
+
+\end{tikzpicture}
+```
+
+## XXXVIII.2 Broader-effects TikZ source
+
+```latex
+\begin{tikzpicture}[font=\sffamily]
+
+\begin{axis}[
+  name=baraxis,
+  xbar,
+  width=16.2cm,
+  height=10.6cm,
+  xmin=-25, xmax=50,
+  axis x line*=bottom,
+  axis y line*=left,
+  y axis line style={draw=none},
+  ytick style={draw=none},
+  xlabel={Oriented improvement (\%)},
+  xlabel style={font=\small},
+  title={Relative to matched reconstruction-only fine-tuning; positive values favor topology-inspired training},
+  title style={font=\small, text=linegray, yshift=2pt},
+  xtick={-20,-10,0,10,20,30,40,50},
+  xticklabel style={font=\scriptsize},
+  ytick={0,1,2,3,4,5,6,7,8},
+  yticklabels={
+    {$W_{2,2}$},
+    {$W_{2,\infty}$},
+    {Bottleneck $d_B$},
+    {Component curve $L_1$},
+    {Gradient $W_1$},
+    {WPD $W_1$},
+    {WPD MAE},
+    {Speed MAE},
+    {Speed SSIM}
+  },
+  yticklabel style={font=\small, align=right, text width=3.1cm},
+  bar width=8pt,
+  enlarge y limits=0.10,
+  grid=major,
+  grid style={draw=lightgray},
+  nodes near coords,
+  nodes near coords style={font=\scriptsize},
+  every axis plot/.append style={draw=none}
+]
+
+% positive: topology-inspired better
+\addplot[fill=topogreen] coordinates {
+  (35.2,0)
+  (32.0,1)
+  (34.6,2)
+  (42.8,3)
+  (44.7,4)
+  (37.2,5)
+};
+
+% negative: reconstruction-only better
+\addplot[fill=controlorange] coordinates {
+  (-19.9,6)
+  (-19.0,7)
+  (-2.5,8)
+};
+
+\draw[dashed, line width=.7pt, color=linegray] (axis cs:0,-0.7) -- (axis cs:0,8.7);
+
+\end{axis}
+
+\node[below=0.35cm of baraxis.south,
+      rounded corners=2pt, draw=linegray, fill=lightgray, line width=.5pt,
+      inner sep=5pt, font=\small, text width=15.2cm, align=left]
+{\textbf{PSNR is logarithmic, so report it directly:}
+reconstruction-only $33.79$ dB $\rightarrow$ topology-inspired $32.49$ dB; both remain above the pretrained CNN ($31.19$ dB).};
+
+\end{tikzpicture}
+```
+
+## XXXVIII.3 Vertical PD/MT explainer TikZ source
+
+```latex
+\begin{tikzpicture}[font=\sffamily]
+
+\node[anchor=west, font=\bfseries\Large, text=tugreen] at (0,0.45) {What do PDs and MTs capture?};
+
+% PD card
+\node[rounded corners=3pt, draw=gray, line width=.55pt, fill=white,
+      minimum width=15.8cm, minimum height=4.4cm, anchor=north west] (pdcard) at (0,0) {};
+\node[anchor=west, font=\bfseries\large, text=blue] at (0.35,-0.55) {Persistence diagram (PD)};
+\node[anchor=west, font=\small, text=gray] at (0.35,-1.05) {Which features persist, and for how long?};
+
+% PD graphic left
+\begin{scope}[shift={(0.75,-3.75)}]
+  \draw[->, line width=.8pt] (0,0) -- (0,2.1) node[left, font=\scriptsize] {death};
+  \draw[->, line width=.8pt] (0,0) -- (2.5,0) node[below, font=\scriptsize] {birth};
+  \draw[dashed, gray] (0,0) -- (2.0,2.0);
+  \fill[blue] (0.55,1.00) circle (2pt);
+  \fill[green] (0.90,1.55) circle (2pt);
+  \fill[orange] (1.25,1.95) circle (2pt);
+  \draw[<->, gray] (1.25,1.25) -- (1.25,1.95);
+  \node[font=\scriptsize, align=center, text=gray] at (2.9,1.62) {farther from diagonal\\$\Rightarrow$ more persistent};
+\end{scope}
+
+\node[anchor=west, align=left, font=\small, text width=8.3cm] at (6.7,-2.0)
+{\textbf{Summarizes birth/death values.} Useful for comparing the strength and lifetime of scalar-field features.\\[5pt]
+\textbf{Does not explicitly encode original spatial location.}};
+
+% MT card
+\node[rounded corners=3pt, draw=gray, line width=.55pt, fill=white,
+      minimum width=15.8cm, minimum height=4.4cm, anchor=north west] (mtcard) at (0,-4.75) {};
+\node[anchor=west, font=\bfseries\large, text=blue] at (0.35,-5.30) {Merge tree (MT)};
+\node[anchor=west, font=\small, text=gray] at (0.35,-5.80) {How are connected regions organized and merged?};
+
+% Tree graphic left
+\begin{scope}[shift={(2.10,-8.80)}]
+  \fill[orange] (0,2.15) circle (2.2pt);
+  \fill[green]  (-0.95,1.38) circle (2.2pt);
+  \fill[green]  (0.95,1.38) circle (2.2pt);
+  \fill[blue]   (-1.55,0.42) circle (2.2pt);
+  \fill[blue]   (-0.40,0.42) circle (2.2pt);
+  \fill[blue]   (0.40,0.42) circle (2.2pt);
+  \fill[blue]   (1.55,0.42) circle (2.2pt);
+  \draw[line width=.9pt] (0,2.15) -- (-0.95,1.38) -- (-1.55,0.42);
+  \draw[line width=.9pt] (-0.95,1.38) -- (-0.40,0.42);
+  \draw[line width=.9pt] (0,2.15) -- (0.95,1.38) -- (0.40,0.42);
+  \draw[line width=.9pt] (0.95,1.38) -- (1.55,0.42);
+\end{scope}
+
+\node[anchor=west, align=left, font=\small, text width=8.3cm] at (6.7,-6.75)
+{\textbf{Retains hierarchy and ancestry.} Useful for comparing how threshold-connected regions appear, merge, and organize into branches.\\[5pt]
+\textbf{Adds structural information beyond persistence alone.}};
+
+\node[rounded corners=3pt, draw=gray, fill=light, line width=.5pt,
+      align=center, font=\small, text width=14.9cm, inner sep=5pt, anchor=north west]
+      at (0,-9.55)
+{\textbf{Complementary views:} PD emphasizes feature persistence; MT additionally emphasizes merge hierarchy.};
+
+\end{tikzpicture}
+```
+
+## XXXVIII.4 Wind-SR overlay TikZ source
+
+```latex
+\begin{tikzpicture}[font=\sffamily, >={Latex[length=2.0mm]}]
+
+\node[font=\bfseries\Large, text=tugreen] at (0,0.55) {Wind-field super-resolution across the same physical region};
+
+% helper macro: image + grid
+\newcommand{\gridpanel}[5]{%
+  \begin{scope}[shift={(#1,#2)}]
+    \node[inner sep=0pt, anchor=south west] (img) at (0,0)
+      {\includegraphics[width=4.3cm,height=4.3cm]{#3}};
+    \draw[line width=.7pt, black!65] (0,0) rectangle (4.3,4.3);
+    \foreach \x in {#4} {\draw[white, opacity=.58, line width=.38pt] (\x,0) -- (\x,4.3);} 
+    \foreach \y in {#4} {\draw[white, opacity=.58, line width=.38pt] (0,\y) -- (4.3,\y);} 
+    \node[font=\bfseries\small, align=center] at (2.15,-0.43) {#5};
+  \end{scope}%
+}
+
+% 4x4-ish grid positions
+\gridpanel{-7.2}{-5.0}{assets/wind_coarse.png}{1.075,2.15,3.225}{Coarse field\\large cells / limited detail}
+% 8x8-ish grid positions
+\gridpanel{-2.15}{-5.0}{assets/wind_medium.png}{0.5375,1.075,1.6125,2.15,2.6875,3.225,3.7625}{SR input\\intermediate detail}
+% 16x16-ish grid positions
+\gridpanel{2.90}{-5.0}{assets/wind_fine.png}{0.26875,0.5375,0.80625,1.075,1.34375,1.6125,1.88125,2.15,2.41875,2.6875,2.95625,3.225,3.49375,3.7625,4.03125}{Fine target / reconstruction\\fine-scale detail}
+
+\draw[->, line width=1.0pt, gray] (-2.75,-2.85) -- (-2.30,-2.85);
+\node[font=\scriptsize, text=gray] at (-2.52,-2.45) {more resolution};
+\draw[->, line width=1.0pt, gray] (2.30,-2.85) -- (2.75,-2.85);
+\node[font=\scriptsize, text=gray] at (2.52,-2.45) {more resolution};
+
+\node[font=\small, text=gray, align=center, text width=13.8cm] at (0,-6.25)
+{Same physical region; grid density increases while finer wind structure becomes visible.\\[-1pt]
+\scriptsize Schematic resampling of one held-out wind field; grid densities are illustrative.};
+
+\end{tikzpicture}
+```
+
+## XXXVIII.5 Poster public terminology frozen for this refresh
+
+Use the following public-facing names in poster/slides rather than internal experiment IDs:
+
+```text
+Pretrained CNN
+Reconstruction-only fine-tuning
+Topology-inspired fine-tuning
+```
+
+Current topology-inspired objective represented conceptually as:
+
+```text
+reconstruction + gradient + TTK-derived critical-value supervision
+               + TTK-derived persistence supervision
+```
+
+Important wording boundary:
+
+> These are differentiable topology-inspired proxy losses. The final persistence-diagram and merge-tree distances remain post-hoc evaluation measures.
+
+# September 14 update takeaway
+
+The September 14 closeout adds two reproducibility items to the existing audit record:
+
+1. **SSIM is now closed for the current topology-inspired model under the exact historical clean-SSIM convention.** Historical CNN and reconstruction-only anchors reproduce to floating-point precision, and the accepted topology-inspired means are speed SSIM `0.793188243` and mean-u/v SSIM `0.827230145`.
+2. **Poster figures now have preserved TikZ sources.** The controlled fine-tuning, broader-effects, PD/MT explainer, and wind-SR resolution schematics can therefore be regenerated independently of the slide/poster editor.
+
+The central scientific interpretation remains unchanged: the topology-inspired model should be presented as a strong balanced structural/persistence candidate, not as a universal winner on every metric.
 
