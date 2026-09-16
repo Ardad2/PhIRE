@@ -1,6 +1,6 @@
 # Dataset Generation and Repair Notes
 
-**Last consolidated update:** September 14, 2026  
+**Last consolidated update:** September 15, 2026  
 **Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. The corrected persistence-diagram distance layer has now also completed an independent GUDHI audit across all 8,568 GT-SR comparisons with 8,568 PASS, zero mismatches/errors, exact bottleneck agreement, and maximum aggregate W2 discrepancy 1.0178524689763435e-12. The GUDHI persistence-distance audit is now fully preserved with an exported environment, version manifest, per-artifact SHA-256 manifest, and a hash-frozen archive.  Final human visual review of the six composites and any separate repository/figure archival tasks should still be recorded independently. On September 14, 2026, the clean-environment SSIM audit for the current topology-inspired model was also closed: the exact historical SSIM implementation reproduced the frozen CNN and reconstruction-only controls to floating-point precision, and the accepted topology-inspired means are speed SSIM = 0.793188243 and mean-u/v SSIM = 0.827230145. Poster-preparation figures and their TikZ sources were also regenerated and preserved as a separate design-artifact bundle.
 
 
@@ -27307,3 +27307,3480 @@ The September 14 closeout adds two reproducibility items to the existing audit r
 
 The central scientific interpretation remains unchanged: the topology-inspired model should be presented as a strong balanced structural/persistence candidate, not as a universal winner on every metric.
 
+
+
+---
+
+# September 15, 2026 — Cross-toolkit Join-Tree semantic/structural audit
+
+## Purpose
+
+This stage investigates whether the colleague toolkit's already-existing
+hierarchical Join-Tree builder can be adapted to regular 2D scalar-grid data
+and compared structurally with the audited TTK Join Tree used in the PhIRE
+wind-field study.
+
+This is intentionally separated from the already-closed persistence-diagram
+cross-toolkit study.
+
+The current semantic boundary is:
+
+```text
+TTK project MT:
+    true Join Tree / merge hierarchy
+    retains parent-child merge organization
+    evaluated with audited TTK MergeTreeDistance
+
+colleague toolkit current 2D scalar-field visualization:
+    get_merge_tree_graph_2d()
+    uses finite H0 persistence-pair cofaces
+    directly adds birth/death-pair edges
+    does not reconstruct the same full hierarchical Join Tree
+
+colleague toolkit dormant/alternate hierarchical path:
+    _build_join_tree_graph()
+    union-find scalar sweep
+    used by the point-cloud path
+    potentially adaptable to explicit regular-grid adjacency
+```
+
+The immediate question is therefore **not** whether the two MT distances agree.
+The first question is:
+
+> When `_build_join_tree_graph()` is supplied with a regular-grid adjacency,
+> does it produce a connected, tree-like merge hierarchy on a controlled 2D
+> scalar field, and how does that structure differ from the current
+> `get_merge_tree_graph_2d()` H0-pair graph?
+
+Only if that first structural test succeeds should the study proceed to
+TTK-specific grid connectivity, simplification/branch-decomposition semantics,
+and any numerical tree-distance comparison.
+
+## Prepared compatibility harness
+
+A two-stage harness was prepared:
+
+```text
+phase1_synthetic_join_tree.py
+    controlled three-basin scalar field
+    compares:
+        current 2D H0-pair graph
+        hierarchical builder with 4-neighbor grid adjacency
+        hierarchical builder with 8-neighbor grid adjacency
+
+phase2_real_field.py
+    real wind-field structural test
+    intended first case: sample 69
+    compares structural summaries only
+    does not yet claim TTK distance parity
+```
+
+Local preserved artifact hashes:
+
+```text
+join_tree_harness_phase1.zip
+    sha256 = cbf69dc1b81af55322b8866c8dea1d55c05a36e3831dbb5b95cab78c717be7a4
+
+README.md
+    sha256 = 966a050148750573125a58461a6574a6095253349af513dad0d5744b6b27f6ab
+
+phase1_synthetic_join_tree.py
+    sha256 = 29ea1a31fb5e254e0f17d3f738b712305a9055a98d0279ca41ac666cc871d7c5
+
+phase2_real_field.py
+    sha256 = 740943c20039950084e01996e8e1670dc60d7310954d706351ae907981ddf327
+```
+
+These hashes refer to the chat-side preserved bundle created before server-side
+execution. A separate server-side manifest should be created after the scripts
+are installed/finalized on Spark.
+
+## Initial Phase-1 execution attempt — dependency failure before experiment
+
+First attempted command:
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 python3 join_tree_harness/phase1_synthetic_join_tree.py \
+  --repo ~/PhIRE/third_party/tda-toolkit-mapper \
+  --out ~/PhIRE/join_tree_harness/phase1_synthetic \
+  2>&1 | tee ~/PhIRE/join_tree_harness/phase1_synthetic.log
+```
+
+Observed failure:
+
+```text
+ModuleNotFoundError: No module named 'sklearn'
+```
+
+The failure occurred while importing:
+
+```text
+src/tda_toolkit/merge_tree.py
+```
+
+because that module imports:
+
+```python
+from sklearn.decomposition import PCA
+```
+
+at module load time.
+
+Interpretation:
+
+```text
+NO Join-Tree experiment had run yet.
+NO structural result had been generated.
+This was an environment/dependency failure only.
+```
+
+The regular-grid harness itself does not require PCA directly, but importing
+the colleague toolkit's `merge_tree.py` loads the point-cloud dependencies as
+part of the whole module.
+
+## Dependency declaration / interpreter audit
+
+The colleague toolkit's `pyproject.toml` explicitly declares:
+
+```text
+scikit-learn>=1.3
+```
+
+Interpreter checks showed:
+
+```text
+system /usr/bin/python3:
+    Python 3.12.3
+    numpy       present
+    networkx    present
+    matplotlib  present
+    gudhi       missing
+    sklearn     missing
+
+existing gudhi-audit environment:
+    numpy       present
+    matplotlib  present
+    gudhi       present
+    networkx    missing
+    sklearn     missing
+```
+
+The completed PD-audit environment was intentionally left untouched.
+
+## Failed environment-clone attempt
+
+An attempted:
+
+```bash
+micromamba create -y -n join-tree-audit --clone gudhi-audit
+```
+
+failed because the installed micromamba did not support `create --clone`.
+
+Interpretation:
+
+```text
+join-tree-audit was not created by this attempt.
+Subsequent "No such file or directory" errors for its Python executable were
+downstream consequences only.
+```
+
+No scientific result was affected.
+
+## Clean Join-Tree environment creation — environment itself created successfully
+
+A new clean environment was then created:
+
+```bash
+micromamba create -y \
+  -n join-tree-audit \
+  -c conda-forge \
+  python=3.12 \
+  pip
+```
+
+Observed prefix:
+
+```text
+/home/adadhwal/micromamba/envs/join-tree-audit
+```
+
+Observed Python package:
+
+```text
+Python 3.12.14
+```
+
+The environment creation transaction completed successfully.
+
+## Colleague-toolkit installation attempt — package build succeeded, environment isolation did not
+
+The toolkit was installed with:
+
+```bash
+REPO="$HOME/PhIRE/third_party/tda-toolkit-mapper"
+JT_PY="$HOME/micromamba/envs/join-tree-audit/bin/python"
+
+"$JT_PY" -m pip install "$REPO"
+```
+
+The toolkit wheel built successfully:
+
+```text
+tda_toolkit-0.1.0-py3-none-any.whl
+```
+
+with observed wheel SHA-256:
+
+```text
+cd5fb4c4bfbe41324212a875453375f9b4a8b4a4c0315857bcf6969b2653c41b
+```
+
+`scikit-learn 1.9.1` and its immediate dependencies were installed.
+
+However, the pip resolver reported several requirements as already satisfied
+from:
+
+```text
+/home/adadhwal/.local/lib/python3.12/site-packages
+```
+
+including observed examples:
+
+```text
+matplotlib 3.10.8
+numpy 2.4.2
+scipy 1.17.1
+```
+
+This is important because the later verification deliberately used:
+
+```text
+PYTHONNOUSERSITE=1
+```
+
+to test whether the new audit environment was actually self-contained.
+
+Under that isolated check, imports failed:
+
+```text
+numpy        FAIL ModuleNotFoundError
+scipy        FAIL ModuleNotFoundError
+networkx     FAIL ModuleNotFoundError
+matplotlib   FAIL ModuleNotFoundError
+gudhi        FAIL ModuleNotFoundError
+sklearn      FAIL because numpy is unavailable
+```
+
+and importing the colleague toolkit from the source checkout failed in:
+
+```text
+tda_toolkit/backends.py
+```
+
+at:
+
+```python
+import numpy as np
+```
+
+## Interpretation of the clean-environment failure
+
+This is **not** a Join-Tree algorithm failure.
+
+It establishes that the first clean-environment installation was not actually
+self-contained:
+
+```text
+environment creation:
+    PASS
+
+toolkit wheel build/install:
+    PASS
+
+isolated runtime dependency closure:
+    FAIL
+```
+
+Cause:
+
+> During `pip install "$REPO"`, pip could see packages in the user's
+> `~/.local/lib/python3.12/site-packages` and therefore treated NumPy,
+> Matplotlib, and SciPy as already satisfied outside the new environment.
+> When `PYTHONNOUSERSITE=1` was later enabled, those external packages became
+> invisible.
+
+In addition:
+
+```text
+networkx
+gudhi
+```
+
+were not available in the new environment during the isolated check.
+
+The TensorFlow warning emitted by pip:
+
+```text
+tensorflow 2.20.0 requires requests<3,>=2.21.0, which is not installed
+```
+
+came from the broader Python/user-site package context and is not relevant to
+the current Join-Tree harness, which does not use TensorFlow.
+
+## Corrective environment step — NEXT
+
+The cleanest corrective action is to install the required scientific stack
+explicitly into the `join-tree-audit` conda environment rather than allowing
+pip to satisfy dependencies from `~/.local`.
+
+Run:
+
+```bash
+cd ~/PhIRE
+
+micromamba install -y \
+  -n join-tree-audit \
+  -c conda-forge \
+  numpy \
+  scipy \
+  matplotlib \
+  networkx \
+  gudhi \
+  scikit-learn
+
+JT_PY="$HOME/micromamba/envs/join-tree-audit/bin/python"
+
+echo
+echo "===== ISOLATED CORE IMPORT CHECK ====="
+PYTHONNOUSERSITE=1 "$JT_PY" - <<'PY'
+mods = ["numpy", "scipy", "networkx", "matplotlib", "gudhi", "sklearn"]
+
+for m in mods:
+    try:
+        mod = __import__(m)
+        print(f"{m:12s} OK   version={getattr(mod, '__version__', 'n/a')}")
+    except Exception as e:
+        print(f"{m:12s} FAIL {type(e).__name__}: {e}")
+PY
+
+echo
+echo "===== COLLEAGUE MERGE-TREE IMPORT CHECK ====="
+
+REPO="$HOME/PhIRE/third_party/tda-toolkit-mapper"
+
+cd "$REPO"
+
+PYTHONNOUSERSITE=1 \
+PYTHONPATH="$REPO/src" \
+"$JT_PY" - <<'PY'
+import inspect
+
+from tda_toolkit.merge_tree import (
+    _build_join_tree_graph,
+    get_merge_tree_graph_2d,
+)
+
+print("merge_tree import: PASS")
+print("_build_join_tree_graph:", inspect.signature(_build_join_tree_graph))
+print("get_merge_tree_graph_2d:", inspect.signature(get_merge_tree_graph_2d))
+PY
+```
+
+Required gate before running Phase 1:
+
+```text
+all six core imports:
+    PASS
+
+merge_tree import:
+    PASS
+```
+
+If either gate fails, stop and diagnose the environment before running the
+synthetic experiment.
+
+## Phase-1 command after environment gate passes
+
+Only after the isolated module import succeeds:
+
+```bash
+cd ~/PhIRE
+
+JT_PY="$HOME/micromamba/envs/join-tree-audit/bin/python"
+
+PYTHONNOUSERSITE=1 \
+"$JT_PY" \
+join_tree_harness/phase1_synthetic_join_tree.py \
+  --repo ~/PhIRE/third_party/tda-toolkit-mapper \
+  --out ~/PhIRE/join_tree_harness/phase1_synthetic \
+  2>&1 | tee ~/PhIRE/join_tree_harness/phase1_synthetic.log
+```
+
+Then preserve/inspect:
+
+```bash
+cat ~/PhIRE/join_tree_harness/phase1_synthetic/summary.txt
+
+find ~/PhIRE/join_tree_harness/phase1_synthetic \
+  -maxdepth 1 -type f -print0 \
+  | sort -z \
+  | xargs -0 sha256sum \
+  > ~/PhIRE/join_tree_harness/phase1_synthetic_sha256.txt
+
+cat ~/PhIRE/join_tree_harness/phase1_synthetic_sha256.txt
+```
+
+## Current Join-Tree-audit status
+
+```text
+source-level semantic distinction:
+    ESTABLISHED
+
+test harness:
+    PREPARED
+
+dedicated clean environment:
+    CREATED
+
+isolated runtime dependency closure:
+    NOT YET COMPLETE
+
+Phase-1 synthetic structural experiment:
+    NOT YET RUN
+
+TTK-vs-colleague structural parity:
+    NOT YET TESTED
+
+TTK MergeTreeDistance parity:
+    NOT YET ATTEMPTED
+```
+
+Scientific interpretation at this checkpoint:
+
+> No new statement about merge-tree agreement or disagreement is justified yet.
+> The only current conclusion is that a dedicated isolated environment was
+> successfully created, but its first package-install pass leaked dependency
+> resolution to the user site. The next action is to make the environment
+> genuinely self-contained, verify the colleague merge-tree module imports
+> under `PYTHONNOUSERSITE=1`, and only then execute the controlled synthetic
+> Join-Tree test.
+
+
+
+## Phase-1 synthetic Join-Tree experiment — COMPLETE / PASS
+
+After repairing the dedicated `join-tree-audit` environment, the isolated
+runtime dependency check passed under:
+
+```text
+PYTHONNOUSERSITE=1
+```
+
+Observed versions:
+
+```text
+numpy        2.5.3
+scipy        1.18.1
+networkx     3.6.1
+matplotlib   3.11.1
+gudhi        3.13.0
+sklearn      1.9.1
+```
+
+`pip check` reported:
+
+```text
+No broken requirements found.
+```
+
+The colleague merge-tree module then imported successfully:
+
+```text
+merge_tree import: PASS
+
+_build_join_tree_graph:
+    (values: np.ndarray, adjacency: Dict[int, List[int]]) -> nx.DiGraph
+
+get_merge_tree_graph_2d:
+    (scalar_field: np.ndarray, direction: Literal[1, -1] = 1)
+    -> Tuple[nx.Graph, np.ndarray, np.ndarray]
+```
+
+### Phase-1 command
+
+```bash
+cd ~/PhIRE
+
+JT_PY="$HOME/micromamba/envs/join-tree-audit/bin/python"
+
+PYTHONNOUSERSITE=1 \
+"$JT_PY" \
+join_tree_harness/phase1_synthetic_join_tree.py \
+  --repo ~/PhIRE/third_party/tda-toolkit-mapper \
+  --out ~/PhIRE/join_tree_harness/phase1_synthetic \
+  2>&1 | tee ~/PhIRE/join_tree_harness/phase1_synthetic.log
+```
+
+The controlled scalar field had shape:
+
+```text
+17 x 23
+```
+
+### Current 2D scalar-field route
+
+For:
+
+```text
+get_merge_tree_graph_2d()
+```
+
+the returned graph had:
+
+```text
+directed: False
+nodes: 274
+edges: 287
+components: 252
+is_tree_undirected: False
+leaves_degree1: 9
+branch_nodes_degree_ge3: 35
+self_loops: 265
+min_node_scalar: 1.2e-07
+max_node_scalar: 5.560000374
+```
+
+This is a strongly fragmented graph with many self-loops and is not an
+undirected tree.
+
+### Hierarchical builder with 4-neighbor regular-grid adjacency
+
+For:
+
+```text
+_build_join_tree_graph(flat_values, four_neighbor_grid_adjacency)
+```
+
+the returned graph had:
+
+```text
+directed: True
+nodes: 5
+edges: 4
+components: 1
+is_tree_undirected: True
+leaves_degree1: 3
+branch_nodes_degree_ge3: 1
+self_loops: 0
+min_node_scalar: 1.2e-07
+max_node_scalar: 1.080000198
+```
+
+### Hierarchical builder with 8-neighbor regular-grid adjacency
+
+For:
+
+```text
+_build_join_tree_graph(flat_values, eight_neighbor_grid_adjacency)
+```
+
+the returned graph had:
+
+```text
+directed: True
+nodes: 5
+edges: 4
+components: 1
+is_tree_undirected: True
+leaves_degree1: 3
+branch_nodes_degree_ge3: 1
+self_loops: 0
+min_node_scalar: 1.2e-07
+max_node_scalar: 0.960000175
+```
+
+### Phase-1 interpretation
+
+The predeclared diagnostics were:
+
+```text
+pair_route_fragmented: True
+hierarchical_4nbr_connected_tree: True
+```
+
+Therefore:
+
+> The source-level distinction is now confirmed empirically on a controlled
+> scalar field. The toolkit's current `get_merge_tree_graph_2d()` route returns
+> a fragmented H0 persistence-pair graph rather than a full merge hierarchy,
+> whereas the existing `_build_join_tree_graph()` routine can produce a
+> connected, acyclic hierarchical tree when supplied with explicit regular-grid
+> adjacency.
+
+This is a **semantic/structural result**, not yet a TTK parity result.
+
+A particularly useful sensitivity observation is that 4-neighbor and
+8-neighbor adjacency produced the same coarse combinatorial signature:
+
+```text
+5 nodes
+4 edges
+1 connected component
+3 leaves
+1 branch node
+0 self-loops
+```
+
+but did **not** produce exactly the same scalar hierarchy:
+
+```text
+4-neighbor max node scalar = 1.080000198
+8-neighbor max node scalar = 0.960000175
+```
+
+Thus grid connectivity affects merge levels even when the coarse tree shape is
+unchanged. This is important for any later comparison against TTK's
+triangulation/connectivity convention.
+
+### Phase-1 preservation manifest
+
+The generated Phase-1 artifacts were frozen with SHA-256:
+
+```text
+dcb7946fb8667a6e68a4bc4955717f9f5d7ccfea0c619179085ee7223ac24147  current_2d_pair_graph_edges.csv
+53990e2a6b84c109061844f23c087271599cec6487dd772a09064176946edd3b  current_2d_pair_graph_nodes.csv
+4c8e1481e38215f535c7c1866701cc7a6e0321d144c006551709cc8d8009789c  current_2d_pair_graph.png
+d7c987bf62c55f42252a175648a6be64251def533a58054272f1bc3a73c6926d  function_signatures.json
+f8b5dbc0d82c73ec8481f35bfdd5bf97ad68ddfb2a05b118a25fa050b244cb35  hierarchical_join_tree_4nbr_edges.csv
+afd7190889b6bc1c7326f4b50f44d54fa8038a2338ae7c5d4143ee8fed19e512  hierarchical_join_tree_4nbr_nodes.csv
+3defaccc4b038a5b172228e0f5443e50f4f16a192dd053e9243cee6cb5b53a7a  hierarchical_join_tree_4nbr.png
+af2493cfab85e3513e8d0ca9eb57a3c5985b0fcf6e6178790d315e2e6c40d415  hierarchical_join_tree_8nbr_edges.csv
+53d892917eaec970539cdb1a9044f655fc39bc38e93fc8273393856249dec83c  hierarchical_join_tree_8nbr_nodes.csv
+bd739081036fae5c69aec8221bccd4ba866500bc8a5b02c7911930f14cb15bc2  hierarchical_join_tree_8nbr.png
+1a000a463b36ac5419d22c35a569e1e1718739a69a0ce0886812ec8f4cf9094b  summary.json
+45ba954ce66f2418e2c867961602b236bfc3b6833bd4343c3b1368b3dc645e8b  summary.txt
+4daf6ab226f1180449554fd1153520fe30c00888d55f1f85bf2192db10722268  synthetic_field.npy
+0c5731d8ebe84f68a990135cd66a64fc0f7bd04c9bb729a6f5156387c28bf7ad  synthetic_field.png
+```
+
+### Phase-1 status
+
+```text
+dedicated isolated environment:
+    PASS
+
+colleague merge_tree import:
+    PASS
+
+current 2D H0-pair route:
+    empirically fragmented / non-tree on controlled field
+
+hierarchical regular-grid builder:
+    connected tree under both 4- and 8-neighbor adjacency
+
+semantic distinction:
+    CONFIRMED
+
+TTK equivalence:
+    NOT YET CLAIMED
+```
+
+## Next stage — real sample-69 structural comparison
+
+The next experiment should use the **same authoritative 160x160 top-left
+topology crop** already used for the corrected TTK/PD/MT sample-69 audit.
+
+Authoritative vector-array roots:
+
+```text
+Pretrained CNN:
+    data_out_fixed/wind_mrhr_cnn
+
+Reconstruction-only:
+    data_out/wind_finetune_candidateUV_expanded2688
+
+Topology-inspired F1:
+    data_out/wind_finetune_candidateF_grad_E2_low_expanded2688
+```
+
+All three roots have bit-identical GT arrays.
+
+The real-field Join-Tree harness must therefore:
+
+```text
+1. select sample 69;
+2. crop [:160, :160] before topology;
+3. compute wind_speed = sqrt(u^2 + v^2);
+4. use exact C-order flattening;
+5. run _build_join_tree_graph() separately under 4-neighbor and 8-neighbor
+   regular-grid adjacency;
+6. report only structural summaries at this stage;
+7. make no MergeTreeDistance-parity claim.
+```
+
+The TTK comparison reference remains:
+
+```text
+same 160x160 top-left topology crop
+C-order scalar layout
+sublevel Join Tree
+TTK threshold-0 numerical metric
+```
+
+The TTK qualitative threshold-3 tree is a separate simplified visualization
+and must not be numerically conflated with the unsimplified colleague tree.
+
+
+
+---
+
+
+## Phase-2 sample-69 real-field hierarchical builder — COMPLETE / PASS
+
+The authoritative sample-69 real-field harness was run with sample 69, the
+top-left 160 x 160 crop, wind_speed = hypot(u,v), and C-order flattening.
+GT identity passed exactly across CNN / UV / F1 roots.
+
+4-neighbor results:
+- GT: 2503 nodes / 2502 edges; 1 component; tree=True; DAG=True; longest path=368; leaves=1258; branch nodes>=3=1244; degree2=1; self-loops=0.
+- CNN: 1446 / 1445; 1 component; tree=True; DAG=True; longest path=289; leaves=726; branch nodes>=3=720; degree2=0; self-loops=0.
+- UV: 937 / 936; 1 component; tree=True; DAG=True; longest path=174; leaves=471; branch nodes>=3=465; degree2=1; self-loops=0.
+- F1: 2769 / 2768; 1 component; tree=True; DAG=True; longest path=539; leaves=1433; branch nodes>=3=1335; degree2=1; self-loops=0.
+
+8-neighbor results:
+- GT: 1701 / 1700; 1 component; tree=True; DAG=True; longest path=300; leaves=851; branch nodes>=3=849; degree2=1; self-loops=0.
+- CNN: 939 / 938; 1 component; tree=True; DAG=True; longest path=193; leaves=470; branch nodes>=3=468; degree2=1; self-loops=0.
+- UV: 625 / 624; 1 component; tree=True; DAG=True; longest path=131; leaves=313; branch nodes>=3=311; degree2=1; self-loops=0.
+- F1: 1150 / 1149; 1 component; tree=True; DAG=True; longest path=207; leaves=579; branch nodes>=3=570; degree2=1; self-loops=0.
+
+Structural conclusion:
+For every tested real field and for both regular-grid adjacency conventions,
+components=1, edges=nodes-1, the undirected graph is a tree, the directed graph
+is acyclic, and there are no self-loops. Thus the colleague toolkit's existing
+hierarchical `_build_join_tree_graph()` remains structurally well behaved on
+the authoritative wind-field grids. This still does NOT establish TTK
+equivalence.
+
+Connectivity sensitivity is large:
+- GT nodes: 2503 -> 1701 (32.0% reduction)
+- CNN: 1446 -> 939 (35.1%)
+- UV: 937 -> 625 (33.3%)
+- F1: 2769 -> 1150 (58.5%)
+
+The raw-complexity ordering changes:
+- 4-neighbor: F1 > GT > CNN > UV
+- 8-neighbor: GT > F1 > CNN > UV
+
+Therefore raw tree complexity must not be interpreted scientifically until the
+grid adjacency / triangulation convention is aligned.
+
+Previously audited original numerical TTK node counts for sample 69:
+- GT: 2193 nodes in CNN/UV provenance and 2195 nodes in F1 provenance; these GT trees are distance-zero equivalent under audited TTK MergeTreeDistance.
+- CNN SR: 1144 nodes.
+- UV SR: 808 nodes.
+- F1 SR: 1765 nodes.
+
+The colleague-builder counts bracket the TTK numerical counts:
+- GT: 1701 < 2193-2195 < 2503
+- CNN: 939 < 1144 < 1446
+- UV: 625 < 808 < 937
+- F1: 1150 < 1765 < 2769
+
+This is not proof of TTK's adjacency. It motivates testing the two consistent
+single-diagonal six-neighbor square-grid triangulations as candidate
+connectivities before any semantic parity claim.
+
+Phase-2 SHA-256 manifest:
+4c0993e79924abe85c0bfee3a7daf39adcfe0b1a6dfed586e831f7d6367a4500  CNN_join4_edges.csv
+7b18481a59f0407717fd530103d32ccc18149bdaa96d2469bafa236f6cf44b94  CNN_join4_nodes.csv
+663ce417d6d7c5c04850e8fcfcfd67b4b54518afec63255927a81261343318a5  CNN_join8_edges.csv
+4e5d1c9bdd375f48b3a3731b6875a121d38285a2d00b7f17f7468bee44aedf89  CNN_join8_nodes.csv
+6554330c19dbc63420e46642a9973775e52ba49825d157e2c056a0ad9958d2cf  CNN_sample069_speed_160.npy
+619c5a121acb4f298e7267c2e7fd32ac047feeb662fd3e4bfa9e61110e44ec19  F1_join4_edges.csv
+00cbf68eacdb3403028306a5df26708aeda90a18f5803f18445481da0b563a19  F1_join4_nodes.csv
+18c50c216c3d4081f3b27866af7c531d5194aeebf15da374a21ea2d97e18679a  F1_join8_edges.csv
+4d3d65327aef4dd7d5fc6b57ee1e05074da75410086b7fd4625777f955f2e162  F1_join8_nodes.csv
+fb4ffe1a593e0f27be1604681a2e041a670b5a3b4a6500d87d79eee8461e2569  F1_sample069_speed_160.npy
+0898b4f1da13fee7f75590dd7a1389b1747434e618aa09e812b9157cbd880a2c  GT_join4_edges.csv
+ffa8a0ebb2b8c7f7e4d94ceeb255b08c9e74875f195275a8a18849e8140e7c2a  GT_join4_nodes.csv
+c15306a128e4ae785fa8a797d4eebce82cd2254145e4d7fec68f2a1bbb524d93  GT_join8_edges.csv
+a2e69eb595f449ebb23a5d69be215677a21a19d586e6633374f138ff2c18c4a3  GT_join8_nodes.csv
+033be1889176194df2a70f8b4e55508c55c70fe271c53a306c35750a1fb24593  GT_sample069_speed_160.npy
+bda34a85e1b5bc52707094db95b7a60439f9a0f773d89551251a0b8b1cc1f78a  UV_join4_edges.csv
+4283b93e1cad06ead7456185b07fcce5bcc04c5ca22d66f4e21a8057cc121a0e  UV_join4_nodes.csv
+7807c67a73d09e923b1bd31988bbf218400bc4cd72b6f7e32fc94be25870ef26  UV_join8_edges.csv
+9804ae7e3b451fce04091c83f44de0cf3181c1ede6f1324ad9a3f0ccead78d76  UV_join8_nodes.csv
+84cb26b99bc21e862388ccc7ddc2732cd37a8620e66bdfa4dab37f2ea03bf260  UV_sample069_speed_160.npy
+6a5650e5715fe4b2e916e1081cf6113291c7545270f6ca8a9fb4837bbede0302  provenance.json
+41f1fb050a12678a4e54cfa416e07dd02ba1da1818e2a3e35a8934711dfd87a3  structural_summary.csv
+7f1646ac6d60d0be245416df45f6ac961b1a161abe3cb1161ad649f8342de14d  structural_summary.json
+
+Current cross-toolkit MT status:
+- current 2D H0-pair graph: not semantically equivalent to TTK Join Tree
+- dormant hierarchical builder on synthetic grid: PASS
+- dormant hierarchical builder on real sample-69 fields: PASS
+- regular-grid adjacency sensitivity: LARGE / confirmed
+- candidate TTK-like triangulation: NEXT
+- cross-toolkit MT distance parity: NOT YET ATTEMPTED
+
+
+
+---
+
+
+## Phase-3A candidate triangulation audit — COMPLETE / HIGHLY INFORMATIVE
+
+The exact Phase-2 sample-69 fields were rerun under four explicit regular-grid
+adjacency conventions:
+
+```text
+4:
+    cardinal neighbors only
+
+6_main:
+    cardinal + NW/SE diagonal
+
+6_anti:
+    cardinal + NE/SW diagonal
+
+8:
+    cardinal + both diagonals
+```
+
+The Phase-3A harness first required the already frozen 4-neighbor and
+8-neighbor node counts to reproduce exactly. Result:
+
+```text
+4/8-neighbor Phase-2 reproduction: PASS
+```
+
+All candidate graphs remained:
+
+```text
+tree = true
+DAG  = true
+```
+
+### Node-count comparison against frozen TTK numerical trees
+
+```text
+GT:
+    4       = 2503
+    6_main  = 1982
+    6_anti  = 2189
+    8       = 1701
+    TTK     = 2193-2195
+
+CNN:
+    4       = 1446
+    6_main  = 1229
+    6_anti  = 1143
+    8       =  939
+    TTK     = 1144
+
+UV:
+    4       = 937
+    6_main  = 755
+    6_anti  = 807
+    8       = 625
+    TTK     = 808
+
+F1:
+    4       = 2769
+    6_main  = 1791
+    6_anti  = 1764
+    8       = 1150
+    TTK     = 1765
+```
+
+Count-nearest convention for every field:
+
+```text
+GT   -> 6_anti, error = 4 relative to lower TTK GT count
+CNN  -> 6_anti, error = 1
+UV   -> 6_anti, error = 1
+F1   -> 6_anti, error = 1
+```
+
+Relative count errors:
+
+```text
+GT 6_anti:
+    -0.23% relative to midpoint of 2193-2195
+
+CNN 6_anti:
+    -0.09%
+
+UV 6_anti:
+    -0.12%
+
+F1 6_anti:
+    -0.06%
+```
+
+By comparison, `6_main` differs substantially more:
+
+```text
+GT:
+    -9.66%
+
+CNN:
+    +7.43%
+
+UV:
+    -6.56%
+
+F1:
+    +1.47%
+```
+
+### Interpretation
+
+This is much stronger evidence than the Phase-2 bracketing result.
+
+> The consistent NE/SW single-diagonal (`6_anti`) regular-grid adjacency
+> reproduces the *number* of hierarchical tree nodes from the audited TTK
+> numerical trees to within 1 node for CNN, UV, and F1, and within 4-6 nodes for
+> the GT representation.
+
+However, this remains a **count-level diagnostic**, not proof of semantic
+equivalence.
+
+The result must NOT yet be phrased as:
+
+```text
+"the colleague builder reproduces the TTK Join Tree"
+```
+
+or:
+
+```text
+"6_anti is definitely TTK's triangulation"
+```
+
+because near-identical node counts can occur without identical critical
+vertices, scalar merge levels, parent-child relationships, or branch
+decomposition.
+
+The result does justify promoting `6_anti` to the primary candidate adjacency
+for the next audit.
+
+### Why the residual +1 / GT residual difference is interesting but unresolved
+
+For CNN, UV, and F1:
+
+```text
+TTK node count = colleague 6_anti count + 1
+```
+
+The repeated one-node offset may reflect a representation convention such as a
+root / global-extremum node, but this must not be asserted without direct
+vertex and hierarchy comparison.
+
+GT differs by a few additional nodes. Possible causes include:
+
+```text
+tie handling
+degenerate critical events
+provenance/orientation differences
+TTK-specific triangulation details
+root/extremum bookkeeping
+```
+
+These are hypotheses only.
+
+### Next required gate
+
+Before any distance or hierarchy-parity experiment:
+
+```text
+1. source/API-check the exact TTK implicit 2D triangulation convention;
+2. extract VertexId sets from the original numerical threshold-0 TTK node VTUs;
+3. map historical CNN/UV VertexIds into authoritative C-order using the already
+   validated transpose bridge;
+4. compare those TTK critical vertices against the colleague 6_anti tree-node
+   vertex IDs;
+5. compare 6_main as a negative/control triangulation.
+```
+
+Primary evidence should be:
+
+```text
+set overlap
+Jaccard overlap
+TTK-only vertices
+colleague-only vertices
+scalar-value agreement at shared vertices
+```
+
+Only after vertex-level agreement is established should parent-child / edge
+agreement be tested.
+
+### Phase-3A preservation manifest
+
+```text
+f2cdefcc2f11e2538cdb7823dd96fb4e7c86fc0aa5599f41441ac5b3e62d9a4d  candidate_connectivity_summary.csv
+6fcc13ea5e3328239df1e267a4c07695743c390f47adecc8b05e591df8f01997  candidate_connectivity_summary.json
+```
+
+### Current status after Phase 3A
+
+```text
+2D H0-pair graph semantic mismatch:
+    CONFIRMED
+
+hierarchical builder on synthetic regular grid:
+    PASS
+
+hierarchical builder on real authoritative fields:
+    PASS
+
+connectivity sensitivity:
+    CONFIRMED / large
+
+best count-level candidate:
+    6_anti (cardinal + NE/SW diagonal)
+
+node-count agreement with TTK:
+    extremely close
+
+critical-vertex parity:
+    NOT YET TESTED
+
+hierarchy/edge parity:
+    NOT YET TESTED
+
+cross-toolkit MT distance parity:
+    NOT YET TESTED
+```
+
+
+---
+
+
+## Phase-3B preflight — artifact discovery PASS; source-level triangulation still unresolved
+
+The Phase-3B preflight produced two effectively duplicate pasted views of the
+same preserved log. The preserved preflight log SHA-256 is:
+
+```text
+62520b671f45c5832494906565351e0f687e2ca1c221590d8510614966f140b5
+```
+
+### Exact numerical MT artifacts confirmed
+
+The authoritative positive-scalar numerical MT node VTUs needed for the
+sample-69 comparison are present.
+
+CNN:
+
+```text
+ttk_runs_fixed/cnn/mt/
+    cnn_GT_s69_speed_p160_x0_y0_mt_port_0.vtu
+    cnn_SR_s69_speed_p160_x0_y0_mt_port_0.vtu
+```
+
+Observed:
+
+```text
+CNN GT:
+    points = 2193
+    arrays = NodeId, Scalar, VertexId, CriticalType, RegionSize, RegionSpan
+    first Scalar values are positive
+
+CNN SR:
+    points = 1144
+    same required arrays present
+    first Scalar values are positive
+```
+
+Matched reconstruction-only control:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_topology/mt/
+    GT/candidateUV_expanded2688_GT_s69_speed_p160_x0_y0_mt_port_0.vtu
+    SR/candidateUV_expanded2688_SR_s69_speed_p160_x0_y0_mt_port_0.vtu
+```
+
+Observed:
+
+```text
+UV GT:
+    points = 2193
+
+UV SR:
+    points = 808
+
+required NodeId / Scalar / VertexId / CriticalType arrays present
+positive scalar convention
+```
+
+Candidate F1:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology/mt/
+    GT/candidateF_grad_E2_low_expanded2688_GT_s69_speed_p160_x0_y0_mt_port_0.vtu
+    SR/candidateF_grad_E2_low_expanded2688_SR_s69_speed_p160_x0_y0_mt_port_0.vtu
+```
+
+Observed:
+
+```text
+F1 GT:
+    points = 2195
+
+F1 SR:
+    points = 1765
+
+required NodeId / Scalar / VertexId / CriticalType arrays present
+positive scalar convention
+```
+
+These counts exactly match the previously audited numerical-tree counts used in
+the sample-69 MT-distance work.
+
+### Important duplicate-family warning
+
+The filesystem search also found `superlevel_topology/...` artifacts with
+different node counts and negative scalar values, for example:
+
+```text
+superlevel_topology/candidateUV_expanded2688:
+    GT = 2075 nodes
+    SR = 765 nodes
+    Scalar values negative
+
+superlevel_topology/cnn:
+    GT = 2075 nodes
+    SR = 1086 nodes
+    Scalar values negative
+```
+
+These are **not** the authoritative positive-scalar numerical Join Trees used by
+the current sample-69 audited MT-distance comparison.
+
+The Phase-3B vertex comparison must use only:
+
+```text
+ttk_runs_fixed/cnn/mt
+ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_topology/mt
+ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology/mt
+```
+
+for CNN / UV / F1 respectively.
+
+### Source-level triangulation check
+
+The captured source grep confirms that merge-tree construction consumes the
+triangulation's `getVertexNeighbor*()` API, and the installed tree code
+preconditions vertex neighbors before use.
+
+However, the pasted preflight output did **not** preserve a decisive installed
+`ImplicitTriangulation` / Freudenthal implementation body establishing the
+exact 2D diagonal orientation.
+
+Therefore:
+
+```text
+6_anti:
+    extremely strong count-level candidate
+
+exact TTK diagonal orientation:
+    NOT YET source-proven
+```
+
+The next experiment should rely on stronger empirical evidence: direct
+critical-vertex overlap against the original TTK `VertexId` arrays.
+
+### Orientation rule frozen for vertex comparison
+
+The already-audited numerical-to-authoritative bridge remains:
+
+```text
+CNN / UV numerical trees:
+    legacy-transpose -> authoritative C-order
+
+F1 numerical trees:
+    identity -> authoritative C-order
+```
+
+For a legacy-transposed TTK VertexId `v` on a 160 x 160 grid:
+
+```text
+old_x = v % 160
+old_y = v // 160
+
+corrected_x = old_y
+corrected_y = old_x
+
+corrected_VertexId = corrected_x + 160 * corrected_y
+                   = old_y + 160 * old_x
+```
+
+### Phase-3B proper acceptance target
+
+For both `6_anti` and control `6_main`, compare:
+
+```text
+TTK corrected VertexId set
+vs.
+colleague hierarchical-builder node-ID set
+```
+
+Report:
+
+```text
+intersection
+Jaccard
+TTK recall
+colleague precision
+TTK-only vertices
+colleague-only vertices
+scalar agreement on shared vertices
+```
+
+The colleague graph node IDs must first be asserted to be valid original
+flattened grid-vertex IDs in `[0, 25600)`.
+
+No parent-child or distance-parity claim is allowed until this vertex-level
+gate is evaluated.
+
+
+---
+
+
+## Phase-3B critical-vertex overlap — COMPLETE / STRONG PASS
+
+The exact original sample-69 numerical TTK node VTUs were extracted and
+compared against node IDs from the colleague toolkit's hierarchical
+`_build_join_tree_graph()` using the two candidate six-neighbor grid
+triangulations.
+
+The extraction step reproduced the frozen numerical-tree counts exactly:
+
+```text
+CNN_GT = 2193
+CNN_SR = 1144
+UV_GT  = 2193
+UV_SR  = 808
+F1_GT  = 2195
+F1_SR  = 1765
+```
+
+The colleague graph-node IDs passed the semantic gate:
+
+```text
+integer original grid IDs:
+    PASS
+
+valid range [0, 25600):
+    PASS
+
+frozen Phase-3A node counts:
+    PASS
+```
+
+### 6_main control results
+
+The NW/SE single-diagonal convention remains a poor match:
+
+```text
+CNN_GT:
+    Jaccard = 0.391667
+    TTK recall = 0.535796
+    colleague precision = 0.592836
+
+CNN_SR:
+    Jaccard = 0.416716
+    TTK recall = 0.610140
+    colleague precision = 0.567941
+
+UV_SR:
+    Jaccard = 0.417044
+    TTK recall = 0.569307
+    colleague precision = 0.609272
+
+F1_SR:
+    Jaccard = 0.312661
+    TTK recall = 0.479887
+    colleague precision = 0.472920
+```
+
+This acts as a useful negative/control connectivity.
+
+### 6_anti primary-candidate results
+
+The NE/SW single-diagonal convention gives extremely high critical-vertex
+agreement.
+
+```text
+CNN_GT:
+    TTK nodes = 2193
+    colleague nodes = 2189
+    intersection = 2173
+    Jaccard = 0.983703
+    TTK recall = 0.990880
+    colleague precision = 0.992691
+    TTK-only = 20
+    colleague-only = 16
+
+UV_GT:
+    identical to CNN_GT
+
+F1_GT:
+    TTK nodes = 2195
+    colleague nodes = 2189
+    intersection = 2176
+    Jaccard = 0.985507
+    TTK recall = 0.991344
+    colleague precision = 0.994061
+    TTK-only = 19
+    colleague-only = 13
+
+CNN_SR:
+    TTK nodes = 1144
+    colleague nodes = 1143
+    intersection = 1143
+    Jaccard = 0.999126
+    TTK recall = 0.999126
+    colleague precision = 1.000000
+    TTK-only = 1
+    colleague-only = 0
+
+UV_SR:
+    TTK nodes = 808
+    colleague nodes = 807
+    intersection = 807
+    Jaccard = 0.998762
+    TTK recall = 0.998762
+    colleague precision = 1.000000
+    TTK-only = 1
+    colleague-only = 0
+
+F1_SR:
+    TTK nodes = 1765
+    colleague nodes = 1764
+    intersection = 1764
+    Jaccard = 0.999433
+    TTK recall = 0.999433
+    colleague precision = 1.000000
+    TTK-only = 1
+    colleague-only = 0
+```
+
+### Shared scalar-value agreement
+
+Maximum absolute TTK-vs-authoritative scalar discrepancy on shared vertices is
+of order `1e-6`:
+
+```text
+GT max:
+    ~6.9e-7
+
+CNN SR max:
+    ~1.09e-6
+
+UV SR max:
+    ~8.76e-7
+
+F1 SR max:
+    ~8.07e-7
+```
+
+This is consistent with storage / floating-point representation differences and
+shows that the shared node IDs refer to the same scalar-grid locations.
+
+### Phase-3B interpretation
+
+This is substantially stronger than the earlier count-level evidence.
+
+For each SR field:
+
+```text
+colleague 6_anti critical-node set
+    is an exact subset of
+TTK numerical-tree VertexId set
+
+and differs by exactly one TTK node.
+```
+
+Therefore, for CNN / UV / F1 sample 69:
+
+> After the already-audited CNN/UV transpose bridge and F1 identity mapping,
+> the colleague hierarchical builder with NE/SW six-neighbor adjacency recovers
+> every one of its critical vertices in the TTK numerical Join Tree, with TTK
+> containing only one additional node.
+
+This strongly supports the hypothesis that `6_anti` reproduces TTK's effective
+critical-vertex connectivity convention for these fields.
+
+It is still not yet a proof that the complete hierarchical trees are identical,
+because the following have not yet been compared:
+
+```text
+the identity/role of the one extra TTK SR node
+parent-child edges
+root handling
+branch decomposition
+tree-distance semantics
+```
+
+### Root/global-extremum hypothesis
+
+Earlier Phase-2 summaries showed that the colleague hierarchical builder's
+largest node scalar is below the full field maximum for CNN, UV, and F1.
+
+The repeated `TTK = colleague + 1` result, together with 100% colleague
+precision, makes a missing final root/global-extremum bookkeeping node a strong
+hypothesis.
+
+This must be checked directly before being stated as a result.
+
+For GT, the residual 19-20 TTK-only and 13-16 colleague-only vertices indicate
+a small additional disagreement beyond any single root node. Plausible causes
+include:
+
+```text
+float32 vs float64 ordering near almost-equal values
+tie-breaking / simulation-of-simplicity offsets
+critical-event bookkeeping
+small provenance/orientation differences
+```
+
+These are hypotheses only.
+
+### Phase-3B preservation hashes
+
+```text
+compare/sha256_manifest.txt:
+    bdb863ccf52870a6b2888a42d0a5f26bf33268923615cb33be02267dec8dab57
+
+vertex_overlap_differences.csv:
+    b48be7e6218cb6cd6a06bb3a4280cc3393c7c97b1e533cb4901b96d7648b754b
+
+vertex_overlap_summary.csv:
+    000a8f4c18b78c0c887890f871ad2f1444c866600f067082aed46988a56eb720
+
+vertex_overlap_summary.json:
+    760d83267169e23a8de6e73ca5851b237478458f4c69eb5468fa3e66c62a585c
+
+step1_extract.log:
+    0042ede006e2e62d31ae6065fb228236150cb8f9ebcb3de18228826318113e1d
+
+step2_compare.log:
+    e3210266f588ab91c58fd2ee5a7e0528a103a8785fbc354643132d76f736a347
+```
+
+TTK extraction CSV hashes:
+
+```text
+CNN_GT:
+    5a265153ad263d16d7f82d209b3dfc6687f2f3f8a6a721a4b24591ab2f973cdc
+
+CNN_SR:
+    8922ccee8beeb34dc1e8a2ea59344f3b54ce1acdec6dad3830aa5a21765631aa
+
+UV_GT:
+    5a265153ad263d16d7f82d209b3dfc6687f2f3f8a6a721a4b24591ab2f973cdc
+
+UV_SR:
+    a9908878e31c4881d205ecce9a7162ac29e86f45eaf4127b5c835c67ef8a1632
+
+F1_GT:
+    6d0a9ed30a221f19a3bf44f562dfb5316a3ccb2a22808befdac2925ae1983867
+
+F1_SR:
+    657e9321e92455fc988da70abc2100a014031402c78bc607db1fdea9b81854a7
+```
+
+### Current status after Phase 3B
+
+```text
+current 2D H0-pair graph:
+    NOT semantically equivalent to TTK Join Tree
+
+dormant hierarchical builder:
+    viable on synthetic and real grids
+
+best candidate connectivity:
+    6_anti (NE/SW single diagonal)
+
+node-count parity:
+    near-exact
+
+critical-vertex parity:
+    STRONG PASS
+    exact colleague subset for all three SR fields, missing one TTK node
+
+shared scalar parity:
+    PASS to ~1e-6
+
+root/global-extremum explanation:
+    NEXT DIAGNOSTIC
+
+edge/hierarchy parity:
+    NOT YET TESTED
+
+tree-distance parity:
+    NOT YET TESTED
+```
+
+
+---
+
+
+## Phase-3C root/global-extremum diagnosis and TTK edge-schema preflight — COMPLETE / PASS
+
+Phase 3C directly tested the repeated one-node discrepancy observed in the
+sample-69 SR critical-vertex comparison and inspected TTK's merge-tree arc
+output.
+
+### The single extra TTK SR node is the global maximum in all three models
+
+CNN SR:
+
+```text
+field argmin:
+    VertexId = 7202
+    scalar   = 0.06793790272250931
+
+field argmax:
+    VertexId = 24571
+    scalar   = 12.367745220033225
+
+single TTK-only 6_anti node:
+    VertexId      = 24571
+    TTK Scalar    = 12.367745399475098
+    field Scalar  = 12.367745220033225
+    CriticalType  = 3
+    is_argmin     = false
+    is_argmax     = true
+```
+
+Reconstruction-only / UV SR:
+
+```text
+field argmin:
+    VertexId = 17983
+    scalar   = 0.0878613396712799
+
+field argmax:
+    VertexId = 8703
+    scalar   = 12.158446282731274
+
+single TTK-only 6_anti node:
+    VertexId      = 8703
+    TTK Scalar    = 12.158445358276367
+    field Scalar  = 12.158446282731274
+    CriticalType  = 3
+    is_argmin     = false
+    is_argmax     = true
+```
+
+F1 SR:
+
+```text
+field argmin:
+    VertexId = 8662
+    scalar   = 0.03015645044556173
+
+field argmax:
+    VertexId = 22332
+    scalar   = 13.529099102502204
+
+single TTK-only 6_anti node:
+    VertexId      = 22332
+    TTK Scalar    = 13.529099464416504
+    field Scalar  = 13.529099102502204
+    CriticalType  = 3
+    is_argmin     = false
+    is_argmax     = true
+```
+
+Therefore the previously stated root/global-extremum hypothesis is now
+confirmed for all three SR fields:
+
+> The colleague hierarchical builder with `6_anti` recovers the full TTK
+> critical-vertex set except for TTK's final global-maximum/root node.
+
+The interpretation is specific to the current sample-69 SR fields and current
+builder semantics. It does not yet establish full edge/hierarchy parity.
+
+### GT mismatch also contains the global maximum but has additional residual differences
+
+For all three GT provenance tracks, the TTK-only set contains the authoritative
+field argmax:
+
+```text
+CNN_GT:
+    TTK-only = 20
+    contains argmax = true
+
+UV_GT:
+    TTK-only = 20
+    contains argmax = true
+
+F1_GT:
+    TTK-only = 19
+    contains argmax = true
+```
+
+The GT mismatch is therefore not explained solely by the global-root
+convention. Small additional critical-vertex differences remain and must be
+treated separately.
+
+### TTK port-1 merge-tree arc representation is directly usable
+
+For every authoritative numerical sample-69 tree, `_mt_port_1.vtu` exists.
+
+Observed schema:
+
+```text
+point arrays:
+    Scalar
+    ttkMaskScalarField
+
+cell arrays:
+    SegmentationId
+    upNodeId
+    downNodeId
+    RegionSize
+    RegionSpan
+```
+
+For all trees:
+
+```text
+number of port-1 points = number of port-0 nodes
+number of port-1 cells  = number of nodes - 1
+```
+
+Examples:
+
+```text
+CNN_GT:
+    points = 2193
+    cells  = 2192
+
+CNN_SR:
+    points = 1144
+    cells  = 1143
+
+UV_GT:
+    points = 2193
+    cells  = 2192
+
+UV_SR:
+    points = 808
+    cells  = 807
+
+F1_GT:
+    points = 2195
+    cells  = 2194
+
+F1_SR:
+    points = 1765
+    cells  = 1764
+```
+
+The `upNodeId` / `downNodeId` cell arrays provide a direct tree-arc
+representation keyed to the port-0 `NodeId` values. This makes a rigorous
+parent-child/edge comparison possible without inferring arcs from geometric
+polyline coordinates.
+
+### Phase-3C preservation hashes
+
+```text
+port1_inventory.json:
+    8608ba34a628b840275ce4e3e9fabc465e405559870ef8a43123f718c57652c1
+
+ttk_only_root_diagnostic.json:
+    01b8c5af8ab335cf0c815198cd276631718100aa13830df55799f8a5863b07de
+```
+
+### Current status after Phase 3C
+
+```text
+6_anti critical-vertex parity:
+    STRONG PASS
+
+single SR residual TTK node:
+    IDENTIFIED
+    global maximum / root in CNN, UV, and F1
+
+GT residual mismatch:
+    small but not root-only
+
+TTK arc representation:
+    IDENTIFIED
+    port-1 cell arrays upNodeId/downNodeId
+
+edge/hierarchy parity:
+    NEXT
+
+tree-distance parity:
+    NOT YET TESTED
+```
+
+
+---
+
+
+## Phase-3D edge / hierarchy overlap — COMPLETE / EXACT SR PARITY UP TO ROOT
+
+The exact TTK `port_0` NodeId->VertexId map and `port_1`
+`downNodeId`/`upNodeId` arc tables were extracted successfully for the six
+authoritative sample-69 numerical trees:
+
+```text
+CNN_GT: 2193 nodes / 2192 edges
+CNN_SR: 1144 nodes / 1143 edges
+UV_GT:  2193 nodes / 2192 edges
+UV_SR:   808 nodes /  807 edges
+F1_GT:  2195 nodes / 2194 edges
+F1_SR:  1765 nodes / 1764 edges
+```
+
+The colleague hierarchical builder was reconstructed with both the `6_main`
+control connectivity and the `6_anti` primary candidate, with all comparisons
+performed in authoritative C-order VertexId space after the already-audited
+CNN/UV transpose bridge.
+
+### SR result: exact hierarchy parity after removing TTK's explicit global root
+
+For all three SR fields, `6_anti` produced the exact same hierarchy on all
+shared critical vertices:
+
+```text
+CNN_SR / 6_anti:
+    common nodes = 1143
+    raw edge Jaccard = 0.999125
+    common-induced edge Jaccard = 1.000000
+    common TTK edge recall = 1.000000
+    common colleague edge precision = 1.000000
+    scalar-directed edge Jaccard = 1.000000
+    TTK-only nodes = 1
+    colleague-only nodes = 0
+
+UV_SR / 6_anti:
+    common nodes = 807
+    raw edge Jaccard = 0.998761
+    common-induced edge Jaccard = 1.000000
+    common TTK edge recall = 1.000000
+    common colleague edge precision = 1.000000
+    scalar-directed edge Jaccard = 1.000000
+    TTK-only nodes = 1
+    colleague-only nodes = 0
+
+F1_SR / 6_anti:
+    common nodes = 1764
+    raw edge Jaccard = 0.999433
+    common-induced edge Jaccard = 1.000000
+    common TTK edge recall = 1.000000
+    common colleague edge precision = 1.000000
+    scalar-directed edge Jaccard = 1.000000
+    TTK-only nodes = 1
+    colleague-only nodes = 0
+```
+
+The single TTK-only node in each SR tree had already been identified in Phase
+3C as the global field maximum with `CriticalType=3`. Phase 3D additionally
+shows that each such node has TTK tree degree 1:
+
+```text
+CNN_SR:
+    extra TTK node = VertexId 24571
+    global maximum = true
+    degree = 1
+
+UV_SR:
+    extra TTK node = VertexId 8703
+    global maximum = true
+    degree = 1
+
+F1_SR:
+    extra TTK node = VertexId 22332
+    global maximum = true
+    degree = 1
+```
+
+Therefore, for these three sample-69 SR fields:
+
+> Removing TTK's explicit degree-1 global-maximum/root node leaves exactly the
+> same critical-vertex set and exactly the same scalar-directed parent-child
+> hierarchy as the colleague toolkit's `_build_join_tree_graph()` under
+> `6_anti` connectivity.
+
+This is an exact structural-equivalence result for the tested SR trees, up to
+the root-representation convention.
+
+It does **not** establish equivalence of the two toolkits' merge-tree distance
+implementations.
+
+### `6_main` remains a strong negative/control connectivity
+
+The alternate NW/SE single-diagonal connectivity gives much weaker hierarchy
+agreement:
+
+```text
+CNN_SR / 6_main:
+    common edge Jaccard = 0.767908
+    scalar-directed Jaccard = 0.767908
+
+UV_SR / 6_main:
+    common edge Jaccard = 0.700893
+    scalar-directed Jaccard = 0.700893
+
+F1_SR / 6_main:
+    common edge Jaccard = 0.579088
+    scalar-directed Jaccard = 0.579088
+```
+
+Together with the Phase-3B critical-vertex results, this confirms that the
+near-exact `6_anti` agreement is not a generic consequence of using any
+six-neighbor square-grid graph.
+
+### GT result: very high but not exact structural agreement
+
+The `6_anti` GT comparisons remain very strong:
+
+```text
+CNN_GT / UV_GT:
+    common nodes = 2173
+    raw edge Jaccard = 0.948399
+    common-induced edge Jaccard = 0.978880
+    common TTK edge recall = 0.989327
+    common colleague edge precision = 0.989327
+    scalar-directed edge Jaccard = 0.978880
+
+F1_GT:
+    common nodes = 2176
+    raw edge Jaccard = 0.948422
+    common-induced edge Jaccard = 0.974863
+    common TTK edge recall = 0.987500
+    common colleague edge precision = 0.987043
+    scalar-directed edge Jaccard = 0.974863
+```
+
+The GT TTK-only list contains the global maximum/root plus a small number of
+additional degree-1 / degree-3 critical vertices.
+
+Several of these residual mismatches occur at almost identical scalar levels,
+for example:
+
+```text
+VertexIds 6849 / 7009:
+    3.720207293554653
+    3.7202073201577073
+
+VertexIds 8559 / 8560:
+    6.186103928570216
+    6.186103558280918
+
+VertexIds 12808 / 12809:
+    0.952178966134424
+    0.9521789665862054
+```
+
+This pattern is consistent with a precision / near-tie / tie-breaking
+difference between the scalar field used by TTK and the float64 recomputation
+fed to the colleague builder. This is a hypothesis, not yet a result.
+
+### Phase-3D preservation hashes
+
+```text
+edge_hierarchy_differences.csv:
+    25efbf314d317facb9eb7ca70402e72f65b289efc710b49a426f1e1e5c1d23df
+
+edge_hierarchy_summary.csv:
+    bfaf129be72d8924d0a3f4b2a392742d2e6d7c1284c8172a4697cf213d7de753
+
+edge_hierarchy_summary.json:
+    06075484e35a321b7691da45270b09d1c36af129d6410be8139f95eb65f27a44
+
+compare/sha256_manifest.txt:
+    e742749ab05d2503ab5843b3b605649a4250aae670bd541e976fa7b75768c14f
+
+step1_extract.log:
+    6d4f8782296806253b1116a9e8f329d68f6759cc9f60b01fcfffeae45225cfbc
+
+step2_compare.log:
+    8982e2cf9224592e3eb9f0ee7dc6bbf29a408c577397c5eedb84738b82e66a8d
+```
+
+### Current status after Phase 3D
+
+```text
+current 2D H0-pair route:
+    NOT semantically equivalent to TTK Join Tree
+
+dormant hierarchical builder:
+    regular-grid viable
+
+effective candidate connectivity:
+    6_anti (NE/SW single diagonal)
+
+sample-69 SR critical vertices:
+    exact colleague subset of TTK
+    TTK has one extra global-root node
+
+sample-69 SR hierarchy:
+    EXACT after removing TTK's degree-1 global root
+
+sample-69 GT hierarchy:
+    ~97.5-97.9% common-edge Jaccard
+    residual near-tie differences remain
+
+distance-implementation parity:
+    NOT YET TESTED
+```
+
+
+---
+
+
+## Phase-3E exact-TTK-input scalar parity — COMPLETE / CONSTRUCTION PARITY CLOSED FOR SAMPLE 69
+
+Phase 3E removed the final input-representation confound by rebuilding the
+colleague hierarchical Join Tree from the exact `wind_speed` scalar arrays
+stored in the VTI files that fed the authoritative TTK numerical trees.
+
+All six exact TTK inputs were confirmed to be:
+
+```text
+dtype:
+    float32
+
+dimensions:
+    160 x 160 x 1
+```
+
+Examples:
+
+```text
+CNN_GT:
+    min = 0.12207793444395065
+    max = 14.300971984863281
+
+CNN_SR:
+    min = 0.06793790310621262
+    max = 12.367745399475098
+
+UV_SR:
+    min = 0.08786133676767349
+    max = 12.158445358276367
+
+F1_SR:
+    min = 0.03015645034611225
+    max = 13.529099464416504
+```
+
+The exact VTI inputs were:
+
+```text
+CNN:
+    ttk_runs_fixed/cnn/mt/
+        cnn_GT_s69_speed_p160_x0_y0_mt_port_2.vti
+        cnn_SR_s69_speed_p160_x0_y0_mt_port_2.vti
+
+UV:
+    ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_topology/mt/
+        GT/candidateUV_expanded2688_GT_s69_speed_p160_x0_y0_mt_port_2.vti
+        SR/candidateUV_expanded2688_SR_s69_speed_p160_x0_y0_mt_port_2.vti
+
+F1:
+    ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology/mt/
+        GT/candidateF_grad_E2_low_expanded2688_GT_s69_speed_p160_x0_y0_mt_port_2.vti
+        SR/candidateF_grad_E2_low_expanded2688_SR_s69_speed_p160_x0_y0_mt_port_2.vti
+```
+
+Because both implementations were now fed the same VTI-indexed scalar sequence,
+the comparison was performed directly in raw TTK VertexId space; no transpose
+bridge was required for this phase.
+
+### Exact-TTK-input results
+
+```text
+CNN_GT:
+    TTK nodes = 2193
+    colleague nodes = 2192
+    node Jaccard = 0.999544
+    TTK-only = 1
+    colleague-only = 0
+    common-edge Jaccard = 1.000000
+    edge recall = 1.000000
+    edge precision = 1.000000
+
+CNN_SR:
+    TTK nodes = 1144
+    colleague nodes = 1143
+    node Jaccard = 0.999126
+    TTK-only = 1
+    colleague-only = 0
+    common-edge Jaccard = 1.000000
+    edge recall = 1.000000
+    edge precision = 1.000000
+
+UV_GT:
+    TTK nodes = 2193
+    colleague nodes = 2192
+    node Jaccard = 0.999544
+    TTK-only = 1
+    colleague-only = 0
+    common-edge Jaccard = 1.000000
+    edge recall = 1.000000
+    edge precision = 1.000000
+
+UV_SR:
+    TTK nodes = 808
+    colleague nodes = 807
+    node Jaccard = 0.998762
+    TTK-only = 1
+    colleague-only = 0
+    common-edge Jaccard = 1.000000
+    edge recall = 1.000000
+    edge precision = 1.000000
+
+F1_GT:
+    TTK nodes = 2195
+    colleague nodes = 2194
+    node Jaccard = 0.999544
+    TTK-only = 1
+    colleague-only = 0
+    common-edge Jaccard = 1.000000
+    edge recall = 1.000000
+    edge precision = 1.000000
+
+F1_SR:
+    TTK nodes = 1765
+    colleague nodes = 1764
+    node Jaccard = 0.999433
+    TTK-only = 1
+    colleague-only = 0
+    common-edge Jaccard = 1.000000
+    edge recall = 1.000000
+    edge precision = 1.000000
+```
+
+### Interpretation
+
+The previous ~2-2.5% GT hierarchy discrepancy from Phase 3D disappears when
+the colleague builder receives the exact float32 scalar sequence stored in the
+TTK input VTI.
+
+Therefore:
+
+> The residual GT disagreement was caused by input scalar representation /
+> precision differences from recomputing wind speed in float64, rather than by
+> a different Join-Tree hierarchy under the `6_anti` connectivity.
+
+For every tested sample-69 tree, GT and SR:
+
+```text
+colleague critical-node set:
+    exact subset of TTK
+
+TTK-only nodes:
+    exactly 1
+
+colleague-only nodes:
+    0
+
+induced hierarchy on shared nodes:
+    exactly identical
+```
+
+For CNN / UV / F1 SR, Phase 3C independently established that the single
+TTK-only node is the degree-1 global maximum/root. The exact identity of the
+single remaining GT-only node should be read from the frozen Phase-3E
+differences CSV before generalizing the root statement to GT, although Phase
+3C had already shown that the GT TTK-only residual set included the global
+maximum.
+
+This is sufficient to close the **sample-69 construction-parity question**:
+
+> When both implementations consume the exact same float32 VTI scalar field,
+> the colleague toolkit's `_build_join_tree_graph()` with the NE/SW
+> six-neighbor (`6_anti`) grid connectivity reproduces the same TTK Join-Tree
+> critical-node hierarchy on all shared nodes, with TTK retaining one
+> additional node.
+
+This does **not** establish equivalence of TTK's MergeTreeDistance with any
+distance implementation in the colleague toolkit.
+
+### Phase-3E preservation hashes
+
+```text
+exact_vti_parity_differences.csv:
+    321fefa4adcca2617dbf266136114d02ea098fb5ffa86156ad034e2bd6677a30
+
+exact_vti_parity_summary.csv:
+    0d3ceeb9de79b73b0f8031f0b2accd141069c3bade75c021f7b0122ece738b50
+
+exact_vti_parity_summary.json:
+    a8bcd402c76a66a8c2d26b6294344114ea68a3e57306e1dfce12ca3adde6d92f
+
+compare/sha256_manifest.txt:
+    ab29b37feec4b820ca73aaf8ef19adb623ac5f559909a00b20b19c21bb32432d
+
+step1_extract.log:
+    f2cc76ceb36384df425f7abc82817796f3dffd953bf49a0a608b8ca7ebede401
+
+step2_compare.log:
+    8b638c43b944857f4e36e8835722cf63c976d55e2aa7c586abcb040aeb9b2153
+```
+
+Exact-scalar NPY hashes:
+
+```text
+CNN_GT / UV_GT:
+    078b0104335f237ced3022abe7f39181f7800b00be4aec73d0828a3748eb007c
+
+CNN_SR:
+    751fa00a5766227130e6bc0e1af7f2b5b81bfccb5f23a88f3fde5f7b9ad653b8
+
+UV_SR:
+    37fae58f7c4cf67d80e9b98d0d237d63e73155c442e7b590f74fd10a557cf1ef
+
+F1_GT:
+    ee92512ce864345e7fb40889a907067c05c753ba8e2968c18b9c0fe36a9d3582
+
+F1_SR:
+    50e0a241a7d95c745f9b657308c1c77a54cac97b16b4f200569b2e9308e7ff63
+```
+
+### Current status after Phase 3E
+
+```text
+current 2D H0-pair visualization route:
+    NOT the same semantic object as TTK Join Tree
+
+dormant hierarchical builder:
+    TRUE hierarchical Join-Tree construction
+
+effective regular-grid connectivity:
+    6_anti strongly supported
+
+sample-69 exact-input critical-node parity:
+    exact subset; TTK +1 node
+
+sample-69 exact-input hierarchy parity:
+    EXACT on all shared nodes for GT and all SR fields
+
+previous GT discrepancy:
+    RESOLVED by exact float32 TTK input
+
+sample-69 Join-Tree construction audit:
+    CLOSED / VALIDATED
+
+all-sample construction robustness:
+    NEXT
+
+MergeTreeDistance cross-toolkit parity:
+    still NOT established
+```
+
+
+---
+
+
+## Phase-4A multi-sample exact-input construction-parity pilot — COMPLETE / 48 OF 48 PASS
+
+A predeclared eight-sample pilot was run on:
+
+```text
+0, 24, 48, 69, 96, 120, 144, 167
+```
+
+For each sample:
+
+```text
+3 methods:
+    CNN
+    reconstruction-only / UV
+    F1
+
+2 field types:
+    GT
+    SR
+```
+
+Total:
+
+```text
+8 samples x 3 methods x 2 field types = 48 trees
+```
+
+The pilot used the exact float32 `wind_speed` arrays extracted from each tree's
+authoritative TTK `mt_port_2.vti` input, together with the corresponding
+`port_0` critical-node arrays and `port_1` arc arrays.
+
+The predeclared `root_only_exact_parity` criterion required all of:
+
+```text
+colleague-only nodes = 0
+TTK-only nodes = 1
+the TTK-only node = exact field argmax
+the TTK-only node has TTK degree 1
+common-edge Jaccard = 1
+common-edge TTK recall = 1
+common-edge colleague precision = 1
+```
+
+### Pilot result
+
+```text
+trees:
+    48
+
+root_only_exact_parity:
+    48 / 48
+
+fraction:
+    1.0
+
+GT:
+    24 / 24
+
+SR:
+    24 / 24
+```
+
+Every individual row reported:
+
+```text
+TTK-only nodes = 1
+colleague-only nodes = 0
+common-edge Jaccard = 1.000000
+root_exact = true
+```
+
+Representative examples:
+
+```text
+sample 0:
+    CNN GT: TTK 1933 / colleague 1932
+    CNN SR: TTK 1407 / colleague 1406
+    F1  GT: TTK 1935 / colleague 1934
+    F1  SR: TTK 1590 / colleague 1589
+    UV  GT: TTK 1933 / colleague 1932
+    UV  SR: TTK  913 / colleague  912
+
+sample 69:
+    CNN GT: TTK 2193 / colleague 2192
+    CNN SR: TTK 1144 / colleague 1143
+    F1  GT: TTK 2195 / colleague 2194
+    F1  SR: TTK 1765 / colleague 1764
+    UV  GT: TTK 2193 / colleague 2192
+    UV  SR: TTK  808 / colleague  807
+
+sample 167:
+    CNN GT: TTK 1952 / colleague 1951
+    CNN SR: TTK 1509 / colleague 1508
+    F1  GT: TTK 1950 / colleague 1949
+    F1  SR: TTK 1761 / colleague 1760
+    UV  GT: TTK 1952 / colleague 1951
+    UV  SR: TTK  906 / colleague  905
+```
+
+### Interpretation
+
+The exact sample-69 construction correspondence generalizes perfectly across
+the predeclared multi-sample pilot.
+
+For all 48 tested trees:
+
+> With identical float32 TTK VTI scalar input and the `6_anti` regular-grid
+> connectivity, the colleague toolkit's `_build_join_tree_graph()` produces
+> exactly the same Join-Tree hierarchy as TTK after accounting for TTK's one
+> additional degree-1 global-maximum/root node.
+
+This includes all tested GT and SR fields.
+
+The pilot also shows that this correspondence is robust to the fact that the
+saved GT TTK trees are not always byte-/node-count-identical across method
+tracks. Each method-specific exact VTI/tree pair still satisfies the same
+root-only equivalence criterion independently.
+
+### Phase-4A preservation hashes
+
+```text
+pilot_differences.csv:
+    d15e6b20c48ddd4840cbe704ee6b0cf5107b6d7e6c82d7ccfbb4442cae88c36a
+
+pilot_parity_summary.csv:
+    677fd45099b939f9fcc1c84484ce5226bc7a18f7774f4e89cf76292d1f04ad5e
+
+pilot_parity_summary.json:
+    8627da7b935f3ea31ba3afd9df23d4509e4d57a3b2c8c4e52f80d24f9c567c0a
+
+pilot_report.json:
+    8887596fba83ce6003a82f01e70dfaabaeff83e7f593c4e56a18a1dbf81c9ca5
+
+compare/sha256_manifest.txt:
+    b92211147924048bcd045621de20242ec3a931862baf61fd068da10641d1fc40
+
+step1_extract.log:
+    e86d80083df2f5936cc6dde958bbe94ce14492392fe29d8dfff09211e6c5379b
+
+step2_compare.log:
+    a369538ed135144b900a59c94eddc22a32dae8651a95d6447556ba4cfaa2bbf5
+```
+
+### Current status after Phase 4A
+
+```text
+sample-69 exact-input construction parity:
+    CLOSED / exact up to TTK root
+
+multi-sample pilot:
+    48 / 48 exact root-only parity
+
+GT pilot:
+    24 / 24
+
+SR pilot:
+    24 / 24
+
+effective connectivity:
+    6_anti strongly validated
+
+full 168-sample construction-parity sweep:
+    NEXT
+
+MergeTreeDistance implementation parity:
+    still separate / NOT established
+```
+
+
+---
+
+
+## Phase-4B full 168-sample construction-parity sweep — COMPLETE, WITH FOUR STRICT-CRITERION EXCEPTIONS
+
+The full exact-input construction-parity sweep successfully extracted and
+processed:
+
+```text
+168 samples x 3 methods x GT/SR = 1008 trees
+```
+
+Extraction completed for all 1008 exact TTK inputs.
+
+### Full-sweep result under the predeclared strict criterion
+
+```text
+trees:
+    1008
+
+root_only_exact_parity:
+    1004 / 1008
+
+fraction:
+    0.996031746031746
+
+strict-criterion failures:
+    4
+```
+
+Breakdown:
+
+```text
+GT:
+    500 / 504
+
+SR:
+    504 / 504
+
+CNN:
+    334 / 336
+    GT = 166 / 168
+    SR = 168 / 168
+
+UV:
+    335 / 336
+    GT = 167 / 168
+    SR = 168 / 168
+
+F1:
+    335 / 336
+    GT = 167 / 168
+    SR = 168 / 168
+```
+
+The most important robust result is:
+
+> Every one of the 504 SR trees passed the exact root-only hierarchy criterion.
+
+### Four strict-criterion exceptions
+
+Three exceptions occur for sample 86 GT:
+
+```text
+sample 86 / CNN GT:
+    TTK nodes = 1952
+    colleague nodes = 1951
+    common nodes = 1951
+    node Jaccard = 0.9994877049180327
+    TTK-only nodes = 1
+    colleague-only nodes = 0
+    common-edge Jaccard = 1.0
+    TTK-only node:
+        VertexId = 10293
+        degree = 1
+        scalar = 18.03033447265625
+        is_argmax by np.argmax identity = false
+
+sample 86 / UV GT:
+    same structural metrics
+    same TTK-only VertexId = 10293
+    same scalar = 18.03033447265625
+
+sample 86 / F1 GT:
+    same structural metrics
+    TTK-only VertexId = 8863
+    degree = 1
+    scalar = 18.03033447265625
+    is_argmax by np.argmax identity = false
+```
+
+These three are **not hierarchy failures**: the shared hierarchy is exactly
+identical (`common-edge Jaccard = 1.0`). They fail only because the predeclared
+criterion required the one TTK-only degree-1 node to equal the single index
+returned by `np.argmax`.
+
+The repeated exact scalar value strongly suggests a tied global maximum /
+plateau-selection issue. This must be verified directly before reclassifying
+the three rows.
+
+The fourth exception is sample 127 / CNN GT:
+
+```text
+TTK nodes = 2010
+colleague nodes = 2009
+common nodes = 2009
+node Jaccard = 0.9995024875621891
+TTK-only nodes = 1
+colleague-only nodes = 0
+
+TTK-only node:
+    VertexId = 16770
+    degree = 1
+    scalar = 18.13410186767578
+    is_argmax = true
+
+common-edge Jaccard:
+    0.9980099502487563
+
+common-edge TTK recall:
+    0.999003984063745
+
+common-edge colleague precision:
+    0.999003984063745
+```
+
+This is a genuine but extremely localized shared-hierarchy mismatch under the
+current comparison: the node sets differ only by the expected one root-like
+TTK node, but a very small number of common-node arcs differ.
+
+The next diagnostic must inspect those exact edge substitutions and their
+float32 scalar values before attributing the discrepancy to tie-breaking.
+
+### Phase-4B preserved summary hashes
+
+```text
+full_parity_failures.csv:
+    f143f2e48246e92013988efe564da24b8cd03fcc5d5b102f15f14d8fda2ae5a9
+
+full_parity_summary.csv:
+    50c5e4913bba5f1e2f4bde8165d958f5ce94be8b8263982f1165793fa7fc7b42
+
+full_parity_summary.json:
+    4b24c2d6bba7aeda149c3996b77e9a82a06de2c9e6952140cb9a78b0cd94c554
+
+full_report.json:
+    b15e327ab1e4ebac0028a87d14cc24b3012b2499e74859f16aee18790634cbb6
+
+compare/sha256_manifest.txt:
+    ae2e9e92302b6aded4732efb904fc3c9e729de21e5f2c4bbf076c50131edfb77
+
+step1_extract.log:
+    65affad399256c3240e5d298ebf4315b45d2f694ec5a9ccc3a4da973a69d2605
+
+step2_compare.log:
+    18c9f88761fe88b1fd1de817ab45ffabf8c78213d69fe46d7ea6173820e15ff7
+```
+
+### Current status after Phase 4B
+
+```text
+full benchmark extracted:
+    1008 / 1008
+
+SR exact root-only parity:
+    504 / 504
+
+GT strict root-only parity:
+    500 / 504
+
+overall strict criterion:
+    1004 / 1008 = 99.603%
+
+sample 86 GT:
+    exact common hierarchy
+    argmax-identity criterion exception
+    tied-max hypothesis NEXT
+
+sample 127 CNN GT:
+    one localized hierarchy discrepancy
+    edge/tie diagnostic NEXT
+
+construction correspondence:
+    overwhelmingly validated
+    final exception diagnosis pending
+
+MergeTreeDistance implementation parity:
+    still separate / NOT established
+```
+
+
+---
+
+
+## Phase-4C exception diagnosis — COMPLETE / THREE STRICT FAILURES RECLASSIFIED AS TIED-MAX ROOT CASES
+
+Phase 4C diagnosed all four strict-criterion exceptions from the full 1008-tree
+Phase-4B sweep.
+
+### Sample 86 GT — exact tied-global-maximum explanation confirmed
+
+For CNN GT and UV GT:
+
+```text
+field dtype:
+    float32
+
+global maximum value:
+    18.03033447265625
+
+exact maximum vertices:
+    [10135, 10293]
+
+np.argmax:
+    10135
+
+single TTK-only node:
+    VertexId = 10293
+    CriticalType = 3
+    degree = 1
+    scalar = 18.03033447265625
+    equals global-max value = true
+    is an exact maximum vertex = true
+    is first np.argmax index = false
+
+colleague-only nodes:
+    none
+
+common edges:
+    TTK = 1950
+    colleague = 1950
+    intersection = 1950
+```
+
+For F1 GT:
+
+```text
+global maximum value:
+    18.03033447265625
+
+exact maximum vertices:
+    [8544, 8863]
+
+np.argmax:
+    8544
+
+single TTK-only node:
+    VertexId = 8863
+    CriticalType = 3
+    degree = 1
+    scalar = 18.03033447265625
+    equals global-max value = true
+    is an exact maximum vertex = true
+    is first np.argmax index = false
+
+colleague-only nodes:
+    none
+
+common edges:
+    TTK = 1950
+    colleague = 1950
+    intersection = 1950
+```
+
+The CNN and UV sample-86 exact fields are bit-identical, and the F1 field is
+the exact transpose:
+
+```text
+CNN == UV:
+    true
+
+CNN == F1:
+    false
+
+CNN.T == F1:
+    true
+
+UV.T == F1:
+    true
+
+max absolute difference after alignment:
+    0.0
+```
+
+Therefore the three sample-86 rows were **not construction mismatches**. They
+failed only because the predeclared strict criterion required the TTK root to
+equal the single index returned by `np.argmax`.
+
+The scientifically appropriate interpretation is:
+
+> Sample 86 contains a two-vertex exact float32 global-maximum plateau. TTK and
+> NumPy select different members of that plateau as the representative root,
+> while the entire shared Join-Tree hierarchy is identical.
+
+For audit integrity, the original predeclared strict Phase-4B score remains:
+
+```text
+1004 / 1008
+```
+
+A post-hoc, explicitly tie-aware root criterion would reclassify these three
+sample-86 GT rows as equivalent and produce:
+
+```text
+1007 / 1008 = 99.9007936508%
+```
+
+with:
+
+```text
+SR:
+    504 / 504
+
+GT:
+    503 / 504
+```
+
+This post-hoc score must be labeled as tie-aware / diagnostic and must not
+replace the frozen predeclared strict score.
+
+### Sample 127 CNN GT — one localized hierarchy discrepancy remains
+
+Sample 127 CNN GT has:
+
+```text
+field dtype:
+    float32
+
+global maximum:
+    18.13410186767578
+
+exact maximum vertices:
+    [16770]
+
+TTK-only node:
+    VertexId = 16770
+    CriticalType = 3
+    degree = 1
+    exact unique global maximum = true
+
+colleague-only nodes:
+    none
+```
+
+On the shared 2009-node set:
+
+```text
+TTK common edges:
+    2008
+
+colleague common edges:
+    2008
+
+intersection:
+    2006
+```
+
+Thus exactly two TTK shared edges and two colleague shared edges differ.
+
+TTK-only shared edges:
+
+```text
+7562 -- 8034
+    scalar 3.8300704956054688 -> 4.831077575683594
+    CriticalType 1 / 1
+
+8195 -- 8840
+    scalar 4.629661560058594 -> 5.349891662597656
+    CriticalType 5 / 4
+```
+
+Colleague-only shared edges:
+
+```text
+7562 -- 8195
+    scalar 3.8300704956054688 -> 4.629661560058594
+    CriticalType 1 / 5
+
+8034 -- 8195
+    scalar 4.831077575683594 -> 4.629661560058594
+    CriticalType 1 / 5
+```
+
+These endpoint scalar gaps are not near-equality events themselves:
+
+```text
+TTK edge gaps:
+    1.001007080078125
+    0.7202301025390625
+
+colleague edge gaps:
+    0.799591064453125
+    0.201416015625
+```
+
+Therefore the Phase-4C evidence does **not** support explaining the sample-127
+edge swap simply as an endpoint scalar tie.
+
+### Important cross-track clue for sample 127
+
+The exact sample-127 GT scalar fields satisfy:
+
+```text
+CNN == UV:
+    true
+
+CNN.T == F1:
+    true
+
+UV.T == F1:
+    true
+
+aligned max absolute differences:
+    0.0
+```
+
+Yet only the CNN GT track failed the common-edge criterion in Phase 4B; UV GT
+and F1 GT passed.
+
+This means the remaining sample-127 discrepancy cannot be attributed to a
+different scalar field between CNN and UV.
+
+The next audit should compare the actual TTK node/edge representations for
+sample 127 across the CNN, UV, and transposed-F1 provenance tracks. If UV and
+F1 agree with the colleague hierarchy while CNN alone contains the two-edge
+swap, that would identify the residual as a TTK artifact/provenance-level
+difference rather than a failure of the recovered regular-grid Join-Tree
+construction.
+
+### Phase-4C preservation hashes
+
+```text
+phase4c_edge_differences.csv:
+    5d96a2c8e05068e17976cd47b209e1ac0bf02d26f88e25dc710511740c7d31cc
+
+phase4c_exception_diagnostic.json:
+    26d700645a267ce09edb30743080ab974e7a61cbe1eb70215b43cde71add5b7e
+```
+
+### Current status after Phase 4C
+
+```text
+predeclared strict score:
+    1004 / 1008 = 99.603%
+
+sample-86 strict exceptions:
+    resolved as exact tied-global-max root representation cases
+
+tie-aware diagnostic score:
+    1007 / 1008 = 99.901%
+
+all SR trees:
+    504 / 504 exact root-only parity
+
+only unresolved tree:
+    sample 127 CNN GT
+
+sample-127 node-set relationship:
+    TTK = colleague + one unique global-max root
+
+sample-127 shared hierarchy:
+    2006 / 2008 shared edges identical
+    two-edge local swap remains
+
+next:
+    cross-track TTK provenance comparison for sample 127
+```
+
+
+---
+
+
+## Phase-4D sample-127 cross-track TTK provenance diagnostic — COMPLETE / RESIDUAL ISOLATED TO HISTORICAL CNN TTK ARTIFACT
+
+Phase 4D compared the sole remaining Phase-4B hierarchy exception,
+sample-127 CNN GT, against the independently stored UV GT and transposed-F1 GT
+TTK trees.
+
+### Exact scalar-field alignment gate
+
+The exact float32 GT fields satisfy:
+
+```text
+CNN == UV:
+    true
+
+CNN == transpose(F1):
+    true
+```
+
+Therefore the CNN and UV TTK trees were generated from exactly the same scalar
+field in exactly the same raw orientation. This makes CNN-vs-UV the decisive
+cross-provenance comparison.
+
+### CNN TTK vs UV TTK
+
+Node sets are identical:
+
+```text
+CNN nodes = 2010
+UV nodes  = 2010
+
+intersection = 2010
+node Jaccard = 1.0
+CNN-only nodes = 0
+UV-only nodes  = 0
+```
+
+But the saved TTK arc sets differ locally:
+
+```text
+CNN edges = 2009
+UV edges  = 2009
+intersection = 2007
+edge Jaccard = 0.9980109398309299
+CNN-only edges = 2
+UV-only edges  = 2
+```
+
+CNN-only edges:
+
+```text
+7562 -- 8034
+8195 -- 8840
+```
+
+UV-only edges:
+
+```text
+7562 -- 8195
+8034 -- 8195
+```
+
+The same local two-edge substitution is exactly the discrepancy previously
+observed between CNN TTK and the colleague builder.
+
+The CriticalType metadata also differs locally despite the identical node set
+and scalar field. For example:
+
+```text
+VertexId 8195:
+    CNN CriticalType = 5
+    UV  CriticalType = 1
+
+VertexId 8840:
+    CNN CriticalType = 4
+    UV  CriticalType = 1
+```
+
+### UV TTK vs colleague hierarchical builder
+
+For the identical sample-127 GT scalar field:
+
+```text
+UV TTK nodes:
+    2010
+
+colleague nodes:
+    2009
+
+shared nodes:
+    2009
+
+TTK-only node:
+    VertexId 16770
+    unique global-maximum/root
+
+colleague-only nodes:
+    none
+
+common TTK edges:
+    2008
+
+common colleague edges:
+    2008
+
+edge intersection:
+    2008
+
+common-edge Jaccard:
+    1.0
+```
+
+Thus the colleague `6_anti` hierarchy exactly matches the independently stored
+UV TTK hierarchy after accounting for the standard one-node TTK root
+convention.
+
+### CNN TTK vs colleague
+
+CNN differs from the colleague hierarchy by exactly the same two-edge local
+substitution that separates CNN TTK from UV TTK:
+
+```text
+common-edge Jaccard:
+    0.9980099502487563
+
+TTK-only shared edges:
+    7562 -- 8034
+    8195 -- 8840
+
+colleague-only shared edges:
+    7562 -- 8195
+    8034 -- 8195
+```
+
+### F1-transposed comparison — not the decisive provenance control
+
+The transposed F1 scalar field is exactly equal to CNN/UV after alignment, but
+its saved TTK critical-node/hierarchy representation differs more broadly after
+transposition.
+
+This does not undermine the CNN-vs-UV conclusion because:
+
+```text
+CNN and UV:
+    exact same scalar field
+    exact same orientation
+    identical TTK node set
+
+F1:
+    historical transposed provenance
+    TTK tie/order bookkeeping may depend on raw VertexId ordering
+```
+
+Therefore the same-orientation CNN-vs-UV comparison is the appropriate control
+for diagnosing the sample-127 anomaly.
+
+### Interpretation
+
+The sole remaining full-sweep hierarchy exception is **not reproduced by the
+independent UV TTK artifact built from the same exact scalar field**.
+
+Instead:
+
+```text
+UV TTK:
+    exactly agrees with colleague hierarchy up to TTK root
+
+CNN TTK:
+    same node set as UV
+    differs by only two local arcs
+```
+
+Therefore the residual should be described conservatively as:
+
+> a historical TTK artifact/provenance-level inconsistency in the saved
+> sample-127 CNN GT tree, rather than evidence that the colleague regular-grid
+> Join-Tree construction fails on that scalar field.
+
+This does not identify the cause as nondeterminism, a bug, or a parameter
+difference. Those possibilities remain unproven.
+
+### Full-sweep construction conclusion after Phase 4D
+
+Frozen predeclared strict result:
+
+```text
+1004 / 1008 = 99.603%
+```
+
+After explicitly diagnosing tied-global-max root representation at sample 86:
+
+```text
+tie-aware root-equivalent:
+    1007 / 1008
+```
+
+The remaining 1/1008 historical CNN GT artifact has an independently stored UV
+TTK tree from the identical field that agrees exactly with the colleague
+builder.
+
+Most importantly:
+
+```text
+SR:
+    504 / 504 exact root-only construction parity
+```
+
+Thus the regular-grid Join-Tree **construction correspondence is now considered
+validated across the benchmark**, with one documented historical TTK
+cross-provenance anomaly on GT sample 127.
+
+### Remaining narrow impact check
+
+Before closing every MT provenance question, one useful final numerical test is:
+
+```text
+TTK MergeTreeDistance(
+    sample-127 CNN GT,
+    sample-127 UV GT
+)
+```
+
+If this distance is exactly zero, then TTK's own audited numerical distance
+treats the two locally different saved GT representations as equivalent,
+analogous to the previously validated sample-69 cross-GT equivalence.
+
+This is an impact/equivalence check, not a construction-parity check.
+
+### Phase-4D preservation hashes
+
+```text
+phase4d_cross_track_report.json:
+    ab73f07cbecc48d7268698f1ef01c6a9c881eb734392c9fa01da672029504bc2
+
+phase4d_pairwise_edge_differences.csv:
+    93a671801e678c1d118d4e946fe242bc2de24e307f67f5a8e7d0838bfbf0fdf2
+```
+
+### Current status after Phase 4D
+
+```text
+regular-grid construction audit:
+    VALIDATED
+
+all SR trees:
+    504 / 504 exact root-only parity
+
+sample-86 GT exceptions:
+    resolved as tied-global-maximum root representation
+
+sample-127 CNN GT:
+    isolated historical TTK provenance anomaly
+
+sample-127 UV GT from identical field:
+    exact root-normalized parity with colleague builder
+
+remaining useful check:
+    CNN-GT vs UV-GT TTK distance at sample 127
+
+MergeTreeDistance cross-toolkit implementation parity:
+    still a separate question
+```
+
+
+---
+
+
+## Phase-4E preflight — validated host96 TTK MT extractor located
+
+The previously validated TTK merge-tree matching extractor used in the
+sample-69 audit was located successfully.
+
+Validated / preserved binaries and sources found:
+
+```text
+/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/
+    mt_matching_extractor_build_host96/extract_ttk_mt_matching
+    mt_matching_extractor_build/extract_ttk_mt_matching
+    mt_matching_extractor_src/extract_ttk_mt_matching.cpp
+
+/home/adadhwal/PhIRE/scripts/
+    extract_ttk_mt_matching.cpp
+    mt_matching_extractor_host96/run_sample69_mt_matching_extract_host96.sh
+    mt_matching_extractor_host96/extract_ttk_mt_matching.cpp
+    mt_matching_extractor_v3/extract_ttk_mt_matching.cpp
+```
+
+Previously preserved host96 output/build directories found:
+
+```text
+/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/
+    mt_matching_extractor_build_host96
+
+/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/
+    corrected_pd_mt/discordance_visuals/sample_069/ttk_matching_host96
+```
+
+This is the correct provenance to reuse for the remaining sample-127
+CNN-GT vs UV-GT impact check.
+
+The next gate is to recover the **exact validated command-line interface and
+parameterization** from the preserved binary/source/runner before executing a
+new comparison. No new extractor should be compiled and no arguments should be
+invented.
+
+Target numerical question:
+
+```text
+TTK MergeTreeDistance(
+    sample-127 CNN GT,
+    sample-127 UV GT
+)
+```
+
+Interpretation plan:
+
+```text
+distance == 0:
+    TTK's own audited numerical metric treats the two locally different saved
+    sample-127 GT tree representations as equivalent.
+
+distance > 0:
+    preserve the exact value as a small historical cross-provenance GT
+    discrepancy; do not hide or relabel it.
+```
+
+This is an **impact/equivalence check** only. The regular-grid Join-Tree
+construction correspondence was already validated in Phase 4D.
+
+
+---
+
+
+## Phase-4E validated extractor CLI/settings recovered — READY FOR SAMPLE-127 IMPACT CHECK
+
+The preserved host96 extractor provenance was verified.
+
+Preserved SHA-256:
+
+```text
+extract_ttk_mt_matching binary:
+    2afe5e9f3a5ab8723eb78e55cdf47ddf41c47c5590f19dd66eb9bbb4eb932fb7
+
+validated sample-69 runner:
+    64ba6951846bcd8f6f37daf85a517527b6471ad0f194f7ec12393baf41fe331f
+
+extractor source:
+    f03d3886aeb59d72998b9a7f90840f325da9cdfb15789b0a2b499b455b0e8924
+```
+
+Exact CLI:
+
+```text
+extract_ttk_mt_matching
+    --nodes1 A_port_0.vtu
+    --arcs1  A_port_1.vtu
+    --nodes2 B_port_0.vtu
+    --arcs2  B_port_1.vtu
+    --postprocess 0|1
+    --matching-csv out.csv
+    --summary-csv summary.csv
+```
+
+The preserved validated sample-69 runner executes **both** postprocess modes:
+
+```text
+postprocess = 0:
+    raw
+
+postprocess = 1:
+    converted
+```
+
+The extractor constructs internal trees with:
+
+```cpp
+ttk::ftm::makeTree<dataType>(nodes, arcs)
+```
+
+and executes:
+
+```cpp
+ttk::MergeTreeDistance distance;
+
+distance.setThreadNumber(1);
+distance.setSaveTree(true);
+distance.setCleanTree(true);
+distance.setIsCalled(true);
+distance.setPostprocess(postprocess);
+
+distance.execute<dataType>(tree1, tree2, matching);
+```
+
+The source explicitly states that remaining algorithmic parameters stay at the
+audited TTK 1.3.0 defaults and that this reproduces the pairwise
+DistanceMatrix execution behavior.
+
+The validated runner builds against:
+
+```text
+VTK:
+    /usr/local/lib/cmake/vtk-9.6
+
+TTK:
+    /usr/local/lib/cmake/ttkBase
+```
+
+### Sample-127 target comparison
+
+Tree A — CNN GT:
+
+```text
+ttk_runs_fixed/cnn/mt/
+    cnn_GT_s127_speed_p160_x0_y0_mt_port_0.vtu
+    cnn_GT_s127_speed_p160_x0_y0_mt_port_1.vtu
+```
+
+Tree B — reconstruction-only / UV GT:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateUV_expanded2688_topology/mt/GT/
+    candidateUV_expanded2688_GT_s127_speed_p160_x0_y0_mt_port_0.vtu
+    candidateUV_expanded2688_GT_s127_speed_p160_x0_y0_mt_port_1.vtu
+```
+
+Both postprocess modes should be preserved. The purpose is to determine whether
+TTK's own audited MergeTreeDistance treats the two locally different saved GT
+representations as distance-zero equivalent.
+
+This is a numerical impact/equivalence check only. It does not reopen the
+already validated regular-grid construction correspondence.
+
+
+---
+
+
+## Phase-4E sample-127 CNN-GT vs UV-GT TTK MergeTreeDistance — COMPLETE / NONZERO PROVENANCE IMPACT
+
+The final sample-127 historical-provenance impact check was run with the
+previously validated host96 TTK extractor.
+
+### Environment / extractor provenance
+
+Observed runtime:
+
+```text
+host:
+    spark-345b
+
+Python:
+    /usr/bin/python3
+
+VTK:
+    9.6.0
+
+TTK Python module:
+    /usr/local/lib/python3.12/site-packages/topologytoolkit/__init__.py
+```
+
+Validated extractor binary SHA-256:
+
+```text
+2afe5e9f3a5ab8723eb78e55cdf47ddf41c47c5590f19dd66eb9bbb4eb932fb7
+```
+
+Sample-127 input hashes:
+
+```text
+CNN GT port_0:
+    36a6c35130808f1defa5fa1c7e00431be5a187b6d28d604b0f42851d6cfc2617
+
+CNN GT port_1:
+    7a044e0b59d826d8b9e16a35228d77d46a1e1bdd37bffa4dcb3b28b5882f7808
+
+UV GT port_0:
+    694d09b7d08297949cdeb5fea552bbee914c971d726643b1f347fc8498cd0c45
+
+UV GT port_1:
+    29b46c3797bfc425c50f8a9bdf77b6f5dcca55dbe991ba58bcf07843619e24c6
+```
+
+The extractor was linked against the host VTK 9.6 and TTK base libraries.
+
+### Numerical result
+
+Raw mode:
+
+```text
+postprocess:
+    0
+
+distance:
+    0.4595809280872345
+
+matching_count:
+    975
+
+input_tree1_nodes:
+    2010
+
+input_tree2_nodes:
+    2010
+
+max_tree1_match_id:
+    1977
+
+max_tree2_match_id:
+    1978
+```
+
+Converted/postprocessed mode:
+
+```text
+postprocess:
+    1
+
+distance:
+    0.4595809280872345
+
+matching_count:
+    1950
+
+input_tree1_nodes:
+    2010
+
+input_tree2_nodes:
+    2010
+
+max_tree1_match_id:
+    1977
+
+max_tree2_match_id:
+    1978
+```
+
+Thus:
+
+```text
+TTK MergeTreeDistance(
+    sample-127 CNN GT,
+    sample-127 UV GT
+)
+= 0.4595809280872345
+```
+
+in both preserved postprocess modes.
+
+### Interpretation
+
+The sample-127 CNN-GT and UV-GT saved TTK trees are **not distance-zero
+equivalent** under the audited TTK MergeTreeDistance, despite:
+
+```text
+the exact scalar fields being bit-identical;
+the TTK critical-node sets being identical;
+only two local shared-tree arcs differing;
+the UV TTK tree agreeing exactly with the colleague 6_anti hierarchy
+after the standard one-node global-root normalization.
+```
+
+Therefore the historical CNN GT provenance anomaly has a measurable effect
+under TTK's own numerical MergeTreeDistance.
+
+This does **not** overturn the regular-grid construction validation:
+
+```text
+all 504 SR trees:
+    exact root-only construction parity
+
+sample-86 GT strict exceptions:
+    resolved as tied-global-max root representation
+
+sample-127 identical-field UV GT:
+    exact root-normalized parity with the colleague hierarchy
+```
+
+The correct final characterization is:
+
+> The recovered regular-grid Join-Tree construction is validated across the
+> benchmark. One historical sample-127 CNN-GT TTK artifact differs locally from
+> an independently stored UV-GT TTK tree built from the identical scalar field,
+> and this two-edge provenance discrepancy produces a nonzero TTK
+> MergeTreeDistance of 0.4595809280872345.
+
+No claim should be made that the cause is a TTK bug, nondeterminism, or a
+specific parameter mismatch without further provenance evidence.
+
+### Raw vs converted matching nuance
+
+The distance is unchanged between postprocess modes:
+
+```text
+raw distance:
+    0.4595809280872345
+
+converted distance:
+    0.4595809280872345
+```
+
+while the exported matching count changes:
+
+```text
+raw:
+    975
+
+converted:
+    1950
+```
+
+Therefore postprocessing changes the matching representation/count for this
+pair but does not change the final numerical distance.
+
+### Phase-4E preservation hashes
+
+```text
+converted.log:
+    4a29cef4df40b553e635d92aa457560366d4d92579d8e648d39642b3f75cd89a
+
+converted_matching.csv:
+    7ee08551fa188d4da169c3146b409e010b0d4cdcf57e2d0fc6ec416445e93638
+
+converted_summary.csv:
+    0eaa1e6e519fb22044de2047dcdbdc202b9b6ac97ae1295f50830fb05c21dca3
+
+raw.log:
+    82756a70af7c31251e3edbd2e993eab2a902fc68e3cef653a641ca4291f67dc1
+
+raw_matching.csv:
+    052c2eec8931b071aa4b2d4c4533d1202237b9db649474efe71ceb5817c2b898
+
+raw_summary.csv:
+    d86e5050fe27c03f9dbe288c612244c551fb3141e4eb4bcbe88150e36a961485
+```
+
+### Construction-audit closeout status
+
+```text
+regular-grid Join-Tree construction:
+    VALIDATED
+
+full SR benchmark:
+    504 / 504 exact root-only parity
+
+GT benchmark:
+    all but one historical provenance artifact explained by root/tie convention
+
+sample-127 CNN GT anomaly:
+    isolated
+    local two-edge difference
+    measurable TTK MT-distance impact = 0.4595809280872345
+
+construction audit:
+    CLOSED
+
+cross-toolkit MergeTreeDistance implementation parity:
+    SEPARATE QUESTION / NOT ESTABLISHED
+```

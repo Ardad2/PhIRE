@@ -1,0 +1,51 @@
+===== JOIN-TREE PHASE 1 SYNTHETIC SUMMARY =====
+repo: /home/adadhwal/PhIRE/third_party/tda-toolkit-mapper
+out: /home/adadhwal/PhIRE/join_tree_harness/phase1_synthetic
+field shape: (17, 23)
+
+FUNCTION SIGNATURES
+get_merge_tree_graph_2d: (scalar_field: 'np.ndarray', direction: 'Literal[1, -1]' = 1) -> 'Tuple[nx.Graph, np.ndarray, np.ndarray]'
+_build_join_tree_graph: (values: 'np.ndarray', adjacency: 'Dict[int, List[int]]') -> 'nx.DiGraph'
+pair_route_extra_return_objects: 2
+
+--- current_2d_pair_graph ---
+directed: False
+nodes: 274
+edges: 287
+components: 252
+is_tree_undirected: False
+leaves_degree1: 9
+branch_nodes_degree_ge3: 35
+self_loops: 265
+min_node_scalar: 1.2000000000000002e-07
+max_node_scalar: 5.560000374
+
+--- hierarchical_join_tree_4nbr ---
+directed: True
+nodes: 5
+edges: 4
+components: 1
+is_tree_undirected: True
+leaves_degree1: 3
+branch_nodes_degree_ge3: 1
+self_loops: 0
+min_node_scalar: 1.2000000000000002e-07
+max_node_scalar: 1.080000198
+
+--- hierarchical_join_tree_8nbr ---
+directed: True
+nodes: 5
+edges: 4
+components: 1
+is_tree_undirected: True
+leaves_degree1: 3
+branch_nodes_degree_ge3: 1
+self_loops: 0
+min_node_scalar: 1.2000000000000002e-07
+max_node_scalar: 0.960000175
+
+DIAGNOSTIC INTERPRETATION
+pair_route_fragmented: True
+hierarchical_4nbr_connected_tree: True
+
+Do not interpret this as TTK parity yet. If the hierarchical 4-neighbor route is a connected tree while the current 2D route is fragmented, Phase 1 supports the semantic distinction found in the source audit.

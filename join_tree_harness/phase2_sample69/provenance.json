@@ -1,0 +1,15 @@
+{
+  "sample": 69,
+  "crop": 160,
+  "crop_rule": "top-left [:crop, :crop]",
+  "scalar": "wind_speed = hypot(u,v)",
+  "flattening": "C-order via ravel(order='C')",
+  "gt_cnn_equals_gt_uv": true,
+  "gt_cnn_equals_gt_f1": true,
+  "roots": {
+    "CNN": "/home/adadhwal/PhIRE/data_out_fixed/wind_mrhr_cnn",
+    "UV": "/home/adadhwal/PhIRE/data_out/wind_finetune_candidateUV_expanded2688",
+    "F1": "/home/adadhwal/PhIRE/data_out/wind_finetune_candidateF_grad_E2_low_expanded2688"
+  },
+  "builder_signature": "(values: 'np.ndarray', adjacency: 'Dict[int, List[int]]') -> 'nx.DiGraph'"
+}
