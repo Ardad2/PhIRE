@@ -30784,3 +30784,2373 @@ construction audit:
 cross-toolkit MergeTreeDistance implementation parity:
     SEPARATE QUESTION / NOT ESTABLISHED
 ```
+
+
+
+---
+
+# Part XXXVIII — Phase 5A Spatially Aware Persistence Evaluation: Sample-69 Provenance Audit
+
+**Status:** Steps 2 and 2B complete. Spatial critical-point provenance is available and internally consistent. Historical topology-inspired GT artifacts exhibit a small orientation/tie-sensitive critical-vertex representation difference, so cross-method spatial evaluation should use a canonically regenerated orientation rather than directly mixing historical GT PD artifacts.
+
+## XXXVIII.1 Scientific goal
+
+Phase 5 is deliberately outside the frozen TopoInVis/arXiv-v1 scope.
+
+The new scientific question is:
+
+> When topology-inspired fine-tuning improves persistence agreement, are the corresponding persistent structures also preserved at the correct physical locations?
+
+The first requirement is an auditable mapping from each finite persistence pair to the original critical-point locations in the 160×160 scalar wind-speed grid.
+
+For a matched GT/SR pair, the planned quantities are:
+
+```math
+d_pers = ||(b,d) - (\hat b,\hat d)||
+```
+
+```math
+d_space_birth =
+    || x_birth_GT - x_birth_SR ||_2
+```
+
+```math
+d_space_death =
+    || x_death_GT - x_death_SR ||_2
+```
+
+Birth and death/saddle displacement will initially be kept separate.
+
+No arbitrary combined persistence+space scalar has been introduced.
+
+---
+
+## XXXVIII.2 Phase 5A Step 2 — authoritative sample-69 pair-provenance extraction
+
+### Script
+
+```text
+spatial_pd/phase5a_extract_sample69_pair_provenance.py
+```
+
+Original generated-script SHA-256:
+
+```text
+bb83dc064b382250e5bad5bee566c3a27e7f531a97d34820f8968b6d508c2be8
+```
+
+### Replication command
+
+```bash
+cd ~/PhIRE
+
+mkdir -p spatial_pd
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 \
+  spatial_pd/phase5a_extract_sample69_pair_provenance.py \
+  --phire ~/PhIRE \
+  --out ~/PhIRE/spatial_pd/phase5a_sample69_provenance \
+  2>&1 | tee ~/PhIRE/spatial_pd/phase5a_sample69_provenance.log
+```
+
+### Authoritative input PD VTUs
+
+Pretrained CNN:
+
+```text
+ttk_runs_fixed/cnn/pd/
+    cnn_GT_s69_speed_p160_x0_y0_pd_port_0.vtu
+    cnn_SR_s69_speed_p160_x0_y0_pd_port_0.vtu
+```
+
+Reconstruction-only:
+
+```text
+ttk_runs_fixed/topology_finetuning/
+    candidateUV_expanded2688_topology/pd/GT/
+        candidateUV_expanded2688_GT_s69_speed_p160_x0_y0_pd_port_0.vtu
+
+ttk_runs_fixed/topology_finetuning/
+    candidateUV_expanded2688_topology/pd/SR/
+        candidateUV_expanded2688_SR_s69_speed_p160_x0_y0_pd_port_0.vtu
+```
+
+Topology-inspired:
+
+```text
+ttk_runs_fixed/topology_finetuning/
+    candidateF_grad_E2_low_expanded2688_topology/pd/GT/
+        candidateF_grad_E2_low_expanded2688_GT_s69_speed_p160_x0_y0_pd_port_0.vtu
+
+ttk_runs_fixed/topology_finetuning/
+    candidateF_grad_E2_low_expanded2688_topology/pd/SR/
+        candidateF_grad_E2_low_expanded2688_SR_s69_speed_p160_x0_y0_pd_port_0.vtu
+```
+
+### TTK PD schema confirmed
+
+Cell arrays:
+
+```text
+PairIdentifier
+PairType
+Persistence
+Birth
+IsFinite
+```
+
+Point arrays:
+
+```text
+ttkVertexScalarField
+CriticalType
+Coordinates
+```
+
+Important interpretation:
+
+```text
+VTU geometric point coordinates:
+    persistence-diagram display geometry
+
+point-data "Coordinates":
+    original scalar-grid critical-point coordinates
+
+point-data "ttkVertexScalarField":
+    original input-grid VertexId
+```
+
+Observed finite-pair geometry follows:
+
+```text
+point 0:
+    approximately (birth, birth, 0)
+
+point 1:
+    approximately (birth, death, 0)
+```
+
+The spatial critical-point location must therefore come from the **point-data
+`Coordinates` array**, not from the VTU display geometry.
+
+### VertexId / spatial-coordinate consistency
+
+For all six sample-69 PD files:
+
+```text
+vid_xy_fail = 0
+```
+
+The raw grid convention is therefore confirmed:
+
+```text
+VertexId = y * 160 + x
+```
+
+for the stored raw orientation.
+
+### Extracted pair counts
+
+```text
+Pretrained CNN GT:
+    cells = 2064
+    finite = 2062
+    nonfinite = 2
+    PairType counts = {-1:1, 0:1100, 1:963}
+
+Pretrained CNN SR:
+    cells = 1066
+    finite = 1064
+    nonfinite = 2
+    PairType counts = {-1:1, 0:573, 1:492}
+
+Reconstruction-only GT:
+    cells = 2064
+    finite = 2062
+    nonfinite = 2
+    PairType counts = {-1:1, 0:1100, 1:963}
+
+Reconstruction-only SR:
+    cells = 746
+    finite = 744
+    nonfinite = 2
+    PairType counts = {-1:1, 0:405, 1:340}
+
+Topology-inspired GT:
+    cells = 2065
+    finite = 2063
+    nonfinite = 2
+    PairType counts = {-1:1, 0:1101, 1:963}
+
+Topology-inspired SR:
+    cells = 1740
+    finite = 1738
+    nonfinite = 2
+    PairType counts = {-1:1, 0:885, 1:854}
+```
+
+### Historical topology-inspired orientation
+
+The topology-inspired historical PD artifacts are transposed relative to the
+CNN/reconstruction-only orientation.
+
+For example, one shared GT critical point appears as:
+
+```text
+CNN / reconstruction-only:
+    Coordinates = (112, 66)
+
+topology-inspired historical artifact:
+    Coordinates = (66, 112)
+```
+
+The Step-2 extractor therefore preserved both:
+
+```text
+raw x/y
+canonical x/y
+```
+
+and used:
+
+```text
+topology-inspired canonicalization:
+    (x,y)_canonical = (y,x)_raw
+```
+
+This is only a diagnostic normalization of historical artifacts. It does not
+yet establish that those artifacts are ideal for the new spatial benchmark.
+
+### Step-2 output files
+
+```text
+spatial_pd/phase5a_sample69_provenance/
+    pretrained_cnn_GT_sample69_pair_provenance.csv
+    pretrained_cnn_SR_sample69_pair_provenance.csv
+    reconstruction_only_GT_sample69_pair_provenance.csv
+    reconstruction_only_SR_sample69_pair_provenance.csv
+    topology_inspired_GT_sample69_pair_provenance.csv
+    topology_inspired_SR_sample69_pair_provenance.csv
+    sample69_all_pair_provenance.csv
+    sample69_pair_provenance_audit.json
+```
+
+---
+
+## XXXVIII.3 Phase 5A Step 2B — exact GT provenance exception diagnostic
+
+### Why Step 2B was needed
+
+The first Step-2 diagnostic compared GT pairs using rounded
+`(PairType, IsFinite, Birth, Persistence)` dictionary keys and reported seven
+coordinate mismatches.
+
+That diagnostic was not strong enough because:
+- distinct pairs can share scalar tuples;
+- rounded keys can collide;
+- a Python dictionary can silently retain only one row for a duplicated key;
+- `PairIdentifier` may not be stable across reordered/transposed TTK outputs.
+
+A second diagnostic therefore used:
+- exact floating-point scalar keys;
+- multiset comparison for duplicate keys;
+- explicit PairIdentifier cross-track checks;
+- exact canonical-coordinate comparison.
+
+### Script
+
+```text
+spatial_pd/phase5a_diagnose_sample69_gt_provenance.py
+```
+
+Original generated-script SHA-256:
+
+```text
+371819b09c238c3160a1cbf9946fed7a0dd387bea753503380cd2c43dcff1f53
+```
+
+### Replication command
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 \
+  spatial_pd/phase5a_diagnose_sample69_gt_provenance.py \
+  --provenance ~/PhIRE/spatial_pd/phase5a_sample69_provenance \
+  --out ~/PhIRE/spatial_pd/phase5a_sample69_provenance_diagnostic \
+  2>&1 | tee ~/PhIRE/spatial_pd/phase5a_sample69_provenance_diagnostic.log
+```
+
+### Step-2B output
+
+```text
+spatial_pd/phase5a_sample69_provenance_diagnostic/
+    phase5a_step2b_gt_provenance_diagnostic.json
+```
+
+Log:
+
+```text
+spatial_pd/phase5a_sample69_provenance_diagnostic.log
+```
+
+---
+
+## XXXVIII.4 Special PD display-geometry cell resolved
+
+Every GT file had exactly one display-geometry check failure.
+
+Pretrained CNN / reconstruction-only:
+
+```text
+cell = 2063
+PairIdentifier = -1
+Birth = 0.0
+Death = 28.3577880859375
+
+display point 0 =
+    (0.12207793444395065,
+     0.12207793444395065,
+     0.0)
+
+display point 1 =
+    (14.11175537109375,
+     14.11175537109375,
+     0.0)
+```
+
+Topology-inspired:
+
+```text
+cell = 2064
+PairIdentifier = -1
+
+same Birth / Death metadata
+same display geometry
+```
+
+Interpretation:
+
+> The sole PD-display-geometry exception is the special `PairIdentifier=-1`
+> bookkeeping/global cell, not a normal finite D0/D1 persistence pair.
+
+It is outside the corrected finite-diagram semantic layer used for the standard
+PD distances and should remain excluded from finite matched-feature spatial
+analysis.
+
+This resolves the repeated `pd_geom_fail=1` observation from Step 2.
+
+---
+
+## XXXVIII.5 Exact-key duplicate audit
+
+Finite D0/D1 rows:
+
+```text
+pretrained CNN:
+    2062
+
+reconstruction-only:
+    2062
+
+topology-inspired:
+    2063
+```
+
+Each GT track has:
+
+```text
+duplicate exact scalar keys:
+    1
+
+duplicate row excess:
+    1
+```
+
+Therefore scalar `(PairType, Birth, Persistence)` values alone are not globally
+unique identifiers for persistence features.
+
+Any spatial matching implementation must preserve row-level feature identity
+and must not collapse pairs through a simple scalar-key dictionary.
+
+---
+
+## XXXVIII.6 PairIdentifier is not a cross-track feature identifier
+
+Across the three GT tracks:
+
+```text
+common finite PairIdentifiers:
+    2062
+
+PairIdentifier scalar/coordinate disagreements:
+    951
+```
+
+Examples show that the topology-inspired transposed artifact can contain the
+same physical/scalar pairs in a different PairIdentifier ordering.
+
+For example:
+
+```text
+CNN / reconstruction-only PairIdentifier 16:
+    Birth = 0.25330352783203125
+    Persistence = 2.5360870361328125
+
+topology-inspired PairIdentifier 16:
+    Birth = 0.25330352783203125
+    Persistence = 0.20752719044685364
+```
+
+while the corresponding topology-inspired physical pair appears at a nearby
+different PairIdentifier.
+
+Conclusion:
+
+> `PairIdentifier` is a file-local identifier and must **not** be treated as a
+> stable cross-track feature ID.
+
+This is important for Phase 5. GT↔SR feature correspondence must come from an
+explicit persistence-diagram matching, not equality of PairIdentifier.
+
+---
+
+## XXXVIII.7 CNN vs reconstruction-only GT provenance
+
+Using exact scalar-key multiset comparison:
+
+```text
+finite rows:
+    2062 vs 2062
+
+exact scalar keys:
+    2061 vs 2061
+
+common exact scalar keys:
+    2061
+
+CNN-only keys:
+    0
+
+reconstruction-only-only keys:
+    0
+
+exact coordinate matches:
+    2062
+
+unique coordinate mismatches:
+    0
+
+multiplicity/duplicate mismatches:
+    0
+```
+
+Conclusion:
+
+> The CNN and reconstruction-only GT persistence-pair provenance is exactly
+> identical at the finite-pair scalar and spatial-coordinate level.
+
+These two historical tracks can be treated as sharing the same GT PD
+representation for the spatial study.
+
+---
+
+## XXXVIII.8 CNN vs historical topology-inspired GT provenance
+
+Exact comparison after swapping topology-inspired raw x/y into the CNN
+canonical orientation:
+
+```text
+CNN finite rows:
+    2062
+
+topology-inspired finite rows:
+    2063
+
+CNN exact scalar keys:
+    2061
+
+topology-inspired exact scalar keys:
+    2062
+
+common exact scalar keys:
+    2061
+
+CNN-only scalar keys:
+    0
+
+topology-inspired-only scalar keys:
+    1
+
+exact canonical coordinate matches:
+    2056
+
+unique coordinate mismatches:
+    6
+
+multiplicity/duplicate mismatches:
+    0
+```
+
+### Extra topology-inspired pair
+
+The one topology-inspired-only scalar key is:
+
+```text
+PairType:
+    0
+
+Birth:
+    6.204414367675781
+
+Death:
+    6.204414367675781
+
+Persistence:
+    0.0
+
+cell_index:
+    1498
+
+PairIdentifier:
+    1498
+
+raw critical-point coordinates:
+    birth = (67,55)
+    death = (66,56)
+
+canonical coordinates:
+    birth = (55,67)
+    death = (56,66)
+```
+
+Therefore the topology-inspired historical GT artifact contains one additional
+**zero-persistence D0 pair**.
+
+### Six common-pair coordinate differences
+
+All six scalar-pair mismatches have the same geometric magnitude pattern:
+
+```text
+one endpoint displacement:
+    0 pixels
+
+other endpoint displacement:
+    sqrt(2) = 1.4142135623730951 pixels
+```
+
+Breakdown:
+
+```text
+three D0 pairs:
+    birth displacement = 0
+    death/saddle displacement = sqrt(2)
+
+three D1 pairs:
+    birth/saddle displacement = sqrt(2)
+    death/maximum displacement = 0
+```
+
+Representative D0 example:
+
+```text
+Birth = 2.6764755249023438
+Persistence = 0.1373291015625
+
+CNN:
+    birth = (110,22)
+    death = (110,21)
+
+topology-inspired canonical:
+    birth = (110,22)
+    death = (109,22)
+
+birth displacement:
+    0
+
+death displacement:
+    sqrt(2)
+```
+
+Representative D1 example:
+
+```text
+Birth = 4.748680114746094
+Persistence = 0.3967437744140625
+
+CNN:
+    birth = (52,152)
+    death = (51,155)
+
+topology-inspired canonical:
+    birth = (51,153)
+    death = (51,155)
+
+birth displacement:
+    sqrt(2)
+
+death displacement:
+    0
+```
+
+### Interpretation
+
+The historical topology-inspired GT PD is nearly identical to the canonical
+CNN/UV GT PD in scalar persistence space but is **not perfectly identical in
+spatial critical-point provenance** after simple transpose normalization.
+
+The residual consists of:
+
+```text
+1 additional zero-persistence D0 pair
+6 common scalar pairs with one endpoint shifted by one diagonal grid step
+```
+
+This behavior is consistent with orientation / triangulation / tie-order
+sensitivity in critical-vertex representative selection, but the exact cause
+has **not** been formally isolated and should not be asserted more strongly.
+
+The previous apparently large seventh mismatch from Step 2 disappeared under
+the exact multiset audit and was therefore a diagnostic key-collision artifact,
+not a genuine spatial discrepancy.
+
+---
+
+## XXXVIII.9 Consequence for the new spatial benchmark
+
+For ordinary scalar PD distance, the historical transpose was largely harmless
+because the birth/death values are nearly identical and standard PD matching
+does not use x/y positions.
+
+For the **new spatially aware evaluation**, critical-point x/y is itself part
+of the quantity being measured.
+
+Therefore directly comparing:
+
+```text
+CNN / reconstruction-only:
+    canonical-orientation historical GT PD
+
+against
+
+topology-inspired:
+    transposed historical GT PD corrected only by x/y swapping
+```
+
+would retain a small representation-level spatial confound.
+
+### Recommended methodological change
+
+Before GT↔SR spatial matching, regenerate the relevant PD artifacts from a
+**single canonical orientation** using the already repaired C-order VTI
+convention:
+
+```text
+scalar_2d[y,x] -> VTK point (x,y)
+
+flat =
+    np.ascontiguousarray(scalar_2d).ravel(order="C")
+```
+
+The project already fixed and validated this convention in:
+
+```text
+scripts/convert_phire_to_vti.py
+```
+
+and previously verified it with:
+
+```text
+scripts/verify_vti_coordinate_mapping.py
+```
+
+For Phase 5, use this canonical orientation for:
+
+```text
+one shared GT field
+CNN SR
+reconstruction-only SR
+topology-inspired SR
+```
+
+Then run the same TTK persistence-diagram extraction on all four canonical
+fields.
+
+This makes the spatial comparison methodologically cleaner:
+
+```text
+same grid orientation
+same triangulation orientation
+same GT persistence representation
+same coordinate convention
+different SR fields only
+```
+
+### Important distinction
+
+This canonical regeneration is a **new Phase-5 evaluation layer**.
+
+It does not invalidate the already closed corrected PD results or the frozen
+TopoInVis/arXiv-v1 study. Those scalar persistence-distance conclusions remain
+authoritative.
+
+The regeneration is needed because Phase 5 introduces a new quantity
+(original critical-point displacement) that is sensitive to spatial
+representative selection.
+
+---
+
+## XXXVIII.10 Current Phase-5A status
+
+```text
+Step 1:
+    locate authoritative sample-69 PD artifacts
+    COMPLETE
+
+Step 2:
+    extract persistence-pair scalar + spatial provenance
+    COMPLETE
+
+Step 2B:
+    diagnose special cells, duplicates, PairIdentifier instability,
+    and cross-track GT spatial differences
+    COMPLETE
+
+Spatial provenance availability:
+    VALIDATED
+
+VertexId -> Coordinate convention:
+    VALIDATED
+
+CNN / reconstruction-only GT spatial provenance:
+    EXACTLY IDENTICAL
+
+historical topology-inspired GT after transpose normalization:
+    scalar-pair structure almost identical
+    + one zero-persistence D0 pair
+    + six one-diagonal-step endpoint differences
+
+PairIdentifier as cross-track ID:
+    REJECTED
+
+historical mixed-orientation GT artifacts for final spatial comparison:
+    NOT RECOMMENDED
+
+next:
+    canonical-orientation Phase-5 PD regeneration preflight
+```
+
+---
+
+## XXXVIII.11 Next replication gate
+
+Before generating any new canonical PDs, inspect the already repaired C-order
+writer and the exact TTK persistence-diagram invocation currently used by the
+authoritative pipeline.
+
+The next preflight should identify:
+
+```text
+1. exact CLI for scripts/convert_phire_to_vti.py
+2. exact canonical scalar-array source paths for sample 69
+3. exact TTK persistence-diagram command/filter settings
+4. desired new Phase-5-only output directory
+5. safeguards preventing overwrite of historical audited artifacts
+```
+
+No historical `ttk_runs_fixed/...` PD artifact should be overwritten.
+
+A new directory such as:
+
+```text
+ttk_runs_fixed/spatial_pd_phase5/
+```
+
+or:
+
+```text
+spatial_pd/canonical_pd_sample69/
+```
+
+should be used for the new experiment.
+
+
+
+
+---
+
+# Part XXXIX — Phase 5A Canonical-Regeneration Preflight
+
+**Status:** COMPLETE / PASS. The repaired C-order writer, exact TTK PD invocation, and cross-track sample-69 GT array equality were recovered and verified. Phase 5A can proceed to an isolated canonical-orientation PD regeneration without touching historical topology artifacts.
+
+## XXXIX.1 Purpose
+
+Step 2B showed that historical topology-inspired GT PD artifacts retain a small
+orientation-sensitive critical-vertex provenance difference after simple x/y
+swapping.
+
+Because Phase 5 explicitly measures physical critical-point displacement, the
+new spatial evaluation should regenerate GT and all SR persistence diagrams
+from one canonical grid orientation.
+
+The preflight therefore checked:
+
+```text
+1. exact CLI of the repaired VTI writer;
+2. exact x/y / flattening convention;
+3. exact TTK persistence-diagram invocation;
+4. equality of the underlying sample-69 GT NumPy arrays across CNN / UV / F1.
+```
+
+All four gates passed.
+
+---
+
+## XXXIX.2 Repaired C-order VTI writer
+
+Script:
+
+```text
+scripts/convert_phire_to_vti.py
+```
+
+Recovered CLI:
+
+```text
+usage: convert_phire_to_vti.py [-h]
+    --input INPUT
+    [--outdir OUTDIR]
+    [--label LABEL]
+    [--scalar {speed,u,v}]
+    [--patch PATCH]
+    [--x0 X0]
+    [--y0 Y0]
+    [--samples SAMPLES [SAMPLES ...]]
+```
+
+Relevant arguments:
+
+```text
+--input:
+    .npy file such as dataGT.npy / dataSR.npy
+
+--scalar:
+    speed / u / v
+
+--patch:
+    square patch size; 0 = full field
+
+--x0:
+    column offset
+
+--y0:
+    row offset
+
+--samples:
+    array positions to export
+```
+
+For the Phase-5 sample-69 regeneration, the intended settings are:
+
+```text
+sample array position:
+    69
+
+scalar:
+    speed
+
+patch:
+    160
+
+x0:
+    0
+
+y0:
+    0
+```
+
+---
+
+## XXXIX.3 Canonical spatial convention recovered
+
+The repaired writer explicitly documents:
+
+```text
+scalar_2d[y,x] -> VTK point (x,y)
+```
+
+with:
+
+```text
+VTK pointId = x + y*W
+```
+
+and:
+
+```python
+flat = np.ascontiguousarray(scalar_2d).ravel(order="C")
+```
+
+ImageData settings:
+
+```text
+Dimensions:
+    (W, H, 1)
+
+Extent:
+    (0, W-1, 0, H-1, 0, 0)
+
+Spacing:
+    (1.0, 1.0, 1.0)
+
+Origin:
+    (0.0, 0.0, 0.0)
+```
+
+The source also explicitly records that the earlier `ravel(order="F")`
+implementation silently transposed square fields.
+
+Therefore the Phase-5 canonical spatial coordinate convention is now frozen as:
+
+```text
+array row    = y
+array column = x
+
+VertexId = x + y*W
+```
+
+for W=160.
+
+---
+
+## XXXIX.4 Wind-speed scalar construction
+
+For vector samples `(H,W,C)`:
+
+```python
+u = sample[..., 0]
+v = sample[..., 1]
+
+wind_speed =
+    np.sqrt(
+        u.astype(np.float32)**2
+        + v.astype(np.float32)**2
+    )
+```
+
+The writer outputs the VTK array:
+
+```text
+wind_speed
+```
+
+as float32.
+
+This exact writer, rather than a newly written Phase-5 scalar conversion,
+should be reused.
+
+---
+
+## XXXIX.5 Existing authoritative TTK PD invocation
+
+The established topology pipeline is:
+
+```text
+scripts/run_candidate_topology_pipeline.sh
+```
+
+Relevant defaults:
+
+```text
+docker image:
+    phire-ttk:latest
+
+n_samples:
+    168
+
+scalar:
+    speed
+
+patch:
+    160
+
+x0:
+    0
+
+y0:
+    0
+
+threads:
+    20
+```
+
+Stage 1 runs `scripts/convert_phire_to_vti.py` inside the same Docker image.
+
+Stage 2 runs the persistence extraction as:
+
+```bash
+ttkPersistenceDiagramCmd -t $THREADS \
+  -i <input>.vti \
+  -a wind_speed \
+  -o <output-prefix>
+```
+
+Thus the Phase-5 canonical regeneration should preserve:
+
+```text
+TTK command:
+    ttkPersistenceDiagramCmd
+
+threads:
+    20
+
+active scalar:
+    wind_speed
+
+other algorithmic settings:
+    TTK command defaults
+```
+
+No new PD extraction convention is needed.
+
+---
+
+## XXXIX.6 Sample-69 raw array audit
+
+Roots:
+
+```text
+CNN:
+    ~/PhIRE/data_out_fixed/wind_mrhr_cnn
+
+reconstruction-only:
+    ~/PhIRE/data_out/wind_finetune_candidateUV_expanded2688
+
+topology-inspired:
+    ~/PhIRE/data_out/wind_finetune_candidateF_grad_E2_low_expanded2688
+```
+
+For all three:
+
+```text
+sample position:
+    69
+
+GT shape:
+    (500,500,2)
+
+SR shape:
+    (500,500,2)
+
+GT dtype:
+    float64
+
+SR dtype:
+    float64
+```
+
+GT SHA-256 of contiguous raw NumPy bytes:
+
+```text
+8f221937cedccc500b0d213758384d22e8c53a3a5fc6776885473b9ecc1e0c0a
+```
+
+The hash is identical for CNN, reconstruction-only, and topology-inspired.
+
+Observed full-field GT speed range:
+
+```text
+min:
+    0.05798339978033268
+
+max:
+    21.509444623007557
+```
+
+Observed SR full-field speed ranges:
+
+```text
+CNN:
+    0.02759863832823329
+    to
+    20.567557276329012
+
+reconstruction-only:
+    0.032186582348861605
+    to
+    18.355405247815227
+
+topology-inspired:
+    0.016686087939464675
+    to
+    20.027876095257334
+```
+
+Exact GT cross-track equality:
+
+```text
+CNN == reconstruction-only:
+    True
+    max_abs_diff = 0.0
+
+CNN == topology-inspired:
+    True
+    max_abs_diff = 0.0
+```
+
+Conclusion:
+
+> The three model tracks use a bit-identical sample-69 GT NumPy field before
+> historical VTI serialization. Therefore Phase 5 can legitimately regenerate
+> one shared canonical GT persistence diagram and compare all three canonically
+> regenerated SR diagrams against it.
+
+This removes the historical topology-inspired GT orientation artifact from the
+new spatial experiment by construction rather than by post-hoc coordinate
+swapping.
+
+---
+
+## XXXIX.7 Phase-5 canonical sample-69 regeneration design
+
+Generate exactly four canonical VTI fields:
+
+```text
+1. shared GT
+2. pretrained CNN SR
+3. reconstruction-only SR
+4. topology-inspired SR
+```
+
+All use:
+
+```text
+sample = 69
+scalar = speed
+patch = 160
+x0 = 0
+y0 = 0
+C-order writer
+```
+
+Then generate exactly four PD outputs with:
+
+```bash
+ttkPersistenceDiagramCmd -t 20 \
+  -i <canonical-vti> \
+  -a wind_speed \
+  -o <isolated-phase5-output-prefix>
+```
+
+### Isolation requirement
+
+Do not write into or overwrite:
+
+```text
+ttk_runs_fixed/cnn/...
+ttk_runs_fixed/topology_finetuning/...
+```
+
+Use a Phase-5-only path such as:
+
+```text
+~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd/
+```
+
+The canonical regeneration is a **new spatial-evaluation artifact layer**.
+Historical corrected PD distances remain frozen and authoritative for the
+TopoInVis/arXiv-v1 study.
+
+---
+
+## XXXIX.8 Preflight result
+
+```text
+repaired writer CLI:
+    PASS
+
+C-order x/y convention:
+    PASS
+
+exact TTK PD invocation recovered:
+    PASS
+
+sample-69 GT equality across methods:
+    PASS
+
+canonical regeneration:
+    READY
+```
+
+Next:
+
+```text
+Phase 5A Step 3:
+    generate isolated canonical GT/CNN-SR/UV-SR/F1-SR VTIs
+    verify orientation against historical exact TTK-input fields
+    generate four canonical PDs
+    preserve hashes/inventory
+```
+
+
+
+---
+
+# Part XL — Phase 5A Step 3 Canonical VTI Regeneration: Orientation Gate Failure
+
+**Status:** VTI generation succeeded; the safety gate failed before TTK PD
+extraction. No canonical Phase-5 PDs were generated. Historical artifacts were
+not modified.
+
+## XL.1 Replication command
+
+```bash
+cd ~/PhIRE
+
+bash spatial_pd/run_phase5a_sample69_canonical_pd.sh \
+  ~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd
+```
+
+Runner SHA-256 at execution:
+
+```text
+c5ca8cea412574c73436f6aca37129f72c0c7454a1b10942e4b75377b74d5b2f
+```
+
+## XL.2 Runtime provenance
+
+```text
+date:
+    2026-09-18T15:59:02-05:00
+
+host:
+    spark-345b
+
+threads:
+    20
+
+Docker image:
+    phire-ttk:latest
+
+Docker image ID:
+    sha256:858d3154edb75c098ccda15f9f812eecbd0d102af77055906d42a67a390d5c86
+```
+
+Script hashes:
+
+```text
+scripts/convert_phire_to_vti.py
+    758464a46e36a77359e539d89d96bd4493473f1c106687cefe92321991dba7cc
+
+scripts/run_candidate_topology_pipeline.sh
+    830be1026b33a39ea7a15d193980baa0a249e90bbb9a2c6b07a480abec67646f
+```
+
+Input-array file hashes:
+
+```text
+CNN dataGT.npy:
+    f2d3942ffec7f55d0f6955a2dc75d3a580a25f9e82f5fba5a9c47fb73e7ee2af
+
+CNN dataSR.npy:
+    e13120a8cfcb0ecb4c28c7ff3f835cc2f5f075d27b1eb78b8987c9eb0c8f6f2e
+
+reconstruction-only dataGT.npy:
+    f2d3942ffec7f55d0f6955a2dc75d3a580a25f9e82f5fba5a9c47fb73e7ee2af
+
+reconstruction-only dataSR.npy:
+    2bb16d37879a3d199c700bbfc250aeb312f85c800739b548969020822fd70ece
+
+topology-inspired dataGT.npy:
+    f2d3942ffec7f55d0f6955a2dc75d3a580a25f9e82f5fba5a9c47fb73e7ee2af
+
+topology-inspired dataSR.npy:
+    b081c5a262db90243f8900b89a87e19b5e45a5bea81ed1b2cd608338c9123263
+```
+
+This independently confirms that the three model tracks store the same GT file.
+
+## XL.3 Four new canonical C-order VTIs were written successfully
+
+Output directory:
+
+```text
+~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd/vti/
+```
+
+Files:
+
+```text
+phase5_GT_s69_speed_p160_x0_y0.vti
+phase5_CNN_SR_s69_speed_p160_x0_y0.vti
+phase5_UV_SR_s69_speed_p160_x0_y0.vti
+phase5_F1_SR_s69_speed_p160_x0_y0.vti
+```
+
+Observed scalar ranges:
+
+```text
+GT:
+    [0.1221, 14.3010]
+
+CNN SR:
+    [0.0679, 12.3677]
+
+reconstruction-only SR:
+    [0.0879, 12.1584]
+
+topology-inspired SR:
+    [0.0302, 13.5291]
+```
+
+These ranges agree with the previously audited sample-69 scalar ranges.
+
+## XL.4 Safety gate result
+
+The runner initially assumed:
+
+```text
+new canonical GT/CNN/UV
+    == historical CNN/UV exact-TTK-input field in raw orientation
+
+new canonical topology-inspired SR
+    == transpose(historical topology-inspired field)
+```
+
+Observed result:
+
+```text
+GT:
+    new == historical CNN raw:
+        False
+    max_abs_diff:
+        10.504469633102417
+
+CNN SR:
+    new == historical CNN raw:
+        False
+    max_abs_diff:
+        8.666558921337128
+
+reconstruction-only SR:
+    new == historical UV raw:
+        False
+    max_abs_diff:
+        8.087376475334167
+
+topology-inspired SR:
+    new == historical F1 raw:
+        True
+    max_abs_diff:
+        0.0
+
+topology-inspired SR:
+    new == transpose(historical F1):
+        False
+    max_abs_diff:
+        9.793493568897247
+```
+
+The runner then exited with:
+
+```text
+Canonicalization gate FAILED. Do not run TTK PD extraction.
+```
+
+Therefore:
+
+```text
+canonical C-order VTI generation:
+    SUCCESS
+
+TTK PD extraction:
+    NOT RUN
+
+historical artifacts modified:
+    NO
+
+Phase-5 PD outputs created:
+    NO
+```
+
+## XL.5 Interpretation
+
+This result does **not** indicate that the repaired C-order writer is wrong.
+
+Instead, it shows that the orientation assumption encoded in the Step-3 safety
+gate is inconsistent with the actual mixed historical topology-artifact
+provenance.
+
+The strongest clue is:
+
+```text
+new canonical topology-inspired SR
+    == historical F1 SR raw exactly
+```
+
+while the new canonical CNN/UV fields do not equal their historical raw
+port-2 fields.
+
+This suggests that at least part of the topology-inspired historical pipeline
+was already generated using the corrected C-order writer, whereas older
+CNN/UV topology artifacts may retain the historical transposed/F-order
+serialization.
+
+This is consistent with the broader project history, but it must be verified
+directly before changing the gate.
+
+No scientific result should be inferred from the large raw-orientation
+differences; a transpose-aware comparison is required first.
+
+## XL.6 Next diagnostic
+
+Before running TTK on the new canonical VTIs, compare each new field against
+**both** raw and transposed forms of every corresponding historical exact
+TTK-input field.
+
+Required checks:
+
+```text
+new GT vs historical:
+    CNN GT raw / transpose
+    UV GT raw / transpose
+    F1 GT raw / transpose
+
+new CNN SR vs historical CNN SR:
+    raw / transpose
+
+new reconstruction-only SR vs historical UV SR:
+    raw / transpose
+
+new topology-inspired SR vs historical F1 SR:
+    raw / transpose
+```
+
+The gate should only be revised after this orientation matrix is explicit.
+
+
+
+
+---
+
+# Part XLI — Phase 5A Step 3A Exact Orientation Matrix
+
+**Status:** COMPLETE / PASS. The mixed historical orientation relationship was
+resolved exactly. The four newly written Phase-5 VTIs are the desired canonical
+C-order fields and can be reused; they do not need to be regenerated.
+
+## XLI.1 Replication command
+
+```bash
+cd ~/PhIRE
+
+PYTHONNOUSERSITE=1 /usr/bin/python3 \
+  spatial_pd/phase5a_diagnose_sample69_vti_orientation.py \
+  --phase5 ~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd \
+  --phire ~/PhIRE \
+  --out ~/PhIRE/spatial_pd/phase5a_sample69_orientation_diagnostic \
+  2>&1 | tee ~/PhIRE/spatial_pd/phase5a_sample69_orientation_diagnostic.log
+```
+
+Diagnostic script SHA-256:
+
+```text
+8d1d7b23c8d7efd699f23db82d1bc194a72c86221728968bdff53ed9b554d6c1
+```
+
+Output JSON:
+
+```text
+~/PhIRE/spatial_pd/phase5a_sample69_orientation_diagnostic/
+    phase5a_step3a_orientation_matrix.json
+```
+
+## XLI.2 Exact new-vs-historical orientation relationships
+
+### Shared canonical GT
+
+Against historical CNN GT:
+
+```text
+raw:
+    equal = False
+    max_abs_diff = 10.504469633102417
+    mean_abs_diff = 1.8232351630408083
+
+transpose(historical):
+    equal = True
+    max_abs_diff = 0.0
+    mean_abs_diff = 0.0
+```
+
+Against historical reconstruction-only GT:
+
+```text
+raw:
+    equal = False
+    max_abs_diff = 10.504469633102417
+    mean_abs_diff = 1.8232351630408083
+
+transpose(historical):
+    equal = True
+    max_abs_diff = 0.0
+    mean_abs_diff = 0.0
+```
+
+Against historical topology-inspired GT:
+
+```text
+raw:
+    equal = True
+    max_abs_diff = 0.0
+    mean_abs_diff = 0.0
+
+transpose(historical):
+    equal = False
+    max_abs_diff = 10.504469633102417
+    mean_abs_diff = 1.8232351630408083
+```
+
+Therefore:
+
+```text
+new canonical GT
+    = transpose(historical CNN GT)
+    = transpose(historical reconstruction-only GT)
+    = historical topology-inspired GT
+```
+
+exactly.
+
+### Canonical CNN SR
+
+```text
+new CNN SR == historical CNN SR raw:
+    False
+
+new CNN SR == transpose(historical CNN SR):
+    True
+    max_abs_diff = 0.0
+```
+
+### Canonical reconstruction-only SR
+
+```text
+new reconstruction-only SR == historical reconstruction-only SR raw:
+    False
+
+new reconstruction-only SR == transpose(historical reconstruction-only SR):
+    True
+    max_abs_diff = 0.0
+```
+
+### Canonical topology-inspired SR
+
+```text
+new topology-inspired SR == historical topology-inspired SR raw:
+    True
+    max_abs_diff = 0.0
+
+new topology-inspired SR == transpose(historical topology-inspired SR):
+    False
+```
+
+## XLI.3 Historical GT cross-track matrix
+
+Historical CNN GT and reconstruction-only GT are exactly identical in raw
+orientation:
+
+```text
+CNN_GT == UV_GT:
+    True
+```
+
+Historical topology-inspired GT is their exact transpose:
+
+```text
+CNN_GT == transpose(F1_GT):
+    True
+
+UV_GT == transpose(F1_GT):
+    True
+```
+
+and not equal without transposition.
+
+## XLI.4 Interpretation
+
+The historical topology artifact set contains two exact orientation
+conventions:
+
+```text
+historical CNN / reconstruction-only:
+    exact transpose of repaired canonical C-order fields
+
+historical topology-inspired:
+    already equal to repaired canonical C-order fields
+```
+
+This is fully consistent with the known writer history:
+
+```text
+older writer:
+    ravel(order="F")
+    -> square-field transpose
+
+repaired writer:
+    ravel(order="C")
+    -> scalar_2d[y,x] maps to VTK point (x,y)
+```
+
+The orientation relationship itself is now **proven exactly** by array equality.
+The historical file-generation chronology is consistent with the writer-history
+explanation; no stronger causal provenance claim is needed for Phase 5.
+
+## XLI.5 Consequence
+
+The Step-3 safety gate failed only because it encoded the wrong expectation for
+which historical tracks were transposed.
+
+The four already generated Phase-5 VTIs are correct and should be reused:
+
+```text
+phase5_GT_s69_speed_p160_x0_y0.vti
+phase5_CNN_SR_s69_speed_p160_x0_y0.vti
+phase5_UV_SR_s69_speed_p160_x0_y0.vti
+phase5_F1_SR_s69_speed_p160_x0_y0.vti
+```
+
+No regeneration is required.
+
+The corrected safety gate for Phase 5 is:
+
+```text
+new GT:
+    == transpose(historical CNN GT)
+    == transpose(historical UV GT)
+    == historical F1 GT
+
+new CNN SR:
+    == transpose(historical CNN SR)
+
+new UV SR:
+    == transpose(historical UV SR)
+
+new F1 SR:
+    == historical F1 SR
+```
+
+All comparisons must be exact (`np.array_equal`, max abs diff = 0).
+
+## XLI.6 Scientific boundary
+
+This orientation result does not reopen the frozen TopoInVis/arXiv-v1
+persistence conclusions.
+
+Phase 5 requires canonical orientation because **spatial critical-point
+coordinates are themselves now an evaluation quantity**.
+
+Before beginning spatial matching, however, the newly regenerated canonical PD
+layer should be checked against the historical scalar PD layer to verify that
+canonicalization does not materially change the sample-69 corrected
+\(d_B\), \(W_{2,\infty}\), and \(W_{2,2}\) values.
+
+Planned sequence:
+
+```text
+Step 3B:
+    reuse four canonical VTIs
+    apply corrected orientation gate
+    generate four canonical PDs
+    freeze hashes/counts
+
+Step 3C:
+    compare canonical PD scalar-pair content against historical PDs
+    recompute sample-69 dB / W2inf / W22
+    quantify any canonicalization effect
+
+Step 4:
+    only after Step 3C passes,
+    construct explicit GT<->SR W2 matching
+    and attach critical-point displacement
+```
+
+---
+
+# Part XLII — Phase 5A Step 3B Canonical Persistence-Diagram Extraction
+
+**Status:** COMPLETE / PASS. Four canonical-orientation sample-69 PDs were generated successfully in the isolated Phase-5 workspace. All required TTK cell/point arrays were present and the outputs were hash-frozen.
+
+## XLII.1 Replication command
+
+```bash
+cd ~/PhIRE
+
+bash spatial_pd/run_phase5a_sample69_canonical_pd_step3b.sh \
+  ~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd
+```
+
+Step-3B runner SHA-256:
+
+```text
+f591bc2265e0a3fa6a835a6984a25a09f9b6ac8f29bbfe3e64a7f219f61cf5fc
+```
+
+## XLII.2 Canonical PD outputs
+
+Directory:
+
+```text
+~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd/pd/
+```
+
+Files:
+
+```text
+phase5_CNN_SR_s69_speed_p160_x0_y0_pd_port_0.vtu
+phase5_F1_SR_s69_speed_p160_x0_y0_pd_port_0.vtu
+phase5_GT_s69_speed_p160_x0_y0_pd_port_0.vtu
+phase5_UV_SR_s69_speed_p160_x0_y0_pd_port_0.vtu
+```
+
+## XLII.3 Schema / pair-count validation
+
+All four PDs passed the required schema check.
+
+Observed counts:
+
+```text
+Canonical CNN SR:
+    points = 2130
+    cells = 1066
+    finite = 1064
+    PairType counts = {0:573, 1:492, -1:1}
+
+Canonical topology-inspired SR:
+    points = 3478
+    cells = 1740
+    finite = 1738
+    PairType counts = {0:885, 1:854, -1:1}
+
+Canonical shared GT:
+    points = 4128
+    cells = 2065
+    finite = 2063
+    PairType counts = {0:1101, 1:963, -1:1}
+
+Canonical reconstruction-only SR:
+    points = 1490
+    cells = 746
+    finite = 744
+    PairType counts = {0:405, 1:340, -1:1}
+```
+
+The canonical shared-GT count matches the historical topology-inspired GT extraction rather than the older historical CNN/UV GT extraction.
+
+## XLII.4 Canonical PD hashes
+
+```text
+CNN SR PD:
+    67c5a4f53834e2b4d401852cd7b730fcbeea695a03d0d853e781fa746693520c
+
+topology-inspired SR PD:
+    908dc080096767063ba88d40b17b03affd24126025b4d1b6f672d41d90ad73be
+
+shared GT PD:
+    3b4cb20b2d830ff2edc4b3c13c9f8e866a176824d52a27be9b7517ae392ae7d5
+
+reconstruction-only SR PD:
+    3fd05fedee7317b4fa51bd8a838e2e99928dd3bc2f610a3d686c56d2b97f6f02
+```
+
+Canonical VTI hashes:
+
+```text
+CNN SR:
+    6f3733e91852ab61390de48a5d0c2ac7e742435f07f187039af96f38211efde2
+
+topology-inspired SR:
+    595764f65ce7394b0b89c76eaf41107019eb159440b2e6e32955e106fe3aede4
+
+shared GT:
+    acb6b2529c074d25314a77ec650a3f71fe9139b6e3e2e63cab448a6ff137b579
+
+reconstruction-only SR:
+    3e3674548e031b1e27d32444bdce4753fbb7ec83f4da4dd1ee490a91fb92c420
+```
+
+## XLII.5 Interpretation
+
+Canonical orientation may alter TTK persistence pairing because the image-grid triangulation is fixed in VTK coordinates. Therefore the next gate is to quantify the scalar-topology effect rather than assume it is zero.
+
+Frozen corrected historical sample-69 values:
+
+```text
+CNN:
+    d_B    = 3.06704616546631
+    W2inf  = 14.57226729106
+    W22    = 18.7224189780594
+
+reconstruction-only:
+    d_B    = 2.43620783090591
+    W2inf  = 15.2562312172225
+    W22    = 19.9125812541732
+
+topology-inspired:
+    d_B    = 1.23333263397217
+    W2inf  = 9.98731279438054
+    W22    = 12.3229624979698
+```
+
+These values remain frozen for the TopoInVis/arXiv-v1 study. Canonical-orientation values are a new Phase-5 diagnostic layer.
+
+
+
+---
+
+# Part XLIII — Phase 5A Step 3C Canonical-vs-Historical Scalar-PD Audit
+
+**Status:** COMPLETE / PASS. Canonical orientation preserves the corrected
+sample-69 persistence distances exactly (up to floating-point roundoff), while
+removing the historical x/y orientation ambiguity needed for spatial analysis.
+
+## XLIII.1 Replication command
+
+```bash
+cd ~/PhIRE
+
+export AUDIT="$HOME/phire_runtime_audit_20260809_221548"
+
+unset PYTHONPATH
+unset PYTHONHOME
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+  python spatial_pd/phase5a_compare_sample69_canonical_vs_historical_pd.py \
+  --phire ~/PhIRE \
+  --audit "$AUDIT" \
+  --phase5 ~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd \
+  --out ~/PhIRE/spatial_pd/phase5a_sample69_pd_scalar_audit \
+  2>&1 | tee ~/PhIRE/spatial_pd/phase5a_sample69_pd_scalar_audit.log
+```
+
+Step-3C script SHA-256:
+
+```text
+b3ba6304e43dbf935153ddb72e7d09fc007f6fe9469f02356de407ebc85fb197
+```
+
+Output directory:
+
+```text
+~/PhIRE/spatial_pd/phase5a_sample69_pd_scalar_audit/
+```
+
+## XLIII.2 Scalar-pair multiset comparison
+
+### Canonical GT vs historical CNN GT
+
+```text
+D0:
+    canonical = 1100
+    historical = 1099
+    common = 1099
+    canonical-only = 1
+    historical-only = 0
+
+D1:
+    canonical = 963
+    historical = 963
+    common = 963
+    canonical-only = 0
+    historical-only = 0
+```
+
+The one canonical-only D0 pair is:
+
+```text
+birth = death = 0x1.8d15200000000p+2
+```
+
+which is the already identified exact zero-persistence D0 pair at:
+
+```text
+6.204414367675781
+```
+
+### Canonical GT vs historical reconstruction-only GT
+
+Identical pattern to historical CNN GT:
+
+```text
+D0:
+    +1 zero-persistence canonical-only pair
+
+D1:
+    exact equality
+```
+
+### Canonical GT vs historical topology-inspired GT
+
+```text
+D0:
+    exact multiset equality, 1100 / 1100
+
+D1:
+    exact multiset equality, 963 / 963
+```
+
+### SR diagrams
+
+All three canonical SR scalar-pair multisets are exactly identical to their
+historical counterparts:
+
+```text
+CNN SR:
+    D0 572 / 572 exact
+    D1 492 / 492 exact
+
+reconstruction-only SR:
+    D0 404 / 404 exact
+    D1 340 / 340 exact
+
+topology-inspired SR:
+    D0 884 / 884 exact
+    D1 854 / 854 exact
+```
+
+## XLIII.3 Historical frozen-reference gate
+
+The Step-3C GUDHI recomputation reproduced every frozen corrected sample-69
+distance.
+
+### CNN
+
+```text
+d_B:
+    historical = 3.06704616546631
+    frozen = 3.06704616546631
+    match = True
+
+W2,infinity:
+    historical = 14.57226729106
+    frozen = 14.57226729106
+    match = True
+
+W2,2:
+    historical = 18.7224189780594
+    frozen = 18.7224189780594
+    match = True
+```
+
+### Reconstruction-only
+
+```text
+d_B:
+    2.43620783090591
+    frozen match = True
+
+W2,infinity:
+    15.2562312172225
+    frozen match = True
+
+W2,2:
+    19.9125812541732
+    frozen match = True
+```
+
+### Topology-inspired
+
+```text
+d_B:
+    1.23333263397217
+    frozen match = True
+
+W2,infinity:
+    9.98731279438053
+    frozen 9.98731279438054
+    match = True within frozen tolerance
+
+W2,2:
+    12.3229624979698
+    frozen match = True
+```
+
+Therefore the independent corrected distance layer remains fully reproduced.
+
+## XLIII.4 Canonical-orientation corrected distances
+
+### CNN
+
+```text
+d_B:
+    3.06704616546631
+    canonical - historical = 0
+
+W2,infinity:
+    14.57226729106
+    canonical - historical = 0
+
+W2,2:
+    18.7224189780594
+    canonical - historical = 0
+```
+
+### Reconstruction-only
+
+```text
+d_B:
+    2.43620783090591
+    delta = 0
+
+W2,infinity:
+    15.2562312172225
+    delta = 0
+
+W2,2:
+    19.9125812541732
+    delta = -3.5527136788005e-15
+```
+
+The W22 difference is numerical roundoff only.
+
+### Topology-inspired
+
+```text
+d_B:
+    1.23333263397217
+    delta = 0
+
+W2,infinity:
+    9.98731279438053
+    delta = 0
+
+W2,2:
+    12.3229624979698
+    delta = 0
+```
+
+## XLIII.5 Scientific interpretation
+
+Canonical orientation changes the older CNN / reconstruction-only GT
+persistence extraction only by adding one exact zero-persistence D0 point.
+
+Because that point lies exactly on the persistence diagonal:
+
+```math
+birth = death
+```
+
+its diagonal matching cost is exactly zero under:
+
+```text
+d_B
+W2,infinity
+W2,2
+```
+
+Therefore all corrected sample-69 distances are invariant to the orientation
+canonicalization.
+
+This establishes the desired bridge:
+
+> The new canonical Phase-5 representation removes historical spatial
+> orientation ambiguity without changing the corrected sample-69 persistence
+> conclusions.
+
+The old TopoInVis/arXiv-v1 corrected PD results therefore remain frozen and do
+not need to be recomputed merely because Phase 5 uses canonical x/y
+coordinates.
+
+## XLIII.6 Consequence for spatial matching
+
+The canonical Phase-5 PD layer is now approved for spatial correspondence work.
+
+However, exact zero-persistence points should not be used as spatial feature
+correspondences. They lie on the diagonal and have zero topological lifetime,
+so their PD matching is degenerate and can be non-unique at zero cost.
+
+Recommended Phase-5 spatial-matching convention:
+
+```text
+finite PairType 0/1:
+    retain for provenance
+
+strictly positive persistence:
+    use for explicit GT<->SR spatial correspondence
+
+exact zero persistence:
+    record separately
+    exclude from spatial-displacement summaries
+```
+
+This exclusion does **not** change any of the corrected persistence distances.
+
+## XLIII.7 Phase 5A status after Step 3C
+
+```text
+pair spatial provenance:
+    VALIDATED
+
+historical orientation matrix:
+    RESOLVED EXACTLY
+
+canonical C-order VTIs:
+    VALIDATED
+
+canonical TTK PD extraction:
+    COMPLETE
+
+canonical vs historical scalar PD audit:
+    PASS
+
+frozen sample-69 dB / W2inf / W22:
+    EXACTLY PRESERVED
+    (W22 UV differs only at ~3.6e-15 roundoff)
+
+ready for explicit spatial correspondence:
+    YES
+```
+
+Next:
+
+```text
+Step 4A:
+    validate GUDHI matching-return semantics on synthetic cases
+
+Step 4B:
+    use W2,2 as the primary GT<->SR assignment
+    retain D0/D1 separately
+    exclude exact zero-persistence points from spatial summaries
+    classify real-real / GT-diagonal / diagonal-SR matches
+    attach birth/death critical-point coordinates to real-real matches
+
+Step 4C:
+    manually inspect a small set of high-persistence sample-69 correspondences
+    before any all-168 sweep
+```
+
+
+
+---
+
+# Part XLIV — Phase 5A Step 4 Initial W2,2 Spatial-Matching Diagnostic
+
+**Status:** MATCHING EXTRACTION PASS; SPATIAL INTERPRETATION NOT YET VALIDATED.
+
+The first explicit sample-69 W2,2 GT<->SR assignment was generated successfully.
+The result is scientifically informative, but it also shows that a raw spatial
+displacement average taken after a persistence-only assignment must **not** yet
+be interpreted as a spatial-fidelity score.
+
+## XLIV.1 Matching API self-test
+
+GUDHI 3.13.0 returned:
+
+```text
+real-real:
+    distance = 0.1414213562373096
+    matching = [[0,0]]
+
+GT -> diagonal:
+    distance = 1.4142135623730951
+    matching = [[0,-1]]
+
+diagonal -> SR:
+    distance = 1.4142135623730951
+    matching = [[-1,0]]
+```
+
+Therefore the returned-index convention is validated for this experiment.
+
+## XLIV.2 Positive- and zero-persistence counts
+
+Exact zero-persistence points were excluded from the assignment:
+
+```text
+GT:
+    D0 positive = 1095
+    D1 positive = 961
+    D0 zero = 5
+    D1 zero = 2
+
+CNN:
+    D0 positive = 572
+    D1 positive = 492
+
+reconstruction-only:
+    D0 positive = 404
+    D1 positive = 340
+
+topology-inspired:
+    D0 positive = 884
+    D1 positive = 854
+```
+
+The seven exact-zero GT pairs remain provenance-only and contribute zero
+diagonal cost.
+
+## XLIV.3 Reproduced W2,2 distances
+
+The matching-return call reproduces the frozen sample-69 W2,2 totals:
+
+```text
+CNN:
+    D0 = 14.066816377377
+    D1 = 12.3553085511919
+    all = 18.72241897805938
+
+reconstruction-only:
+    D0 = 14.6788213333968
+    D1 = 13.4552256192999
+    all = 19.912581254173233
+
+topology-inspired:
+    D0 = 9.37877743737924
+    D1 = 7.99336840802907
+    all = 12.322962497969836
+```
+
+Thus correspondence extraction is numerically consistent with the validated
+distance layer.
+
+## XLIV.4 Match-type counts
+
+Across D0+D1 positive-persistence GT features:
+
+```text
+CNN:
+    real-real = 986
+    GT->diagonal = 1070
+    diagonal->SR = 78
+    fraction of positive GT features assigned real-real =
+        47.96%
+
+reconstruction-only:
+    real-real = 715
+    GT->diagonal = 1341
+    diagonal->SR = 29
+    fraction of positive GT features assigned real-real =
+        34.78%
+
+topology-inspired:
+    real-real = 1490
+    GT->diagonal = 566
+    diagonal->SR = 248
+    fraction of positive GT features assigned real-real =
+        72.47%
+```
+
+Under the W2,2 optimum, topology-inspired therefore assigns a substantially
+larger fraction of positive-persistence GT points to real SR points rather than
+to the diagonal.
+
+This is a statement about the **persistence-space optimal assignment**, not yet
+a claim that those pairs are the same physical feature.
+
+Topology-inspired also has more diagonal->SR matches than CNN/UV because its SR
+diagram contains substantially more positive-persistence features.
+
+## XLIV.5 Raw spatial displacement statistics
+
+Among real-real matches, the pooled mean of the two endpoint displacements is:
+
+```text
+CNN:
+    mean = 68.600 px
+    median = 62.591 px
+    mean = 30.51% of grid diagonal
+
+reconstruction-only:
+    mean = 72.517 px
+    median = 65.364 px
+    mean = 32.25% of grid diagonal
+
+topology-inspired:
+    mean = 70.683 px
+    median = 65.838 px
+    mean = 31.43% of grid diagonal
+```
+
+Dimension-specific raw medians are similarly large, typically around 61-68
+pixels.
+
+## XLIV.6 Critical interpretation
+
+These large distances must **not** be interpreted as saying that physical
+features literally moved ~70 grid cells.
+
+The W2,2 assignment optimizes only birth/death-plane cost:
+
+```text
+(b_GT,d_GT) <-> (b_SR,d_SR)
+```
+
+It has no knowledge of:
+
+```text
+x
+y
+physical proximity
+feature identity
+```
+
+Therefore, when many topological features have similar scalar birth/death
+values, a globally optimal persistence matching can pair physically distant
+critical points.
+
+The sample-69 output contains both behaviors among highly persistent features:
+
+```text
+some high-persistence matches:
+    small endpoint displacement
+
+other high-persistence matches:
+    very large endpoint displacement
+```
+
+This is direct evidence that:
+
+> scalar-persistence correspondence is not automatically a physical-feature
+> correspondence.
+
+That observation is itself central to the motivation for Phase 5.
+
+## XLIV.7 What can already be said
+
+Supported:
+
+> Under W2,2 persistence matching, topology-inspired sample 69 has more GT
+> persistence points assigned to real SR points and fewer assigned to the
+> diagonal than CNN or reconstruction-only.
+
+Supported:
+
+> The physical coordinates of persistence-matched pairs can nevertheless be
+> far apart, showing that persistence-space similarity does not imply spatial
+> localization agreement.
+
+Not yet supported:
+
+```text
+"F1 is spatially better/worse than CNN"
+"mean W2-matched displacement is the spatial error"
+"these ~70 px values measure literal feature motion"
+```
+
+The current raw spatial means are a diagnostic of persistence-only matching,
+not a finalized spatial metric.
+
+## XLIV.8 Required next validation
+
+Before choosing a spatial evaluation convention:
+
+```text
+1. self-match GT->GT under W2,2 and W2,infinity;
+2. compare W2,2 vs W2,infinity returned assignments;
+3. inspect the highest-persistence GT features under both assignments;
+4. quantify assignment agreement / instability;
+5. run controlled translated-feature tests where the true displacement is known.
+```
+
+Only after these tests should a final spatial correspondence rule be frozen.
