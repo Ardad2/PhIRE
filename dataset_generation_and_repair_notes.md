@@ -33154,3 +33154,3582 @@ Before choosing a spatial evaluation convention:
 ```
 
 Only after these tests should a final spatial correspondence rule be frozen.
+
+
+
+---
+
+# Part XLV — Phase 5A Step 4C Matching-Sensitivity / Self-Match Audit
+
+**Status:** COMPLETE / IMPORTANT METHODOLOGICAL RESULT.
+
+The sample-69 matching-sensitivity diagnostic shows that a persistence-only
+optimal matching is not stable enough to serve directly as a physical-feature
+correspondence rule.
+
+## XLV.1 Replication command
+
+```bash
+cd ~/PhIRE
+
+unset PYTHONPATH
+unset PYTHONHOME
+set -o pipefail
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+  python spatial_pd/phase5a_sample69_matching_sensitivity.py \
+  --phase5 ~/PhIRE/spatial_pd/phase5a_sample69_canonical_pd \
+  --out ~/PhIRE/spatial_pd/phase5a_sample69_matching_sensitivity \
+  --top-k 12 \
+  2>&1 | tee ~/PhIRE/spatial_pd/phase5a_sample69_matching_sensitivity.log
+```
+
+Script SHA-256:
+
+```text
+41ad57174edbab9dd709f5d41ac059872aa333e1e02a11009fc83517d01de0b3
+```
+
+## XLV.2 GT self-match result
+
+### D0
+
+```text
+W2,2:
+    distance = 0
+    nonidentity real-real matches = 0
+    max birth displacement = 0
+    max death displacement = 0
+
+W2,infinity:
+    distance = 0
+    nonidentity real-real matches = 0
+    max birth displacement = 0
+    max death displacement = 0
+```
+
+### D1
+
+```text
+W2,2:
+    distance = 0
+    nonidentity real-real matches = 2
+    max birth displacement = 51.9711 px
+    max death displacement = 51.9711 px
+
+W2,infinity:
+    distance = 0
+    nonidentity real-real matches = 2
+    max birth displacement = 51.9711 px
+    max death displacement = 51.9711 px
+```
+
+This is a decisive diagnostic:
+
+> Even when a persistence diagram is matched to itself with total cost exactly
+> zero, GUDHI can return a non-identity feature assignment if multiple
+> persistence points are indistinguishable in birth/death space.
+
+Therefore a returned optimal PD matching is not, by itself, a valid
+physical-feature identity map.
+
+The ~51.97 px self-match displacement is not a physical motion. It is an
+assignment ambiguity among persistence-indistinguishable features.
+
+## XLV.3 W2,2 versus W2,infinity assignment sensitivity
+
+### CNN
+
+```text
+D0:
+    same assignment for all GT features:
+        651 / 1095 = 59.45%
+
+    real-real GT features:
+        W2,2 = 533
+        W2,infinity = 486
+
+    among features real-real under both:
+        same SR partner =
+        161 / 414 = 38.89%
+
+D1:
+    same assignment for all GT features:
+        570 / 961 = 59.31%
+
+    real-real:
+        W2,2 = 453
+        W2,infinity = 400
+
+    both real, same SR partner:
+        133 / 329 = 40.43%
+```
+
+### Reconstruction-only
+
+```text
+D0:
+    same assignment:
+        722 / 1095 = 65.94%
+
+    real-real:
+        W2,2 = 392
+        W2,infinity = 347
+
+    both real, same SR partner:
+        94 / 272 = 34.56%
+
+D1:
+    same assignment:
+        665 / 961 = 69.20%
+
+    real-real:
+        W2,2 = 323
+        W2,infinity = 278
+
+    both real, same SR partner:
+        87 / 218 = 39.91%
+```
+
+### Topology-inspired
+
+```text
+D0:
+    same assignment:
+        513 / 1095 = 46.85%
+
+    real-real:
+        W2,2 = 782
+        W2,infinity = 714
+
+    both real, same SR partner:
+        250 / 664 = 37.65%
+
+D1:
+    same assignment:
+        526 / 961 = 54.73%
+
+    real-real:
+        W2,2 = 708
+        W2,infinity = 653
+
+    both real, same SR partner:
+        303 / 623 = 48.64%
+```
+
+## XLV.4 Interpretation
+
+Two independent observations now reject a naive "PD match = physical feature
+identity" interpretation:
+
+```text
+1. zero-cost GT self-match can be spatially non-identity;
+2. changing only the birth/death ground norm changes a large fraction of
+   returned SR partners.
+```
+
+For features that are real-real under both W2 conventions, exact SR-partner
+agreement is only about 35-49%.
+
+Therefore:
+
+> spatial displacement computed after an arbitrary persistence-optimal
+> assignment is not a stable standalone spatial metric.
+
+This result strengthens, rather than weakens, the Phase-5 motivation:
+standard persistence distances intentionally discard localization information.
+
+## XLV.5 Consequence for metric design
+
+The project should not average the raw coordinate displacement from one
+arbitrary W2-optimal matching and call it "spatial error."
+
+A more defensible spatial evaluation needs either:
+
+```text
+A. a controlled secondary spatial rule among persistence-equivalent / near-
+   equivalent candidates;
+
+B. a joint persistence+space matching objective with explicitly justified
+   scaling;
+
+C. a feature-specific localization metric that avoids forcing a unique global
+   PD assignment when persistence values are degenerate.
+```
+
+No option is frozen yet.
+
+## XLV.6 Immediate next diagnostic
+
+Before designing the final spatial rule, identify the exact sample-69 duplicate
+persistence points responsible for the non-identity D1 self-match.
+
+Required output:
+
+```text
+- every exact duplicate (birth,death) group in canonical GT D0/D1;
+- multiplicity;
+- spatial critical-point coordinates for each duplicate member;
+- pair identifiers / vertex ids;
+- within-group endpoint separations;
+- the exact two D1 features swapped by the zero-cost self-match.
+```
+
+After that diagnostic, move to controlled synthetic translation tests where the
+known physical displacement is prescribed.
+
+
+
+---
+
+# Part XLVI — Phase 5A Step 4D Exact Duplicate-Persistence Ambiguity
+
+**Status:** COMPLETE / CONFIRMED.
+
+## XLVI.1 Exact duplicate group
+
+Canonical sample-69 GT contains:
+
+```text
+D0 positive features:
+    1095
+
+D0 exact duplicate scalar groups:
+    0
+
+D1 positive features:
+    961
+
+D1 exact duplicate scalar groups:
+    1
+```
+
+The sole positive-persistence duplicate D1 group has multiplicity 2:
+
+```text
+birth:
+    5.4933319091796875
+
+death:
+    5.5269012451171875
+
+persistence:
+    0.0335693359375
+```
+
+Member A:
+
+```text
+index:
+    476
+
+PairIdentifier:
+    1350
+
+birth:
+    (110,50)
+
+death:
+    (110,51)
+
+birth VertexId:
+    8110
+
+death VertexId:
+    8270
+```
+
+Member B:
+
+```text
+index:
+    477
+
+PairIdentifier:
+    1352
+
+birth:
+    (84,95)
+
+death:
+    (84,96)
+
+birth VertexId:
+    15284
+
+death VertexId:
+    15444
+```
+
+Spatial separation:
+
+```text
+birth endpoint:
+    51.97114584074513 px
+
+death endpoint:
+    51.97114584074513 px
+```
+
+## XLVI.2 Zero-cost self-match ambiguity
+
+Both W2,2 and W2,infinity self-matching return:
+
+```text
+476 -> 477
+477 -> 476
+```
+
+rather than the identity assignment.
+
+For both rows:
+
+```text
+same exact scalar persistence point:
+    True
+
+birth displacement:
+    51.97114584074513 px
+
+death displacement:
+    51.97114584074513 px
+```
+
+while the total diagram distance remains exactly:
+
+```text
+0
+```
+
+This confirms the mechanism behind the Step-4C self-match result.
+
+## XLVI.3 Methodological conclusion
+
+The ~51.97-pixel displacement is purely an assignment ambiguity.
+
+Two distinct physical structures occupy exactly the same persistence-diagram
+coordinate. Swapping them has zero persistence cost under either W2 ground
+norm.
+
+Therefore:
+
+> an optimal persistence-diagram matching is generally an equivalence-class
+> assignment in persistence space, not a unique physical-feature identity map.
+
+This is direct empirical evidence from the project's own canonical sample-69
+GT field.
+
+A spatial evaluation must explicitly decide how physical identity is resolved
+inside persistence-degenerate groups.
+
+## XLVI.4 Next validation stage
+
+Proceed to a controlled synthetic translation benchmark.
+
+The benchmark should contain:
+
+```text
+Scenario A:
+    unique persistence signatures
+    -> pure PD matching should recover the known translated feature identity
+
+Scenario B:
+    duplicate persistence signatures
+    -> pure PD matching may swap equally valid persistence points
+    -> a secondary spatial tie-break should recover the known translation
+       without altering the primary PD cost
+```
+
+Translation offsets:
+
+```text
+0, 1, 2, 4, 8 pixels
+```
+
+The first controlled benchmark should focus on D0 minimum/birth locations,
+where the physical feature identity is explicitly constructed and known.
+
+
+
+---
+
+# Part XLVII — Phase 5B Controlled-Translation Benchmark: Generation Failure and Infrastructure Fix
+
+**Status:** INITIAL GENERATION ATTEMPT FAILED SAFELY; ROOT CAUSE IDENTIFIED; PATCH PREPARED. No synthetic PD results exist yet.
+
+## XLVII.1 Failed generation attempt
+
+The first Phase-5B generation command launched:
+
+```bash
+docker run --rm \
+  -v "$HOME/PhIRE":/work \
+  -w /work \
+  phire-ttk:latest \
+  python spatial_pd/phase5b_controlled_translation_benchmark.py \
+    --mode generate \
+    --out /work/spatial_pd/phase5b_translation_benchmark
+```
+
+The benchmark failed before writing the synthetic VTI set with:
+
+```text
+ModuleNotFoundError: No module named 'scripts'
+```
+
+at the import:
+
+```python
+from scripts.convert_phire_to_vti import make_vti_from_scalar
+```
+
+### Root cause
+
+The benchmark itself lives at:
+
+```text
+/work/spatial_pd/phase5b_controlled_translation_benchmark.py
+```
+
+When Python executes a script by path, its script directory is placed on
+`sys.path`. Inside this Docker invocation, the repository root `/work` was not
+available as an import root for `scripts`, so `from scripts...` failed.
+
+This is an infrastructure/import-path failure only. It says nothing about the
+synthetic experiment or the repaired VTI writer.
+
+## XLVII.2 Root-owned failed workspace side effect
+
+The benchmark's `main()` created:
+
+```text
+/work/spatial_pd/phase5b_translation_benchmark
+```
+
+before `generate()` reached the failing import.
+
+Because the Docker container ran as root, the new directory was created
+root-owned on the bind-mounted host filesystem.
+
+The later host command:
+
+```bash
+mkdir -p "$OUT/pd"
+```
+
+therefore failed with:
+
+```text
+Permission denied
+```
+
+This permission issue is a side effect of the failed root-run container, not a
+TTK or filesystem-health issue.
+
+## XLVII.3 Why the attempted TTK loop saw `*.vti`
+
+Since generation had failed, no synthetic `.vti` files existed.
+
+Therefore the shell glob:
+
+```text
+"$OUT"/vti/*.vti
+```
+
+did not expand to real files and the literal `*.vti` path reached
+`ttkPersistenceDiagramCmd`, which then reported:
+
+```text
+Unable to read input file
+spatial_pd/phase5b_translation_benchmark/vti/*.vti
+```
+
+No persistence diagrams were generated and no scientific benchmark result
+should be inferred from this failed attempt.
+
+## XLVII.4 Patch
+
+A patched benchmark was prepared:
+
+```text
+phase5b_controlled_translation_benchmark_v2.py
+```
+
+It loads the repaired writer directly from:
+
+```text
+<repo-root>/scripts/convert_phire_to_vti.py
+```
+
+using `importlib.util.spec_from_file_location()`.
+
+This avoids depending on `scripts/` being importable as a Python package and
+still reuses the exact repaired C-order writer.
+
+The rerun should also execute Docker with the host UID/GID:
+
+```text
+--user "$(id -u):$(id -g)"
+```
+
+so newly generated Phase-5B files remain host-user owned.
+
+## XLVII.5 Recovery rule
+
+The failed benchmark directory is an isolated Phase-5B scratch/output
+directory. Before rerunning generation, remove only:
+
+```text
+~/PhIRE/spatial_pd/phase5b_translation_benchmark
+```
+
+from inside the Docker container (where root can remove the root-owned
+directory), then recreate it under the host user.
+
+Do not touch any historical or Phase-5A directories.
+
+## XLVII.6 Current status
+
+```text
+synthetic field generation:
+    NOT YET COMPLETE
+
+synthetic VTI generation:
+    NOT YET COMPLETE
+
+TTK PD generation:
+    NOT STARTED SUCCESSFULLY
+
+analysis:
+    NOT STARTED
+
+scientific result:
+    NONE YET
+
+failure classification:
+    infrastructure/import + ownership only
+```
+
+
+
+---
+
+# Part XLVIII — Phase 5B Controlled Translation Benchmark: Exact-Degeneracy Validation
+
+**Status:** COMPLETE / PASS.
+
+The repaired benchmark generated 12 canonical synthetic VTIs, TTK persistence
+diagrams were produced successfully, and the controlled translation analysis
+passed for every prescribed shift.
+
+## XLVIII.1 Generation closeout
+
+Patched benchmark:
+
+```text
+spatial_pd/phase5b_controlled_translation_benchmark_v2.py
+```
+
+SHA-256:
+
+```text
+637c87256934670db6c2cdb4ad4304dbc7dcf41993134fa62539890f5876ee71
+```
+
+Generated VTI inventory:
+
+```text
+duplicate_GT.vti
+duplicate_SR_dx0.vti
+duplicate_SR_dx1.vti
+duplicate_SR_dx2.vti
+duplicate_SR_dx4.vti
+duplicate_SR_dx8.vti
+unique_GT.vti
+unique_SR_dx0.vti
+unique_SR_dx1.vti
+unique_SR_dx2.vti
+unique_SR_dx4.vti
+unique_SR_dx8.vti
+```
+
+Total:
+
+```text
+12 VTIs
+```
+
+## XLVIII.2 Unique-persistence scenario
+
+Finite D0 GT features:
+
+```text
+birth=2, death=20, location=(50,50)
+birth=4, death=20, location=(90,70)
+birth=6, death=20, location=(120,110)
+```
+
+For every rigid translation:
+
+```text
+dx = 0, 1, 2, 4, 8
+```
+
+the persistence diagram is unchanged:
+
+```text
+W2,2 = 0
+W2,infinity = 0
+```
+
+and the raw persistence-optimal matching recovers the known birth-location
+displacement exactly:
+
+```text
+dx=0:
+    [0,0,0]
+
+dx=1:
+    [1,1,1]
+
+dx=2:
+    [2,2,2]
+
+dx=4:
+    [4,4,4]
+
+dx=8:
+    [8,8,8]
+```
+
+The exact-key spatial secondary rule returns the same correct identity.
+
+Conclusion:
+
+> When finite persistence signatures uniquely identify the constructed
+> features, the returned zero-cost PD matching preserves the known physical
+> feature identity in this controlled benchmark.
+
+## XLVIII.3 Duplicate-persistence scenario
+
+Finite D0 GT features:
+
+```text
+birth=4, death=20, location=(50,50)
+birth=4, death=20, location=(110,90)
+birth=6, death=20, location=(90,120)
+```
+
+The first two features have identical persistence coordinates but are spatially
+distinct.
+
+For every translation, the PD remains identical:
+
+```text
+W2,2 = 0
+W2,infinity = 0
+```
+
+but raw GUDHI matching swaps the duplicate pair.
+
+### dx = 0
+
+True motion:
+
+```text
+0 px
+```
+
+Raw W2,2 / W2,infinity displacement:
+
+```text
+[72.1110, 72.1110, 0]
+mean = 48.0740 px
+```
+
+Exact-persistence spatial secondary rule:
+
+```text
+[0,0,0]
+mean = 0
+```
+
+### dx = 1
+
+Raw matching:
+
+```text
+[72.9452, 71.2811, 1]
+mean = 48.4088 px
+```
+
+Secondary rule:
+
+```text
+[1,1,1]
+```
+
+### dx = 2
+
+Raw matching:
+
+```text
+[73.7835, 70.4557, 2]
+mean = 48.7464 px
+```
+
+Secondary rule:
+
+```text
+[2,2,2]
+```
+
+### dx = 4
+
+Raw matching:
+
+```text
+[75.4718, 68.8186, 4]
+mean = 49.4302 px
+```
+
+Secondary rule:
+
+```text
+[4,4,4]
+```
+
+### dx = 8
+
+Raw matching:
+
+```text
+[78.8923, 65.6049, 8]
+mean = 50.8324 px
+```
+
+Secondary rule:
+
+```text
+[8,8,8]
+```
+
+All known-shift checks passed.
+
+## XLVIII.4 Scientific conclusion
+
+This controlled experiment separates two cases cleanly.
+
+### Unique persistence signatures
+
+```text
+PD-only optimal assignment
+    -> correct physical correspondence in this benchmark
+```
+
+### Exact persistence degeneracy
+
+```text
+PD-only optimal assignment
+    -> may choose a spatially wrong but persistence-equivalent permutation
+
+exact-persistence spatial tie-break
+    -> recovers the known correspondence exactly
+    -> does not change the primary PD cost
+```
+
+Therefore the following narrow rule is now empirically validated:
+
+> Within an exact persistence-equivalence class, physical proximity can be
+> used as a secondary assignment criterion without altering the primary
+> persistence objective.
+
+This is not yet a justification for adding spatial distance to matches with
+different persistence coordinates.
+
+## XLVIII.5 Important boundary
+
+The exact-degeneracy tie-break does not solve the broader real-data ambiguity.
+
+Sample-69 W2,2 versus W2,infinity partner agreement was only about 35-49% among
+features matched real-real under both conventions. Most of that instability
+cannot be explained by the single exact duplicate GT D1 group.
+
+Therefore the next controlled benchmark should study **near-degenerate but
+non-identical persistence signatures**.
+
+A useful controlled crossover design is:
+
+```text
+two spatially separated D0 features
+
+GT births:
+    A = 4.0
+    B = 4.4
+
+SR true identities:
+    A translated spatially and birth perturbed upward
+    B translated spatially and birth perturbed downward
+
+perturbation delta:
+    0.00, 0.10, 0.19, 0.20, 0.21, 0.30, 0.40
+```
+
+At delta < 0.20, persistence ordering supports the true correspondence.
+
+At delta = 0.20, the two SR persistence points become exactly degenerate.
+
+At delta > 0.20, persistence-only matching is expected to prefer the crossed
+scalar correspondence even though physical identity is known by construction.
+
+This benchmark can identify the exact point at which recovering physical
+identity requires accepting a nonzero increase in persistence cost.
+
+
+
+---
+
+# Part XLIX — Phase 5B2 Near-Degenerate Crossover Benchmark: Synthetic VTI Generation
+
+**Status:** COMPLETE / PASS.
+
+The near-degenerate crossover benchmark generated the full expected canonical
+synthetic VTI set successfully under the host UID/GID.
+
+## XLIX.1 Generation command
+
+```bash
+cd ~/PhIRE
+
+OUT="$HOME/PhIRE/spatial_pd/phase5b2_near_degenerate"
+
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$HOME/PhIRE":/work \
+  -w /work \
+  phire-ttk:latest \
+  python spatial_pd/phase5b2_near_degenerate_crossover.py \
+    --mode generate \
+    --out /work/spatial_pd/phase5b2_near_degenerate
+```
+
+## XLIX.2 Generated canonical VTIs
+
+```text
+GT.vti
+SR_delta_0p00.vti
+SR_delta_0p10.vti
+SR_delta_0p19.vti
+SR_delta_0p20.vti
+SR_delta_0p21.vti
+SR_delta_0p30.vti
+SR_delta_0p40.vti
+```
+
+Observed VTI count:
+
+```text
+8
+```
+
+Expected VTI count:
+
+```text
+1 GT + 7 SR perturbation levels = 8
+```
+
+Therefore the generation inventory gate passed exactly.
+
+## XLIX.3 Experimental parameter grid
+
+The finite D0 crossover benchmark uses:
+
+```text
+GT feature A birth:
+    4.0
+
+GT feature B birth:
+    4.4
+
+SR feature A birth:
+    4.0 + delta
+
+SR feature B birth:
+    4.4 - delta
+
+translation:
+    +4 pixels in x
+
+delta values:
+    0.00
+    0.10
+    0.19
+    0.20
+    0.21
+    0.30
+    0.40
+```
+
+Interpretive regions:
+
+```text
+delta < 0.20:
+    scalar persistence ordering still supports the known physical identity
+
+delta = 0.20:
+    the two tracked SR persistence signatures are exactly degenerate
+
+delta > 0.20:
+    scalar ordering crosses, so a persistence-only optimum may prefer the
+    crossed correspondence even though physical identity remains known by
+    construction
+```
+
+## XLIX.4 Current status
+
+```text
+synthetic field generation:
+    PASS
+
+canonical VTI generation:
+    PASS
+
+VTI inventory:
+    8 / 8
+
+TTK PD extraction:
+    NEXT
+
+crossover analysis:
+    PENDING
+```
+
+The next stage must generate exactly eight TTK PD port-0 VTUs in a fresh
+`pd/` directory and freeze hashes before the crossover analysis is run.
+
+
+
+---
+
+# Part L — Phase 5B2 Near-Degenerate Crossover Benchmark: TTK PD Extraction
+
+**Status:** COMPLETE / PASS.
+
+The full Phase-5B2 synthetic PD set was generated successfully and passed the
+inventory/schema gate.
+
+## L.1 Output PD inventory
+
+```text
+GT_pd_port_0.vtu
+SR_delta_0p00_pd_port_0.vtu
+SR_delta_0p10_pd_port_0.vtu
+SR_delta_0p19_pd_port_0.vtu
+SR_delta_0p20_pd_port_0.vtu
+SR_delta_0p21_pd_port_0.vtu
+SR_delta_0p30_pd_port_0.vtu
+SR_delta_0p40_pd_port_0.vtu
+```
+
+Observed:
+
+```text
+PD count = 8
+```
+
+Expected:
+
+```text
+1 GT + 7 SR perturbation levels = 8
+```
+
+Inventory gate:
+
+```text
+PASS
+```
+
+## L.2 Schema / pair-count validation
+
+All eight PD VTUs passed the required TTK schema check.
+
+For every field:
+
+```text
+points = 10
+cells = 6
+finite cells = 4
+PairType counts = {0:5, -1:1}
+schema = PASS
+```
+
+This means the controlled construction is topologically consistent across all
+seven perturbation levels before the correspondence analysis is performed.
+
+## L.3 Frozen PD hashes
+
+```text
+GT:
+58d1b3cbb275eeb8f22535c5a0b40465f3f92a2b9c9dd9f21ab00c45a0df697f
+
+delta=0.00:
+d2a17a772d90b68ba7b6b7ebb65f155a92764349f14e374e4996d31bc5091cfe
+
+delta=0.10:
+39c329340c885f7f2161640df975a988e7cfef20dcc83c6bc6262fc8998a12be
+
+delta=0.19:
+ab53fbcb42e375862c976142e61c9eb4043cc5eb4d0a722d88e047765cfa61e2
+
+delta=0.20:
+c1ac4cbd0bcacb50311f49a86c9b5de1ab5ddfaf990b5295c893a38acfba4cc7
+
+delta=0.21:
+b6c6900af0b8fc3b89c52c9bf738682683f6a270596e9a18ab3784dd71165acf
+
+delta=0.30:
+2af6158aabeb6d792abb51d1f294fde93cb293b931979fd1c49345fc3ee13678
+
+delta=0.40:
+22432f5c8e217d82f2b9265f9d50c412bf82739fe4f1241d5dabf6f8a0eb2c69
+```
+
+## L.4 Current benchmark status
+
+```text
+synthetic VTI generation:
+    PASS
+
+VTI inventory:
+    8 / 8
+
+TTK PD extraction:
+    PASS
+
+PD inventory:
+    8 / 8
+
+PD schema:
+    PASS on all 8
+
+PD hashes:
+    FROZEN
+
+near-degenerate crossover analysis:
+    READY
+```
+
+The next analysis should use the already-generated PDs and report, for each
+delta and each persistence convention:
+
+```text
+- globally optimal PD distance;
+- whether A and B retain the known physical identities;
+- persistence cost of forcing the known physical identity;
+- extra persistence cost required to preserve physical identity;
+- raw spatial displacement selected by the optimizer;
+- exact-degeneracy spatial tie-break behavior at delta=0.20.
+```
+
+
+
+---
+
+# Part LI — Phase 5B2 Near-Degenerate Crossover Analysis
+
+**Status:** COMPLETE / PASS. The controlled crossover behaves exactly as
+designed and establishes the boundary at which persistence-optimal
+correspondence ceases to preserve known physical identity.
+
+## LI.1 GT finite D0 features
+
+```text
+A:
+    birth = 4.0
+    death = 20.0
+    persistence = 16.0
+    location = (50,50)
+
+B:
+    birth = 4.400000095367432
+    death = 20.000000476837158
+    persistence = 15.600000381469727
+    location = (110,90)
+
+C:
+    birth = 7.0
+    death = 20.0
+    persistence = 13.0
+    location = (90,120)
+```
+
+All physical identities are translated by:
+
+```text
++4 px in x
+```
+
+while A/B scalar signatures move toward and through each other.
+
+## LI.2 Observed crossover
+
+### delta = 0.00
+
+```text
+optimal PD distance = 0
+true-identity PD cost = 0
+extra cost for physical identity = 0
+A correct = True
+B correct = True
+spatial displacement = 4 px / 4 px
+```
+
+### delta = 0.10
+
+```text
+W2,2 optimum = 0.14142122136900204
+W2,infinity optimum = 0.14142122136739427
+true identity = optimum
+extra identity cost = 0
+A/B correspondence correct
+```
+
+### delta = 0.19
+
+```text
+W2,2 optimum = 0.2687006577736834
+W2,infinity optimum = 0.2687006577728372
+true identity = optimum
+extra identity cost = 0
+A/B correspondence correct
+```
+
+### delta = 0.20 — exact crossover / degeneracy
+
+```text
+W2,2 optimum = 0.28284277991017953
+W2,infinity optimum = 0.2828427799097776
+true identity = optimum
+extra identity cost = 0
+A/B correspondence correct in returned assignment
+exact-degenerate spatial tie-break = [4,4] px
+```
+
+At the exact equality point the persistence objective has no reason to prefer
+one A/B permutation over the other. The returned assignment happened to
+preserve identity here, but the earlier exact-duplicate benchmark proves that
+the opposite zero-cost permutation can also be returned.
+
+### delta = 0.21 — first crossed regime
+
+```text
+W2,2:
+    optimum = 0.2687006577736834
+    true identity = 0.2969849020478473
+    extra persistence cost for identity = 0.028284244274163872
+
+W2,infinity:
+    optimum = 0.2687006577728372
+    true identity = 0.29698490204631606
+    extra persistence cost = 0.028284244273478865
+
+A correct = False
+B correct = False
+
+raw persistence-optimal spatial displacements:
+    A = 75.47184905645283 px
+    B = 68.81860213634101 px
+```
+
+### delta = 0.30
+
+```text
+W2,2:
+    optimum = 0.14142122136900204
+    true identity = 0.42426433845283085
+    extra identity cost = 0.2828431170838288
+
+W2,infinity:
+    optimum = 0.14142122136739427
+    true identity = 0.424264338451759
+    extra identity cost = 0.2828431170843647
+
+A/B correspondence crossed
+```
+
+### delta = 0.40 — scalar multiset returns exactly to GT
+
+```text
+W2,2 optimum = 0
+W2,infinity optimum = 0
+
+true-identity W2,2 cost = 0.5656855598195552
+true-identity W2,infinity cost = 0.5656855598191532
+
+A correct = False
+B correct = False
+
+raw spatial displacements remain:
+    75.47184905645283 px
+    68.81860213634101 px
+```
+
+This is the strongest controlled demonstration:
+
+> The persistence diagram can be exactly identical (distance zero) while the
+> physical identities of two spatially separated structures have exchanged
+> their scalar signatures.
+
+## LI.3 Analytical crossover
+
+Ignoring float32 roundoff, GT A/B births differ by:
+
+```text
+0.4
+```
+
+Under the true physical assignment:
+
+```text
+A cost = delta
+B cost = delta
+```
+
+so the order-2 aggregate is:
+
+```text
+sqrt(2) * delta
+```
+
+Under the crossed scalar assignment:
+
+```text
+A cost = 0.4 - delta
+B cost = 0.4 - delta
+```
+
+so the aggregate is:
+
+```text
+sqrt(2) * |0.4 - delta|
+```
+
+The two assignments have equal persistence cost at:
+
+```text
+delta = 0.20
+```
+
+which matches the observed experiment.
+
+## LI.4 Methodological conclusion
+
+The exact-tie spatial rule is valid but insufficient for the general real-data
+problem.
+
+Supported:
+
+> If persistence signatures are exactly degenerate, spatial proximity can
+> break the tie without changing the persistence objective.
+
+Also supported:
+
+> Once persistence signatures cross, preserving known physical identity can
+> require a strictly larger persistence cost.
+
+Therefore a general spatial evaluation must expose the tradeoff rather than
+silently relabel a non-optimal assignment as the PD correspondence.
+
+## LI.5 Recommended next formulation: locality-constrained persistence
+
+A useful next metric avoids directly adding persistence units and pixels.
+
+For a spatial tolerance r:
+
+```text
+minimize:
+    standard PD matching cost
+
+subject to:
+    a real-real match is allowed only if the relevant spatial endpoint
+    displacement <= r
+
+diagonal matches:
+    remain allowed
+```
+
+For D0, the first controlled implementation should constrain the **birth
+minimum** location.
+
+This produces a curve:
+
+```text
+D_PD(r)
+```
+
+with:
+
+```text
+r -> infinity:
+    recovers ordinary persistence distance
+
+small r:
+    requires persistence agreement to occur locally
+```
+
+The locality penalty is:
+
+```text
+Delta_local(r) = D_PD(r) - D_PD(infinity)
+```
+
+This is preferable to immediately choosing an arbitrary weighted sum such as:
+
+```text
+persistence_cost + lambda * spatial_cost
+```
+
+because the standard persistence metric remains the objective and space enters
+as an interpretable physical tolerance rather than a unit-mixing coefficient.
+
+The Phase-5B2 crossover benchmark is suitable for validating this formulation
+before it is applied to sample 69.
+
+
+
+---
+
+# Part LII — Phase 5B3 Locality-Constrained Persistence Benchmark
+
+**Status:** COMPLETE / PASS.
+
+The locality-constrained augmented assignment reproduced the unconstrained
+GUDHI result at r=infinity for every delta under both W2,2 and W2,infinity,
+then exhibited the expected spatial-feasibility crossover.
+
+## LII.1 Validation gate
+
+For all delta values:
+
+```text
+delta = 0.00, 0.10, 0.19, 0.20, 0.21, 0.30, 0.40
+```
+
+and both persistence ground norms:
+
+```text
+W2,2
+W2,infinity
+```
+
+the augmented assignment at:
+
+```text
+r = infinity
+```
+
+reproduced the corresponding GUDHI unconstrained distance exactly to the
+configured numerical tolerance.
+
+Therefore the constrained solver is validated against the independently
+validated GUDHI implementation before interpreting finite-r results.
+
+## LII.2 Known physical translation threshold
+
+All three tracked features were translated by exactly:
+
+```text
+4 px
+```
+
+Observed for every delta and both persistence conventions:
+
+```text
+r < 4:
+    no real-real matches are spatially feasible
+    all finite features match through the diagonal
+
+r = 4:
+    all three known physical correspondences become feasible
+```
+
+This validates the spatial hard constraint against known displacement.
+
+## LII.3 Pre-crossover regime: delta <= 0.20
+
+For:
+
+```text
+delta = 0.00
+delta = 0.10
+delta = 0.19
+delta = 0.20
+```
+
+once r reaches 4 px:
+
+```text
+constrained persistence cost
+    =
+ordinary unconstrained persistence cost
+
+locality gap
+    =
+0
+
+A physical identity:
+    correct
+
+B physical identity:
+    correct
+```
+
+Thus no persistence penalty is required to demand the known local
+correspondence in the pre-crossover regime.
+
+At delta=0.20 the persistence signatures are exactly degenerate; the returned
+assignment happens to preserve identity, and the earlier exact-degeneracy
+benchmark independently showed that a spatial secondary rule can resolve such
+ties without changing persistence cost.
+
+## LII.4 Crossed regime: delta > 0.20
+
+### delta = 0.21
+
+For radii:
+
+```text
+4 <= r <= 72
+```
+
+the constrained assignment preserves physical identity:
+
+```text
+W2,2 constrained:
+    0.296984902
+
+ordinary W2,2:
+    0.268700658
+
+locality gap:
+    +0.028284244
+
+A correct:
+    True
+
+B correct:
+    True
+```
+
+At:
+
+```text
+r = 76
+```
+
+the spatially crossed scalar-optimal assignment becomes feasible:
+
+```text
+constrained cost:
+    0.268700658
+
+locality gap:
+    0
+
+A/B physical identity:
+    False / False
+```
+
+### delta = 0.30
+
+For:
+
+```text
+4 <= r <= 72
+```
+
+physical identity is preserved at:
+
+```text
+constrained:
+    0.424264338
+
+ordinary:
+    0.141421221
+
+locality gap:
+    +0.282843117
+```
+
+At r=76 and above, the crossed scalar-optimal assignment is again admitted and
+the locality gap returns to zero.
+
+### delta = 0.40
+
+The ordinary persistence diagram distance is:
+
+```text
+0
+```
+
+even though A/B physical identities have exchanged scalar signatures.
+
+For:
+
+```text
+4 <= r <= 72
+```
+
+the locality constraint preserves known physical identity:
+
+```text
+constrained:
+    0.565685560
+
+ordinary:
+    0
+
+locality gap:
+    +0.565685560
+```
+
+At:
+
+```text
+r >= 76
+```
+
+the physically crossed zero-cost persistence assignment becomes feasible and:
+
+```text
+constrained:
+    0
+
+locality gap:
+    0
+
+A/B correct:
+    False / False
+```
+
+## LII.5 Spatial crossover radius
+
+The two crossed A/B correspondences have spatial birth displacements around:
+
+```text
+75.47 px
+68.82 px
+```
+
+Therefore:
+
+```text
+r <= 72:
+    at least one crossed correspondence remains forbidden
+
+r = 76:
+    both crossed correspondences are feasible
+```
+
+The observed locality-curve transition therefore agrees with the actual
+geometry of the controlled construction.
+
+## LII.6 Methodological conclusion
+
+The controlled benchmark validates a useful spatial-topology diagnostic:
+
+```text
+C_PD(r):
+    minimum standard persistence matching cost
+    subject to a real-real match satisfying a physical locality threshold r
+```
+
+and:
+
+```text
+Delta_local(r)
+    =
+C_PD(r) - C_PD(infinity)
+```
+
+Interpretation:
+
+```text
+Delta_local(r) = 0:
+    the ordinary persistence agreement can be realized within radius r
+
+Delta_local(r) > 0:
+    requiring locality forces a more expensive persistence assignment
+    or additional diagonal matches
+```
+
+This construction avoids immediately mixing persistence units and pixels in a
+weighted sum.
+
+Important terminology:
+
+> Until metric properties such as the triangle inequality are established,
+> refer to this quantity as a **locality-constrained persistence cost** or
+> **locality curve**, not as a new mathematical distance/metric.
+
+## LII.7 Next real-data pilot
+
+The next stage should remain sample-69 only.
+
+Primary convention:
+
+```text
+persistence objective:
+    W2,2
+
+D0 and D1:
+    matched separately
+
+spatial admissibility of a real-real pair:
+    BOTH critical endpoints must be local
+
+criterion:
+    max(
+        Euclidean birth-endpoint displacement,
+        Euclidean death-endpoint displacement
+    ) <= r
+```
+
+Suggested radii:
+
+```text
+4, 8, 16, 32, 64, 96, 128, infinity
+```
+
+For each method/dimension/radius report:
+
+```text
+constrained W2,2
+locality gap from ordinary W2,2
+real-real count
+GT->diagonal count
+diagonal->SR count
+fraction of positive-persistence GT features retained real-real
+GT-persistence-weighted real-real coverage
+maximum endpoint displacement among accepted real-real pairs
+```
+
+The sample-69 pilot should be inspected before any all-168 sweep.
+
+
+
+---
+
+# Part LIII — Phase 5C Sample-69 Locality-Constrained W2,2 Pilot
+
+**Status:** COMPLETE / PASS. The real-data sample-69 pilot validates the constrained solver on the canonical PD layer and reveals a nontrivial tradeoff between local GT-feature coverage and total constrained PD cost.
+
+## LIII.1 Unconstrained anchors reproduced
+
+The r=infinity aggregate values reproduce the validated sample-69 W2,2 values:
+
+```text
+CNN:
+    18.72241898
+
+reconstruction-only:
+    19.91258125
+
+topology-inspired F1:
+    12.32296250
+```
+
+Thus the finite-radius curves are anchored to the already validated ordinary W2,2 analysis.
+
+## LIII.2 Aggregate locality-constrained W2,2
+
+```text
+radius    CNN          UV           F1
+4         31.05331012  29.91023776  32.25549755
+8         27.63329349  26.93270375  27.85644276
+16        23.67346907  24.01121114  21.26869272
+32        20.85901209  21.88213627  16.41072038
+64        19.29635618  20.73152674  13.68516491
+96        18.98329839  20.26351280  12.79326302
+128       18.84387276  20.15238964  12.53769863
+infinity  18.72241898  19.91258125  12.32296250
+```
+
+Corresponding aggregate locality gaps:
+
+```text
+radius    CNN          UV           F1
+4         12.33089114   9.99765651  19.93253505
+8          8.91087451   7.02012250  15.53348026
+16         4.95105010   4.09862988   8.94573022
+32         2.13659311   1.96955502   4.08775788
+64         0.57393720   0.81894549   1.36220241
+96         0.26087942   0.35093155   0.47030052
+128        0.12145378   0.23980839   0.21473613
+infinity   0            0            0
+```
+
+At the tightest tested radii (4 and 8 px), F1 has the largest locality gap and a slightly larger absolute constrained cost than the two baselines. By 16 px, F1 has the lowest absolute constrained aggregate cost and retains that advantage through the wider radii.
+
+This must not yet be reduced to a statement that F1 is "spatially worse" at 4/8 px, because the constrained W2,2 objective includes both:
+- GT features forced to the diagonal; and
+- SR features forced to the diagonal.
+
+F1's SR diagram contains substantially more positive-persistence points than CNN or UV, so a tight locality threshold can incur a large unmatched-SR diagonal burden.
+
+## LIII.3 Local GT-feature coverage
+
+Despite the larger tight-radius total cost, F1 has higher local GT feature coverage.
+
+### D0 persistence-weighted GT coverage
+
+```text
+radius    CNN     UV      F1
+4         0.1598  0.1798  0.2759
+8         0.4074  0.3570  0.5180
+16        0.6045  0.5273  0.7343
+32        0.7650  0.6652  0.8454
+64        0.8524  0.7449  0.9250
+96        0.8664  0.7709  0.9474
+128       0.8793  0.7898  0.9538
+infinity  0.8838  0.7956  0.9571
+```
+
+### D1 persistence-weighted GT coverage
+
+```text
+radius    CNN     UV      F1
+4         0.1499  0.1653  0.2393
+8         0.3398  0.3322  0.4738
+16        0.5809  0.4624  0.7277
+32        0.7155  0.6034  0.8507
+64        0.8003  0.6848  0.9082
+96        0.8176  0.7107  0.9292
+128       0.8287  0.7179  0.9378
+infinity  0.8406  0.7363  0.9441
+```
+
+Thus sample 69 shows two simultaneous behaviors:
+
+```text
+F1:
+    more GT persistence mass is represented by spatially local real-real matches
+    at every tested radius;
+
+but:
+    under very tight locality, the total constrained W2,2 cost is large,
+    potentially because many F1 SR features are forced to the diagonal.
+```
+
+These are complementary, not contradictory, observations.
+
+## LIII.4 Real-real count pattern
+
+At r=4:
+
+```text
+D0 real-real:
+    CNN 101
+    UV   99
+    F1  181
+
+D1 real-real:
+    CNN  70
+    UV   64
+    F1  132
+```
+
+At r=8:
+
+```text
+D0:
+    CNN 218
+    UV  196
+    F1  338
+
+D1:
+    CNN 172
+    UV  142
+    F1  274
+```
+
+F1 therefore has substantially more local real-real correspondences even where its total constrained cost is not the lowest.
+
+## LIII.5 Next required decomposition
+
+Before drawing a sample-69 spatial conclusion, decompose the squared W2,2 objective:
+
+```text
+C_total^2
+    =
+C_real-real^2
+    +
+C_GT->diag^2
+    +
+C_diag->SR^2
+```
+
+for each method, dimension, and radius.
+
+This will reveal whether F1's tight-radius locality penalty is driven primarily by:
+
+```text
+1. expensive local real-real scalar mismatches;
+2. unmatched GT topological mass;
+3. unmatched/excess SR topological mass.
+```
+
+The decomposition should also refine the radius grid between 8 and 16 px to locate the sample-69 absolute-cost crossover more precisely.
+
+No all-168 sweep should begin before this decomposition is understood.
+
+
+
+---
+
+# Part LIV — Phase 5C Sample-69 Locality-Cost Decomposition
+
+**Status:** COMPLETE / PASS. The decomposition resolves the apparent tension in
+the sample-69 locality pilot.
+
+## LIV.1 Tight-radius aggregate decomposition
+
+At r=4:
+
+```text
+CNN:
+    W22_all = 31.0533
+    RR contribution = 9.90%
+    GT->diag contribution = 73.16%
+    diag->SR contribution = 16.93%
+
+UV:
+    W22_all = 29.9102
+    RR contribution = 13.68%
+    GT->diag contribution = 72.81%
+    diag->SR contribution = 13.51%
+
+F1:
+    W22_all = 32.2555
+    RR contribution = 13.02%
+    GT->diag contribution = 55.55%
+    diag->SR contribution = 31.43%
+```
+
+Approximate squared-cost components derived from the reported percentages:
+
+```text
+r = 4
+
+CNN:
+    RR^2 contribution       ~95.5
+    GT->diag^2 contribution ~705.5
+    SR->diag^2 contribution ~163.3
+
+UV:
+    RR^2 contribution       ~122.4
+    GT->diag^2 contribution ~651.4
+    SR->diag^2 contribution ~120.9
+
+F1:
+    RR^2 contribution       ~135.5
+    GT->diag^2 contribution ~578.0
+    SR->diag^2 contribution ~327.0
+```
+
+Thus F1's larger total tight-radius cost is not caused by a larger unmatched-GT
+burden. Its GT->diagonal contribution is already lower than CNN and UV at r=4.
+The dominant distinguishing term is the much larger unmatched/excess SR-side
+contribution.
+
+## LIV.2 r=8 confirms the mechanism
+
+Aggregate percentages at r=8:
+
+```text
+CNN:
+    RR 34.34%
+    GT->diag 57.23%
+    SR->diag 8.44%
+
+UV:
+    RR 32.91%
+    GT->diag 61.31%
+    SR->diag 5.78%
+
+F1:
+    RR 31.50%
+    GT->diag 44.69%
+    SR->diag 23.82%
+```
+
+Approximate squared components:
+
+```text
+CNN:
+    RR ~262.2
+    GT->diag ~437.0
+    SR->diag ~64.4
+
+UV:
+    RR ~238.7
+    GT->diag ~444.7
+    SR->diag ~41.9
+
+F1:
+    RR ~244.4
+    GT->diag ~346.8
+    SR->diag ~184.8
+```
+
+Again:
+
+```text
+F1:
+    lower unmatched GT cost
+    much higher unmatched SR cost
+```
+
+## LIV.3 By r=12 F1 becomes lowest total cost
+
+At r=10:
+
+```text
+CNN = 26.0857
+UV  = 25.6024
+F1  = 25.8299
+```
+
+F1 is already below CNN but remains slightly above UV.
+
+At r=12:
+
+```text
+CNN = 24.8247
+UV  = 25.2264
+F1  = 23.1860
+```
+
+F1 is lower than both.
+
+Do not interpolate a precise crossover radius from these discrete values because
+the optimal assignment changes combinatorially with r.
+
+## LIV.4 Scientific interpretation
+
+Sample 69 supports the following more precise interpretation:
+
+> F1 realizes substantially more of the GT persistence mass through local
+> real-real correspondences, thereby reducing the GT->diagonal burden, but it
+> also contains substantially more SR persistence mass that cannot be paired
+> locally under tight radii. That unmatched SR-side burden explains the larger
+> total locality-constrained W2,2 at r=4-8.
+
+This is an asymmetric coverage/excess tradeoff.
+
+The result should not be phrased as simply:
+
+```text
+F1 is spatially worse at tight radii
+```
+
+because that would ignore the simultaneous reduction in unmatched GT topology.
+
+## LIV.5 Next diagnostic
+
+Before leaving sample 69, compute normalized coverage in both directions:
+
+```text
+GT-side persistence coverage:
+    persistence mass of GT points in real-real matches
+    / total positive GT persistence mass
+
+SR-side persistence coverage:
+    persistence mass of SR points in real-real matches
+    / total positive SR persistence mass
+```
+
+Also report the complementary unmatched persistence-mass fractions.
+
+This will turn the cost decomposition into a more interpretable
+coverage/excess view without introducing another matching rule.
+
+
+
+---
+
+# Part LV — Phase 5C Sample-69 Bidirectional Persistence-Mass Coverage
+
+**Status:** COMPLETE / PASS. This closes the sample-69 coverage/excess interpretation.
+
+## LV.1 GT-side coverage
+
+F1 has the highest GT-side persistence-mass coverage for both D0 and D1 at
+every tested radius.
+
+Selected values:
+
+```text
+D0 GT persistence coverage
+
+r=4:
+    CNN = 0.1598
+    UV  = 0.1798
+    F1  = 0.2759
+
+r=8:
+    CNN = 0.4074
+    UV  = 0.3570
+    F1  = 0.5180
+
+r=16:
+    CNN = 0.6045
+    UV  = 0.5273
+    F1  = 0.7343
+
+r=infinity:
+    CNN = 0.8838
+    UV  = 0.7956
+    F1  = 0.9571
+```
+
+```text
+D1 GT persistence coverage
+
+r=4:
+    CNN = 0.1499
+    UV  = 0.1653
+    F1  = 0.2393
+
+r=8:
+    CNN = 0.3398
+    UV  = 0.3322
+    F1  = 0.4738
+
+r=16:
+    CNN = 0.5809
+    UV  = 0.4624
+    F1  = 0.7277
+
+r=infinity:
+    CNN = 0.8406
+    UV  = 0.7363
+    F1  = 0.9441
+```
+
+## LV.2 SR-side coverage
+
+The SR-side view differs.
+
+At r=4:
+
+```text
+D0 SR persistence coverage:
+    CNN = 0.2656
+    UV  = 0.3887
+    F1  = 0.3651
+
+D1:
+    CNN = 0.2353
+    UV  = 0.3397
+    F1  = 0.3063
+```
+
+At r=8:
+
+```text
+D0:
+    CNN = 0.6840
+    UV  = 0.7326
+    F1  = 0.6414
+
+D1:
+    CNN = 0.6223
+    UV  = 0.7987
+    F1  = 0.6020
+```
+
+At r=16:
+
+```text
+D0:
+    CNN = 0.9011
+    UV  = 0.9564
+    F1  = 0.8979
+
+D1:
+    CNN = 0.8923
+    UV  = 0.9295
+    F1  = 0.8576
+```
+
+At infinity:
+
+```text
+D0:
+    CNN = 0.9949
+    UV  = 0.9996
+    F1  = 0.9916
+
+D1:
+    CNN = 0.9963
+    UV  = 0.9978
+    F1  = 0.9859
+```
+
+Thus F1 covers much more GT persistence mass, while a somewhat larger fraction
+of its own SR persistence mass remains unmatched.
+
+## LV.3 Interpretation
+
+The cost decomposition and bidirectional coverage now agree:
+
+```text
+F1:
+    higher GT-side local persistence coverage;
+    lower GT unmatched burden;
+    more SR-side unmatched/excess persistence mass under tight locality.
+```
+
+UV exhibits the opposite tendency more strongly:
+
+```text
+high fraction of its own SR persistence mass is matchable,
+but much lower fraction of GT persistence mass is covered.
+```
+
+This is best described as a **coverage/excess tradeoff**.
+
+Avoid reducing the result to a single "spatially better/worse" label.
+
+The two directional coverage quantities should remain separate in the next
+pilot; do not combine them into an arbitrary score or harmonic mean yet.
+
+## LV.4 Sample-69 closeout
+
+Sample 69 is now sufficiently characterized to move to a fixed multi-sample
+pilot.
+
+Use the previously predeclared evenly spread audit set:
+
+```text
+0, 24, 48, 69, 96, 120, 144, 167
+```
+
+Rationale:
+
+```text
+- fixed before this Phase-5 multi-sample result;
+- spans the full 0..167 index range;
+- already used as a predeclared validation pilot in the Join-Tree construction
+  audit;
+- avoids selecting samples based on the new locality outcome.
+```
+
+The next stage is canonical C-order VTI + TTK PD regeneration for these eight
+samples across GT/CNN/UV/F1, followed by the same locality analysis.
+
+
+
+---
+
+# Part LVI — Phase 5D Predeclared 8-Sample Canonical PD Regeneration
+
+**Status:** COMPLETE / PASS.
+
+The fixed multi-sample pilot set is:
+
+```text
+0, 24, 48, 69, 96, 120, 144, 167
+```
+
+This set was predeclared before the Phase-5 locality outcome and was previously
+used in the Join-Tree construction audit.
+
+## LVI.1 Canonical regeneration
+
+The Phase-5D runner completed successfully and reached its final PASS marker.
+
+Because the runner uses:
+
+```text
+set -euo pipefail
+```
+
+and the canonical-orientation block explicitly exits on any failed equality
+test, reaching the final PASS marker implies that no orientation gate failed
+during this run.
+
+The pasted terminal excerpt begins later in the run, so the individual
+orientation lines are not preserved in the supplied excerpt, but the runner
+could not have reached PD extraction / final PASS after an orientation failure.
+
+## LVI.2 Inventory
+
+Final counts:
+
+```text
+canonical C-order VTIs:
+    32 / 32
+
+TTK PD port-0 VTUs:
+    32 / 32
+```
+
+All 32 PDs passed the required schema check.
+
+## LVI.3 Sample-69 continuity gate
+
+The regenerated Phase-5D sample-69 PD hashes exactly reproduce the already
+frozen canonical sample-69 hashes:
+
+```text
+GT:
+3b4cb20b2d830ff2edc4b3c13c9f8e866a176824d52a27be9b7517ae392ae7d5
+
+CNN:
+67c5a4f53834e2b4d401852cd7b730fcbeea695a03d0d853e781fa746693520c
+
+reconstruction-only:
+3fd05fedee7317b4fa51bd8a838e2e99928dd3bc2f610a3d686c56d2b97f6f02
+
+topology-inspired F1:
+908dc080096767063ba88d40b17b03affd24126025b4d1b6f672d41d90ad73be
+```
+
+Therefore the 8-sample canonical regeneration is continuous with the fully
+audited sample-69 Phase-5 layer.
+
+## LVI.4 PD schema counts
+
+All files contain:
+
+```text
+PairIdentifier
+PairType
+Persistence
+Birth
+IsFinite
+
+ttkVertexScalarField
+CriticalType
+Coordinates
+```
+
+and all report:
+
+```text
+schema=PASS
+```
+
+The number of persistence pairs varies naturally by sample and method.
+
+## LVI.5 Current status
+
+```text
+Phase-5D pilot sample selection:
+    FROZEN
+
+canonical VTI regeneration:
+    PASS
+
+orientation gate:
+    PASS by runner control flow / final completion
+
+PD generation:
+    PASS
+
+PD count:
+    32 / 32
+
+PD schema:
+    PASS on all 32
+
+sample-69 hash continuity:
+    EXACT
+
+multi-sample locality analysis:
+    READY
+```
+
+The next analysis should apply the already validated locality-constrained W2,2
+construction to these eight fixed samples.  No all-168 conclusion should be
+drawn from the pilot alone.
+
+
+
+---
+
+# Part LVII — Phase 5D Predeclared 8-Sample Locality Pilot
+
+**Status:** COMPLETE / PASS.
+
+The optimized 8-sample locality analysis passed all continuity and numerical
+validation gates.
+
+## LVII.1 Validation gates
+
+Sample-69 canonical hashes:
+
+```text
+GT:
+    PASS
+
+CNN:
+    PASS
+
+reconstruction-only:
+    PASS
+
+topology-inspired F1:
+    PASS
+```
+
+Sample-69 numerical parity with the prior validated single-sample locality
+implementation:
+
+```text
+CNN r=4:
+    31.0533101195 vs 31.0533101200
+    PASS
+
+CNN r=infinity:
+    18.7224189781 vs 18.7224189800
+    PASS
+
+UV r=4:
+    29.9102377612 vs 29.9102377600
+    PASS
+
+UV r=infinity:
+    19.9125812542 vs 19.9125812500
+    PASS
+
+F1 r=4:
+    32.2554975522 vs 32.2554975500
+    PASS
+
+F1 r=infinity:
+    12.3229624980 vs 12.3229625000
+    PASS
+```
+
+For every sample/method/dimension, the optimized augmented assignment at
+`r=infinity` reproduced GUDHI W2,2.
+
+## LVII.2 Macro aggregate locality curves across the 8 fixed samples
+
+Mean constrained aggregate W2,2:
+
+```text
+radius   CNN       UV        F1
+4        48.7596   45.6008   50.5306
+8        43.8094   41.6548   43.4147
+16       36.3161   36.4128   33.2844
+32       29.8002   32.0552   24.8300
+64       26.5507   29.7890   20.6553
+96       25.6974   29.1344   19.5916
+128      25.3505   28.8684   19.1425
+infinity 25.2004   28.7411   18.9669
+```
+
+At r=4, F1 mean constrained cost is:
+
+```text
++3.63% relative to CNN
++10.81% relative to UV
+```
+
+At r=8:
+
+```text
+-0.90% relative to CNN
++4.22% relative to UV
+```
+
+At r=16:
+
+```text
+-8.35% relative to CNN
+-8.59% relative to UV
+```
+
+At r=infinity:
+
+```text
+-24.74% relative to CNN
+-34.01% relative to UV
+```
+
+## LVII.3 GT-side persistence coverage is the most consistent pilot result
+
+Mean aggregate GT persistence coverage:
+
+```text
+radius   CNN      UV       F1
+4        0.1398   0.1510   0.2420
+8        0.3680   0.3306   0.5010
+16       0.6130   0.5208   0.7313
+32       0.7699   0.6614   0.8658
+64       0.8527   0.7485   0.9337
+96       0.8721   0.7739   0.9504
+128      0.8797   0.7859   0.9565
+infinity 0.8836   0.7918   0.9584
+```
+
+Sample-wise result:
+
+```text
+At every tested radius:
+    F1 GT persistence coverage > CNN in 8/8 samples.
+    F1 GT persistence coverage > UV  in 8/8 samples.
+```
+
+This is the strongest cross-sample locality observation in the pilot.
+
+## LVII.4 Tight-radius coverage/excess tradeoff generalizes beyond sample 69
+
+At r=4:
+
+```text
+F1 lower total constrained cost than CNN:
+    1 / 8
+
+F1 lower total constrained cost than UV:
+    0 / 8
+
+F1 higher GT persistence coverage than CNN:
+    8 / 8
+
+F1 higher GT persistence coverage than UV:
+    8 / 8
+```
+
+At r=8:
+
+```text
+F1 lower total constrained cost than CNN:
+    5 / 8
+
+F1 lower total constrained cost than UV:
+    2 / 8
+
+F1 higher GT persistence coverage than CNN:
+    8 / 8
+
+F1 higher GT persistence coverage than UV:
+    8 / 8
+```
+
+Thus the sample-69 observation was not isolated: under stringent locality, F1
+can recover more GT persistence mass locally without necessarily minimizing the
+two-sided total constrained W2,2 cost.
+
+## LVII.5 Moderate and wider radii
+
+From r=16 onward in this fixed pilot:
+
+```text
+F1 lower constrained W2,2 than CNN:
+    8 / 8
+
+F1 lower constrained W2,2 than UV:
+    8 / 8
+
+F1 higher GT persistence coverage than CNN:
+    8 / 8
+
+F1 higher GT persistence coverage than UV:
+    8 / 8
+```
+
+Therefore, in the predeclared 8-sample pilot, every sample simultaneously shows
+lower constrained persistence cost and higher GT-side persistence coverage for
+F1 from r=16 through the unconstrained limit.
+
+This is a pilot robustness result, not yet an all-168 result.
+
+## LVII.6 SR-side coverage is more nuanced
+
+Mean SR-side persistence coverage:
+
+```text
+radius   CNN      UV       F1
+4        0.2047   0.2981   0.3117
+8        0.5526   0.6581   0.6258
+16       0.8344   0.8949   0.8441
+32       0.9513   0.9710   0.9433
+64       0.9827   0.9944   0.9755
+96       0.9884   0.9969   0.9826
+128      0.9906   0.9976   0.9848
+infinity 0.9916   0.9979   0.9860
+```
+
+F1 is not uniformly lowest or highest on SR-side coverage.  The asymmetry
+should therefore remain described using separate GT-side coverage, SR-side
+coverage, and total constrained cost rather than a single combined score.
+
+## LVII.7 Decision
+
+The locality methodology has now passed:
+
+```text
+1. canonical provenance/orientation audit;
+2. matching ambiguity diagnostics;
+3. exact-degeneracy controlled benchmark;
+4. near-degenerate crossover benchmark;
+5. locality-constrained solver validation;
+6. detailed sample-69 decomposition;
+7. predeclared 8-sample robustness pilot.
+```
+
+The next scientifically justified scale-up is the full 168-sample canonical
+Phase-5 locality evaluation, retaining the same predeclared radius grid and
+reporting distributions/sample-wise counts rather than only pooled means.
+
+
+
+---
+
+# Part LVIII — Phase 5E All-168 Generation: Initial Runner Failure and Fix
+
+**Status:** INITIAL ATTEMPT FAILED SAFELY BEFORE PD GENERATION. Root cause identified and patched.
+
+## LVIII.1 Observed failure
+
+The first all-168 runner passed the input-hash gate, GT-equality gate, and Docker-image capture, but generated only four VTIs:
+
+```text
+phase5_GT_s0...
+phase5_CNN_SR_s0...
+phase5_UV_SR_s0...
+phase5_F1_SR_s0...
+```
+
+It then stopped at:
+
+```text
+[error] Expected exactly 672 VTIs; found 4
+```
+
+No TTK persistence-diagram extraction occurred.
+
+## LVIII.2 Root cause
+
+The all-168 runner invoked the repaired writer without an explicit:
+
+```text
+--samples ...
+```
+
+argument.
+
+For `scripts/convert_phire_to_vti.py`, omitting `--samples` does not mean
+"process every sample"; it defaults to sample 0.
+
+The earlier pilot-8 runner explicitly passed its sample list, which is why the
+issue did not appear there.
+
+This is an orchestration bug in the new Phase-5E runner only. It does not alter
+the input arrays, the canonical writer, or any previously validated result.
+
+## LVIII.3 Safety behavior
+
+The VTI-count gate behaved correctly:
+
+```text
+expected = 672
+observed = 4
+```
+
+and terminated the run before PD generation.
+
+Therefore there is no partial all-168 PD result to interpret or preserve.
+
+## LVIII.4 Patch
+
+Patched runner:
+
+```text
+run_phase5e_all168_canonical_pd_v2.sh
+```
+
+It explicitly constructs:
+
+```text
+0, 1, 2, ..., 167
+```
+
+and passes the entire list to each writer call:
+
+```text
+--samples $sample_args
+```
+
+The pilot continuity indices remain separate:
+
+```text
+PILOT_SAMPLES=(0 24 48 69 96 120 144 167)
+```
+
+so the full 0..167 sample array is never overwritten.
+
+## LVIII.5 Recovery
+
+The failed output directory is isolated to:
+
+```text
+~/PhIRE/spatial_pd/phase5e_all168_canonical_pd
+```
+
+It contains failed-run metadata and four sample-0 VTIs only.
+
+Delete only this directory before rerunning the patched script.
+
+Current status:
+
+```text
+all-168 canonical VTI generation:
+    NOT YET COMPLETE
+
+all-168 TTK PD generation:
+    NOT STARTED
+
+failure classification:
+    runner sample-selection bug only
+
+previous Phase-5 results:
+    unaffected
+```
+
+
+
+---
+
+# Part LIX — Phase 5E All-168 Canonical PD Generation
+
+**Status:** COMPLETE / PASS.
+
+The patched all-168 runner completed the full canonical regeneration and TTK
+persistence-diagram extraction.
+
+## LIX.1 Final inventory
+
+```text
+canonical C-order VTIs:
+    672 / 672
+
+TTK PD port-0 VTUs:
+    672 / 672
+```
+
+This corresponds to:
+
+```text
+168 GT
+168 pretrained CNN
+168 reconstruction-only UV
+168 topology-inspired F1
+```
+
+## LIX.2 Pilot continuity
+
+The regenerated all-168 PD layer reproduced the frozen Phase-5D pilot files:
+
+```text
+PILOT-8 PD CONTINUITY GATE:
+    PASS (32/32)
+```
+
+Thus the full canonical PD layer is continuous with the previously audited
+8-sample pilot.
+
+The VTI continuity gate was also part of the patched runner before PD
+extraction; the runner could not have reached the final PASS after a failed
+gate.
+
+## LIX.3 Schema validation
+
+All 672 persistence diagrams passed the required schema/count gate:
+
+```text
+schema checked 100/672
+schema checked 200/672
+schema checked 300/672
+schema checked 400/672
+schema checked 500/672
+schema checked 600/672
+schema checked 672/672
+
+PD SCHEMA GATE:
+    PASS (672/672)
+```
+
+## LIX.4 Final runner status
+
+```text
+VTI count:
+    672
+
+PD count:
+    672
+
+PHASE 5E ALL-168 CANONICAL PD GENERATION:
+    PASS
+```
+
+The terminal ordering near the end (`s99` followed by `s9`) is simply
+lexicographic filename ordering, not a missing or duplicated sample issue.  The
+672-count and schema gates establish the complete inventory.
+
+## LIX.5 Next computational issue
+
+A literal extension of the dense augmented Hungarian solver would require:
+
+```text
+168 samples
+x 3 methods
+x 2 homology dimensions
+x 8 radii
+=
+8064 assignment solves
+```
+
+with augmented matrices roughly of size `(n_GT+n_SR)^2`.
+
+Before the full locality sweep, use an equivalent sparse formulation based on
+**matching savings relative to the all-diagonal baseline**:
+
+```text
+B
+=
+sum_i c_GTdiag(i)^2
++
+sum_j c_SRdiag(j)^2
+```
+
+For an admissible real-real edge `(i,j)`:
+
+```text
+saving(i,j)
+=
+c_GTdiag(i)^2
++
+c_SRdiag(j)^2
+-
+c_real(i,j)^2
+```
+
+The constrained W2,2 optimum is obtained by selecting a one-to-one set of
+admissible positive-savings edges that maximizes total savings:
+
+```text
+C(r)^2
+=
+B
+-
+max_matching sum saving(i,j)
+```
+
+Non-positive-savings real-real edges can be discarded because leaving both
+points unmatched on the diagonal is no more expensive.
+
+This formulation is mathematically equivalent to the dense augmented
+assignment for the same admissibility rule, while avoiding the dense
+dummy-dummy block.
+
+It must first reproduce the already frozen Phase-5D pilot outputs before being
+used on all 168 samples.
+
+
+
+---
+
+# Part LX — Phase 5E Sparse Locality Solver Validation
+
+**Status:** COMPLETE / PASS.
+
+The sparse savings-based locality solver was validated against the already
+frozen dense Phase-5D pilot implementation.
+
+## LX.1 Validation scope
+
+The comparison covered:
+
+```text
+8 fixed samples
+x 3 methods
+x 2 homology dimensions
+x 8 radii
+=
+384 comparison rows
+```
+
+Samples:
+
+```text
+0, 24, 48, 69, 96, 120, 144, 167
+```
+
+Methods:
+
+```text
+CNN
+UV
+F1
+```
+
+Radii:
+
+```text
+4, 8, 16, 32, 64, 96, 128, infinity
+```
+
+## LX.2 Results
+
+Every pilot sample passed:
+
+```text
+sample 0:   PASS
+sample 24:  PASS
+sample 48:  PASS
+sample 69:  PASS
+sample 96:  PASS
+sample 120: PASS
+sample 144: PASS
+sample 167: PASS
+```
+
+Maximum sparse-vs-dense discrepancies:
+
+```text
+max |W22 sparse-dense|
+    7.105427357601002e-15
+
+max |total_sq sparse-dense|
+    4.547473508864641e-13
+
+max |coverage sparse-dense|
+    0.0
+```
+
+Runtime:
+
+```text
+5.595948026049882 seconds
+```
+
+Final gate:
+
+```text
+SPARSE SOLVER PILOT VALIDATION: PASS
+```
+
+## LX.3 Interpretation
+
+The sparse formulation reproduces the dense augmented assignment to floating
+point precision across all 384 predeclared pilot comparisons.
+
+The GT- and SR-side persistence coverage values are exactly identical.
+
+Therefore the sparse savings formulation is validated as an implementation of
+the same locality-constrained W2,2 objective used in Phase 5C/D.
+
+This is implementation parity, not a new metric.
+
+## LX.4 Full-scale readiness
+
+The following are now complete:
+
+```text
+all-168 canonical VTI layer:
+    PASS
+
+all-168 canonical PD layer:
+    PASS
+
+672/672 PD schema:
+    PASS
+
+pilot-8 canonical continuity:
+    PASS
+
+sparse solver vs dense pilot:
+    PASS
+```
+
+The full 168-sample locality analysis can now be run without changing:
+- the persistence objective;
+- the spatial admissibility rule;
+- the radius grid;
+- the coverage definitions;
+- or the cost decomposition.
+
+
+
+---
+
+# Part LXI — Phase 5E Full 168-Sample Locality Analysis
+
+**Status:** COMPLETE / PASS.
+
+The full canonical Phase-5 locality sweep completed successfully over all 168
+samples using the sparse solver previously validated against the dense pilot
+implementation.
+
+## LXI.1 Runtime and validation
+
+The full sweep covered:
+
+```text
+168 samples
+x 3 methods
+x 2 homology dimensions
+x 8 radii
+```
+
+and completed in approximately:
+
+```text
+2.0 minutes
+```
+
+Final gate:
+
+```text
+PHASE 5E ALL-168 LOCALITY ANALYSIS: PASS
+```
+
+The unconstrained means at `r=infinity` reproduce the already frozen corrected
+W2,2 means:
+
+```text
+CNN:
+    24.5522
+
+UV:
+    27.5087
+
+F1:
+    17.8319
+```
+
+Thus the full locality analysis remains continuous with the corrected PD study.
+
+## LXI.2 Mean constrained aggregate W2,2
+
+```text
+radius    CNN       UV        F1
+4         46.0575   43.9291   48.5049
+8         41.8013   40.5380   41.6092
+16        35.2183   35.4269   31.9472
+32        29.2503   31.0266   23.9213
+64        25.9081   28.5876   19.6087
+96        25.0404   27.9047   18.4536
+128       24.7081   27.6343   18.0242
+infinity  24.5522   27.5087   17.8319
+```
+
+Relative mean F1 cost versus CNN:
+
+```text
+r=4:
+    +5.31%
+
+r=8:
+    -0.46%
+
+r=16:
+    -9.29%
+
+r=32:
+    -18.22%
+
+r=64:
+    -24.31%
+
+r=96:
+    -26.30%
+
+r=128:
+    -27.05%
+
+r=infinity:
+    -27.37%
+```
+
+Relative mean F1 cost versus UV:
+
+```text
+r=4:
+    +10.42%
+
+r=8:
+    +2.64%
+
+r=16:
+    -9.82%
+
+r=32:
+    -22.90%
+
+r=64:
+    -31.41%
+
+r=96:
+    -33.87%
+
+r=128:
+    -34.78%
+
+r=infinity:
+    -35.18%
+```
+
+## LXI.3 Dataset-wide GT persistence coverage
+
+Mean aggregate GT-side persistence coverage:
+
+```text
+radius    CNN      UV       F1
+4         0.1392   0.1486   0.2380
+8         0.3561   0.3118   0.4877
+16        0.5913   0.4940   0.7109
+32        0.7554   0.6312   0.8469
+64        0.8404   0.7195   0.9164
+96        0.8637   0.7491   0.9350
+128       0.8725   0.7606   0.9411
+infinity  0.8758   0.7649   0.9431
+```
+
+The strongest full-dataset result is sample-wise:
+
+```text
+At every tested radius:
+    F1 GT persistence coverage > CNN in 168/168 samples.
+    F1 GT persistence coverage > UV  in 168/168 samples.
+```
+
+This is no longer a pilot observation.
+
+## LXI.4 Tight-locality coverage/excess regime
+
+At `r=4`:
+
+```text
+F1 lower total constrained cost than CNN:
+    14 / 168 = 8.33%
+
+F1 lower total constrained cost than UV:
+    0 / 168 = 0%
+
+F1 higher GT coverage than CNN:
+    168 / 168
+
+F1 higher GT coverage than UV:
+    168 / 168
+```
+
+At `r=8`:
+
+```text
+F1 lower total constrained cost than CNN:
+    92 / 168 = 54.76%
+
+F1 lower total constrained cost than UV:
+    41 / 168 = 24.40%
+
+F1 higher GT coverage than CNN:
+    168 / 168
+
+F1 higher GT coverage than UV:
+    168 / 168
+```
+
+Therefore the tight-radius coverage/excess tradeoff observed on sample 69 and
+in the pilot generalizes to the full dataset: F1 can cover more GT persistence
+mass locally while not yet minimizing the symmetric two-sided constrained cost.
+
+## LXI.5 Moderate and wider locality
+
+At `r=16`:
+
+```text
+F1 lower constrained W2,2 than CNN:
+    162 / 168 = 96.43%
+
+F1 lower constrained W2,2 than UV:
+    164 / 168 = 97.62%
+```
+
+At `r=32`:
+
+```text
+vs CNN:
+    165 / 168 = 98.21%
+
+vs UV:
+    168 / 168 = 100%
+```
+
+At `r=64`:
+
+```text
+vs CNN:
+    167 / 168 = 99.40%
+
+vs UV:
+    168 / 168 = 100%
+```
+
+At `r=infinity`:
+
+```text
+vs CNN:
+    166 / 168 = 98.81%
+
+vs UV:
+    168 / 168 = 100%
+```
+
+Because F1 also has higher GT persistence coverage than both baselines in every
+sample at these radii, the joint condition:
+
+```text
+lower constrained W2,2
+AND
+higher GT-side persistence coverage
+```
+
+holds with the same sample counts.
+
+## LXI.6 Locality gap
+
+Mean locality gap:
+
+```text
+radius    CNN       UV        F1
+4         21.5053   16.4204   30.6730
+8         17.2492   13.0294   23.7773
+16        10.6662    7.9182   14.1154
+32         4.6981    3.5179    6.0894
+64         1.3559    1.0789    1.7768
+96         0.4882    0.3961    0.6217
+128        0.1560    0.1256    0.1923
+```
+
+F1 has the largest finite-radius locality gap at every tested radius.
+
+This should not be interpreted as contradicting its lower absolute constrained
+cost from moderate radii onward. F1 starts from a substantially lower
+unconstrained W2,2 baseline, while the finite locality constraint removes some
+of that advantage and exposes additional SR-side unmatched structure.
+
+## LXI.7 SR-side coverage
+
+Mean SR-side persistence coverage:
+
+```text
+radius    CNN      UV       F1
+4         0.2214   0.2994   0.3182
+8         0.5709   0.6522   0.6480
+16        0.8426   0.8928   0.8543
+32        0.9515   0.9719   0.9429
+64        0.9838   0.9942   0.9755
+96        0.9895   0.9968   0.9826
+128       0.9914   0.9976   0.9850
+infinity  0.9922   0.9980   0.9859
+```
+
+The SR-side behavior is not monotone across methods. F1 is highest at r=4,
+nearly tied with UV at r=8, and below CNN/UV at wider radii.
+
+This reinforces the asymmetric interpretation:
+
+```text
+F1:
+    substantially greater GT-side persistence coverage,
+    while retaining somewhat more unmatched SR-side persistence mass.
+```
+
+Do not collapse GT coverage, SR coverage, and total constrained cost into one
+ad hoc score.
+
+## LXI.8 Dataset-wide Phase-5 conclusion
+
+The full 168-sample analysis supports:
+
+> Topology-inspired F1 consistently increases the fraction of GT persistence
+> mass represented by spatially local real-real correspondences. Under very
+> tight locality this improved GT coverage coexists with a larger two-sided
+> locality penalty, reflecting a coverage/excess tradeoff. At moderate and
+> wider locality thresholds, F1 generally combines higher GT-side persistence
+> coverage with lower locality-constrained W2,2 than either pretrained CNN or
+> reconstruction-only fine-tuning.
+
+Use "generally" rather than "always" for the constrained-cost claim because a
+small number of CNN exceptions remain at r>=16.
+
+## LXI.9 Next audit
+
+Before closing Phase 5E, inspect paired-difference distributions and the small
+set of exception samples where F1 does not have lower constrained cost than
+CNN/UV at moderate or wide radii.
+
+This is an analysis of existing outputs only, not a new experiment.
+
+
+
+---
+
+# Part LXII — Phase 5E Exception Audit: Initial Dependency Failure and Fix
+
+**Status:** INITIAL AUDIT ATTEMPT FAILED BEFORE ANALYSIS. No scientific result
+was produced by the failed attempt.
+
+Observed error:
+
+```text
+ModuleNotFoundError: No module named 'pandas'
+```
+
+The `gudhi-audit` environment contains the libraries needed for the validated
+persistence workflow, but does not contain pandas.
+
+This is an analysis-script dependency issue only. It does not affect:
+- the completed all-168 locality analysis;
+- any generated PD;
+- the sparse solver;
+- any previously frozen result.
+
+The exception audit only needs CSV parsing and elementary summary statistics,
+so pandas is unnecessary. A patched version uses Python's standard-library
+`csv` module plus NumPy, which is already available in the environment.
+
+Patched script:
+
+```text
+phase5e_all168_exception_audit_v2.py
+```
+
+The v2 script performs the same analysis on the existing
+`all168_locality_aggregate_by_sample.csv` and introduces no new experiment or
+matching computation.
+
+
+
+---
+
+# Part LXIII — Phase 5E Paired-Difference / Exception Audit
+
+**Status:** COMPLETE / PASS.
+
+The patched standard-library/NumPy exception audit completed successfully:
+
+```text
+PHASE 5E PAIRED-DIFFERENCE / EXCEPTION AUDIT: PASS
+```
+
+The visible tail of the per-sample stable-radius output includes:
+
+```text
+sample 155 -> 8
+sample 156 -> 8
+sample 157 -> 16
+sample 158 -> 16
+sample 159 -> 16
+sample 160 -> 64
+sample 161 -> 32
+sample 162 -> none
+sample 163 -> none
+sample 164 -> 16
+sample 165 -> 64
+sample 166 -> 8
+sample 167 -> 16
+```
+
+Here `first_stable=r` means the first tested radius at which F1 has lower
+aggregate locality-constrained W2,2 than BOTH CNN and UV and remains lower at
+every wider tested radius.
+
+The two `none` cases visible in the tail are samples:
+
+```text
+162
+163
+```
+
+These are consistent with the already frozen all-168 infinity result:
+
+```text
+F1 lower cost than CNN at infinity:
+    166 / 168
+
+F1 lower cost than UV at infinity:
+    168 / 168
+```
+
+Since UV has no infinity exceptions and exactly two CNN infinity exceptions,
+samples 162 and 163 are necessarily the two cases that cannot attain a stable
+joint advantage over both baselines anywhere on the tested radius sequence.
+
+This does not alter the dataset-wide conclusion:
+- F1 has higher GT-side persistence coverage than both baselines in 168/168
+  samples at every tested radius;
+- constrained-cost advantage becomes dominant from moderate radii onward;
+- a very small number of CNN exceptions remain even at the unconstrained
+  endpoint.
+
+The full stable-radius histogram and paired-difference quartiles should be
+preserved from the audit log before final presentation, but no additional
+matching computation is required.
+
+
+
+---
+
+# Part LXIV — Phase 5E Closeout Summary
+
+**Status:** COMPLETE / FROZEN.
+
+The presentation-oriented closeout extractor completed successfully:
+
+```text
+PHASE 5E CLOSEOUT SUMMARY EXTRACTION: PASS
+```
+
+No new persistence matching was performed; this stage summarized the already
+completed all-168 locality outputs.
+
+## LXIV.1 First stable joint-advantage radius
+
+Definition:
+
+```text
+first tested radius at which F1 has lower constrained W2,2 than BOTH CNN and UV
+and remains lower than both at every wider tested radius
+```
+
+Histogram:
+
+```text
+r=8:
+     39 / 168 = 23.21%
+
+r=16:
+    118 / 168 = 70.24%
+
+r=32:
+      7 / 168 = 4.17%
+
+r=64:
+      2 / 168 = 1.19%
+
+none:
+      2 / 168 = 1.19%
+```
+
+Cumulative:
+
+```text
+stable by r=16:
+    157 / 168 = 93.45%
+
+stable by r=32:
+    164 / 168 = 97.62%
+
+stable by r=64:
+    166 / 168 = 98.81%
+```
+
+Never-stable samples:
+
+```text
+162
+163
+```
+
+The modal and median stable radius are both r=16.
+
+## LXIV.2 Paired constrained-cost distributions
+
+Paired difference convention:
+
+```text
+delta_cost = F1 constrained W2,2 - baseline constrained W2,2
+```
+
+Negative values favor F1.
+
+### Versus CNN
+
+```text
+r=4:
+    median +2.4652
+    IQR [+1.3874, +3.4986]
+    F1 lower in 14/168
+
+r=8:
+    median -0.1736
+    IQR [-1.3740, +1.0773]
+    F1 lower in 92/168
+
+r=16:
+    median -3.0483
+    IQR [-4.2919, -2.1261]
+    F1 lower in 162/168
+
+r=32:
+    median -5.1388
+    IQR [-6.9152, -3.6636]
+    F1 lower in 165/168
+
+r=64:
+    median -6.1554
+    IQR [-8.1074, -4.2802]
+    F1 lower in 167/168
+
+r=infinity:
+    median -6.5990
+    IQR [-8.7516, -4.7455]
+    F1 lower in 166/168
+```
+
+### Versus reconstruction-only UV
+
+```text
+r=4:
+    median +4.7199
+    IQR [+3.1338, +5.8962]
+    F1 lower in 0/168
+
+r=8:
+    median +1.0886
+    IQR [+0.0660, +2.1726]
+    F1 lower in 41/168
+
+r=16:
+    median -3.5097
+    IQR [-4.7359, -2.0731]
+    F1 lower in 164/168
+
+r=32:
+    median -7.0882
+    IQR [-8.4737, -5.2177]
+    F1 lower in 168/168
+
+r=64:
+    median -9.0463
+    IQR [-10.5817, -6.8131]
+    F1 lower in 168/168
+
+r=infinity:
+    median -9.7587
+    IQR [-11.3659, -7.3910]
+    F1 lower in 168/168
+```
+
+At r=16 the entire interquartile range of paired constrained-cost differences
+is below zero against both baselines.
+
+## LXIV.3 Paired GT-side persistence coverage
+
+Paired coverage convention:
+
+```text
+delta_GTcoverage = F1 GT persistence coverage - baseline GT persistence coverage
+```
+
+Positive values favor F1.
+
+Every reported median and both quartiles are positive at every radius.
+
+Selected values:
+
+```text
+versus CNN:
+
+r=4:
+    median +0.0929
+    IQR [+0.0776, +0.1178]
+
+r=8:
+    median +0.1229
+    IQR [+0.1012, +0.1515]
+
+r=16:
+    median +0.1083
+    IQR [+0.0872, +0.1374]
+
+r=infinity:
+    median +0.0620
+    IQR [+0.0458, +0.0785]
+```
+
+```text
+versus UV:
+
+r=4:
+    median +0.0897
+    IQR [+0.0689, +0.1058]
+
+r=8:
+    median +0.1785
+    IQR [+0.1560, +0.1945]
+
+r=16:
+    median +0.2214
+    IQR [+0.1989, +0.2411]
+
+r=infinity:
+    median +0.1819
+    IQR [+0.1567, +0.1991]
+```
+
+Together with the 168/168 sample-wise coverage counts, this confirms that the
+GT-side coverage advantage is not driven by a few large outliers.
+
+## LXIV.4 Frozen Phase-5E interpretation
+
+Recommended dataset-wide wording:
+
+> Across all 168 fields, topology-inspired F1 consistently increases the
+> fraction of GT persistence mass represented by spatially local real-real
+> correspondences relative to both pretrained CNN and reconstruction-only
+> fine-tuning. Under very tight locality, this greater GT coverage coexists
+> with a larger symmetric constrained-persistence penalty, revealing a
+> coverage/excess tradeoff. As the admissible localization radius increases,
+> the persistence-cost advantage of F1 becomes dominant: 93.45% of samples
+> attain a stable joint cost advantage over both baselines by r=16, 97.62% by
+> r=32, and 98.81% by r=64. Two fields never attain this joint advantage over
+> the tested radius sequence.
+
+Use "dominant", "generally", or sample counts rather than "universal" for the
+constrained-cost comparison.
+
+GT coverage, SR coverage, locality gap, and constrained W2,2 remain separate
+quantities; do not combine them into an ad hoc scalar score.
+
+## LXIV.5 Phase 5E status
+
+The following are now frozen:
+
+```text
+canonical all-168 PD provenance:
+    PASS
+
+sparse solver implementation parity:
+    PASS
+
+all-168 locality sweep:
+    PASS
+
+paired-difference / exception audit:
+    PASS
+
+presentation closeout summaries:
+    PASS
+```
+
+No further Phase-5E numerical audit is required unless a concrete inconsistency
+is discovered during writing or figure generation.
