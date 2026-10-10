@@ -1,0 +1,73 @@
+CANDIDATE F vs MATCHED L_uv-ONLY FINE-TUNING CONTROL
+========================================================================================
+
+Candidate UV expanded-2688 is the matched reconstruction-only fine-tuning control.
+Candidate F grad+E2-low uses the same 2688-sample scale but adds gradient + repaired E2 supervision.
+
+Important: the decomposition below is descriptive. It is not a formal causal percentage attribution.
+
+d_B
+----------------------------------------------------------------------------------------
+  means:   CNN=3.124108  UV=3.287864  F=2.149744
+  medians: CNN=2.912511  UV=3.188247  F=1.934064
+  UV vs CNN mean change: +5.24% (positive = worse because lower is better)
+  F vs UV mean change:   -34.62% (negative = better)
+  F vs CNN mean change:  -31.19%
+  additive mean-distance decomposition:
+    total CNN->F improvement:       +0.974364
+    ordinary fine-tuning component: -0.163755
+    extra F improvement beyond UV:  +1.138120
+    descriptive shares: fine-tuning=-16.81%, beyond-UV=+116.81%
+  sample wins: UV<CNN 62/168, F<UV 156/168, F<CNN 151/168
+
+W2inf
+----------------------------------------------------------------------------------------
+  means:   CNN=19.152145  UV=21.062447  F=14.325676
+  medians: CNN=18.815892  UV=21.289925  F=14.122292
+  UV vs CNN mean change: +9.97% (positive = worse because lower is better)
+  F vs UV mean change:   -31.98% (negative = better)
+  F vs CNN mean change:  -25.20%
+  additive mean-distance decomposition:
+    total CNN->F improvement:       +4.826469
+    ordinary fine-tuning component: -1.910301
+    extra F improvement beyond UV:  +6.736770
+    descriptive shares: fine-tuning=-39.58%, beyond-UV=+139.58%
+  sample wins: UV<CNN 22/168, F<UV 168/168, F<CNN 167/168
+
+W22
+----------------------------------------------------------------------------------------
+  means:   CNN=24.552151  UV=27.508675  F=17.831897
+  medians: CNN=24.056543  UV=27.841107  F=17.531404
+  UV vs CNN mean change: +12.04% (positive = worse because lower is better)
+  F vs UV mean change:   -35.18% (negative = better)
+  F vs CNN mean change:  -27.37%
+  additive mean-distance decomposition:
+    total CNN->F improvement:       +6.720253
+    ordinary fine-tuning component: -2.956524
+    extra F improvement beyond UV:  +9.676778
+    descriptive shares: fine-tuning=-43.99%, beyond-UV=+143.99%
+  sample wins: UV<CNN 17/168, F<UV 168/168, F<CNN 166/168
+
+THREE-METRIC CONSENSUS
+----------------------------------------------------------------------------------------
+  UV better than CNN under all three: 11/168
+  Candidate F better than UV under all three: 156/168
+  Candidate F better than CNN under all three: 150/168
+
+CONVENTIONAL FIDELITY: F vs UV
+----------------------------------------------------------------------------------------
+  median |delta PSNRuv|: 1.291121 dB
+  median relative speed-MAE gap: 18.847%
+  median relative speed-RMSE gap: 15.695%
+
+PREDECLARED VISUAL SAMPLES
+----------------------------------------------------------------------------------------
+  sample 78: F<UV all3=1 | dB 4.150->3.626->2.586 | W2inf 23.701->24.152->16.101 | W22 30.568->31.164->20.145 | F-vs-UV dPSNR=1.2979 dB, relMAE=18.35%, relRMSE=16.19%
+  sample 71: F<UV all3=1 | dB 2.696->3.175->1.580 | W2inf 17.140->18.569->11.670 | W22 21.906->24.000->14.469 | F-vs-UV dPSNR=1.3731 dB, relMAE=18.32%, relRMSE=17.37%
+  sample 80: F<UV all3=1 | dB 4.296->3.600->1.808 | W2inf 22.770->23.272->15.907 | W22 29.627->30.484->19.978 | F-vs-UV dPSNR=1.3141 dB, relMAE=18.75%, relRMSE=16.61%
+  sample 63: F<UV all3=1 | dB 4.000->4.028->2.039 | W2inf 18.124->19.181->13.145 | W22 23.745->25.359->16.741 | F-vs-UV dPSNR=1.2378 dB, relMAE=16.25%, relRMSE=14.82%
+  sample 69: F<UV all3=1 | dB 3.067->2.436->1.233 | W2inf 14.572->15.256->9.987 | W22 18.722->19.913->12.323 | F-vs-UV dPSNR=1.2771 dB, relMAE=17.16%, relRMSE=16.33%
+
+Interpretation rule:
+  If UV is worse than CNN while Candidate F is better than both, then the observed topology improvement cannot be described as a generic benefit of fine-tuning alone at the corresponding aggregate level.
+  Shares above 100% are possible when ordinary L_uv-only fine-tuning moves the topology metric in the wrong direction; interpret this as overcoming a negative fine-tuning component, not as literal causal percent.

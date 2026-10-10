@@ -1,0 +1,88 @@
+CANDIDATE-F CORRECTED-PD / MT DISCORDANCE SELECTION
+============================================================================================
+
+SOURCE POLICY
+--------------------------------------------------------------------------------------------
+  historical TTK PD used: NO
+  corrected PD / audited MT source:
+    /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/corrected_pd_mt/corrected_pd_mt_sample_archetypes_vs_cnn.csv
+  frozen conventional-near-tie source:
+    /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/near_tie_candidateF_grad_E2_vs_cnn_topology_ranked.csv
+  matched L_uv-only control is context only, not a selection criterion.
+
+FROZEN SECONDARY SELECTION RULE
+--------------------------------------------------------------------------------------------
+  1. retain membership in an already-frozen conventional near-tie tier;
+  2. require Candidate F to improve d_B, W2inf, and W22 vs CNN;
+  3. require audited MT distance to worsen vs CNN;
+  4. rank by minimum relative PD gain descending;
+  5. tie-break by MT worsening magnitude descending, then conventional rank ascending, then sample index.
+
+STRICT 10%
+--------------------------------------------------------------------------------------------
+  frozen near-tie cases: 17
+  all3 corrected-PD improve + MT worsen: 5
+
+  ranked discordant cases:
+    rank= 1 sample= 76 conv_rank=  6 min_PD= 29.00% mean_PD= 34.47% dB= 43.70% W2inf= 29.00% W22= 30.71% MT=  -4.62% F-vs-UV-MT= +11.66%
+    rank= 2 sample= 75 conv_rank= 11 min_PD= 28.34% mean_PD= 33.65% dB= 43.57% W2inf= 28.34% W22= 29.03% MT=  -3.40% F-vs-UV-MT= +15.14%
+    rank= 3 sample=103 conv_rank= 16 min_PD= 26.28% mean_PD= 33.02% dB= 45.30% W2inf= 26.28% W22= 27.47% MT=  -4.58% F-vs-UV-MT=  +8.60%
+    rank= 4 sample= 61 conv_rank= 15 min_PD= 21.55% mean_PD= 22.76% dB= 22.58% W2inf= 21.55% W22= 24.16% MT=  -1.96% F-vs-UV-MT= +10.23%
+    rank= 5 sample= 60 conv_rank=  5 min_PD=  9.46% mean_PD= 21.68% dB=  9.46% W2inf= 26.56% W22= 29.03% MT= -12.35% F-vs-UV-MT=  +2.78%
+
+PRIMARY 20%
+--------------------------------------------------------------------------------------------
+  frozen near-tie cases: 34
+  all3 corrected-PD improve + MT worsen: 12
+
+  ranked discordant cases:
+    rank= 1 sample= 69 conv_rank= 27 min_PD= 31.46% mean_PD= 41.81% dB= 59.79% W2inf= 31.46% W22= 34.18% MT=  -3.61% F-vs-UV-MT=  +0.57%
+    rank= 2 sample= 84 conv_rank= 20 min_PD= 29.02% mean_PD= 37.98% dB= 55.17% W2inf= 29.02% W22= 29.75% MT=  -7.98% F-vs-UV-MT=  +3.96%
+    rank= 3 sample= 76 conv_rank=  6 min_PD= 29.00% mean_PD= 34.47% dB= 43.70% W2inf= 29.00% W22= 30.71% MT=  -4.62% F-vs-UV-MT= +11.66%
+    rank= 4 sample= 75 conv_rank= 11 min_PD= 28.34% mean_PD= 33.65% dB= 43.57% W2inf= 28.34% W22= 29.03% MT=  -3.40% F-vs-UV-MT= +15.14%
+    rank= 5 sample=109 conv_rank= 33 min_PD= 27.20% mean_PD= 28.39% dB= 28.35% W2inf= 27.20% W22= 29.61% MT=  -2.21% F-vs-UV-MT= +11.73%
+    rank= 6 sample=103 conv_rank= 16 min_PD= 26.28% mean_PD= 33.02% dB= 45.30% W2inf= 26.28% W22= 27.47% MT=  -4.58% F-vs-UV-MT=  +8.60%
+    rank= 7 sample= 86 conv_rank= 25 min_PD= 24.83% mean_PD= 26.55% dB= 24.83% W2inf= 26.67% W22= 28.14% MT=  -0.00% F-vs-UV-MT=  +8.95%
+    rank= 8 sample= 99 conv_rank= 28 min_PD= 23.92% mean_PD= 29.46% dB= 38.76% W2inf= 23.92% W22= 25.70% MT=  -0.84% F-vs-UV-MT= +11.72%
+    rank= 9 sample= 61 conv_rank= 15 min_PD= 21.55% mean_PD= 22.76% dB= 22.58% W2inf= 21.55% W22= 24.16% MT=  -1.96% F-vs-UV-MT= +10.23%
+    rank=10 sample= 73 conv_rank= 23 min_PD= 20.82% mean_PD= 24.25% dB= 20.82% W2inf= 24.87% W22= 27.07% MT= -16.55% F-vs-UV-MT=  +5.01%
+    rank=11 sample= 74 conv_rank= 18 min_PD= 10.46% mean_PD= 18.64% dB= 10.46% W2inf= 22.04% W22= 23.42% MT=  -5.19% F-vs-UV-MT= +20.94%
+    rank=12 sample= 60 conv_rank=  5 min_PD=  9.46% mean_PD= 21.68% dB=  9.46% W2inf= 26.56% W22= 29.03% MT= -12.35% F-vs-UV-MT=  +2.78%
+
+BROAD 30%
+--------------------------------------------------------------------------------------------
+  frozen near-tie cases: 51
+  all3 corrected-PD improve + MT worsen: 23
+
+  ranked discordant cases:
+    rank= 1 sample= 67 conv_rank= 49 min_PD= 34.69% mean_PD= 43.22% dB= 56.39% W2inf= 34.69% W22= 38.58% MT=  -6.51% F-vs-UV-MT=  -3.58%
+    rank= 2 sample= 69 conv_rank= 27 min_PD= 31.46% mean_PD= 41.81% dB= 59.79% W2inf= 31.46% W22= 34.18% MT=  -3.61% F-vs-UV-MT=  +0.57%
+    rank= 3 sample= 84 conv_rank= 20 min_PD= 29.02% mean_PD= 37.98% dB= 55.17% W2inf= 29.02% W22= 29.75% MT=  -7.98% F-vs-UV-MT=  +3.96%
+    rank= 4 sample= 76 conv_rank=  6 min_PD= 29.00% mean_PD= 34.47% dB= 43.70% W2inf= 29.00% W22= 30.71% MT=  -4.62% F-vs-UV-MT= +11.66%
+    rank= 5 sample= 75 conv_rank= 11 min_PD= 28.34% mean_PD= 33.65% dB= 43.57% W2inf= 28.34% W22= 29.03% MT=  -3.40% F-vs-UV-MT= +15.14%
+    rank= 6 sample=111 conv_rank= 47 min_PD= 27.45% mean_PD= 32.66% dB= 41.19% W2inf= 27.45% W22= 29.34% MT=  -1.97% F-vs-UV-MT= +10.89%
+    rank= 7 sample=109 conv_rank= 33 min_PD= 27.20% mean_PD= 28.39% dB= 28.35% W2inf= 27.20% W22= 29.61% MT=  -2.21% F-vs-UV-MT= +11.73%
+    rank= 8 sample=103 conv_rank= 16 min_PD= 26.28% mean_PD= 33.02% dB= 45.30% W2inf= 26.28% W22= 27.47% MT=  -4.58% F-vs-UV-MT=  +8.60%
+    rank= 9 sample= 55 conv_rank= 51 min_PD= 26.10% mean_PD= 29.50% dB= 35.46% W2inf= 26.10% W22= 26.95% MT=  -3.95% F-vs-UV-MT=  +0.79%
+    rank=10 sample= 98 conv_rank= 36 min_PD= 25.31% mean_PD= 30.12% dB= 37.20% W2inf= 25.31% W22= 27.87% MT=  -8.29% F-vs-UV-MT=  +3.44%
+    rank=11 sample= 86 conv_rank= 25 min_PD= 24.83% mean_PD= 26.55% dB= 24.83% W2inf= 26.67% W22= 28.14% MT=  -0.00% F-vs-UV-MT=  +8.95%
+    rank=12 sample= 56 conv_rank= 44 min_PD= 24.16% mean_PD= 26.10% dB= 24.16% W2inf= 25.81% W22= 28.32% MT=  -8.12% F-vs-UV-MT=  -4.93%
+    rank=13 sample= 99 conv_rank= 28 min_PD= 23.92% mean_PD= 29.46% dB= 38.76% W2inf= 23.92% W22= 25.70% MT=  -0.84% F-vs-UV-MT= +11.72%
+    rank=14 sample= 51 conv_rank= 43 min_PD= 22.88% mean_PD= 24.10% dB= 22.96% W2inf= 22.88% W22= 26.47% MT=  -0.55% F-vs-UV-MT=  -2.93%
+    rank=15 sample= 53 conv_rank= 45 min_PD= 22.61% mean_PD= 25.57% dB= 28.63% W2inf= 22.61% W22= 25.48% MT=  -4.79% F-vs-UV-MT=  +2.11%
+
+PRIMARY INTERPRETATION
+--------------------------------------------------------------------------------------------
+  Primary secondary-study case under the frozen rule:
+    sample 69
+    conventional rank = 27/168
+    minimum corrected-PD gain = 31.46%
+    audited MT gain = -3.61% (negative = MT worsens)
+
+  This case should be visualized before any appearance-based substitution.
+
+OUTPUTS
+--------------------------------------------------------------------------------------------
+  master:  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/corrected_pd_mt/candidateF_pd_mt_discordance_master.csv
+  ranked:  /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/corrected_pd_mt/candidateF_pd_mt_discordance_ranked.csv
+  summary: /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/corrected_pd_mt/candidateF_pd_mt_discordance_summary.txt

@@ -1,0 +1,497 @@
+===== BASE: distance_ / costs_ assignments =====
+89-  const ttk::DiagramType &CTDiagram2,
+90-  const double zeroThresh,
+91-  std::vector<std::vector<double>> &minMatrix,
+92-  std::vector<std::vector<double>> &maxMatrix,
+93-  std::vector<std::vector<double>> &sadMatrix,
+94-  const bool reverseMin,
+95-  const bool reverseMax,
+96-  const bool reverseSad,
+97:  const int wasserstein) const {
+98-
+99-  int maxI = 0, minI = 0;
+100-  int maxJ = 0, minJ = 0;
+101-  int sadI = 0, sadJ = 0;
+102-
+103-  for(const auto &p1 : CTDiagram1) {
+104-    if(std::abs(p1.persistence()) < zeroThresh)
+105-      continue;
+--
+137-      if(p2.birth.type == CriticalType::Local_minimum
+138-         && p2.death.type == CriticalType::Local_maximum) {
+139-        isMin2 = false;
+140-        isMax2 = true;
+141-      }
+142-      if((isMin1 && !isMin2) || (isMax1 && !isMax2) || (isSad1 && !isSad2))
+143-        continue;
+144-
+145:      double distance = this->distanceFunction(p1, p2, wasserstein);
+146:      const double diag1 = this->diagonalDistanceFunction(p1, wasserstein);
+147:      const double diag2 = this->diagonalDistanceFunction(p2, wasserstein);
+148-
+149-      if(distance > diag1 + diag2)
+150-        distance = std::numeric_limits<double>::max();
+151-
+152-      if(isMin1 && isMin2) {
+153-        if(reverseMin)
+154-          minMatrix[minJ++][minI] = distance;
+155-        else
+--
+163-        if(reverseSad)
+164-          sadMatrix[sadJ++][sadI] = distance;
+165-        else
+166-          sadMatrix[sadI][sadJ++] = distance;
+167-      }
+168-    }
+169-
+170-    const double distanceToDiagonal
+171:      = this->diagonalDistanceFunction(p1, wasserstein);
+172-    if(isMin1) {
+173-      if(reverseMin)
+174-        minMatrix[minJ++][minI] = distanceToDiagonal;
+175-      else
+176-        minMatrix[minI][minJ++] = distanceToDiagonal;
+177-    }
+178-    if(isMax1) {
+179-      if(reverseMax)
+--
+215-                            && p3.death.type == CriticalType::Saddle1);
+216-    if(p3.birth.type == CriticalType::Local_minimum
+217-       && p3.death.type == CriticalType::Local_maximum) {
+218-      isMin2 = false;
+219-      isMax2 = true;
+220-    }
+221-
+222-    const double distanceToDiagonal
+223:      = this->diagonalDistanceFunction(p3, wasserstein);
+224-    if(isMin2) {
+225-      if(reverseMin)
+226-        minMatrix[minJ++][minI] = distanceToDiagonal;
+227-      else
+228-        minMatrix[minI][minJ++] = distanceToDiagonal;
+229-    }
+230-    if(isMax2) {
+231-      if(reverseMax)
+--
+400-
+401-double ttk::BottleneckDistance::buildMappings(
+402-  const std::vector<MatchingType> &inputMatchings,
+403-  const bool transposeGlobal,
+404-  const bool transposeLocal,
+405-  std::vector<MatchingType> &outputMatchings,
+406-  const std::vector<int> &m1,
+407-  const std::vector<int> &m2,
+408:  int wasserstein) const {
+409-
+410-  // Input map permutation (so as to ignore transposition later on)
+411-  const auto &map1 = transposeLocal ? m2 : m1;
+412-  const auto &map2 = transposeLocal ? m1 : m2;
+413-
+414-  double addedPersistence = 0;
+415-  const auto doTranspose = transposeGlobal ^ transposeLocal;
+416-
+417-  for(const auto &t : inputMatchings) {
+418-
+419-    const auto val = std::abs(std::get<2>(t));
+420-    const size_t p1 = std::get<0>(t);
+421-    const size_t p2 = std::get<1>(t);
+422-
+423-    if(p1 >= map1.size() || p2 >= map2.size()) {
+424:      addedPersistence = (wasserstein > 0 ? addedPersistence + val
+425-                                          : std::max(val, addedPersistence));
+426-    } else {
+427-      if(doTranspose) {
+428-        outputMatchings.emplace_back(map2[p2], map1[p1], val);
+429-      } else {
+430-        outputMatchings.emplace_back(map1[p1], map2[p2], val);
+431-      }
+432-    }
+433-  }
+434-
+435-  return addedPersistence;
+436-}
+437-
+438-double ttk::BottleneckDistance::distanceFunction(const ttk::PersistencePair &a,
+439-                                                 const ttk::PersistencePair &b,
+440:                                                 const int wasserstein) const {
+441-
+442:  const int w = std::max(wasserstein, 1); // L_inf not managed.
+443-
+444-  // We don't match critical points of different index.
+445-  // This must be ensured before calling the distance function.
+446-  const bool isMin1 = a.birth.type == CriticalType::Local_minimum;
+447-  const bool isMax1 = a.death.type == CriticalType::Local_maximum;
+448-
+449-  const std::array<float, 3> coordsAbsDiff{
+450-    std::abs(a.death.coords[0] - b.death.coords[0]),
+--
+479-                   - std::abs(b.birth.coords[2] + b.death.coords[2]) / 2,
+480-                 w));
+481-
+482-  const double persDistance = x + y;
+483-  return Geometry::pow(persDistance + geoDistance, 1.0 / w);
+484-}
+485-
+486-double ttk::BottleneckDistance::diagonalDistanceFunction(
+487:  const ttk::PersistencePair &a, const int wasserstein) const {
+488-
+489:  const int w = std::max(wasserstein, 1);
+490-  const bool isMin1 = a.birth.type == CriticalType::Local_minimum;
+491-  const bool isMax1 = a.death.type == CriticalType::Local_maximum;
+492-  const double infDistance = (isMin1 || isMax1 ? this->PE : this->PS)
+493-                             * Geometry::pow(std::abs(a.persistence()), w);
+494-  const double geoDistance
+495-    = (this->PX
+496-         * Geometry::pow(std::abs(a.death.coords[0] - a.birth.coords[0]), w)
+497-       + this->PY
+--
+511-  if(transposeOriginal) {
+512-    this->printMsg("The first persistence diagram is larger than the second.");
+513-    this->printMsg("Solving the transposed problem.");
+514-  }
+515-  const auto &CTDiagram1 = transposeOriginal ? d2 : d1;
+516-  const auto &CTDiagram2 = transposeOriginal ? d1 : d2;
+517-
+518-  // Check user parameters.
+519:  const auto isBottleneck = this->WassersteinMetric == "inf";
+520:  const int wasserstein = isBottleneck ? -1 : stoi(this->WassersteinMetric);
+521:  if(wasserstein < 0 && !isBottleneck) {
+522-    this->printErr("Wrong value for the Wassertein power parameter");
+523-    return -4;
+524-  }
+525-
+526-  // Needed to limit computation time.
+527-  const auto zeroThresh
+528-    = this->computeMinimumRelevantPersistence(CTDiagram1, CTDiagram2);
+529-
+--
+567-  const bool transposeMin = nbRowMin > nbColMin;
+568-  const bool transposeMax = nbRowMax > nbColMax;
+569-  const bool transposeSad = nbRowSad > nbColSad;
+570-
+571-  Timer t;
+572-
+573-  this->buildCostMatrices(CTDiagram1, CTDiagram2, zeroThresh, minMatrix,
+574-                          maxMatrix, sadMatrix, transposeMin, transposeMax,
+575:                          transposeSad, wasserstein);
+576-
+577-  if(!isBottleneck) {
+578-
+579-    if(nbRowMin > 0 && nbColMin > 0) {
+580-      AssignmentMunkres<double> solverMin;
+581-      this->printMsg("Affecting minima...");
+582-      solvePWasserstein(minMatrix, minMatchings, solverMin);
+583-    }
+--
+622-  }
+623-
+624-  this->printMsg("TTK CORE DONE", 1, t.getElapsedTime());
+625-
+626-  // Rebuild mappings.
+627-  // Begin cost computation for unpaired vertices.
+628-  const std::array<double, 3> addedPersistence{
+629-    this->buildMappings(minMatchings, transposeOriginal, transposeMin,
+630:                        matchings, map1[0], map2[0], wasserstein),
+631-    this->buildMappings(sadMatchings, transposeOriginal, transposeSad,
+632:                        matchings, map1[1], map2[1], wasserstein),
+633-    this->buildMappings(maxMatchings, transposeOriginal, transposeMax,
+634:                        matchings, map1[2], map2[2], wasserstein),
+635-  };
+636-
+637-  // TODO [HIGH] do that for embeddings
+638-  // Recompute matching weights for user-friendly distance.
+639-  std::array<double, 3> costs{};
+640-  std::vector<bool> paired1(CTDiagram1.size(), false);
+641-  std::vector<bool> paired2(CTDiagram2.size(), false);
+642-
+--
+647-    const int i = transposeOriginal ? std::get<1>(mt) : std::get<0>(mt);
+648-    const int j = transposeOriginal ? std::get<0>(mt) : std::get<1>(mt);
+649-
+650-    const auto &t1 = CTDiagram1[i];
+651-    const auto &t2 = CTDiagram2[j];
+652-    paired1[i] = true;
+653-    paired2[j] = true;
+654-
+655:    partialDistance = this->distanceFunction(t1, t2, wasserstein);
+656-
+657-    if(t1.death.type == CriticalType::Local_maximum) {
+658-      if(!isBottleneck) {
+659-        costs[2] += partialDistance;
+660-      } else {
+661-        costs[2] = std::max(costs[2], partialDistance);
+662-      }
+663-    } else if(t1.birth.type == CriticalType::Local_minimum) {
+--
+677-  }
+678-
+679-  const auto affectationD
+680-    = !isBottleneck ? costs[0] + costs[1] + costs[2] : partialDistance;
+681-  const auto addedPers
+682-    = addedPersistence[0] + addedPersistence[1] + addedPersistence[2];
+683-  this->distance_
+684-    = !isBottleneck
+685:        ? Geometry::pow(affectationD + addedPers, 1.0 / wasserstein)
+686-        : std::max(affectationD, *std::max_element(addedPersistence.begin(),
+687-                                                   addedPersistence.end()));
+688-
+689-  this->printMsg("Computed distance:");
+690-  this->printMsg("diagMax(" + std::to_string(addedPersistence[2])
+691-                 + "), diagMin(" + std::to_string(addedPersistence[0])
+692-                 + "), diagSad(" + std::to_string(addedPersistence[1]) + ")");
+693-  this->printMsg("affAll(" + std::to_string(affectationD) + "), res("
+694-                 + std::to_string(this->distance_) + ")");
+695-
+696-  // aggregate costs per pair type
+697-  if(!isBottleneck) {
+698:    costs[0] = Geometry::pow(costs[0] + addedPersistence[0], 1.0 / wasserstein);
+699:    costs[1] = Geometry::pow(costs[1] + addedPersistence[1], 1.0 / wasserstein);
+700:    costs[2] = Geometry::pow(costs[2] + addedPersistence[2], 1.0 / wasserstein);
+701-  } else {
+702-    costs[0] = std::max(costs[0], addedPersistence[0]);
+703-    costs[1] = std::max(costs[1], addedPersistence[1]);
+704-    costs[2] = std::max(costs[2], addedPersistence[2]);
+705-  }
+706-
+707-  this->costs_ = costs;
+708-
+709-  // display results
+710-  const std::vector<std::vector<std::string>> rows{
+711:    {" Min-saddle cost", std::to_string(this->costs_[0])},
+712:    {" Saddle-saddle cost", std::to_string(this->costs_[1])},
+713:    {" Saddle-max cost", std::to_string(this->costs_[2])},
+714-    {isBottleneck ? "Bottleneck Distance" : "Wasserstein Distance",
+715-     std::to_string(this->distance_)},
+716-  };
+717-  this->printMsg(rows);
+718-
+719-  return 0;
+720-}
+
+===== BASE: execute-related definitions =====
+5-
+6-ttk::BottleneckDistance::BottleneckDistance() {
+7-  this->setDebugMsgPrefix("BottleneckDistance");
+8-}
+9-
+10:int ttk::BottleneckDistance::execute(const ttk::DiagramType &diag0,
+11-                                     const ttk::DiagramType &diag1,
+12-                                     std::vector<MatchingType> &matchings) {
+13-  Timer t;
+14-
+15-  if(diag0.empty() || diag1.empty()) {
+--
+256-    sadMatrix[sadJ][sadI] = std::numeric_limits<double>::max();
+257-  else
+258-    sadMatrix[sadI][sadJ] = std::numeric_limits<double>::max();
+259-}
+260-
+261:double ttk::BottleneckDistance::computeGeometricalRange(
+262-  const ttk::DiagramType &CTDiagram1,
+263-  const ttk::DiagramType &CTDiagram2) const {
+264-
+265-  float minX, minY, minZ, maxX, maxY, maxZ;
+266-
+--
+306-
+307-  return std::sqrt(square(maxX - minX) + square(maxY - minY)
+308-                   + square(maxZ - minZ));
+309-}
+310-
+311:double ttk::BottleneckDistance::computeMinimumRelevantPersistence(
+312-  const ttk::DiagramType &CTDiagram1,
+313-  const ttk::DiagramType &CTDiagram2) const {
+314-
+315-  const auto sp = this->Tolerance;
+316-  const double s = sp > 0.0 && sp < 100.0 ? sp / 100.0 : 0;
+--
+328-  const auto minVal = *std::min_element(toSort.begin(), toSort.end());
+329-  const auto maxVal = *std::max_element(toSort.begin(), toSort.end());
+330-  return s * (maxVal - minVal);
+331-}
+332-
+333:void ttk::BottleneckDistance::computeMinMaxSaddleNumberAndMapping(
+334-  const ttk::DiagramType &CTDiagram,
+335-  int &nbMin,
+336-  int &nbMax,
+337-  int &nbSaddle,
+338-  std::vector<int> &minMap,
+--
+396-    solver.run(matchings);
+397-    solver.clear();
+398-  }
+399-} // namespace
+400-
+401:double ttk::BottleneckDistance::buildMappings(
+402-  const std::vector<MatchingType> &inputMatchings,
+403-  const bool transposeGlobal,
+404-  const bool transposeLocal,
+405-  std::vector<MatchingType> &outputMatchings,
+406-  const std::vector<int> &m1,
+--
+500-           * Geometry::pow(std::abs(a.death.coords[2] - a.birth.coords[2]), w));
+501-
+502-  return Geometry::pow(infDistance + geoDistance, 1.0 / w);
+503-}
+504-
+505:int ttk::BottleneckDistance::computeBottleneck(
+506-  const ttk::DiagramType &d1,
+507-  const ttk::DiagramType &d2,
+508-  std::vector<MatchingType> &matchings) {
+509-
+510-  const auto transposeOriginal = d1.size() > d2.size();
+--
+624-  this->printMsg("TTK CORE DONE", 1, t.getElapsedTime());
+625-
+626-  // Rebuild mappings.
+627-  // Begin cost computation for unpaired vertices.
+628-  const std::array<double, 3> addedPersistence{
+629:    this->buildMappings(minMatchings, transposeOriginal, transposeMin,
+630-                        matchings, map1[0], map2[0], wasserstein),
+631:    this->buildMappings(sadMatchings, transposeOriginal, transposeSad,
+632-                        matchings, map1[1], map2[1], wasserstein),
+633:    this->buildMappings(maxMatchings, transposeOriginal, transposeMax,
+634-                        matchings, map1[2], map2[2], wasserstein),
+635-  };
+636-
+637-  // TODO [HIGH] do that for embeddings
+638-  // Recompute matching weights for user-friendly distance.
+
+===== VTK: how base distance becomes output =====
+1:#include <ttkBottleneckDistance.h>
+2:#include <ttkBottleneckDistanceUtils.h>
+3-#include <ttkUtils.h>
+4-
+5-#include <vtkDoubleArray.h>
+6-#include <vtkFloatArray.h>
+7-#include <vtkInformation.h>
+8-#include <vtkIntArray.h>
+9-#include <vtkMultiBlockDataSet.h>
+10-#include <vtkPointData.h>
+11-#include <vtkUnstructuredGrid.h>
+12-
+13:vtkStandardNewMacro(ttkBottleneckDistance);
+14-
+15:ttkBottleneckDistance::ttkBottleneckDistance() {
+16-  SetNumberOfInputPorts(1);
+17-  SetNumberOfOutputPorts(2);
+18-}
+19-
+20:int ttkBottleneckDistance::FillInputPortInformation(int port,
+21-                                                    vtkInformation *info) {
+22-  if(port == 0) {
+23-    info->Set(ttkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkMultiBlockDataSet");
+24-    return 1;
+25-  }
+26-  return 0;
+27-}
+28-
+29:int ttkBottleneckDistance::FillOutputPortInformation(int port,
+30-                                                     vtkInformation *info) {
+31-  if(port == 0) {
+32-    info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkMultiBlockDataSet");
+33-    return 1;
+34-  } else if(port == 1) {
+35-    info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkUnstructuredGrid");
+36-    return 1;
+37-  }
+38-  return 0;
+39-}
+40-
+41:static int generateMatchings(vtkUnstructuredGrid *const outputCT3,
+42-                             const ttk::DiagramType &diagram1,
+43-                             const ttk::DiagramType &diagram2,
+44-                             const std::vector<ttk::MatchingType> &matchings,
+45-                             const std::array<double, 3> &distances,
+46-                             const double globalDist,
+47-                             const double spacing,
+48-                             const bool isBottleneck,
+49-                             const bool is2D0,
+50-                             const bool is2D1) {
+51-
+52-  vtkNew<vtkUnstructuredGrid> vtu{};
+53-
+--
+92-    points->SetPoint(2 * i + 1, p1.data());
+93-
+94-    std::array<vtkIdType, 2> ids{
+95-      2 * static_cast<vtkIdType>(i) + 0,
+96-      2 * static_cast<vtkIdType>(i) + 1,
+97-    };
+98-    vtu->InsertNextCell(VTK_LINE, 2, ids.data());
+99-
+100-    costs->SetTuple1(i, std::get<2>(t));
+101-    matchingIds->SetTuple1(i, i);
+102-  }
+103-
+104:  // add distance results to output_matchings FieldData
+105-  vtkNew<vtkDoubleArray> minSad{};
+106-  minSad->SetName("MinSaddleCost");
+107-  minSad->SetNumberOfTuples(1);
+108-  minSad->SetTuple1(0, distances[0]);
+109-
+110-  vtkNew<vtkDoubleArray> sadSad{};
+111-  sadSad->SetName("SaddleSaddleCost");
+112-  sadSad->SetNumberOfTuples(1);
+113-  sadSad->SetTuple1(0, distances[1]);
+114-
+115-  vtkNew<vtkDoubleArray> sadMax{};
+116-  sadMax->SetName("SaddleMaxCost");
+117-  sadMax->SetNumberOfTuples(1);
+118-  sadMax->SetTuple1(0, distances[2]);
+119-
+120-  vtkNew<vtkDoubleArray> wass{};
+121:  wass->SetName(isBottleneck ? "BottleneckDistance" : "WassersteinDistance");
+122-  wass->SetNumberOfTuples(1);
+123-  wass->SetTuple1(0, globalDist);
+124-
+125:  vtu->GetFieldData()->AddArray(minSad);
+126:  vtu->GetFieldData()->AddArray(sadSad);
+127:  vtu->GetFieldData()->AddArray(sadMax);
+128:  vtu->GetFieldData()->AddArray(wass);
+129-
+130-  outputCT3->ShallowCopy(vtu);
+131-
+132-  return 1;
+133-}
+134-
+135:int ttkBottleneckDistance::RequestData(vtkInformation *ttkNotUsed(request),
+136-                                       vtkInformationVector **inputVector,
+137-                                       vtkInformationVector *outputVector) {
+138-
+139-  auto outputDiagrams = vtkMultiBlockDataSet::GetData(outputVector, 0);
+140-  auto outputMatchings = vtkUnstructuredGrid::GetData(outputVector, 1);
+141-
+142-  auto blocks = vtkMultiBlockDataSet::GetData(inputVector[0]);
+143-  std::vector<vtkUnstructuredGrid *> inputDiags{};
+144-
+145-  if(blocks == nullptr) {
+146-    this->printErr("No input diagrams");
+147-    return 0;
+--
+190-  }
+191-
+192-  // Exec.
+193-  status = this->execute(diagram0, diagram1, matchings);
+194-  if(status != 0) {
+195-    this->printErr("Base layer failed with error status "
+196-                   + std::to_string(status));
+197-    return 0;
+198-  }
+199-
+200-  // Generate matchings
+201-  if(this->UseOutputMatching) {
+202:    status = generateMatchings(outputMatchings, diagram0, diagram1, matchings,
+203:                               this->costs_, this->distance_, this->Spacing,
+204-                               this->WassersteinMetric == "inf", is2D0, is2D1);
+205-
+206-    if(status != 1) {
+207-      this->printErr("Could not compute matchings");
+208-      return 0;
+209-    }
+210-  }
+211-
+212-  // Translate diagrams
+213-  vtkNew<vtkUnstructuredGrid> vtu0{}, vtu1{};
+214-  if(this->UseGeometricSpacing) {
+215-    vtu0->ShallowCopy(inputDiags[0]);

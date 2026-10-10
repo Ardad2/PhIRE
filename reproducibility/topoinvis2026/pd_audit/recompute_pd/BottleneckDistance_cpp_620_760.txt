@@ -1,0 +1,101 @@
+   620	        minRowColSad, maxRowColSad, sadMatrix, sadMatchings, solverSad);
+   621	    }
+   622	  }
+   623	
+   624	  this->printMsg("TTK CORE DONE", 1, t.getElapsedTime());
+   625	
+   626	  // Rebuild mappings.
+   627	  // Begin cost computation for unpaired vertices.
+   628	  const std::array<double, 3> addedPersistence{
+   629	    this->buildMappings(minMatchings, transposeOriginal, transposeMin,
+   630	                        matchings, map1[0], map2[0], wasserstein),
+   631	    this->buildMappings(sadMatchings, transposeOriginal, transposeSad,
+   632	                        matchings, map1[1], map2[1], wasserstein),
+   633	    this->buildMappings(maxMatchings, transposeOriginal, transposeMax,
+   634	                        matchings, map1[2], map2[2], wasserstein),
+   635	  };
+   636	
+   637	  // TODO [HIGH] do that for embeddings
+   638	  // Recompute matching weights for user-friendly distance.
+   639	  std::array<double, 3> costs{};
+   640	  std::vector<bool> paired1(CTDiagram1.size(), false);
+   641	  std::vector<bool> paired2(CTDiagram2.size(), false);
+   642	
+   643	  // store last matching distance for bottleneck
+   644	  double partialDistance{};
+   645	
+   646	  for(const auto &mt : matchings) {
+   647	    const int i = transposeOriginal ? std::get<1>(mt) : std::get<0>(mt);
+   648	    const int j = transposeOriginal ? std::get<0>(mt) : std::get<1>(mt);
+   649	
+   650	    const auto &t1 = CTDiagram1[i];
+   651	    const auto &t2 = CTDiagram2[j];
+   652	    paired1[i] = true;
+   653	    paired2[j] = true;
+   654	
+   655	    partialDistance = this->distanceFunction(t1, t2, wasserstein);
+   656	
+   657	    if(t1.death.type == CriticalType::Local_maximum) {
+   658	      if(!isBottleneck) {
+   659	        costs[2] += partialDistance;
+   660	      } else {
+   661	        costs[2] = std::max(costs[2], partialDistance);
+   662	      }
+   663	    } else if(t1.birth.type == CriticalType::Local_minimum) {
+   664	      if(!isBottleneck) {
+   665	        costs[0] += partialDistance;
+   666	      } else {
+   667	        costs[0] = std::max(costs[0], partialDistance);
+   668	      }
+   669	    } else if(t1.birth.type == CriticalType::Saddle1
+   670	              && t1.death.type == CriticalType::Saddle2) {
+   671	      if(!isBottleneck) {
+   672	        costs[1] += partialDistance;
+   673	      } else {
+   674	        costs[1] = std::max(costs[1], partialDistance);
+   675	      }
+   676	    }
+   677	  }
+   678	
+   679	  const auto affectationD
+   680	    = !isBottleneck ? costs[0] + costs[1] + costs[2] : partialDistance;
+   681	  const auto addedPers
+   682	    = addedPersistence[0] + addedPersistence[1] + addedPersistence[2];
+   683	  this->distance_
+   684	    = !isBottleneck
+   685	        ? Geometry::pow(affectationD + addedPers, 1.0 / wasserstein)
+   686	        : std::max(affectationD, *std::max_element(addedPersistence.begin(),
+   687	                                                   addedPersistence.end()));
+   688	
+   689	  this->printMsg("Computed distance:");
+   690	  this->printMsg("diagMax(" + std::to_string(addedPersistence[2])
+   691	                 + "), diagMin(" + std::to_string(addedPersistence[0])
+   692	                 + "), diagSad(" + std::to_string(addedPersistence[1]) + ")");
+   693	  this->printMsg("affAll(" + std::to_string(affectationD) + "), res("
+   694	                 + std::to_string(this->distance_) + ")");
+   695	
+   696	  // aggregate costs per pair type
+   697	  if(!isBottleneck) {
+   698	    costs[0] = Geometry::pow(costs[0] + addedPersistence[0], 1.0 / wasserstein);
+   699	    costs[1] = Geometry::pow(costs[1] + addedPersistence[1], 1.0 / wasserstein);
+   700	    costs[2] = Geometry::pow(costs[2] + addedPersistence[2], 1.0 / wasserstein);
+   701	  } else {
+   702	    costs[0] = std::max(costs[0], addedPersistence[0]);
+   703	    costs[1] = std::max(costs[1], addedPersistence[1]);
+   704	    costs[2] = std::max(costs[2], addedPersistence[2]);
+   705	  }
+   706	
+   707	  this->costs_ = costs;
+   708	
+   709	  // display results
+   710	  const std::vector<std::vector<std::string>> rows{
+   711	    {" Min-saddle cost", std::to_string(this->costs_[0])},
+   712	    {" Saddle-saddle cost", std::to_string(this->costs_[1])},
+   713	    {" Saddle-max cost", std::to_string(this->costs_[2])},
+   714	    {isBottleneck ? "Bottleneck Distance" : "Wasserstein Distance",
+   715	     std::to_string(this->distance_)},
+   716	  };
+   717	  this->printMsg(rows);
+   718	
+   719	  return 0;
+   720	}

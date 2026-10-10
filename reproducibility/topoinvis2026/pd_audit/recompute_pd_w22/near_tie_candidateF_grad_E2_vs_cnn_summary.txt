@@ -1,0 +1,73 @@
+CANDIDATE-F CONVENTIONAL NEAR-TIE / PD-SEPARATION STUDY
+================================================================================
+
+Comparison:
+  CNN vs candidateF_grad_E2_low_expanded2688
+
+Conventional metrics used:
+  |delta PSNRuv|
+  |delta speed MAE| / CNN speed MAE
+  |delta speed RMSE| / CNN speed RMSE
+
+SSIM:
+  excluded because all values are NaN
+
+Conventional selection was performed before topology ranking.
+
+STRICT 10%
+  conventional cases: 17
+  all-three-PD-improved: 17
+
+  top topology-separated cases:
+    sample= 78 conv_rank= 13 C=0.0898 min_PD_gain=32.07% mean_PD_gain=34.62% dB=37.68% W2inf=32.07% W22=34.10%
+    sample= 71 conv_rank=  8 C=0.0719 min_PD_gain=31.91% mean_PD_gain=35.75% dB=41.38% W2inf=31.91% W22=33.95%
+    sample= 70 conv_rank= 14 C=0.0958 min_PD_gain=30.89% mean_PD_gain=32.19% dB=33.20% W2inf=30.89% W22=32.48%
+    sample= 80 conv_rank=  2 C=0.0180 min_PD_gain=30.14% mean_PD_gain=40.21% dB=57.93% W2inf=30.14% W22=32.57%
+    sample= 79 conv_rank=  4 C=0.0479 min_PD_gain=29.86% mean_PD_gain=37.11% dB=49.58% W2inf=29.86% W22=31.89%
+    sample= 81 conv_rank=  7 C=0.0659 min_PD_gain=29.40% mean_PD_gain=36.23% dB=47.45% W2inf=29.40% W22=31.82%
+    sample= 76 conv_rank=  6 C=0.0599 min_PD_gain=29.00% mean_PD_gain=34.47% dB=43.70% W2inf=29.00% W22=30.71%
+    sample= 72 conv_rank= 17 C=0.1138 min_PD_gain=28.84% mean_PD_gain=32.72% dB=38.40% W2inf=28.84% W22=30.91%
+    sample= 82 conv_rank=  9 C=0.0719 min_PD_gain=28.47% mean_PD_gain=40.11% dB=62.21% W2inf=28.47% W22=29.66%
+    sample= 75 conv_rank= 11 C=0.0838 min_PD_gain=28.34% mean_PD_gain=33.65% dB=43.57% W2inf=28.34% W22=29.03%
+
+PRIMARY 20%
+  conventional cases: 34
+  all-three-PD-improved: 34
+
+  top topology-separated cases:
+    sample= 78 conv_rank= 13 C=0.0898 min_PD_gain=32.07% mean_PD_gain=34.62% dB=37.68% W2inf=32.07% W22=34.10%
+    sample= 71 conv_rank=  8 C=0.0719 min_PD_gain=31.91% mean_PD_gain=35.75% dB=41.38% W2inf=31.91% W22=33.95%
+    sample= 69 conv_rank= 27 C=0.1916 min_PD_gain=31.46% mean_PD_gain=41.81% dB=59.79% W2inf=31.46% W22=34.18%
+    sample= 70 conv_rank= 14 C=0.0958 min_PD_gain=30.89% mean_PD_gain=32.19% dB=33.20% W2inf=30.89% W22=32.48%
+    sample= 80 conv_rank=  2 C=0.0180 min_PD_gain=30.14% mean_PD_gain=40.21% dB=57.93% W2inf=30.14% W22=32.57%
+    sample= 79 conv_rank=  4 C=0.0479 min_PD_gain=29.86% mean_PD_gain=37.11% dB=49.58% W2inf=29.86% W22=31.89%
+    sample= 87 conv_rank= 24 C=0.1617 min_PD_gain=29.51% mean_PD_gain=31.89% dB=35.76% W2inf=29.51% W22=30.39%
+    sample= 81 conv_rank=  7 C=0.0659 min_PD_gain=29.40% mean_PD_gain=36.23% dB=47.45% W2inf=29.40% W22=31.82%
+    sample= 84 conv_rank= 20 C=0.1317 min_PD_gain=29.02% mean_PD_gain=37.98% dB=55.17% W2inf=29.02% W22=29.75%
+    sample= 76 conv_rank=  6 C=0.0599 min_PD_gain=29.00% mean_PD_gain=34.47% dB=43.70% W2inf=29.00% W22=30.71%
+
+BROAD 30%
+  conventional cases: 51
+  all-three-PD-improved: 51
+
+  top topology-separated cases:
+    sample= 67 conv_rank= 49 C=0.3114 min_PD_gain=34.69% mean_PD_gain=43.22% dB=56.39% W2inf=34.69% W22=38.58%
+    sample= 68 conv_rank= 35 C=0.2395 min_PD_gain=33.31% mean_PD_gain=39.35% dB=47.74% W2inf=33.31% W22=37.01%
+    sample= 78 conv_rank= 13 C=0.0898 min_PD_gain=32.07% mean_PD_gain=34.62% dB=37.68% W2inf=32.07% W22=34.10%
+    sample= 71 conv_rank=  8 C=0.0719 min_PD_gain=31.91% mean_PD_gain=35.75% dB=41.38% W2inf=31.91% W22=33.95%
+    sample= 69 conv_rank= 27 C=0.1916 min_PD_gain=31.46% mean_PD_gain=41.81% dB=59.79% W2inf=31.46% W22=34.18%
+    sample= 70 conv_rank= 14 C=0.0958 min_PD_gain=30.89% mean_PD_gain=32.19% dB=33.20% W2inf=30.89% W22=32.48%
+    sample= 80 conv_rank=  2 C=0.0180 min_PD_gain=30.14% mean_PD_gain=40.21% dB=57.93% W2inf=30.14% W22=32.57%
+    sample= 79 conv_rank=  4 C=0.0479 min_PD_gain=29.86% mean_PD_gain=37.11% dB=49.58% W2inf=29.86% W22=31.89%
+    sample= 87 conv_rank= 24 C=0.1617 min_PD_gain=29.51% mean_PD_gain=31.89% dB=35.76% W2inf=29.51% W22=30.39%
+    sample= 81 conv_rank=  7 C=0.0659 min_PD_gain=29.40% mean_PD_gain=36.23% dB=47.45% W2inf=29.40% W22=31.82%
+
+Primary interpretation rule:
+  Visual inspection must begin only after this table is frozen.
+  Prefer samples in the PRIMARY 20% conventional near-tie subset
+  where all three validated PD metrics favor Candidate F.
+  Rank topology separation by the minimum relative improvement across
+  dB, W2inf, and W22.
+
+Master CSV: /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/near_tie_candidateF_grad_E2_vs_cnn_master.csv
+Topology-ranked CSV: /home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd_w22/near_tie_candidateF_grad_E2_vs_cnn_topology_ranked.csv

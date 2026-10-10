@@ -1,0 +1,29 @@
+STANDARD W_{2,2} FULL-SWEEP SUMMARY
+================================================================================
+expected comparisons:          8568
+rows in W22 CSV:               8568
+unique (run,sample):           8568
+PASS rows:                     8568
+INVARIANT_FAIL rows:           0
+ERROR rows:                    0
+count mismatches:              0
+
+Cross-norm invariant:
+    W2_inf <= W2_2 <= sqrt(2) * W2_inf
+max lower-bound violation:     0
+max upper-bound violation:     0
+min W22/W2inf ratio:           1.1108209537045188
+max W22/W2inf ratio:           1.3519058515617817
+mean W22/W2inf ratio:          1.2656120581039576
+mean W22-W2inf:                4.7853472835572894
+
+mean historical_TTK2-W22:      3.5061131930586908
+
+abs tolerance:                 1e-10
+rel tolerance:                 1e-12
+
+OVERALL INTERNAL CHECK: PASS
+
+NOTE:
+This validates internal consistency and the cross-norm inequality.
+Independent numerical validation against GUDHI is a separate next stage.

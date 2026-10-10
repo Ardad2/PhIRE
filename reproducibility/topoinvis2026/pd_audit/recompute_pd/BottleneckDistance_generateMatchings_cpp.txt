@@ -1,0 +1,101 @@
+    35	    info->Set(vtkDataObject::DATA_TYPE_NAME(), "vtkUnstructuredGrid");
+    36	    return 1;
+    37	  }
+    38	  return 0;
+    39	}
+    40	
+    41	static int generateMatchings(vtkUnstructuredGrid *const outputCT3,
+    42	                             const ttk::DiagramType &diagram1,
+    43	                             const ttk::DiagramType &diagram2,
+    44	                             const std::vector<ttk::MatchingType> &matchings,
+    45	                             const std::array<double, 3> &distances,
+    46	                             const double globalDist,
+    47	                             const double spacing,
+    48	                             const bool isBottleneck,
+    49	                             const bool is2D0,
+    50	                             const bool is2D1) {
+    51	
+    52	  vtkNew<vtkUnstructuredGrid> vtu{};
+    53	
+    54	  vtkNew<vtkPoints> points{};
+    55	  points->SetNumberOfPoints(2 * matchings.size());
+    56	  vtu->SetPoints(points);
+    57	
+    58	  vtkNew<vtkDoubleArray> costs{};
+    59	  costs->SetName("Cost");
+    60	  costs->SetNumberOfComponents(1);
+    61	  costs->SetNumberOfTuples(matchings.size());
+    62	  vtu->GetCellData()->AddArray(costs);
+    63	
+    64	  vtkNew<vtkIntArray> matchingIds{};
+    65	  matchingIds->SetName("MatchingIdentifier");
+    66	  matchingIds->SetNumberOfComponents(1);
+    67	  matchingIds->SetNumberOfTuples(matchings.size());
+    68	  vtu->GetCellData()->AddArray(matchingIds);
+    69	
+    70	  // Build matchings.
+    71	  for(size_t i = 0; i < matchings.size(); ++i) {
+    72	    const auto &t = matchings[i];
+    73	    const auto n1 = std::get<0>(t);
+    74	    const auto n2 = std::get<1>(t);
+    75	
+    76	    const auto &pair0 = diagram1[n1];
+    77	    const auto &pair1 = diagram2[n2];
+    78	
+    79	    const auto pairPoint = [](const ttk::PersistencePair &pair, const bool is2D,
+    80	                              const double zval) -> std::array<double, 3> {
+    81	      if(is2D) {
+    82	        return {pair.birth.sfValue, pair.death.sfValue, zval};
+    83	      } else {
+    84	        return {
+    85	          pair.death.coords[0], pair.death.coords[1], pair.death.coords[2]};
+    86	      }
+    87	    };
+    88	
+    89	    const auto p0 = pairPoint(pair0, is2D0, -spacing / 2.0);
+    90	    points->SetPoint(2 * i + 0, p0.data());
+    91	    const auto p1 = pairPoint(pair1, is2D1, spacing / 2.0);
+    92	    points->SetPoint(2 * i + 1, p1.data());
+    93	
+    94	    std::array<vtkIdType, 2> ids{
+    95	      2 * static_cast<vtkIdType>(i) + 0,
+    96	      2 * static_cast<vtkIdType>(i) + 1,
+    97	    };
+    98	    vtu->InsertNextCell(VTK_LINE, 2, ids.data());
+    99	
+   100	    costs->SetTuple1(i, std::get<2>(t));
+   101	    matchingIds->SetTuple1(i, i);
+   102	  }
+   103	
+   104	  // add distance results to output_matchings FieldData
+   105	  vtkNew<vtkDoubleArray> minSad{};
+   106	  minSad->SetName("MinSaddleCost");
+   107	  minSad->SetNumberOfTuples(1);
+   108	  minSad->SetTuple1(0, distances[0]);
+   109	
+   110	  vtkNew<vtkDoubleArray> sadSad{};
+   111	  sadSad->SetName("SaddleSaddleCost");
+   112	  sadSad->SetNumberOfTuples(1);
+   113	  sadSad->SetTuple1(0, distances[1]);
+   114	
+   115	  vtkNew<vtkDoubleArray> sadMax{};
+   116	  sadMax->SetName("SaddleMaxCost");
+   117	  sadMax->SetNumberOfTuples(1);
+   118	  sadMax->SetTuple1(0, distances[2]);
+   119	
+   120	  vtkNew<vtkDoubleArray> wass{};
+   121	  wass->SetName(isBottleneck ? "BottleneckDistance" : "WassersteinDistance");
+   122	  wass->SetNumberOfTuples(1);
+   123	  wass->SetTuple1(0, globalDist);
+   124	
+   125	  vtu->GetFieldData()->AddArray(minSad);
+   126	  vtu->GetFieldData()->AddArray(sadSad);
+   127	  vtu->GetFieldData()->AddArray(sadMax);
+   128	  vtu->GetFieldData()->AddArray(wass);
+   129	
+   130	  outputCT3->ShallowCopy(vtu);
+   131	
+   132	  return 1;
+   133	}
+   134	
+   135	int ttkBottleneckDistance::RequestData(vtkInformation *ttkNotUsed(request),

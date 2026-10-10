@@ -1,0 +1,52 @@
+================================================================================
+CANONICAL PD FULL-SWEEP VALIDATION
+================================================================================
+
+[1] COVERAGE
+rows: 8568
+columns: 25
+runs: 51
+duplicate (run,sample): 0
+samples/run min: 168
+samples/run max: 168
+runs not exactly samples 0..167: 0
+COVERAGE: PASS
+
+[2] FINITE NUMERIC VALUES
+pd_bottleneck_d0: PASS
+pd_bottleneck_d1: PASS
+pd_bottleneck_all: PASS
+pd_w2_d0: PASS
+pd_w2_d1: PASS
+pd_w2_all: PASS
+gt_global_min: PASS
+gt_global_max: PASS
+sr_global_min: PASS
+sr_global_max: PASS
+global_min_abs_error: PASS
+global_max_abs_error: PASS
+global_endpoint_linf: PASS
+global_span_abs_error: PASS
+historical_ttk_metric2: PASS
+canonical_w2_minus_historical: PASS
+elapsed_seconds: PASS
+FINITE VALUES: PASS
+
+[3] METRIC INVARIANTS
+D0 dB > W2: 0
+D1 dB > W2: 0
+all dB > W2: 0
+dB <= W2: PASS
+
+[4] AGGREGATE DEFINITIONS
+max dB aggregate error: 0.0
+max W2 aggregate error: 1.4210854715202004e-14
+AGGREGATES: PASS
+
+[5] NON-NEGATIVITY
+negative metric entries: 0
+NON-NEGATIVITY: PASS
+
+================================================================================
+ALL 8568 CANONICAL PD COMPARISONS: VERIFIED
+================================================================================

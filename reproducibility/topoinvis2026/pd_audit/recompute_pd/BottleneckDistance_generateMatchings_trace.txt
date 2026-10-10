@@ -1,0 +1,44 @@
+/opt/ttk/core/vtk/ttkBottleneckDistance/ttkBottleneckDistance.cpp:41:static int generateMatchings(vtkUnstructuredGrid *const outputCT3,
+/opt/ttk/core/vtk/ttkBottleneckDistance/ttkBottleneckDistance.cpp:202:    status = generateMatchings(outputMatchings, diagram0, diagram1, matchings,
+
+===== UTILS HEADER =====
+     1	#include <ttkPersistenceDiagramUtils.h>
+     2	
+     3	#include <vtkCellData.h>
+     4	#include <vtkIntArray.h>
+     5	#include <vtkUnstructuredGrid.h>
+     6	
+     7	// used by ttkBottleneckDistance & ttkTrackingFromPersistenceDiagrams
+     8	inline int augmentDiagrams(const std::vector<ttk::MatchingType> &matchings,
+     9	                           vtkUnstructuredGrid *const vtu0,
+    10	                           vtkUnstructuredGrid *const vtu1) {
+    11	
+    12	  if(matchings.empty()) {
+    13	    return 0;
+    14	  }
+    15	
+    16	  vtkNew<vtkIntArray> matchingIds0{};
+    17	  matchingIds0->SetName("MatchingIdentifier");
+    18	  matchingIds0->SetNumberOfComponents(1);
+    19	  matchingIds0->SetNumberOfTuples(vtu0->GetNumberOfCells());
+    20	  vtu0->GetCellData()->AddArray(matchingIds0);
+    21	
+    22	  vtkNew<vtkIntArray> matchingIds1{};
+    23	  matchingIds1->SetName("MatchingIdentifier");
+    24	  matchingIds1->SetNumberOfComponents(1);
+    25	  matchingIds1->SetNumberOfTuples(vtu1->GetNumberOfCells());
+    26	  vtu1->GetCellData()->AddArray(matchingIds1);
+    27	
+    28	  // Unaffected by default
+    29	  matchingIds0->Fill(-1);
+    30	  matchingIds1->Fill(-1);
+    31	
+    32	  // Affect bottleneck matchings
+    33	  for(size_t i = 0; i < matchings.size(); ++i) {
+    34	    const auto &t = matchings[i];
+    35	    matchingIds0->SetTuple1(std::get<0>(t), i);
+    36	    matchingIds1->SetTuple1(std::get<1>(t), i);
+    37	  }
+    38	
+    39	  return 1;
+    40	}

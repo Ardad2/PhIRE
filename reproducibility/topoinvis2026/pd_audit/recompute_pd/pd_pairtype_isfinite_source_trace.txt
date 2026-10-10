@@ -1,0 +1,325 @@
+===== CRITICAL TYPE ENUM =====
+/usr/local/include/ttk/base/DataTypes.h-75-
+/usr/local/include/ttk/base/DataTypes.h-76-  // default name for compact triangulation index
+/usr/local/include/ttk/base/DataTypes.h-77-  const char compactTriangulationIndex[] = "ttkCompactTriangulationIndex";
+/usr/local/include/ttk/base/DataTypes.h-78-
+/usr/local/include/ttk/base/DataTypes.h-79-  /// default value for critical index
+/usr/local/include/ttk/base/DataTypes.h:80:  enum class CriticalType {
+/usr/local/include/ttk/base/DataTypes.h-81-    Local_minimum = 0,
+/usr/local/include/ttk/base/DataTypes.h-82-    Saddle1,
+/usr/local/include/ttk/base/DataTypes.h-83-    Saddle2,
+/usr/local/include/ttk/base/DataTypes.h-84-    Local_maximum,
+/usr/local/include/ttk/base/DataTypes.h-85-    Degenerate,
+/usr/local/include/ttk/base/DataTypes.h-86-    Regular
+/usr/local/include/ttk/base/DataTypes.h-87-  };
+/usr/local/include/ttk/base/DataTypes.h-88-  /// number of different critical types
+/usr/local/include/ttk/base/DataTypes.h-89-  const int CriticalTypeNumber = 6;
+/usr/local/include/ttk/base/DataTypes.h-90-
+/usr/local/include/ttk/base/DataTypes.h-91-} // namespace ttk
+
+===== PERSISTENCE-DIAGRAM PAIR TYPE / ISFINITE =====
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-29-  if(cd == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-30-    dbg.printWrn("VTU diagram with NULL Cell Data");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-31-    return -2;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-32-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-33-  if(points == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-34-    dbg.printWrn("VTU with no points");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-35-    return -3;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-36-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-37-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-38-  // cell data
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-39-  const auto pairId = ttkSimplexIdTypeArray::SafeDownCast(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-40-    cd->GetArray(ttk::PersistencePairIdentifierName));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:41:  const auto pairType
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:42:    = vtkIntArray::SafeDownCast(cd->GetArray(ttk::PersistencePairTypeName));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-43-  const auto pairPers = cd->GetArray(ttk::PersistenceName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-44-  const auto birthScalars = cd->GetArray(ttk::PersistenceBirthName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:45:  const auto isFinite = cd->GetArray(ttk::PersistenceIsFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-46-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-47-  // point data
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-48-  const auto vertexId = ttkSimplexIdTypeArray::SafeDownCast(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-49-    pd->GetArray(ttk::VertexScalarFieldName));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-50-  const auto critType
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-51-    = vtkIntArray::SafeDownCast(pd->GetArray(ttk::PersistenceCriticalTypeName));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-52-  const auto coords = vtkFloatArray::SafeDownCast(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-53-    pd->GetArray(ttk::PersistenceCoordinatesName));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-54-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-55-  const bool embed = coords == nullptr;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-56-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-57-  if(pairId == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-58-    dbg.printWrn("Missing PairIdentifier cell data array");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-59-    return -5;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-60-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:61:  if(pairType == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:62:    dbg.printWrn("Missing PairType cell data array");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-63-    return -6;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-64-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-65-  if(pairPers == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-66-    dbg.printWrn("Missing Persistence cell data array");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-67-    return -7;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-68-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-69-  if(vertexId == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-70-    dbg.printWrn("Missing ttkVertexScalarField point data array");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-71-    return -8;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-72-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-73-  if(critType == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-74-    dbg.printWrn("Missing CriticalType point data array");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-75-    return -9;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-76-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-77-  if(birthScalars == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-78-    dbg.printWrn("Missing Birth cell data array");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-79-    return -10;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-80-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:81:  if(isFinite == nullptr) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:82:    dbg.printWrn("Missing IsFinite cell data array");
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-83-    return -12;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-84-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-85-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-86-  int nPairs = pairId->GetNumberOfTuples();
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-87-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-88-  // compact pairIds in [0, nPairs - 1] (diagonal excepted)
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-89-  for(int i = 0; i < nPairs; i++) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-90-    if(pairId->GetTuple1(i) != -1) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-91-      pairId->SetTuple1(i, i);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-92-    } else {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-93-      // detect diagram diagonal
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-94-      nPairs -= 1;
+--
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-110-    if(pId == -1) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-111-      continue;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-112-    }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-113-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-114-    const auto i0 = 2 * i + 0;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-115-    const auto i1 = 2 * i + 1;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-116-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-117-    const auto v0 = vertexId->GetValue(i0);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-118-    const auto v1 = vertexId->GetValue(i1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-119-    const auto ct0 = static_cast<ttk::CriticalType>(critType->GetValue(i0));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-120-    const auto ct1 = static_cast<ttk::CriticalType>(critType->GetValue(i1));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-121-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:122:    const auto pType = pairType->GetValue(i);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-123-    const auto pers = pairPers->GetTuple1(i);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-124-    const auto birth = birthScalars->GetTuple1(i);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:125:    const auto isFin = static_cast<bool>(isFinite->GetTuple1(i));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-126-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-127-    std::array<float, 3> coordsBirth{}, coordsDeath{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-128-    // no vtkPoints::GetPoint() taking a float array, have to do the
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-129-    // conversion by hand...
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-130-    std::array<double, 3> tmp{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-131-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-132-    if(embed) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-133-      points->GetPoint(i0, tmp.data());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-134-      coordsBirth = {static_cast<float>(tmp[0]), static_cast<float>(tmp[1]),
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-135-                     static_cast<float>(tmp[2])};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-136-      points->GetPoint(i1, tmp.data());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-137-      coordsDeath = {static_cast<float>(tmp[0]), static_cast<float>(tmp[1]),
+--
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-195-    coordsScalars->SetNumberOfTuples(2 * diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-196-    pd->AddArray(coordsScalars);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-197-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-198-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-199-  // cell data arrays
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-200-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-201-  vtkNew<ttkSimplexIdTypeArray> pairsId{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-202-  pairsId->SetName(ttk::PersistencePairIdentifierName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-203-  pairsId->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-204-  cd->AddArray(pairsId);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-205-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-206-  vtkNew<vtkIntArray> pairsDim{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:207:  pairsDim->SetName(ttk::PersistencePairTypeName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-208-  pairsDim->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-209-  cd->AddArray(pairsDim);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-210-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-211-  vtkSmartPointer<vtkDataArray> const persistence{inputScalars->NewInstance()};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-212-  persistence->SetName(ttk::PersistenceName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-213-  persistence->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-214-  cd->AddArray(persistence);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-215-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-216-  vtkSmartPointer<vtkDataArray> const birthScalars{inputScalars->NewInstance()};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-217-  birthScalars->SetName(ttk::PersistenceBirthName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-218-  birthScalars->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-219-  cd->AddArray(birthScalars);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-220-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:221:  vtkNew<vtkUnsignedCharArray> isFinite{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:222:  isFinite->SetName(ttk::PersistenceIsFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:223:  isFinite->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:224:  cd->AddArray(isFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-225-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-226-  // grid
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-227-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-228-  vtkNew<vtkPoints> points{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-229-  points->SetNumberOfPoints(2 * diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-230-  vtkNew<vtkIdTypeArray> offsets{}, connectivity{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-231-  offsets->SetNumberOfComponents(1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-232-  offsets->SetNumberOfTuples(diagram.size() + 1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-233-  connectivity->SetNumberOfComponents(1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-234-  connectivity->SetNumberOfTuples(2 * diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-235-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-236-#ifdef TTK_ENABLE_OPENMP
+--
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-261-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-262-    if(!embedInDomain) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-263-      coordsScalars->SetTuple3(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-264-        i0, pair.birth.coords[0], pair.birth.coords[1], pair.birth.coords[2]);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-265-      coordsScalars->SetTuple3(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-266-        i1, pair.death.coords[0], pair.death.coords[1], pair.death.coords[2]);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-267-    }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-268-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-269-    // cell data
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-270-    pairsId->SetTuple1(i, i);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-271-    persistence->SetTuple1(i, pair.persistence());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-272-    birthScalars->SetTuple1(i, pair.birth.sfValue);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:273:    isFinite->SetTuple1(i, pair.isFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-274-    pairsDim->SetTuple1(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:275:      i, (pair.dim == 2 && pair.isFinite) ? dim - 1 : pair.dim);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-276-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-277-  offsets->SetTuple1(diagram.size(), connectivity->GetNumberOfTuples());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-278-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-279-  vtkNew<vtkCellArray> cells{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-280-  cells->SetData(offsets, connectivity);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-281-  vtu->SetPoints(points);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-282-  vtu->SetCells(VTK_LINE, cells);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-283-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-284-  if(!embedInDomain) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-285-    // highest birth (last pair)
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-286-    const auto lastPair = std::max_element(diagram.begin(), diagram.end());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-287-    // add diagonal (first point -> last birth/penultimate point)
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-288-    std::array<vtkIdType, 2> diag{
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-289-      0, 2 * std::distance(diagram.begin(), lastPair)};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-290-    vtu->InsertNextCell(VTK_LINE, 2, diag.data());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-291-    pairsId->InsertTuple1(diagram.size(), -1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-292-    pairsDim->InsertTuple1(diagram.size(), -1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:293:    isFinite->InsertTuple1(diagram.size(), false);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-294-    // persistence of global min-max pair
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-295-    const auto maxPersistence = diagram[0].persistence();
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-296-    persistence->InsertTuple1(diagram.size(), 2 * maxPersistence);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-297-    // birth == death == 0
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-298-    birthScalars->InsertTuple1(diagram.size(), 0);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-299-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-300-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-301-  return 0;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-302-}
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-303-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-304-#if defined(TTK_ENABLE_MPI) && defined(TTK_ENABLE_OPENMP)
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-305-int DiagramToDistributedVTU(vtkUnstructuredGrid *vtu,
+--
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-343-    coordsScalars->SetNumberOfTuples(2 * diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-344-    pd->AddArray(coordsScalars);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-345-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-346-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-347-  // cell data arrays
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-348-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-349-  vtkNew<ttkSimplexIdTypeArray> pairsId{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-350-  pairsId->SetName(ttk::PersistencePairIdentifierName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-351-  pairsId->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-352-  cd->AddArray(pairsId);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-353-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-354-  vtkNew<vtkIntArray> pairsDim{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:355:  pairsDim->SetName(ttk::PersistencePairTypeName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-356-  pairsDim->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-357-  cd->AddArray(pairsDim);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-358-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-359-  vtkSmartPointer<vtkDataArray> const persistence{inputScalars->NewInstance()};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-360-  persistence->SetName(ttk::PersistenceName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-361-  persistence->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-362-  cd->AddArray(persistence);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-363-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-364-  vtkSmartPointer<vtkDataArray> const birthScalars{inputScalars->NewInstance()};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-365-  birthScalars->SetName(ttk::PersistenceBirthName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-366-  birthScalars->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-367-  cd->AddArray(birthScalars);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-368-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:369:  vtkNew<vtkUnsignedCharArray> isFinite{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:370:  isFinite->SetName(ttk::PersistenceIsFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:371:  isFinite->SetNumberOfTuples(diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:372:  cd->AddArray(isFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-373-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-374-  // grid
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-375-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-376-  vtkNew<vtkPoints> points{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-377-  points->SetNumberOfPoints(2 * diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-378-  vtkNew<vtkIdTypeArray> offsets{}, connectivity{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-379-  offsets->SetNumberOfComponents(1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-380-  offsets->SetNumberOfTuples(diagram.size() + 1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-381-  connectivity->SetNumberOfComponents(1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-382-  connectivity->SetNumberOfTuples(2 * diagram.size());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-383-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-384-#pragma omp parallel for num_threads(dbg.getThreadNumber())
+--
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-407-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-408-    if(!embedInDomain) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-409-      coordsScalars->SetTuple3(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-410-        i0, pair.birth.coords[0], pair.birth.coords[1], pair.birth.coords[2]);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-411-      coordsScalars->SetTuple3(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-412-        i1, pair.death.coords[0], pair.death.coords[1], pair.death.coords[2]);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-413-    }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-414-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-415-    // cell data
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-416-    pairsId->SetTuple1(i, beginning + i);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-417-    persistence->SetTuple1(i, pair.persistence());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-418-    birthScalars->SetTuple1(i, pair.birth.sfValue);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:419:    isFinite->SetTuple1(i, pair.isFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-420-    pairsDim->SetTuple1(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:421:      i, (pair.dim == 2 && pair.isFinite) ? dim - 1 : pair.dim);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-422-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-423-  offsets->SetTuple1(diagram.size(), connectivity->GetNumberOfTuples());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-424-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-425-  vtkNew<vtkCellArray> cells{};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-426-  cells->SetData(offsets, connectivity);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-427-  vtu->SetPoints(points);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-428-  vtu->SetCells(VTK_LINE, cells);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-429-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-430-  if(!embedInDomain) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-431-    const auto lastPair = std::max_element(diagram.begin(), diagram.end());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-432-    // add diagonal (first point -> last birth/penultimate point)
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-433-    std::array<vtkIdType, 2> diag{
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-434-      0, 2 * std::distance(diagram.begin(), lastPair)};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-435-    vtu->InsertNextCell(VTK_LINE, 2, diag.data());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-436-    pairsId->InsertTuple1(diagram.size(), -1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-437-    pairsDim->InsertTuple1(diagram.size(), -1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:438:    isFinite->InsertTuple1(diagram.size(), false);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-439-    const auto maxPersistence = diagram[0].persistence();
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-440-    persistence->InsertTuple1(diagram.size(), 2 * maxPersistence);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-441-    birthScalars->InsertTuple1(diagram.size(), 0);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-442-  }
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-443-  return 0;
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-444-}
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-445-#endif
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-446-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-447-int ProjectDiagramInsideDomain(vtkUnstructuredGrid *const inputDiagram,
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-448-                               vtkUnstructuredGrid *const outputDiagram,
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-449-                               const ttk::Debug &dbg) {
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-450-
+--
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-559-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-560-  outputDiagram->SetPoints(points);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-561-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-562-  // add diagonal(first point -> last birth/penultimate point)
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-563-  std::array<vtkIdType, 2> diag{0, 2 * (outputDiagram->GetNumberOfCells() - 1)};
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-564-  outputDiagram->InsertNextCell(VTK_LINE, 2, diag.data());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-565-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-566-  // add diagonal data
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-567-  auto cellData = outputDiagram->GetCellData();
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-568-  auto pairIdentifierScalars = vtkIntArray::SafeDownCast(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-569-    cellData->GetArray(ttk::PersistencePairIdentifierName));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-570-  auto extremumIndexScalars = vtkIntArray::SafeDownCast(
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:571:    cellData->GetArray(ttk::PersistencePairTypeName));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-572-  auto persistenceScalars = cellData->GetArray(ttk::PersistenceName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-573-  auto birthScalars = cellData->GetArray(ttk::PersistenceBirthName);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:574:  auto isFinite = cellData->GetArray(ttk::PersistenceIsFinite);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-575-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-576-  pairIdentifierScalars->InsertNextTuple1(-1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-577-  extremumIndexScalars->InsertNextTuple1(-1);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp:578:  isFinite->InsertNextTuple1(0);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-579-  // 2 * persistence of min-max pair
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-580-  persistenceScalars->InsertNextTuple1(2 * persistenceScalars->GetTuple1(0));
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-581-  // birth == death == 0
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-582-  birthScalars->InsertNextTuple1(0);
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-583-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-584-  // don't forget to forward the Field Data
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-585-  outputDiagram->GetFieldData()->ShallowCopy(inputDiagram->GetFieldData());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-586-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-587-  dbg.printMsg("Projected Persistence Diagram back to 2D", 1.0,
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-588-               tm.getElapsedTime(), dbg.getThreadNumber());
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-589-
+/opt/ttk/core/vtk/ttkPersistenceDiagram/ttkPersistenceDiagramUtils.cpp-590-  return 0;
