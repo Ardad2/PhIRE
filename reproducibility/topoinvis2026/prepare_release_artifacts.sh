@@ -147,7 +147,11 @@ echo "  GitHub limit: 2 GiB per asset."
 
 # -----------------------------------------------------------------------------
 hdr "6. Checksums and next steps"
-( cd "$DEST" && git ls-files -z -- . | python3 -c '
+TMP_SUMS="$(mktemp "$DEST/.SHA256SUMS.tmp.XXXXXX")" || {
+  warn "Could not create temporary checksum file"
+  exit 1
+}
+if ( cd "$DEST" && git ls-files -z -- . | python3 -c '
 import hashlib
 from pathlib import Path
 import sys
@@ -164,8 +168,17 @@ for name in paths:
     if not path.is_file():
         raise SystemExit(f"Missing tracked file: {name}")
     print(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./{name}")
-' > SHA256SUMS )
-ok "wrote $DEST/SHA256SUMS ($(wc -l < "$DEST/SHA256SUMS") files)"
+' ) > "$TMP_SUMS" && [ -s "$TMP_SUMS" ]; then
+  if mv -f "$TMP_SUMS" "$DEST/SHA256SUMS"; then
+    ok "wrote $DEST/SHA256SUMS ($(wc -l < "$DEST/SHA256SUMS") files)"
+  else
+    rm -f "$TMP_SUMS"
+    warn "Could not install SHA256SUMS; previous manifest preserved"
+  fi
+else
+  rm -f "$TMP_SUMS"
+  warn "SHA256SUMS generation failed; previous manifest preserved"
+fi
 du -sh "$DEST" | sed 's/^/  size: /'
 
 cat <<EOF
@@ -178,7 +191,7 @@ Review, then commit and tag:
   git commit -m "Add TopoInVis 2026 arXiv-v1 reproducibility package"
   git push origin master
 
-Then publish the draft release with tag topoinvis-2026-arxiv-v1 targeting that
+Then publish the draft release with tag topoinvis-2026-arxiv-v1.1 targeting that
 commit, and upload every file in $ASSETS (including SHA256SUMS) as assets.
 
 Warnings: $WARN

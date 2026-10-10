@@ -1,7 +1,9 @@
 # TopoInVis 2026 / arXiv v1 — Reproducibility Guide
 
 **Paper:** *Topology-Inspired Fine-Tuning for Wind-Field Super-Resolution* (A. Dadhwal, B. Summa)
-**Release tag:** [`topoinvis-2026-arxiv-v1`](https://github.com/Ardad2/PhIRE/releases/tag/topoinvis-2026-arxiv-v1)
+**Release tag:** [`topoinvis-2026-arxiv-v1.1`](https://github.com/Ardad2/PhIRE/releases/tag/topoinvis-2026-arxiv-v1.1)
+
+This release supersedes `topoinvis-2026-arxiv-v1` (`105655cb`), retained unchanged for provenance. The original tag predates the checksum and reproducibility-documentation corrections.
 
 This repository is a research fork of [PhIRE](https://github.com/NREL/PhIRE) that deliberately keeps its full development history: earlier loss designs, smaller-scale runs, PyTorch refiner experiments, and a superseded persistence-diagram metric. This guide identifies exactly which code, checkpoints and tables produce the results in the paper, and how to check or regenerate them.
 
@@ -21,7 +23,7 @@ The quantitative topology tables and loss-study figures are derived from one per
 
 ```bash
 git clone https://github.com/Ardad2/PhIRE.git && cd PhIRE
-git checkout topoinvis-2026-arxiv-v1
+git checkout topoinvis-2026-arxiv-v1.1
 
 J=reproducibility/topoinvis2026/pd_audit/recompute_pd_w22/corrected_pd_mt/corrected_pd_mt_joined.csv
 python3 reproducibility/topoinvis2026/manuscript_tools/make_tables.py  --joined $J --out /tmp/tables
@@ -121,7 +123,7 @@ export HS_ENDPOINT="https://developer.nlr.gov/api/hsds"; export HSDS_ENDPOINT="$
 python3 scripts/build_wind_mrhr_expanded_dataset_2688.py --out-dir example_data_topology_expanded_2688
 ```
 
-The evaluation benchmark is the release asset `topoinvis2026_benchmark_wind_MR-HR.tfrecord`. Place it at `example_data_fixed/wind_MR-HR.tfrecord`. How it was built and audited is described in Parts I–III of `dataset_generation_and_repair_notes.md`.
+The evaluation benchmark is the release asset `topoinvis2026_benchmark_wind_MR-HR.tfrecord`. Place it at `example_data_fixed/wind_MR-HR.tfrecord`. Its SHA-256 is `8e742d8c778b59b06d06f4946f112085d8472d5488be06526b773cc41bac8f58`. How it was built and audited is described in Parts I–III of `dataset_generation_and_repair_notes.md`.
 
 ### 4.2 Fixed-pair constraints
 
@@ -216,7 +218,7 @@ historical `*_pd_mt_distances.csv`, unified evaluation
 tables, and Phase-2 analysis files.
 
 Use the corrected PD audit metrics instead. The final
-analysis script explicitly rejects historical PD columns.
+analysis script uses corrected PD data and never reads historical `pd_distance` columns.
 
 ### 4.5 Loss-scale calibration
 
