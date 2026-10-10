@@ -147,7 +147,24 @@ echo "  GitHub limit: 2 GiB per asset."
 
 # -----------------------------------------------------------------------------
 hdr "6. Checksums and next steps"
-( cd "$DEST" && find . -type f ! -name SHA256SUMS ! -path "*/__pycache__/*" -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS )
+( cd "$DEST" && git ls-files -z -- . | python3 -c '
+import hashlib
+from pathlib import Path
+import sys
+
+paths = sorted(set(
+    p.decode("utf-8")
+    for p in sys.stdin.buffer.read().split(b"\0")
+    if p
+))
+for name in paths:
+    if name == "SHA256SUMS":
+        continue
+    path = Path(name)
+    if not path.is_file():
+        raise SystemExit(f"Missing tracked file: {name}")
+    print(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  ./{name}")
+' > SHA256SUMS )
 ok "wrote $DEST/SHA256SUMS ($(wc -l < "$DEST/SHA256SUMS") files)"
 du -sh "$DEST" | sed 's/^/  size: /'
 

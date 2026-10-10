@@ -13,7 +13,7 @@ lived outside the repository. The full guide is
 | `manuscript_tools/` | `make_tables.py` / `make_figures.py`: regenerate quantitative topology tables and loss-study figures from `corrected_pd_mt_joined.csv` (numerical checks compare against fixed reference values; figure identity is not separately pixel-verified) |
 | `manuscript_outputs/` | Tables, figures and verification log produced by those tools |
 | `prepare_release_artifacts.sh` | One-time script that assembled this directory on Spark |
-| `SHA256SUMS` | Checksums of every file here |
+| `SHA256SUMS` | Checksums of Git-tracked package files, excluding the manifest itself |
 
 Verify the paper's numbers (Python 3 with NumPy and Matplotlib):
 

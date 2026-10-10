@@ -17,7 +17,7 @@ Status labels used below:
 
 ## 1. Check the paper's numbers in one step
 
-Every topology table and loss-study figure in the paper is generated from one per-field table: `corrected_pd_mt_joined.csv`, with 18 methods × 168 benchmark fields, giving d_B, W₂,∞, W₂,₂ and MT distance for each pair. To regenerate the tables and check each value against the manuscript, run:
+The quantitative topology tables and loss-study figures are derived from one per-field table: `corrected_pd_mt_joined.csv`, with 18 methods × 168 benchmark fields, giving d_B, W₂,∞, W₂,₂ and MT distance for each pair. To regenerate the tables and check each value against the manuscript, run:
 
 ```bash
 git clone https://github.com/Ardad2/PhIRE.git && cd PhIRE
@@ -44,6 +44,7 @@ The first command recomputes every mean, median, rank, per-field win count, fact
 | Reconstructions of the 168 benchmark fields | `data_out_fixed/wind_mrhr_{cnn,gan}/`, `data_out/wind_finetune_<run>/` (`idx.npy`, `dataGT.npy`, `dataSR.npy`) | regenerate (§4.3) |
 | TTK persistence diagrams and merge trees (VTU) | written by `scripts/run_candidate_topology_pipeline.sh` | regenerate (§4.4) |
 | Conventional / domain metrics per field | `ttk_runs_fixed/topology_finetuning/<run>_eval/all_sample_metrics_<run>.csv`; unified: `ttk_runs_fixed/unified_candidate_evaluation/unified_primary_per_sample_long.csv` | in repo |
+| Recomputed speed SSIM | `ttk_runs_fixed/ssim_recomputed_topology_inspired_historical_convention/ssim_per_sample.csv`; `ttk_runs_fixed/ssim_recomputed_scale_sweep/ssim_per_sample_scale_sweep.csv` | in repo |
 | MT distance per field | `ttk_runs_fixed/unified_candidate_evaluation/unified_primary_per_sample_long.csv`, column `mt_distance` | in repo |
 | Corrected PD distances (d_B, W₂,∞, W₂,₂) per run and field | `reproducibility/topoinvis2026/pd_audit/recompute_pd_w22/w22_full_sweep.csv` (51 archived runs × 168 fields) | in repo |
 | PD distance implementation | `pd_audit/recompute_pd/canonical_pd_pilot.py` (diagram parsing, D₀/D₁ split), `pd_audit/recompute_pd_w22/w22_full_sweep.py` | in repo |
@@ -56,6 +57,20 @@ The first command recomputes every mean, median, rank, per-field win count, fact
 | Paper tables and loss-study figures | `reproducibility/topoinvis2026/manuscript_tools/` | in repo |
 | Figure 6 (Sample 78) | `scripts/paper_sample78_figure.py` → `figures/paper_sample78/sample078_paper.pdf` | in repo (rerunning needs the reconstructions and diagrams) |
 | Loss-scale calibration (Appendix) | `scripts/run_physics_loss_diagnostic.py` → `ttk_runs_fixed/topology_finetuning/loss_magnitude_diagnostic.csv`, `docs/topology_finetuning_loss_diagnostic.md` | in repo |
+
+**SSIM convention.** The manuscript's recomputed speed-SSIM
+means use `compute_sample_ssim` from
+`scripts/recompute_scale_sweep_ssim.py`. The data range for
+each field includes both ground-truth and reconstructed values.
+
+Under this convention, CNN wins 165 of the 168 benchmark
+fields against GAN; GAN wins samples 27, 33, and 34.
+
+The older `ttk_runs_fixed/baseline_metrics/all_methods_per_sample.csv`
+uses a ground-truth-only data range and yields 168/0.
+These conventions must not be mixed.
+`scripts/recompute_topology_inspired_ssim.py` also uses
+the ground-truth-only convention.
 
 Paths starting `pd_audit/` are under `reproducibility/topoinvis2026/`. Checksums for that directory are in `reproducibility/topoinvis2026/SHA256SUMS`, and for the release assets in the asset `SHA256SUMS`.
 
@@ -90,7 +105,7 @@ Notes:
 
 * Despite the `_refiner` / `_ttkcrit_refiner` suffix, the four scripts above fine-tune the PhIRE generator itself, not a separate residual head. The suffix is historical, as each script's docstring states.
 * Loss weights are fixed across configurations: 0.01 (S), 0.05 (G), 0.25 (L), 0.001 (M), and 0.004 L_CV + 0.002 L_pers (FP). The final objective is `L_uv + 0.05 L_grad + 0.004 L_CV + 0.002 L_pers`.
-* Each script has a usage block at the top. The F-family and factorial scripts support `--print-config` and `--dry-run`.
+* Each script has a usage block at the top. The F-family scripts support `--print-config` and `--dry-run`; the factorial script supports `--dry-run`.
 * The artifact paths for every method (checkpoint, reconstruction, metric CSVs, reports) are listed in `docs/primary_candidate_artifact_reference.md`.
 
 ---
@@ -110,7 +125,7 @@ The evaluation benchmark is the release asset `topoinvis2026_benchmark_wind_MR-H
 
 ### 4.2 Fixed-pair constraints
 
-The constraints file is committed. To rebuild it: compute 160×160 ground-truth persistence diagrams, keep finite pairs with persistence ≥ 1% of the field maximum, and retain the top 64.
+The constraints file is committed. To rebuild it: compute 160×160 ground-truth persistence diagrams, keep finite pairs with persistence ≥ 1% of the field's maximum finite persistence, and retain the top 64.
 
 ```bash
 python3 scripts/generate_expanded_cnn_sr.py --data-type wind_mrhr_cnn_expanded2688 \
@@ -127,6 +142,16 @@ python3 scripts/build_candidateE2_expanded672_ttk_constraints.py \
 ### 4.3 Fine-tuning and reconstructions
 
 Run the commands in §3. Each training script writes checkpoints to `models_fixed/topology_finetuning/wind_finetune_<run>/` and benchmark reconstructions to `data_out/wind_finetune_<run>/`. The baseline reconstructions in `data_out_fixed/wind_mrhr_{cnn,gan}/` come from the original PhIRE test workflow on the benchmark; see `dataset_generation_and_repair_notes.md`.
+
+For the repaired CNN/GAN baseline,
+`scripts/run_full_experiment_fixed.sh` provides the historical
+inference and topology workflow. For fine-tuned candidates,
+`scripts/run_candidate_topology_pipeline.sh` processes
+existing reconstructed fields. These are topology-generation
+workflows; their historical `pd_distance` outputs are not
+the corrected PD distances reported in the manuscript.
+The exact historical wrapper invocation has not been verified.
+
 
 ### 4.4 Evaluation
 
@@ -148,7 +173,31 @@ bash scripts/run_candidate_topology_pipeline.sh --method <run> --data-dir data_o
 
 The unified per-field table (conventional metrics and MT) is built by `scripts/build_unified_candidate_evaluation.py`.
 
-Corrected PD distances. `w22_full_sweep.py` and the bottleneck / W₂,∞ sweep in `recompute_pd/` read the TTK diagram files listed in `w22_full_sweep.csv`. D₀ and D₁ are evaluated separately and combined as d_B = max and W₂,q = root-sum-of-squares, with the non-finite global pair excluded.
+Corrected PD distances. The canonical audit computes
+bottleneck distance and W₂,∞. The separate
+`pd_audit/recompute_pd_w22/w22_full_sweep.py` computes
+W₂,₂ and carries forward the frozen canonical bottleneck
+and W₂,∞ values. D₀ and D₁ are evaluated separately;
+their distances are combined using the maximum for
+bottleneck distance and root-sum-of-squares for
+Wasserstein distances. The non-finite global pair is excluded.
+
+The historical canonical sweep script is
+`pd_audit/recompute_pd/run_canonical_pd_full_sweep.py`.
+Its original manifest is preserved at
+`pd_audit/manifests/pd_result_run_manifest_v2.csv`.
+The script still contains Spark-specific path assumptions
+and requires historical per-run persistence diagrams and
+distance files. Including the manifest does not by itself
+make this runner portable.
+
+For independent GUDHI verification, use
+`pd_audit/recompute_pd/gudhi_crosscheck_full.py`.
+It accepts an explicit repository root and a canonical
+reference CSV. The full historical cross-check requires
+8,568 comparisons across 51 archived runs, plus their
+persistence diagrams. The released numerical results
+can be inspected without regenerating those diagrams.
 
 Joined table and analyses. This script writes into `$W22/corrected_pd_mt/`. Point `W22` at a scratch copy so the released files are not overwritten:
 
@@ -158,7 +207,16 @@ python3 scripts/analyze_corrected_pd_mt_tradeoff.py      # expects the repositor
 diff -r "$W22/corrected_pd_mt" reproducibility/topoinvis2026/pd_audit/recompute_pd_w22/corrected_pd_mt
 ```
 
-Do **not** use the historical `pd_distance` column (TTK's default "2" quantity) in the unified tables, nor the PD columns in `ttk_runs_fixed/unified_candidate_analysis/phase2*`, as d_B, W₂,∞ or W₂,₂. The analysis script refuses them by design.
+**Historical PD warning:** Any historical column named
+`pd_distance` represents a superseded TTK quantity, not the
+corrected bottleneck, W₂,∞ or W₂,₂ distance.
+
+This includes columns in candidate `*_eval/*.csv`,
+historical `*_pd_mt_distances.csv`, unified evaluation
+tables, and Phase-2 analysis files.
+
+Use the corrected PD audit metrics instead. The final
+analysis script explicitly rejects historical PD columns.
 
 ### 4.5 Loss-scale calibration
 
@@ -215,6 +273,15 @@ The following are kept for provenance but are not interchangeable with the paper
 
 * PhIRE / TensorFlow: `tf_env.yml`
 * Topology analysis: `topo_env_freeze.txt`
+* Spark TTK Docker image: `phire-ttk:latest`. Recorded image ID:
+  `sha256:858d3154edb75c098ccda15f9f812eecbd0d102af77055906d42a67a390d5c86`.
+  The `latest` tag is mutable. The image ID documents the
+  original environment but does not guarantee image availability.
+* Historical manual-install record:
+  `docs/phase2db_manual_topology_qa/authoritative_install_record.txt`
+  records TTK 1.3.0 / VTK 9.1.0 for that installation.
+  These versions should not be assumed to describe the
+  Docker image. Historical Docker build files remain in `archive/`.
 * PD audit and GUDHI cross-checks: `pd_audit/*/gudhi-audit-environment.yml`, `pd_audit/*/gudhi_versions.txt`
 
 ## 8. Scope of this release
@@ -222,8 +289,29 @@ The following are kept for provenance but are not interchangeable with the paper
 The release contains:
 * the code for every training, evaluation and analysis step above;
 * all 16 fine-tuned checkpoints and the fixed-pair constraints;
-* the frozen per-field tables behind every number in the paper;
-* tools that regenerate the paper's tables and figures and check them against the manuscript.
+* the per-field sources supporting the quantitative topology
+  analyses, together with conventional metric, SSIM and
+  loss-calibration data;
+* scripts that regenerate the quantitative topology tables
+  and loss-study figures, with numerical consistency checks.
+
+Three reproducibility levels should be distinguished:
+
+1. **Directly checkable from released files:** corrected PD/MT
+   distances, quantitative topology analyses, GUDHI cross-check
+   summaries, conventional metrics, SSIM and loss calibration.
+2. **Requires regenerated or restored intermediate data:**
+   model reconstructions, persistence diagrams, merge trees
+   and the qualitative Sample 78 figure.
+3. **Requires further computation or external data access:**
+   constructing the 2,688-field training dataset, retraining,
+   and rerunning the cubical-complex descriptor comparison.
+
+The cubical-complex comparison is implemented in
+`scripts/run_all168_pd_descriptor_compatibility.py`, with
+third-party source material under `third_party/tda-toolkit-mapper/`.
+Its summary is retained in the research notes, but complete
+per-field outputs are not included in this Git snapshot.
 
 Large intermediate data are regenerated by the listed scripts and are not stored in Git: the training TFRecord, the reconstructions, and the TTK diagram files. The full pipeline has not been re-run end to end from a clean machine with a single command.
 
