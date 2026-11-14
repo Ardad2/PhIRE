@@ -1,0 +1,193 @@
+adadhwal@spark-345b:~/PhIRE$ env -u PYTHONNOUSERSITE /usr/bin/python3 - <<'PY'
+import numpy as np
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+
+from PhIREGANs import PhIREGANs
+from sr_network import SR_NETWORK, PhysicsLossConfig
+
+MU_SIG = [[0.7684, -0.4575], [5.02455, 5.9017]]
+
+tf.reset_default_graph()
+
+phire = PhIREGANs(
+    data_type="phase6_smoke",
+    learning_rate=1e-5,
+    mu_sig=MU_SIG,
+)
+phire.set_LR_data_shape(
+    "example_data_topology_expanded_2688/wind_MR-HR.tfrecord"
+)
+
+h, w, c = phire.LR_data_shape
+
+x_lr = tf.placeholder(tf.float32, [None, h, w, c])
+x_hr = tf.placeholder(tf.float32, [None, h*5, w*5, c])
+
+cfg = PhysicsLossConfig(
+    use_aux_losses=True,
+    mu=MU_SIG[0],
+    sig=MU_SIG[1],
+    lambda_grad=0.05,
+)
+
+model = SR_NETWORK(
+    x_lr, x_hr, r=[5],
+PY  print("OPTIMIZER GRAPH: PASS (no update executed)")cn
+
+A module that was compiled using NumPy 1.x cannot be runin
+NumPy 2.4.2 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+Traceback (most recent call last):  File "<stdin>", line2, in <module>
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/tensorflow/__init__.py", line 468, in <module>
+    importlib.import_module("keras.src.optimizers")
+  File "/usr/lib/python3.12/importlib/__init__.py", line90, in import_module
+    return _bootstrap._gcd_import(name[level:], package,level)
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/__init__.py", line 7, in <module>
+    from keras import _tf_keras as _tf_keras
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/_tf_keras/__init__.py", line 1, in <module>
+    from keras._tf_keras import keras
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/_tf_keras/keras/__init__.py", line 7, in <module>
+    from keras import activations as activations
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/activations/__init__.py", line 7, in <module>
+    from keras.src.activations import deserialize as deserialize
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/__init__.py", line 7, in <module>
+    from keras.src import layers
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/layers/__init__.py", line 185, in <module>
+    from keras.src.layers.preprocessing.normalization import Normalization
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/layers/preprocessing/normalization.py", line9, in <module>
+    from keras.src.trainers.data_adapters.py_dataset_adapter import PyDataset
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/trainers/data_adapters/__init__.py", line 4,in <module>
+    from keras.src.trainers.data_adapters import array_data_adapter
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/trainers/data_adapters/array_data_adapter.py", line 7, in <module>
+    from keras.src.trainers.data_adapters import array_slicing
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/trainers/data_adapters/array_slicing.py", line 12, in <module>
+    import pandas
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/__init__.py", line 46, in <module>
+    from pandas.core.api import (
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/api.py", line 27, in <module>
+    from pandas.core.arrays import Categorical
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/arrays/__init__.py", line 1, in <module>
+    from pandas.core.arrays.arrow import ArrowExtensionArray
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/arrays/arrow/__init__.py", line 5, in <module>
+    from pandas.core.arrays.arrow.array import ArrowExtensionArray
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/arrays/arrow/array.py", line 65, in <module>
+    from pandas.core import (
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/ops/__init__.py", line 9, in <module>
+    from pandas.core.ops.array_ops import (
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/ops/array_ops.py", line 55, in <module>
+    from pandas.core.computation import expressions
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/computation/expressions.py", line 22, in <module>
+    from pandas.core.computation.check import NUMEXPR_INSTALLED
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/computation/check.py", line 5, in <module>
+    ne = import_optional_dependency("numexpr", errors="warn")
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/compat/_optional.py", line 158, in import_optional_dependency
+    module = importlib.import_module(name)
+  File "/usr/lib/python3.12/importlib/__init__.py", line90, in import_module
+    return _bootstrap._gcd_import(name[level:], package,level)
+  File "/usr/lib/python3/dist-packages/numexpr/__init__.py", line 24, in <module>
+    from numexpr.interpreter import MAX_THREADS, use_vml, __BLOCK_SIZE1__
+Traceback (most recent call last):
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/numpy/core/_multiarray_umath.py", line 46, in __getattr__
+    raise ImportError(msg)
+ImportError: 
+A module that was compiled using NumPy 1.x cannot be runin
+NumPy 2.4.2 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+
+
+A module that was compiled using NumPy 1.x cannot be runin
+NumPy 2.4.2 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+Traceback (most recent call last):  File "<stdin>", line2, in <module>
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/tensorflow/__init__.py", line 468, in <module>
+    importlib.import_module("keras.src.optimizers")
+  File "/usr/lib/python3.12/importlib/__init__.py", line90, in import_module
+    return _bootstrap._gcd_import(name[level:], package,level)
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/__init__.py", line 7, in <module>
+    from keras import _tf_keras as _tf_keras
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/_tf_keras/__init__.py", line 1, in <module>
+    from keras._tf_keras import keras
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/_tf_keras/keras/__init__.py", line 7, in <module>
+    from keras import activations as activations
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/activations/__init__.py", line 7, in <module>
+    from keras.src.activations import deserialize as deserialize
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/__init__.py", line 7, in <module>
+    from keras.src import layers
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/layers/__init__.py", line 185, in <module>
+    from keras.src.layers.preprocessing.normalization import Normalization
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/layers/preprocessing/normalization.py", line9, in <module>
+    from keras.src.trainers.data_adapters.py_dataset_adapter import PyDataset
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/trainers/data_adapters/__init__.py", line 4,in <module>
+    from keras.src.trainers.data_adapters import array_data_adapter
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/trainers/data_adapters/array_data_adapter.py", line 7, in <module>
+    from keras.src.trainers.data_adapters import array_slicing
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/keras/src/trainers/data_adapters/array_slicing.py", line 12, in <module>
+    import pandas
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/__init__.py", line 46, in <module>
+    from pandas.core.api import (
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/api.py", line 27, in <module>
+    from pandas.core.arrays import Categorical
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/arrays/__init__.py", line 1, in <module>
+    from pandas.core.arrays.arrow import ArrowExtensionArray
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/arrays/arrow/__init__.py", line 5, in <module>
+    from pandas.core.arrays.arrow.array import ArrowExtensionArray
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/arrays/arrow/array.py", line 79, in <module>
+    from pandas.core.arrays.masked import BaseMaskedArray
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/arrays/masked.py", line 56, in <module>
+    from pandas.core import (
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/core/nanops.py", line 54, in <module>
+    bn = import_optional_dependency("bottleneck", errors="warn")
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/pandas/compat/_optional.py", line 158, in import_optional_dependency
+    module = importlib.import_module(name)
+  File "/usr/lib/python3.12/importlib/__init__.py", line90, in import_module
+    return _bootstrap._gcd_import(name[level:], package,level)
+  File "/usr/lib/python3/dist-packages/bottleneck/__init__.py", line 7, in <module>
+    from .move import (move_argmax, move_argmin, move_max, move_mean, move_median,
+Traceback (most recent call last):
+  File "/home/adadhwal/.local/lib/python3.12/site-packages/numpy/core/_multiarray_umath.py", line 46, in __getattr__
+    raise ImportError(msg)
+ImportError: 
+A module that was compiled using NumPy 1.x cannot be runin
+NumPy 2.4.2 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+
+/home/adadhwal/.local/lib/python3.12/site-packages/matplotlib/projections/__init__.py:63: UserWarning: Unable to import Axes3D. This may be due to multiple versions of Matplotlib being installed (e.g. as a system package and asa pip package). As a result, the 3D projection is not available.
+  warnings.warn("Unable to import Axes3D. This may be due to multiple versions of "
+WARNING:tensorflow:From /home/adadhwal/.local/lib/python3.12/site-packages/tensorflow/python/compat/v2_compat.py:98: disable_resource_variables (from tensorflow.python.ops.resource_variables_toggle) is deprecated and will be removed in a future version.
+Instructions for updating:
+non-resource variables are not supported in the long term
+WARNING:tensorflow:From /home/adadhwal/PhIRE/PhIREGANs.py:650: DatasetV1.make_one_shot_iterator (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version.
+Instructions for updating:
+This is a deprecated API that should only be used in TF 1 graph mode and legacy TF 2 graph mode available through`tf.compat.v1`. In all other situations -- namely, eagermode and inside `tf.function` -- you can consume datasetelements using `for elem in dataset: ...` or by explicitly creating iterator via `iterator = iter(dataset)` and fetching its elements via `values = next(iterator)`. Furthermore, this API is not available in TF 2. During the transition from TF 1 to TF 2 you can use `tf.compat.v1.data.make_one_shot_iterator(dataset)` to create a TF 1 graph mode style iterator for a dataset created through TF 2 APIs. Note that this should be a transient state of your code base as there are in general no guarantees about the interoperability of TF 1 and TF 2 code.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1791867458.241801 1089979 mlir_graph_optimization_pass.cc:437] MLIR V1 optimization pass is not enabled
+2026-10-12 23:57:38.264498: I tensorflow/core/kernels/data/tf_record_dataset_op.cc:390] TFRecordDataset `buffer_size` is unspecified, default to 262144
+Loading data ... CHECKPOINT RESTORE: PASS
+FORWARD LOSS: PASS 3.05885259876959e-05
+OPTIMIZER GRAPH: PASS (no update executed)
+adadhwal@spark-345b:~/PhIRE$ 

@@ -1,0 +1,127 @@
+{
+  "distance_definitions": {
+    "W22": "GUDHI Wasserstein order=2 internal_p=2, aggregate=hypot(D0,D1)",
+    "W2inf": "GUDHI Wasserstein order=2 internal_p=inf, aggregate=hypot(D0,D1)",
+    "dB": "exact GUDHI bottleneck e=0, L_infinity ground metric, aggregate=max(D0,D1)",
+    "essential_global_pair": "excluded by the archived canonical read_pd parser"
+  },
+  "environment": {
+    "architecture": "aarch64",
+    "gudhi": "3.13.0",
+    "numpy": "2.5.3",
+    "python": "3.12.14 (main, Sep  2 2026, 23:29:55) [GCC 15.3.0]"
+  },
+  "gradient_only_s0": {
+    "counts": {
+      "gt_d0": 968,
+      "gt_d1": 871,
+      "sr_d0": 1493,
+      "sr_d1": 1569
+    },
+    "distances": {
+      "W22_D0": 11.604187098333727,
+      "W22_D1": 14.626075363992493,
+      "W22_all": 18.670276879744527,
+      "W2inf_D0": 9.776984662084446,
+      "W2inf_D1": 12.188091446078456,
+      "W2inf_all": 15.624948069693074,
+      "dB_D0": 2.5805740356445312,
+      "dB_D1": 2.4058074951171875,
+      "dB_all": 2.5805740356445312
+    }
+  },
+  "historical_cnn_s0_regression": {
+    "counts": {
+      "gt_d0": 967,
+      "gt_d1": 871,
+      "sr_d0": 703,
+      "sr_d1": 632
+    },
+    "distances": {
+      "W22_D0": 13.216415932319807,
+      "W22_D1": 16.351320797766878,
+      "W22_all": 21.024731673140575,
+      "W2inf_D0": 10.890185021667012,
+      "W2inf_D1": 13.657539176969223,
+      "W2inf_all": 17.46781343433086,
+      "dB_D0": 2.5131587982177734,
+      "dB_D1": 3.0914716720581055,
+      "dB_all": 3.0914716720581055
+    },
+    "expected_W2inf_all": 17.46781343433086,
+    "expected_dB_all": 3.0914716720581055,
+    "status": "PASS"
+  },
+  "method": "candidateF_grad_pairzero_expanded2688",
+  "patch": "160x160 top-left (x0=0,y0=0), active scalar wind_speed",
+  "sample_idx": 0,
+  "scope": "corrected PD distances on TTK-extracted finite D0/D1; NOT a merge-tree or spatial audit",
+  "source_sha256": {
+    "GT_mt0": {
+      "bytes": 40764,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/mt/candidateF_grad_pairzero_expanded2688_GT_s0_speed_p160_x0_y0_mt_port_0.vtu",
+      "sha256": "0d6bc57436665a3c01b76e579f177acfd7500b66f4fc20bd8f334aed06bdb8b7"
+    },
+    "GT_mt1": {
+      "bytes": 51926,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/mt/candidateF_grad_pairzero_expanded2688_GT_s0_speed_p160_x0_y0_mt_port_1.vtu",
+      "sha256": "e1252b2424037698f24a3bea62da542baf152598d0a0f16dfb1370b3fdcd1be8"
+    },
+    "GT_mt2": {
+      "bytes": 250820,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/mt/candidateF_grad_pairzero_expanded2688_GT_s0_speed_p160_x0_y0_mt_port_2.vti",
+      "sha256": "da80e307986eeccfe1ecad232f3a4ac93053fda1aee9e9b0e6426603a3b69d5d"
+    },
+    "GT_pd0": {
+      "bytes": 81717,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/pd/candidateF_grad_pairzero_expanded2688_GT_s0_speed_p160_x0_y0_pd_port_0.vtu",
+      "sha256": "85db754ceac029a8deeea85896c03af9993fc953a323a1000d8b9c1b310638af"
+    },
+    "GT_vti": {
+      "bytes": 502992,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/vti/candidateF_grad_pairzero_expanded2688_GT_s0_speed_p160_x0_y0.vti",
+      "sha256": "3098c9f195f53fbbb4353dfbbb0a9068296928ab7d5dd3742882329729ac51e5"
+    },
+    "SR_mt0": {
+      "bytes": 63956,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/mt/candidateF_grad_pairzero_expanded2688_SR_s0_speed_p160_x0_y0_mt_port_0.vtu",
+      "sha256": "b7e83cbeaddab4effab1280bfda751823d994d0ae29ecaf56430dfb6510a9eaa"
+    },
+    "SR_mt1": {
+      "bytes": 76790,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/mt/candidateF_grad_pairzero_expanded2688_SR_s0_speed_p160_x0_y0_mt_port_1.vtu",
+      "sha256": "9ccaf1965ad802abe9215fe1158b34124bee2d70b7e48ebdde67aa5257ec7a64"
+    },
+    "SR_mt2": {
+      "bytes": 284908,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/mt/candidateF_grad_pairzero_expanded2688_SR_s0_speed_p160_x0_y0_mt_port_2.vti",
+      "sha256": "48c2deabf76faca0144d420c087e3a6863797a46742eeb3c8f21a2b2fadccfd9"
+    },
+    "SR_pd0": {
+      "bytes": 140589,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/pd/candidateF_grad_pairzero_expanded2688_SR_s0_speed_p160_x0_y0_pd_port_0.vtu",
+      "sha256": "79b2b685968dad0387be8b5460881d3d641272807cd08e1e155efe7b6eabc00b"
+    },
+    "SR_vti": {
+      "bytes": 502751,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/vti/candidateF_grad_pairzero_expanded2688_SR_s0_speed_p160_x0_y0.vti",
+      "sha256": "26e2af52cccaca6120ea4bc009a55215ebbae716bd9eaef44d91a4e2408e2030"
+    },
+    "archived_canonical_parser": {
+      "bytes": 10940,
+      "path": "/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py",
+      "sha256": "04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6c"
+    },
+    "historical_cnn_GT_pd": {
+      "bytes": 81221,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/cnn/pd/cnn_GT_s0_speed_p160_x0_y0_pd_port_0.vtu",
+      "sha256": "01e2bdc548e27c1421811b5a7ca360fb414a1b29f5626b6be23bbcba7f6b94ae"
+    },
+    "historical_cnn_SR_pd": {
+      "bytes": 63509,
+      "path": "/home/adadhwal/PhIRE/ttk_runs_fixed/cnn/pd/cnn_SR_s0_speed_p160_x0_y0_pd_port_0.vtu",
+      "sha256": "3322c6777b9cdf667625af1376f2de2dc519ce4566fa8ad06d944502b0f5d9ae"
+    }
+  },
+  "status": "PASS"
+}

@@ -1,0 +1,200 @@
+{
+  "baseline_note": "Phase5E canonical CNN/F1, not the older differently oriented CNN PD archive",
+  "format": "phase6-lxxix-corrected-pd-summary-v1",
+  "methods": {
+    "cnn": {
+      "W22": {
+        "better_than_cnn_count": null,
+        "max": 45.13776185464681,
+        "mean": 24.552150603046847,
+        "median": 24.056543189003058,
+        "min": 10.774991033326144,
+        "std_sample": 7.582996268220024
+      },
+      "W2inf": {
+        "better_than_cnn_count": null,
+        "max": 34.82793411665468,
+        "mean": 19.152145358260785,
+        "median": 18.815891921477714,
+        "min": 8.305363841064027,
+        "std_sample": 5.827222550969388
+      },
+      "dB": {
+        "better_than_cnn_count": null,
+        "max": 9.417118072509766,
+        "mean": 3.1241084101299443,
+        "median": 2.912510871887207,
+        "min": 1.0994454622268677,
+        "std_sample": 1.0519223144107335
+      }
+    },
+    "cv": {
+      "W22": {
+        "better_than_cnn_count": 166,
+        "max": 35.71671242748814,
+        "mean": 17.875644616268623,
+        "median": 17.230961326252796,
+        "min": 7.289712138875035,
+        "std_sample": 6.032248563893095
+      },
+      "W2inf": {
+        "better_than_cnn_count": 166,
+        "max": 27.9514177336432,
+        "mean": 14.407073447260872,
+        "median": 13.987607622754364,
+        "min": 5.897329244578596,
+        "std_sample": 4.723229488540234
+      },
+      "dB": {
+        "better_than_cnn_count": 151,
+        "max": 5.417881011962891,
+        "mean": 2.188472722790071,
+        "median": 2.0360450744628906,
+        "min": 0.8248519897460938,
+        "std_sample": 0.7843482432469121
+      }
+    },
+    "f1": {
+      "W22": {
+        "better_than_cnn_count": 166,
+        "max": 33.754728847171705,
+        "mean": 17.831897218940394,
+        "median": 17.531404344912083,
+        "min": 7.1117238008661845,
+        "std_sample": 5.642189751721965
+      },
+      "W2inf": {
+        "better_than_cnn_count": 167,
+        "max": 26.950148946193035,
+        "mean": 14.32567618728599,
+        "median": 14.122292161838725,
+        "min": 5.742657384216583,
+        "std_sample": 4.468712223583361
+      },
+      "dB": {
+        "better_than_cnn_count": 151,
+        "max": 5.691871643066406,
+        "mean": 2.1497439691974294,
+        "median": 1.934063971042633,
+        "min": 0.8334255218505859,
+        "std_sample": 0.8182292514567178
+      }
+    },
+    "grad": {
+      "W22": {
+        "better_than_cnn_count": 164,
+        "max": 37.32888247544088,
+        "mean": 18.30636658345376,
+        "median": 17.227190375634333,
+        "min": 7.846778660571697,
+        "std_sample": 6.324776987673621
+      },
+      "W2inf": {
+        "better_than_cnn_count": 164,
+        "max": 29.999652781679078,
+        "mean": 14.889700392721181,
+        "median": 14.162144941417637,
+        "min": 6.424348421517913,
+        "std_sample": 4.967324321652
+      },
+      "dB": {
+        "better_than_cnn_count": 130,
+        "max": 5.32106876373291,
+        "mean": 2.5625064449296113,
+        "median": 2.4138214588165283,
+        "min": 1.088447093963623,
+        "std_sample": 0.8558874359688377
+      }
+    },
+    "pers": {
+      "W22": {
+        "better_than_cnn_count": 167,
+        "max": 32.58294141567862,
+        "mean": 17.484939062743386,
+        "median": 17.279794978007406,
+        "min": 7.127987817971418,
+        "std_sample": 5.488699030336933
+      },
+      "W2inf": {
+        "better_than_cnn_count": 166,
+        "max": 25.940739643294396,
+        "mean": 14.153229915234178,
+        "median": 13.885348377440273,
+        "min": 5.810806739197591,
+        "std_sample": 4.3565853630514715
+      },
+      "dB": {
+        "better_than_cnn_count": 152,
+        "max": 4.833195686340332,
+        "mean": 2.1961192887808596,
+        "median": 1.982208013534546,
+        "min": 0.8929028511047363,
+        "std_sample": 0.7841883947040029
+      }
+    }
+  },
+  "n": 168,
+  "statistics_note": "Descriptive per-field statistics; 168 consecutive hours are temporally correlated. No significance tests or multi-seed replication.",
+  "two_by_two_effects": {
+    "W22": {
+      "cv": {
+        "mean": -0.04188190549406282,
+        "median": -0.008418452569182389,
+        "negative_count": 85,
+        "positive_count": 83
+      },
+      "interaction": {
+        "mean": 0.7776801233821479,
+        "median": 0.5846370610996416,
+        "negative_count": 36,
+        "positive_count": 132
+      },
+      "pers": {
+        "mean": -0.43258745901930046,
+        "median": -0.24280660527303155,
+        "negative_count": 103,
+        "positive_count": 65
+      }
+    },
+    "W2inf": {
+      "cv": {
+        "mean": -0.15509033670424888,
+        "median": -0.07895367475520976,
+        "negative_count": 103,
+        "positive_count": 65
+      },
+      "interaction": {
+        "mean": 0.6550732175121207,
+        "median": 0.5257255355486867,
+        "negative_count": 34,
+        "positive_count": 134
+      },
+      "pers": {
+        "mean": -0.4089338687309423,
+        "median": -0.23991357619150344,
+        "negative_count": 110,
+        "positive_count": 58
+      }
+    },
+    "dB": {
+      "cv": {
+        "mean": -0.21020452086148517,
+        "median": -0.2009057253599167,
+        "negative_count": 119,
+        "positive_count": 49
+      },
+      "interaction": {
+        "mean": 0.32765840255611,
+        "median": 0.3421625345945358,
+        "negative_count": 51,
+        "positive_count": 117
+      },
+      "pers": {
+        "mean": -0.20255795487069658,
+        "median": -0.20063692331314087,
+        "negative_count": 120,
+        "positive_count": 48
+      }
+    }
+  }
+}

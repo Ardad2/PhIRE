@@ -1,0 +1,84 @@
+--- a/reproducibility/topoinvis2026/README.md
++++ b/reproducibility/topoinvis2026/README.md
+@@ -9,8 +9,8 @@
+ |---|---|
+ | `pd_audit/recompute_pd/` | Diagram parser (`canonical_pd_pilot.py`), bottleneck/W2,inf sweep and GUDHI cross-check (code, CSV, summaries, environment, checksums) |
+ | `pd_audit/recompute_pd_w22/` | W2,2 sweep (`w22_full_sweep.py`), the frozen per-run corrected distance table `w22_full_sweep.csv`, GUDHI W2,2 cross-check, near-tie selection |
+-| `pd_audit/recompute_pd_w22/corrected_pd_mt/` | Output of `scripts/analyze_corrected_pd_mt_tradeoff.py`; `corrected_pd_mt_joined.csv` (18 methods x 168 fields) is the single per-field table behind every topology table and figure in the paper |
+-| `manuscript_tools/` | `make_tables.py` / `make_figures.py`: regenerate the paper's tables and loss-study figures from `corrected_pd_mt_joined.csv` and check every value against the manuscript |
++| `pd_audit/recompute_pd_w22/corrected_pd_mt/` | Output of `scripts/analyze_corrected_pd_mt_tradeoff.py`; `corrected_pd_mt_joined.csv` (18 methods x 168 fields) is the shared per-field source for quantitative topology tables and loss-study figures; the Sample 78 and conceptual figures have separate source dependencies |
++| `manuscript_tools/` | `make_tables.py` / `make_figures.py`: regenerate quantitative topology tables and loss-study figures from `corrected_pd_mt_joined.csv` (numerical checks compare against fixed reference values; figure identity is not separately pixel-verified) |
+ | `manuscript_outputs/` | Tables, figures and verification log produced by those tools |
+ | `prepare_release_artifacts.sh` | One-time script that assembled this directory on Spark |
+ | `SHA256SUMS` | Checksums of every file here |
+--- a/reproducibility/topoinvis2026/prepare_release_artifacts.sh
++++ b/reproducibility/topoinvis2026/prepare_release_artifacts.sh
+@@ -166,3 +166,8 @@
+ 
+ Warnings: $WARN
+ EOF
++
++if (( WARN > 0 )); then
++  echo "[error] Release preparation has $WARN warning(s). Review and correct before tagging." >&2
++  exit 1
++fi
+--- a/reproducibility/topoinvis2026/manuscript_tools/make_tables.py
++++ b/reproducibility/topoinvis2026/manuscript_tools/make_tables.py
+@@ -454,12 +454,19 @@
+     table corrected_pd_mt_joined.csv (columns: sample_idx, method_id, dB, W2inf,
+     W22, MT; 18 methods x 168 fields), and check them against the values that
+     were transcribed from the compendium (the numbers printed in the paper)."""
+-    import statistics
++    import statistics, math
+     vals = {}
+     with open(path) as fh:
+         for row in csv.DictReader(fh):
+-            vals.setdefault(row["method_id"], {})[int(row["sample_idx"])] = tuple(
+-                float(row[m]) for m in METRICS)
++            k = row["method_id"]
++            sample = int(row["sample_idx"])
++            method_rows = vals.setdefault(k, {})
++            if sample in method_rows:
++                sys.exit(f"[error] duplicate method/sample pair: {k}/{sample}")
++            data = tuple(float(row[m]) for m in METRICS)
++            if not all(math.isfinite(v) and v >= 0 for v in data):
++                sys.exit(f"[error] invalid distance at {k}/{sample}: {data}")
++            method_rows[sample] = data
+     missing = sorted(set(IDS) - set(vals))
+     extra = sorted(set(vals) - set(IDS))
+     if missing or extra:
+@@ -481,6 +488,7 @@
+             w[4] += all3; w[5] += all3 and lower[3]
+         return tuple(w)
+ 
++    old_mean = dict(MEAN)
+     old_median = dict(MEDIAN)
+     old_wcnn, old_wuv = dict(WINS_VS_CNN), dict(WINS_VS_UV)
+     for k in IDS:
+@@ -492,6 +500,7 @@
+         if k != "uv":
+             WINS_VS_UV[k] = wins(k, "uv")
+     for k in IDS:
++        check(f"mean[{k}]", MEAN[k], old_mean[k], 0.00002)
+         check(f"median[{k}]", MEDIAN[k], old_median[k], 0.0006)
+         if k in old_wcnn:
+             check(f"wins_vs_cnn[{k}]", WINS_VS_CNN[k], old_wcnn[k], 0)
+--- a/docs/topoinvis_2026_reproducibility.md
++++ b/docs/topoinvis_2026_reproducibility.md
+@@ -171,7 +171,15 @@
+ 
+ ### 4.6 Paper tables and figures
+ 
+-Tables 3, 5, 7–10 and Figures 4–5 are produced by the command in §1. Figure 6 is produced by `python3 scripts/paper_sample78_figure.py`, which needs the CNN, control and final reconstructions, the audited diagrams, and `W22`.
++The quantitative topology tables and loss-study Figures 4–5 use the frozen joined per-field table (see §1). Figure 6 is a separate qualitative visualization and needs the CNN, control and final reconstructed fields, their audited persistence diagrams, and the same corrected sweep. Assuming the required reconstructions and diagrams have been regenerated or restored, run:
++
++```bash
++export AUDIT="$PWD/reproducibility/topoinvis2026/pd_audit"
++export W22="$AUDIT/recompute_pd_w22"
++python3 scripts/paper_sample78_figure.py
++```
++
++The conceptual diagrams and data-pipeline schematic are authored separately in the manuscript LaTeX source. They cannot be regenerated from the per-field distances alone.
+ 
+ ---
+ 

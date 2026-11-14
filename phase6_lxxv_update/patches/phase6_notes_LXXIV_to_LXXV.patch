@@ -1,0 +1,41 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38280,3 +38280,38 @@
+ ```
+ 
+ **Next gate:** Inspect actual historical regression PASS, new sample-0 finite D0/D1 counts, corrected distance values and exit code. Only then expand VTI+PD+MT extraction to all 168 benchmark indices for each of the three new methods, with an explicit source-hash manifest, a validated corrected-PD pipeline, the matched MT distance parameterization, and Phase 5E's canonical locality solver. Keep corrected `W_{2,∞}` distinct from Euclidean-ground `W_{2,2}`; compare candidate and F1 topological values only under matched extraction/metric conventions. No corrected candidate distance, MT result, or spatial-locality win is asserted yet.
++
++---
++
++# Part LXXV — Phase 6: corrected sample-0 GUDHI result and GT parity gate (October 14, 2026)
++
++## LXXV.1 Researcher-observed corrected-PD completion
++
++From a real Spark execution of the `phase6_lxxiv_update` corrected-PD script:
++
++```text
++[PREFLIGHT] Canonical parser and historical CNN sample-0PDs found
++[PREFLIGHT] 10 pilot artifacts (2 VTI + 2 PD + 6 MT) present and nonempty
++[PREFLIGHT] SHA256 manifest prepared in memory
++[REGRESSION] PASS CNN sample-0 dB=3.09147167206 W2inf=17.4678134343
++[NEW MODEL] D0 GT/SR=968/1493 D1 GT/SR=871/1569
++[NEW MODEL] dB_all=2.58057403564
++[NEW MODEL] W2inf_all=15.6249480697
++[NEW MODEL] W22_all=18.6702768797
++[OUTPUT] /home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_corrected_pd_audit_20261014/phase6_s0_corrected_pd.json
++[AUDIT] PASS: historical GUDHI reference reproduced and gradient-only sample-0 corrected PD values saved
++[AUDIT] Merge-tree and spatial-locality distances NOT computed
++Corrected-PD audit exit status: 0
++```
++
++These are genuine new **sample-0 corrected PD distance results** for gradient-only. The reported canonical count mismatch is noteworthy: historical CNN sample-0 GT finite D0=967, D1=871, while new gradient-only sample-0 GT finite D0=968, D1=871. A passed reference-distance regression does **not** establish GT scalar or GT diagram identity across runs. The historical pipeline default was `-t 20` while the isolated new pilot used `-t 1`; no causal explanation for the one-pair discrepancy is yet established. Differences relative to historical CNN distances (CNN dB 3.0914716721, W2inf 17.4678134343) must remain **provisional** until the GT-equivalence check is completed. W22 historical CNN was not rechecked by this run.
++
++## LXXV.2 Prepared read-only parity diagnostic
++
++The companion bundle `Phase6_S0_GT_Parity_Gate_LXXV_20261014.zip` contains `scripts/phase6_s0_gt_parity.py`, which reads the archived fixed CNN `dataGT.npy`, current gradient-only `dataGT.npy`, benchmark index arrays, historical CNN and new sample-0 VTI speed fields, and their TTK PD port-0 VTUs. It compares arrays, field identity and canonical finite D0/D1 multisets. Exact artifact SHA-256s are inventoried. All diagnostics are read-only and are run from the repository; no Spark experiment is executed as part of preparing this bundle.
++
++Running instructions are in `phase6_lxxv_update/README.md`. Python and Bash extraction script syntax / archive are tested outside Spark; actual data results are still pending.
++
++## LXXV.3 Interpretation gate
++
++If the GT source vector and VTI fields match but PD pairs differ, inspect the TTK extraction settings, tie-handling and repeatability, and if needed run an **isolated** matched-threads regeneration. If the GT source vector or fields themselves differ, resolve input/crop/orientation/precision provenance first. If both finite GT diagrams and GT fields match, assess candidate-vs-CNN one-sample comparisons as preliminary and proceed to staged three-arm extraction with corrected distances and Phase 5E-locality evaluation. Do not edit the 8,568-comparison historical audit, historical VTI/PD artifacts, or fixed CNN checkpoint. Full 168, merge-tree distance, and spatial-locality stages remain pending.

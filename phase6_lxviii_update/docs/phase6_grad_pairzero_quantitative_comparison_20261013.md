@@ -1,0 +1,185 @@
+# Phase 6 — Gradient-only quantitative results and full-loss F1 comparator
+
+---
+
+# Part LXVIII — Phase 6 gradient-only ablation: quantitative scalar/domain assessment and archived F1 comparison (October 13, 2026)
+
+**Evidence received:** The author's read-only CSV extraction transcript for `grad_pair_zero`, and the complete generated cheap-evaluation report `docs/topology_finetuning_candidateF_grad_pairzero_expanded2688_eval.md` (generated 2026-10-13). Historical context comes from the independently archived `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md` (generated 2026-07-16; frozen `topoinvis-2026-arxiv-v1.1` release). The latter is a *report-level historical comparator*, **not** a fresh paired significance analysis or a guarantee that training random-state conditions were identical. This entry supersedes only LXVII's “comparative results pending” status; all preceding provenance remains unchanged.
+
+## LXVIII.1 Arm definitions and verification scope
+
+| Arm | Loss terms | Current status |
+|---|---|---|
+| Pretrained CNN | Original frozen PhIRE baseline; no Phase 6 fine-tuning | Existing benchmark reference |
+| `grad_pair_zero` | `L_uv + 0.05 L_grad + 0 L_TTKCV + 0 L_TTKpers` | **Trained (3 epochs), 168-field inference verified, cheap evaluation complete** |
+| `grad_cv_only` | `L_uv + 0.05 L_grad + 0.004 L_TTKCV + 0 L_TTKpers` | Dry-run only; **no completed real training reported** |
+| `grad_pers_only` | `L_uv + 0.05 L_grad + 0 L_TTKCV + 0.002 L_TTKpers` | Dry-run only; **no completed real training reported** |
+| `grad_e2_low` / F1 (historical) | `L_uv + 0.05 L_grad + 0.004 L_TTKCV + 0.002 L_TTKpers` | Archived prior evaluation; **not rerun in Phase 6** |
+
+For the three new arms, the matched configuration is 2,688 training records, 3 epochs, learning rate `1e-5`, batch size 4, same pretrained CNN initialization and fixed 168-field test set, and the same repaired-E2 custom training pathway (the gradient-only arm still enters the pathway with zero-weight E2 losses to maintain matching conditions). The static check and dry-run passed earlier (Part LXV). No assertion of identical RNG streams between this October run and the historical July F1 run is established.
+
+## LXVIII.2 Complete available four-method summary from October's cheap-evaluation report
+
+**Metric directions:** `↑` higher is better, `↓` lower is better. Repeated scores are means over the same 168 held-out wind fields. The `GAN` and `bicubic` columns are contextual baselines, **not** independently trained new Phase 6 arms. `WPD` is the evaluator's wind-power-density proxy (speed-cubed-related), not a directly computed power-production claim.
+
+| Metric | Bicubic | CNN | GAN | Gradient-only | Direction |
+|---|---:|---:|---:|---:|:---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | **33.3872** | ↑ |
+| Speed MAE (m/s) | 0.5963 | 0.6941 | 0.9026 | **0.5275** | ↓ |
+| Speed RMSE (m/s) | 1.0156 | 1.1078 | 1.3775 | **0.8939** | ↓ |
+| WPD-proxy MAE | 193.5403 | 231.6709 | 310.7328 | **169.3772** | ↓ |
+| WPD-proxy W1 | 55.5103 | 45.2713 | 85.6191 | **22.3588** | ↓ |
+| WPD-proxy abs bias | 41.2244 | 35.3439 | 78.7236 | **16.4208** | ↓ |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | **0.3107** | ↓ |
+| Gradient W1 | 0.3282 | 0.2329 | **0.0564** | 0.1809 | ↓ |
+| Gradient kurtosis abs Δ | 6.6163 | 3.7004 | 4.2010 | **2.5295** | ↓ |
+| PSD log-L2 | 1.3625 | **0.8335** | 0.5139 | 0.8992 | ↓ |
+| PSD slope abs Δ | 1.6684 | **0.9150** | 0.9482 | 1.4924 | ↓ |
+| Exceedance abs Δ at 5 m/s | 0.0095 | 0.0042 | 0.0082 | **0.0039** | ↓ |
+| Exceedance abs Δ at 10 m/s | 0.0085 | 0.0066 | 0.0243 | **0.0032** | ↓ |
+| Exceedance abs Δ at 15 m/s | 0.0074 | 0.0062 | 0.0096 | **0.0030** | ↓ |
+| Exceedance abs Δ at GT p90 | 0.0109 | 0.0103 | 0.0123 | **0.0040** | ↓ |
+| Superlevel component-count curve L1 | 173.1855 | 115.5278 | 124.6567 | **97.6548** | ↓ |
+| SSIM (speed) | N/A | N/A | N/A | N/A | ↑ |
+| **Candidate PD / MT** | N/A | historical | historical | **NOT EVALUATED** | ↓ |
+
+**Correction on visual emphasis:** The bold entry denotes the new control's value or an important reference, **not necessarily the best among all four methods**. For PSD log-L2 and gradient W1, GAN is better than the gradient-only arm (GAN PSD log-L2 `0.5139`, GAN gradient W1 `0.0564`). For PSD slope, CNN is the better of these four. The new control improves fidelity and many domain metrics but **regresses spectrally**.
+
+## LXVIII.3 Exact candidate-vs-CNN pairwise statistics from the user's transcript
+
+The actual `pairwise_cnn_vs_*.csv` file records `mean_baseline_cnn`, `mean_candidate`, `delta` (candidate minus CNN), `n_improved`, and `n_valid`. The printed figures are **not** newly estimated from screenshots; they are the stdout of Python's standard-library CSV reader applied on Spark.
+
+| Metric | CNN mean | Control mean | Control − CNN | Improved / valid |
+|---|---:|---:|---:|---:|
+| `psnruv` | 31.19250043 | 33.38722367 | +2.19472324 | **168/168** |
+| `speed_mae` | 0.69407016 | 0.52748124 | −0.16658893 | **168/168** |
+| `speed_rmse` | 1.10775860 | 0.89386073 | −0.21389787 | **168/168** |
+| `grad_mae` | 0.34905572 | 0.31069253 | −0.03836319 | **168/168** |
+| `grad_w1` | 0.23294292 | 0.18093229 | −0.05201063 | 154/168 |
+| `wpd_mae` | 231.67091095 | 169.37715803 | −62.29375292 | **168/168** |
+| `wpd_w1` | 45.27127092 | 22.35884094 | −22.91242998 | 141/168 |
+| `exceed_abs_t5` | 0.00424233 | 0.00388783 | −0.00035450 | 98/168 |
+| `exceed_abs_t10` | 0.00658081 | 0.00323424 | −0.00334657 | 130/168 |
+| `comp_curve_l1` | 115.52777778 | 97.65476190 | −17.87301587 | 141/168 |
+| `ssim` | NaN | NaN | NaN | **0/0, UNAVAILABLE, not 0 wins out of 168** |
+
+Additional fields in the uploaded *full report*, omitted by the user's short terminal extraction, must be preserved when interpreting trade-offs:
+
+- `psd_log_l2`: CNN `0.8335`, control `0.8992`, Δ `+0.0657`, improves **49/168**, worsens **119/168**.
+- `psd_slope_abs_delta`: CNN `0.9150`, control `1.4924`, Δ `+0.5774`, improves **0/168**, worsens **168/168**.
+- `grad_kurtosis_abs_delta`: CNN `3.7004`, control `2.5295`, improves **96/168**, worsens **72/168**.
+- `exceed_abs_t15`: CNN `0.0062`, control `0.0030`, improves **126/168**.
+- `exceed_abs_p90`: CNN `0.0103`, control `0.0040`, improves **144/168**.
+- `comp_curve_l1`: 141 improved, 26 worsened; **one unaccounted-for case is a tie**, not missing data (168 = 141 + 26 + 1). Winner counts exclude ties.
+
+**Derived relative improvements vs pretrained CNN:** speed MAE drops by about `24.0%`; WPD-proxy MAE by about `26.9%`; component-count curve L1 by about `15.5%`. PSNR rises `2.1947 dB` and should not be described as a percent improvement in dB.
+
+## LXVIII.4 Controlled interpretation against *archived* full-loss F1
+
+Historical reference: repository-root file `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md`, tagged `topoinvis-2026-arxiv-v1.1`; metrics are from its four-method summary table, generated 2026-07-16. The two reports use the same 168-sample evaluation convention and same metric definitions, but no independent paired per-field test or exact random-state matching has been supplied. The following is **comparison of reported means** only, *not causal attribution*.
+
+| Metric | CNN | Gradient-only (`CV=0,PERS=0`) | Archived F1 (`CV=.004,PERS=.002`) | Gradient-only − F1 |
+|---|---:|---:|---:|---:|
+| PSNRuv ↑ (dB) | 31.1925 | **33.3872** | 32.4949 | **+0.8923** |
+| Speed MAE ↓ (m/s) | 0.6941 | **0.5275** | 0.5899 | **−0.0624** |
+| Speed RMSE ↓ | 1.1078 | **0.8939** | 0.9891 | **−0.0952** |
+| Gradient MAE ↓ | 0.3491 | **0.3107** | 0.3125 | **−0.0018** |
+| Gradient W1 ↓ | 0.2329 | 0.1809 | **0.1381** | +0.0428 |
+| WPD MAE ↓ | 231.6709 | **169.3772** | 190.6897 | **−21.3125** |
+| WPD W1 ↓ | 45.2713 | **22.3588** | 24.7322 | **−2.3734** |
+| Component-count curve L1 ↓ | 115.5278 | 97.6548 | **81.1815** | +16.4733 |
+| PSD log-L2 ↓ | 0.8335 | 0.8992 | **0.8147** | +0.0845 |
+| PSD slope abs Δ ↓ | **0.9150** | 1.4924 | 1.1385 | +0.3539 |
+| Exceedance abs Δ 5 m/s ↓ | 0.0042 | 0.0039 | **0.0025** | +0.0014 |
+| Exceedance abs Δ 10 m/s ↓ | 0.0066 | **0.0032** | 0.0052 | −0.0020 |
+| Exceedance abs Δ 15 m/s ↓ | 0.0062 | 0.0030 | **0.0027** | +0.0003 |
+
+**Scientific reading:** The gradient-only arm is substantially stronger on PSNRuv, speed MAE/RMSE and WPD-proxy error. The archived combined-loss F1 is stronger on the superlevel component-count proxy, gradient-distribution W1, and both PSD metrics. At present, this is a **plausible fidelity–structural trade-off**, not evidence that TTK-CV or TTK-PERS independently improves true topology, nor proof of how much any loss causes the difference. The loss-isolating arms and true corrected topology evaluation are necessary.
+
+Do **not** conflate `comp_curve_l1` with PD bottleneck / corrected PD-W₂ distances: connected-component counts over speed thresholds are a coarse superlevel-set proxy and omit feature pairings, births/deaths, and spatial correspondences. Also, GAN has the lowest gradient W1 and PSD log-L2 of the four October report columns; the full-loss F1 cannot be called an across-the-board best structural model.
+
+## LXVIII.5 Documentation and exact output files
+
+Primary user-supplied source is the report file:
+
+```text
+docs/topology_finetuning_candidateF_grad_pairzero_expanded2688_eval.md
+```
+
+The generated artifacts (preserve raw bytes; do not overwrite/recalculate without versioning):
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_eval/
+  all_sample_metrics_candidateF_grad_pairzero_expanded2688.csv
+  pairwise_cnn_vs_candidateF_grad_pairzero_expanded2688.csv
+  winner_counts_candidateF_grad_pairzero_expanded2688.csv
+  adjacent_cluster_table_candidateF_grad_pairzero_expanded2688.csv
+logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log
+logs/phase6_candidateF_grad_pairzero_expanded2688_cheap_eval.log
+models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn.*
+```
+
+To reproduce the human-readable comparison between the current control report and the historical F1 report **without importing NumPy, pandas or TensorFlow**, use the attached standard-library script `scripts/compare_phase6_scalar_reports.py` from the documentation package:
+
+```bash
+cd ~/PhIRE
+/usr/bin/python3 scripts/compare_phase6_scalar_reports.py \
+  --control docs/topology_finetuning_candidateF_grad_pairzero_expanded2688_eval.md \
+  --f1 docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md
+```
+
+To preserve hashes of all input/report/checkpoint metadata (record actual output on Spark rather than inventing checksum values):
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_pairzero_expanded2688
+sha256sum \
+  scripts/run_candidateF_cv_pers_ablation.py \
+  scripts/run_candidateF_expanded2688_finetune.py \
+  scripts/evaluate_finetune_candidate.py \
+  docs/topology_finetuning_${METHOD}_eval.md \
+  ttk_runs_fixed/topology_finetuning/${METHOD}_eval/pairwise_cnn_vs_${METHOD}.csv \
+  models_fixed/topology_finetuning/wind_finetune_${METHOD}/cnn/cnn.index \
+  models_fixed/topology_finetuning/wind_finetune_${METHOD}/cnn/cnn.data-00000-of-00001
+```
+
+Version manifests and actual SHA-256 values have **not** yet been provided and must not be reported as verified.
+
+## LXVIII.6 Next steps: complete the matched 2×2 ablation
+
+**Recommendation:** Train `grad_cv_only` and `grad_pers_only` **one at a time**, using separate `tmux` sessions and separate console logs. Keep the exact original `grad_pair_zero` outputs and original full F1 checkpoint frozen. Successful dry-runs for both remaining arms were documented in LXV. For each new arm, verify final checkpoints, the ordered 168-element `idx.npy`, finite tensors, and exact GT/IN equality to the fixed CNN benchmark *before* running cheap evaluation. Keep SSIM marked unavailable if the NumPy/scikit-image ABI is still broken; do not attempt an ad-hoc environment repair mid-experiment.
+
+Example **first arm** to execute (on Spark in a tmux session, not in this chat):
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+tmux new -s phase6_cv_only
+# Inside tmux:
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/run_candidateF_cv_pers_ablation.py --variant grad_cv_only \
+  2>&1 | tee logs/phase6_grad_cv_only_console.log
+printf 'Training pipeline exit status: %s\n' "$?"
+```
+
+Then run a matching cheap evaluation (only **after** training + fixed-benchmark validation succeeded):
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_CV_only_expanded2688
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+```
+
+Next train/evaluate `grad_pers_only` analogously, with method `candidateF_grad_PERS_only_expanded2688`. Avoid the costly topology stage until the scalar/domain outputs for all three new arms are reviewed. Thereafter run the **corrected, independently audited** PD distance and MT pipelines followed by the same 168-field spatial/locality protocol as Phase 5E for all four arms: gradient-only, CV-only, PERS-only and archived full F1. No new Phase 6 PD/MT/locality results are claimed as of October 13, 2026.
+
+**Archival hygiene:** `master` has other uncommitted figures/scripts and untracked packages; add only intentional documentation/script paths. The frozen `topoinvis-2026-arxiv-v1.1` tag remains unchanged. All findings above are **single-checkpoint descriptive comparisons**, not replicated seed variance estimates, not independent hourly samples for inferential statistics, and not geographically generalized wind-field findings.

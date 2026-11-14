@@ -1,0 +1,219 @@
+{
+  "geographic_roles": {
+    "development": [
+      "gulf_inland",
+      "southwest_borderland"
+    ],
+    "historical_reference": {
+      "region": "mid_atlantic_legacy",
+      "role": "historical_development_only"
+    },
+    "locked_external_test": [
+      "upper_midwest",
+      "pacific_inland"
+    ],
+    "rule": "Use full 500x500 WTK window separated by >=80 grid cells; no external prediction access before frozen metric/model/mask/aggregation protocol."
+  },
+  "limitations": [
+    "Original PhIRE pretrained-model patch membership unknown; claims restricted to geographic/temporal separation from our fine-tuning.",
+    "Four development fields in XC were only a smoke test; cannot infer population effects.",
+    "Spatial WTK coordinate grid is non-trivial: 500-cell tiles and model arrays must be geospatially calibrated before physical displacement in km.",
+    "A single 3-epoch fine-tuning trajectory per arm does not establish seed-wise robustness."
+  ],
+  "metric_definitions": {
+    "canonical_topology": {
+      "aggregation": "Use paired GT/model distance per exact field (H0 and H1 combined by identical historical rule); lower is better.",
+      "metrics": [
+        "dB_Linf",
+        "W2inf_order2_Linf_ground",
+        "W22_order2_L2_ground"
+      ],
+      "pd": "Reuse corrected Phase 6 canonical TTK extraction and GUDHI parsing/conventions with essential-pair treatment and per-dimension decomposition validated before external evaluation.",
+      "primary_crop": {
+        "height": 160,
+        "width": 160,
+        "x0": 0,
+        "y0": 0
+      },
+      "scalar": "speed=sqrt(u^2+v^2) in m/s computed after full-field inference"
+    },
+    "distributed_tile_sensitivity": {
+      "evaluation": "Nine predeclared nonoverlapping tiles from the SAME full500 model predictions; treat tiles as clustered under parent field, not independent hourly cases.",
+      "reported_separately_from_primary": true,
+      "start_x": [
+        0,
+        160,
+        320
+      ],
+      "start_y": [
+        0,
+        160,
+        320
+      ],
+      "status": "secondary_not_merged_into_legacy_primary",
+      "tile_size": [
+        160,
+        160
+      ]
+    },
+    "full500_topology_pilot": {
+      "caution": "PD of complete 500x500 field is not union of tile PDs; compare models within spatial support, not raw topology costs across supports.",
+      "scope": "Predeclare a fixed development field subset by region/time before extraction; report TTK extraction success, feature count, runtime, memory and solver feasibility; never silently promote pilot metrics to primary.",
+      "status": "feasibility_exploratory_dev_only_until_runtime_and_parity_gates"
+    },
+    "merge_tree": {
+      "caution": "Do not treat historic MT distance code as independently validated or claim MT results until a numerical synthetic reference gate passes.",
+      "status": "secondary_after_independent_MT_distance_validation"
+    },
+    "primary_reconstruction": {
+      "aggregation": "Compute per-field metrics, aggregate means within 168-hour region-season blocks, then balanced means across regions/seasons; do not pool all pixels as statistically independent.",
+      "direction": "lower_is_better",
+      "speed_mae_mps": "mean(abs(norm(prediction_uv,axis=-1)-norm(reference_uv,axis=-1))) over complete 500x500 field",
+      "uv_rmse_mps": "sqrt(mean((prediction_uv-reference_uv)^2)) over both vector channels and complete 500x500 field"
+    },
+    "spatial_locality": {
+      "aggregation": "Per-field region-week comparisons; do not convert pixels to km without validated geometry and orientation.",
+      "measures": [
+        "constrained_W22_cost",
+        "GT_persistence_mass_coverage",
+        "SR_excess_persistence_mass",
+        "real_real_matching_counts",
+        "diagonal_counts"
+      ],
+      "primary_focus_radii": [
+        4,
+        16,
+        "infinity"
+      ],
+      "radius_grid_cells": [
+        4,
+        8,
+        16,
+        32,
+        64,
+        96,
+        128,
+        "infinity"
+      ],
+      "rule": "A GT/SR feature match is admissible iff both birth and death vertex Euclidean separations are <= r; preserve original W22 cost and diagonal allowances.",
+      "solver": "Reuse frozen Phase5E sparse locality solver with validated Phase 6 LXXXII/LXXXIII infinity regression."
+    }
+  },
+  "models": {
+    "architecture": "Native PhIREGANs.test_paired MR->HR r=[5], pretrained mu=[0.7684,-0.4575] sigma=[5.02455,5.9017], batch_size=1.",
+    "checkpoints": "Reuse the exact six XC source SHA-indexed checkpoint prefixes and bytes, no retraining, model selection or test-time adaptation.",
+    "data": "100x100x2 MR factor-five average pooling from complete 500x500x2 native HR; predict full 500x500 [u,v], then crop for topology.",
+    "order": [
+      "cnn",
+      "gan",
+      "grad",
+      "cv",
+      "pers",
+      "f1"
+    ]
+  },
+  "predeclared_comparisons": [
+    {
+      "id": "C1",
+      "metrics": [
+        "uv_rmse_mps",
+        "speed_mae_mps"
+      ],
+      "models": [
+        "grad",
+        "cnn"
+      ],
+      "question": "Does gradient fine-tuning retain better pointwise quality than pretrained CNN?"
+    },
+    {
+      "id": "C2",
+      "metrics": [
+        "W22_order2_L2_ground",
+        "dB_Linf"
+      ],
+      "models": [
+        "pers",
+        "f1",
+        "grad"
+      ],
+      "question": "Do global topology rankings from 2007 persist by geographical block?"
+    },
+    {
+      "id": "C3",
+      "metrics": [
+        "constrained_W22_cost",
+        "GT_persistence_mass_coverage"
+      ],
+      "models": [
+        "grad",
+        "pers"
+      ],
+      "question": "Does gradient beat PERS under tight locality while PERS beats gradient at infinity?",
+      "radii": [
+        4,
+        16,
+        "infinity"
+      ]
+    },
+    {
+      "id": "C4",
+      "metrics": [
+        "uv_rmse_mps",
+        "speed_mae_mps",
+        "W22_order2_L2_ground"
+      ],
+      "models": [
+        "cnn",
+        "gan"
+      ],
+      "question": "Does adversarial CNN/GAN trade-off vary by region?"
+    }
+  ],
+  "protocol_id": "phase7_xci_geographic_evaluation_protocol_20261015_v1",
+  "purpose": "Test transfer of frozen PhIRE CNN/GAN and 2x2 CNN fine-tuning family beyond documented 2007 fine-tuning geography and time, without claiming pretrained-data novelty",
+  "schema_version": 1,
+  "statistics": {
+    "external_test_policy": "No model tuning or new metric choices in response to locked 2010 scores; analyze the predeclared 2012 replication without reselecting windows.",
+    "report": [
+      "per_region_per_season_mean",
+      "per_region_mean",
+      "paired_block_differences",
+      "wins_per_block",
+      "full_distributions",
+      "primary_vs_replication_year_separate"
+    ],
+    "uncertainty": "Report between-block variation; any bootstrap must resample whole region-week blocks with small-cluster caveat; no hour-wise independence claims or posthoc significance thresholds.",
+    "unit_of_aggregation": "Region-by-seven-day-week block, equal block weight; n=8 blocks per role per year (2 regions x 4 seasonal weeks).",
+    "unit_of_pairing": "Identical WTK region/time/field and tile when applicable"
+  },
+  "status": "PREDECLARED_BEFORE_EXTERNAL_INFERENCE",
+  "study": "phase7_geographic_generalization",
+  "times": {
+    "hourly_fields_per_week": 168,
+    "inclusion": "All predeclared hours are included. Failed samples must be logged by region/time/index with reason; no silent removal or replacement.",
+    "primary_week_start_utc": [
+      "2010-02-01T00:00:00",
+      "2010-05-01T00:00:00",
+      "2010-08-01T00:00:00",
+      "2010-11-01T00:00:00"
+    ],
+    "primary_year": 2010,
+    "replication_week_start_utc": [
+      "2012-02-01T00:00:00",
+      "2012-05-01T00:00:00",
+      "2012-08-01T00:00:00",
+      "2012-11-01T00:00:00"
+    ],
+    "replication_year": 2012,
+    "reporting": "Analyze 2010 primary and 2012 replication separately before any combined summary."
+  },
+  "validation_gates": [
+    "source and checkpoint byte continuity with verified XC pilot",
+    "WTK row-column orientation, original normalization and full500 paired inference continuity",
+    "exact region IDs and timestamp indices according to LXXXIX frozen split",
+    "synthetic/past-result parity for PD distances and locality solver before external use",
+    "document model inference runtime and scientific feasibility on DEVELOPMENT fields",
+    "halt on any nonfinite model output, field orientation mismatch, or input/GT numerical discrepancy",
+    "all external results written once to isolated SHA-indexed directories; no overwrite"
+  ]
+}

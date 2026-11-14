@@ -72,9 +72,9 @@ EXPECTED_PD = {  # (W22, W2inf, dB)
 WIND_CMAP = "viridis"
 COL = {"GT": "#111111", "CNN": "#777777", "Control": "#C77C22", "Topology": "#009E73"}
 TITLE = {"GT": "Ground truth", "CNN": "Pretrained CNN",
-         "Control": "Recon.-only", "Topology": "Topology-inspired"}
+         "Control": "Std. fine-tuning", "Topology": "Topology-inspired"}
 LEGEND = {"GT": "Ground truth", "CNN": "Pretrained CNN",
-          "Control": "Reconstruction-only", "Topology": "Topology-inspired"}
+          "Control": "Standard fine-tuning", "Topology": "Topology-inspired"}
 INK2, GRID = "#52514e", "#e6e5e0"
 
 plt.rcParams.update({

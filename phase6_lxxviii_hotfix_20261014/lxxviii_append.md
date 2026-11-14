@@ -1,0 +1,25 @@
+
+---
+
+# Part LXXVIII — Phase 6 LXXVII VTU reader compatibility diagnosis and safe continuation (October 14, 2026)
+
+## LXXVIII.1 Spark evidence (supplied by the user)
+
+* Part LXXVII README/script hashes and documentation patch verified. Preflight passed all three new-arm source tensor SHA/alignment/finiteness checks and preserved Phase 5E GT reference.
+* The gradient-only sample-0 VTI and TTK PD port-0 extraction completed. The LXXVII script then failed during its *new* `vtkXMLUnstructuredGridReader` readback with an XML parser error at line 29, column 13, byte 2508; the CV and PERS extractions were not reached.
+* A subsequent SHA-256 and byte comparison established that the newly extracted gradient-only VTI and PD VTU are **byte-identical** to the earlier LXXIII pilot files. The SR VTI SHA-256 is `26e2af52cccaca6120ea4bc009a55215ebbae716bd9eaef44d91a4e2408e2030`. The PD VTU SHA-256 is `79b2b685968dad0387be8b5460881d3d641272807cd08e1e155efe7b6eabc00b` (140,589 bytes). The VTU XML header advertises appended base64 zlib-compressed data. These facts do not establish an underlying field mismatch.
+* The separate LXXVII canonical `read_pd()` / GUDHI pilot gate successfully read the newly generated gradient-only VTU and printed `dB=2.58057403564`, `W2inf=15.6249480697`, `W22=18.6702768797`. It then exited 1 due to a missing CV-only sample-0 VTU, a downstream consequence of the earlier pilot stop. No CV/PERS sample-0 metric was computed in that aborted gate.
+* LXXIII extraction had checked nonempty artifacts and exit code, not validated the VTU using the exact later LXXVII Docker VTK XML reader. Therefore the observed failure is newly exposed readback incompatibility, not demonstrated numeric-regression evidence. The exact underlying VTK reader compatibility cause remains unconfirmed until the independent XML structural probe runs.
+
+## LXXVIII.2 Compatible validation protocol (prepared locally; not executed on Spark)
+
+New package `Phase6_LXXVIII_PD_XML_Reader_Hotfix_20261014.zip` provides a small *in-memory* compatibility launcher for the original `phase6_lxxvii_update/scripts/phase6_canonical_newarms_pd.py` file. The original driver stays byte-for-byte unchanged, which preserves its SHA-256 commitment inside already-created `input_manifest.json`. The launcher replaces **only** `verify_pd()` in memory, using Python standard-library XML parsing and schema checks instead of the failing container `vtkXMLUnstructuredGridReader`. Sample arrays, VTI generation and exact orientation checks, TTK command, hash manifests, separate output directory, resume rules, and GUDHI pilot marker requirements remain as before.
+
+Required ordered gates:
+
+1. **Read-only XML probe** compares both old/new gradient-only sample-0 VTUs, ensuring well-formed VTK UnstructuredGrid XML, positive geometry counts, expected persistence fields, appended base64 framing, and exact old/new file hashes. If XML parsing fails, stop rather than bypass validation.
+2. **Sample-0 pilot** resumes gradient-only and generates CV-only and PERS-only PDs, without modifying original LXXVII code or any Phase 5E archives.
+3. **Independent GUDHI gate** runs the *unchanged* `phase6_lxxvii_update/scripts/phase6_pilot_pd_gudhi_gate.py` for all three arms, rechecking gradient numerical continuity and writing `pilot_verified.json` only on success.
+4. Only then may the guarded, resumable **168-sample extraction** run, to be followed by a complete canonical diagram parser/schema check and corrected GUDHI distance computation for every new PD. XML structural parsing **does not** prove the compressed appended data are numerically intact and cannot replace this audit.
+
+No LXXVIII hotfix execution or new CV/PERS topology data is claimed by this documentation entry. Original Phase 5E diagrams, model checkpoints, fixed benchmark, archived metrics and frozen paper artifacts must remain unchanged.

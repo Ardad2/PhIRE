@@ -53,7 +53,7 @@ C_WORSE = "#A6A6A6"             # "comparison model better"
 C_GRID = "#E3E3E3"
 
 NAME_PRE = "Pretrained CNN"
-NAME_CTL = "Reconstruction-only fine-tuning (control)"
+NAME_CTL = "Standard fine-tuning (control)"
 NAME_OURS = "Topology-inspired fine-tuning"
 
 PAD = 0.12                      # outer margin (in)
@@ -113,9 +113,9 @@ PD_PANELS = [
 JOINT_VS_PRE, JOINT_VS_CTL = 150, 156
 
 PD_TITLE = "Topology-inspired fine-tuning lowers PD distance by 25–31%"
-PD_SUB = ("Reconstruction-only fine-tuning (the control) makes PD agreement worse, "
+PD_SUB = ("Standard fine-tuning (the control) makes PD agreement worse, "
           "so the gain does not come from fine-tuning alone.")
-PD_TICKS = ["Pretrained", "Recon.-\nonly", "Topology-\ninspired"]
+PD_TICKS = ["Pretrained", "Standard\nfine-tuning", "Topology-\ninspired"]
 
 
 def pd_figure():

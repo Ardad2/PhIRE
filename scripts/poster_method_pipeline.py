@@ -42,7 +42,7 @@ FORK_LABEL = "fine-tune"
 
 # (bold name, regular description) - "adds" keeps it clear that the
 # reconstruction loss is still there in the topology-inspired objective.
-CONTROL = ("Reconstruction-only (control)", "")
+CONTROL = ("Standard fine-tuning (control)", "")
 OURS = ("Reconstruction + gradient + persistence-pair supervision", "")
 
 EVAL_LABEL = ("same evaluation on", "168 held-out fields")   # above / below arrow
@@ -57,7 +57,7 @@ METRICS = [
 
 # Font sizes (pt).  Titles 30 (pipeline text), branch lines 26, secondary 24.
 F_TITLE = 30
-F_BRANCH = 26
+F_BRANCH = 25
 F_SUB = 24
 
 

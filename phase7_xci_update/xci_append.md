@@ -1,0 +1,10 @@
+
+# Part XCI — Phase 7: six-model 500×500 development inference verified; geographic evaluation protocol freeze prepared (October 15, 2026)
+
+The **real Spark** Part XC development-only inference completed with six `[MODEL-PASS]` records, `[INFER-GATE] PASS`, `Inference exit: 0`, independent `[VERIFY-GATE] PASS`, `Verify exit: 0`, and all eleven output checksums OK. Four predeclared development fields: Gulf inland and Southwest borderland, February and August 2010. Native paired PhIRE full-500×500 inference used the original six checkpoints; max GT/MR discrepancy was 3.55e−15, and no Upper Midwest or Pacific inland model scores were accessed.
+
+XC four-field descriptive pooled values (UV RMSE m/s; speed MAE m/s): CNN (0.90463,0.58800), GAN (1.13549,0.75754), gradient-only (0.66814,0.41495), CV-only (0.71809,0.46076), PERS-only (0.72577,0.47043), F1 (0.73967,0.48084). Do not claim statistical generalization from four development fields.
+
+Part XCI is a **protocol-freeze** package, not a new model run. It predeclares source/hash and full-500 inference conventions; the original top-left 160×160 speed crop as the **primary PD/locality benchmark**; dB, W2inf, W22; original Phase5E locality radii [4,8,16,32,64,96,128,∞]; nine 160×160 tiles as a separate secondary spatial-sensitivity analysis; full 500×500 topology extraction only as an initially development-only feasibility study; 2010 season-stratified primary and 2012 replication weeks; immutable geographic roles; and region-by-week paired summaries. No metric selection or model tuning on external scores. The original pretrained PhIRE membership remains unknown. Pilot and future analysis tools must be validated on development data before external evaluation.
+
+Run `phase7_xci_update/scripts/phase7_freeze_evaluation_protocol.py` with `--mode preflight|freeze|verify --repo-root "$PWD"` after verifying package hashes. Output is an isolated SHA-256 index under `ttk_runs_fixed/topology_finetuning/phase7_xci_frozen_evaluation_protocol_20261015`. It must be frozen and verified before test-region inference; no modification to the previous frozen data or checkpoints.

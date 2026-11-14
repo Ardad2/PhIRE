@@ -1,0 +1,377 @@
+{
+  "expected_counts": {
+    "primary_development_fields": 1344,
+    "primary_fields_per_region": 672,
+    "primary_locked_test_fields": 1344,
+    "replication_development_fields": 1344,
+    "replication_fields_per_region": 672,
+    "replication_locked_test_fields": 1344
+  },
+  "frozen_split": {
+    "assignment_rule": "Declared using LXXXVII wind-field covariates and LXXXVIII footprints, before model inference or scores",
+    "dev_pilot_previews": [
+      "preview_gulf_inland_20100201.npz",
+      "preview_gulf_inland_20100801.npz",
+      "preview_southwest_borderland_20100201.npz",
+      "preview_southwest_borderland_20100801.npz"
+    ],
+    "development_regions": [
+      "gulf_inland",
+      "southwest_borderland"
+    ],
+    "hours_per_window": 168,
+    "locked_external_test_regions": [
+      "upper_midwest",
+      "pacific_inland"
+    ],
+    "original_reference": {
+      "id": "mid_atlantic_legacy",
+      "rectangle": [
+        720,
+        1220,
+        2102,
+        2602
+      ],
+      "role": "historical_development_only"
+    },
+    "pretraining_caveat": "These regions are disjoint from documented PhIRE fine-tuning footprint, not proven absent from PhIRE original pretraining",
+    "primary_windows_utc": [
+      "2010-02-01T00:00:00",
+      "2010-05-01T00:00:00",
+      "2010-08-01T00:00:00",
+      "2010-11-01T00:00:00"
+    ],
+    "reference_separation_grid_cells": 80,
+    "replication_windows_utc": [
+      "2012-02-01T00:00:00",
+      "2012-05-01T00:00:00",
+      "2012-08-01T00:00:00",
+      "2012-11-01T00:00:00"
+    ],
+    "schema_version": 1,
+    "study": "phase7_geographic_generalization",
+    "test_access_rule": "No inference or model-scoring on locked external test regions until frozen metric, model and analysis protocols are documented using development fields"
+  },
+  "no_inference_or_model_scoring": true,
+  "pretraining_novelty_proven": false,
+  "region_metadata": {
+    "gulf_inland": {
+      "actual_center": {
+        "latitude": 32.00639,
+        "longitude": -91.002563
+      },
+      "corners": [
+        {
+          "col": 1471,
+          "corner": "northwest_grid",
+          "latitude": 27.643902,
+          "longitude": -96.331421,
+          "row": 205
+        },
+        {
+          "col": 1970,
+          "corner": "northeast_grid",
+          "latitude": 27.127483,
+          "longitude": -86.355316,
+          "row": 205
+        },
+        {
+          "col": 1471,
+          "corner": "southwest_grid",
+          "latitude": 36.691231,
+          "longitude": -96.378845,
+          "row": 704
+        },
+        {
+          "col": 1970,
+          "corner": "southeast_grid",
+          "latitude": 36.080818,
+          "longitude": -84.991516,
+          "row": 704
+        }
+      ],
+      "grid_center": {
+        "col": 1721,
+        "row": 455
+      },
+      "grid_rect": [
+        205,
+        705,
+        1471,
+        1971
+      ],
+      "intended_environment": "Gulf-influenced inland/coastal transition",
+      "mean_grad_p95_over_fields": 0.895909309387207,
+      "mean_p99_speed_over_fields": 12.34454965591431,
+      "mean_speed_over_fields": 6.494271521883011,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "gulf_inland",
+      "suggested_data_suitability": true
+    },
+    "pacific_inland": {
+      "actual_center": {
+        "latitude": 40.993176,
+        "longitude": -119.009521
+      },
+      "corners": [
+        {
+          "col": 315,
+          "corner": "northwest_grid",
+          "latitude": 35.184029,
+          "longitude": -122.799591,
+          "row": 820
+        },
+        {
+          "col": 814,
+          "corner": "northeast_grid",
+          "latitude": 37.602203,
+          "longitude": -111.788025,
+          "row": 820
+        },
+        {
+          "col": 315,
+          "corner": "southwest_grid",
+          "latitude": 43.826946,
+          "longitude": -127.032013,
+          "row": 1319
+        },
+        {
+          "col": 814,
+          "corner": "southeast_grid",
+          "latitude": 46.661736,
+          "longitude": -114.44162,
+          "row": 1319
+        }
+      ],
+      "grid_center": {
+        "col": 565,
+        "row": 1070
+      },
+      "grid_rect": [
+        820,
+        1320,
+        315,
+        815
+      ],
+      "intended_environment": "Western basin and range",
+      "mean_grad_p95_over_fields": 2.011359214782715,
+      "mean_p99_speed_over_fields": 15.61232566833497,
+      "mean_speed_over_fields": 6.043126852338791,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "pacific_inland",
+      "suggested_data_suitability": true
+    },
+    "southwest_borderland": {
+      "actual_center": {
+        "latitude": 30.505024,
+        "longitude": -109.996368
+      },
+      "corners": [
+        {
+          "col": 572,
+          "corner": "northwest_grid",
+          "latitude": 25.257706,
+          "longitude": -113.93634,
+          "row": 173
+        },
+        {
+          "col": 1071,
+          "corner": "northeast_grid",
+          "latitude": 26.694355,
+          "longitude": -104.26976,
+          "row": 173
+        },
+        {
+          "col": 572,
+          "corner": "southwest_grid",
+          "latitude": 33.956936,
+          "longitude": -116.377441,
+          "row": 672
+        },
+        {
+          "col": 1071,
+          "corner": "southeast_grid",
+          "latitude": 35.652069,
+          "longitude": -105.432159,
+          "row": 672
+        }
+      ],
+      "grid_center": {
+        "col": 822,
+        "row": 423
+      },
+      "grid_rect": [
+        173,
+        673,
+        572,
+        1072
+      ],
+      "intended_environment": "Southern Arizona / borderland transition (domain suitability unverified)",
+      "mean_grad_p95_over_fields": 1.565600872039795,
+      "mean_p99_speed_over_fields": 13.437119483947763,
+      "mean_speed_over_fields": 5.276889558649064,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "southwest_borderland",
+      "suggested_data_suitability": true
+    },
+    "upper_midwest": {
+      "actual_center": {
+        "latitude": 43.996811,
+        "longitude": -93.993713
+      },
+      "corners": [
+        {
+          "col": 1315,
+          "corner": "northwest_grid",
+          "latitude": 39.287479,
+          "longitude": -100.128815,
+          "row": 849
+        },
+        {
+          "col": 1814,
+          "corner": "northeast_grid",
+          "latitude": 39.075306,
+          "longitude": -88.202972,
+          "row": 849
+        },
+        {
+          "col": 1315,
+          "corner": "southwest_grid",
+          "latitude": 48.554726,
+          "longitude": -100.851776,
+          "row": 1348
+        },
+        {
+          "col": 1814,
+          "corner": "southeast_grid",
+          "latitude": 48.304329,
+          "longitude": -86.845612,
+          "row": 1348
+        }
+      ],
+      "grid_center": {
+        "col": 1565,
+        "row": 1099
+      },
+      "grid_rect": [
+        849,
+        1349,
+        1315,
+        1815
+      ],
+      "intended_environment": "Upper Midwest / Great Lakes transition",
+      "mean_grad_p95_over_fields": 0.7833700180053711,
+      "mean_p99_speed_over_fields": 13.016908645629885,
+      "mean_speed_over_fields": 6.829844391450882,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "upper_midwest",
+      "suggested_data_suitability": true
+    }
+  },
+  "schema_version": 1,
+  "source_digests": {
+    "lxxxviii_source_sha256": "468c2677436f1c442f8d9e0f0760cab19f36a96d79671d62337b9a1f7a970a23",
+    "phase7_lxxxvi_inventory": {
+      "inventory.json": "c1892f7b843ac9174d5f9b3de9d27d45e9e992f2f41f47d41da3b88c25b8b857",
+      "inventory.md": "9bb4730c3066270c481818344e8e721019438241e32e1ca697270d3b18401b39"
+    },
+    "phase7_lxxxvii_screen": {
+      "preview_gulf_inland_20100201.npz": "72385ab67395d9f69b5a7115a4b49fd8786e02c3b4c62cba452d840f45fd9db7",
+      "preview_gulf_inland_20100801.npz": "60754a99c293b3d43f30fab099e511970b88a5446ce3a26c25638db4d27549f8",
+      "preview_pacific_inland_20100201.npz": "573df9bc1cca6cdcb61adbc85367679ab9accc739543f5e250881c67ed92a37c",
+      "preview_pacific_inland_20100801.npz": "abcc13a36ee7948ccd186163eded5da25b2646fea03f539e654ff01e2cc43198",
+      "preview_southwest_borderland_20100201.npz": "ba782ad7fd8359e40228db078c6edbe55a0081855b5c1dc8033de481898db4a6",
+      "preview_southwest_borderland_20100801.npz": "33c46bf76c9d95be9869b8ab5748e10e220314c1363b8f97a3804029c18c140d",
+      "preview_upper_midwest_20100201.npz": "97c17ccd37450e56f7c792609e44416da7550bbeeb7545c3c49fb5044965019a",
+      "preview_upper_midwest_20100801.npz": "39de02114509a80b3800539075e8f674de7e5d2e27be9cc31f1bad768d1bbd7b",
+      "sample_screen.csv": "5253f3c294381bec430ebf30ea4d10e3ad0192ee31a3a365739a136679ed77fb",
+      "screen_summary.json": "b20683a0c020dbe7271dda72475415b2adf3aee6707aa4d8562ff3b4fa2f9fb7",
+      "wind_screen.md": "9d1e2d74c24d63d02f134dfb88c7c8e600b2b30cb1cb3c1329c1c365bf7980c5"
+    },
+    "phase7_lxxxviii_parity": {
+      "parity_report.json": "758a4505b55b21ffe8b6fc5a20a33d75d284d969436a7dc338fb8eaf88dc2913",
+      "parity_report.md": "bb5e627697dfb1e33e2725d198a0dc4e7c4a15bada23cc2250ebca2f03a9bd4c"
+    },
+    "split_plan_sha256": "e5347d164b1a32ae69caba6d5fa234d8b81e4a148bd7f8d24dcd9e122efa3c81",
+    "split_script_sha256": "dbac045055a37a9c6bbd5afd43a89099561974f19843e17a22feac99680d660e"
+  },
+  "status": "FROZEN_BEFORE_MODEL_SCORES",
+  "time_windows": [
+    {
+      "actual_first": "2010-02-01 00:00:00",
+      "actual_last": "2010-02-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 27215,
+      "index_start": 27048,
+      "requested_start": "2010-02-01T00:00:00"
+    },
+    {
+      "actual_first": "2010-05-01 00:00:00",
+      "actual_last": "2010-05-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 29351,
+      "index_start": 29184,
+      "requested_start": "2010-05-01T00:00:00"
+    },
+    {
+      "actual_first": "2010-08-01 00:00:00",
+      "actual_last": "2010-08-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 31559,
+      "index_start": 31392,
+      "requested_start": "2010-08-01T00:00:00"
+    },
+    {
+      "actual_first": "2010-11-01 00:00:00",
+      "actual_last": "2010-11-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 33767,
+      "index_start": 33600,
+      "requested_start": "2010-11-01T00:00:00"
+    },
+    {
+      "actual_first": "2012-02-01 00:00:00",
+      "actual_last": "2012-02-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 44735,
+      "index_start": 44568,
+      "requested_start": "2012-02-01T00:00:00"
+    },
+    {
+      "actual_first": "2012-05-01 00:00:00",
+      "actual_last": "2012-05-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 46895,
+      "index_start": 46728,
+      "requested_start": "2012-05-01T00:00:00"
+    },
+    {
+      "actual_first": "2012-08-01 00:00:00",
+      "actual_last": "2012-08-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 49103,
+      "index_start": 48936,
+      "requested_start": "2012-08-01T00:00:00"
+    },
+    {
+      "actual_first": "2012-11-01 00:00:00",
+      "actual_last": "2012-11-07 23:00:00",
+      "available": true,
+      "hours": 168,
+      "index_end": 51311,
+      "index_start": 51144,
+      "requested_start": "2012-11-01T00:00:00"
+    }
+  ]
+}

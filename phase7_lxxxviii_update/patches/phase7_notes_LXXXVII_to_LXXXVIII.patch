@@ -1,0 +1,27 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38847,3 +38847,24 @@
+ `Phase7_LXXXVII_WTK_Wind_Screening_20261015.zip` contains `phase7_lxxxvii_update/scripts/phase7_wtk_wind_screen.py`, a README, this additive master-notes patch, and a SHA-256 manifest. It is **prepared but not yet executed on live Spark/WIND Toolkit**. Its `--mode preflight` only validates the immutable LXXXVI report/sources, four full native-grid rectangles, mutual 80-cell separation, and timestamp exclusion. Its `--mode pilot` samples two predetermined times (offsets 0 and 84 hours) from each of the eight predeclared 2010/2012 week-long windows in **each** provisional region: 4 regions × 8 windows × 2 times = **64 native 500×500 WTK fields**. It reads only `windspeed_100m`, `winddirection_100m` and timestamp slots from HSDS, computes validity, wind-speed quantiles, high-speed fractions and finite-adjacency spatial gradient summaries. It saves only eight selected 500×500 `(u,v)` and factor-5 block-averaged 100×100 MR preview pairs, not complete TFRecords. The predeclared preview anchors are February and August 2010 at week offset 0 for each region. Output is isolated, atomic, checksum indexed, and refuses overwrites. `--mode verify` independently rechecks file hashes, exact region/time inventory and arithmetic consistency without HSDS access. Neither models, physics/topology extraction nor region/split assignments are performed.
+ 
+ After live screening, manually inspect actual footprint coordinates/corners, NaN/validity percentages, speed and spatial-gradient distributions, and environment suitability; if a selected target is problematic, make a separately versioned amended inventory. **Do not select development/test splits after inspecting model rankings.** Next perform a tiny frozen CNN/GAN/gradient/CV/PERS/F1 full-field inference pilot against the preview MR/GT pairs, with exact PhIRE downsampling/orientation parity and unchanged normalization. Only thereafter commit geographic validation and locked external-test regions and expand the seasonal test dataset. Preserve prior PhIRE training checkpoints, master Phase5E and Phase6 evaluations unchanged.
++
++# Part LXXXVIII — Phase 7: live 64-field wind screening verified, preview parity and footprint review prepared (October 15, 2026)
++
++## LXXXVIII.1 Confirmed Spark-side meteorological inventory
++
++The previous Part LXXXVII screening was completed successfully and verified independently. Its `[PILOT] PASS` reported **64/64** WTK snapshots in four provisional, 500×500, 80-grid-cell-buffer-separated regions (Gulf inland, Upper Midwest, Pacific inland, Southwest borderland), all finite, and saved eight full-500×500 `[u,v]` + factor-5 block-average MR previews. The offline verifier passed (`0`) with **all 11** output files matching `SHA256SUMS`. No inference, model ranking, PD/MT, training, or locked test split has occurred.
++
++| Candidate | Native mean speed (m/s) | Mean per-field p99 speed (m/s) | Mean per-field p95 absolute neighbor speed difference (m/s) |
++|---|---:|---:|---:|
++| gulf_inland | 6.494 | 12.345 | 0.896 |
++| upper_midwest | 6.830 | 13.017 | 0.783 |
++| pacific_inland | 6.043 | 15.612 | 2.011 |
++| southwest_borderland | 5.277 | 13.437 | 1.566 |
++
++These are selected 16-field **meteorological screening** statistics, not population estimates or confirmation of mountainous/coastal conditions. Original fine-tuning region remains frozen, and the proposed 2010/2012 windows do not overlap documented 2007 fine-tuning times. Original PhIRE pretraining patch membership remains unknown.
++
++## LXXXVIII.2 Next proposed read-only compatibility gate
++
++`Phase7_LXXXVIII_Preview_Parity_20261015.zip` prepares an isolated gate to verify eight preview fields and their WTK/time IDs against the hashed LXXXVII screening data, print exact native-grid geographic center/corners, and compare archived 100×100 MR to **PhIRE's own unchanged TensorFlow `utils.downscale_image()`** (K=5) on 500×500 `[u,v]`, tolerance 1e-8. It includes `--mode preflight` without TensorFlow, `--mode parity` with TensorFlow, and `--mode verify` to recheck the separately written report. It does not read the remote WTK, run any model, train, generate TFRecords, or finalize evaluation splits; source SHA and output digests are preserved. A successful gate will justify an isolated development-only six-model inference pilot, after the geographic split is frozen separately. No actual Spark parity result is claimed here.
++
++Before exposing model-level metrics, manually review geographic footprint corners and ancillary environmental information and declare which regions are development vs locked final test. A **provisional discussion-only** split is Gulf/Southwest development vs Upper Midwest/Pacific final test. Locked regions should not be used to select weights, checkpoints, or model variants. Do not alter archived Phase 5E / Phase 6 records.

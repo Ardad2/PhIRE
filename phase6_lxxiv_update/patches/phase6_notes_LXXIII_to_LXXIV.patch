@@ -1,0 +1,73 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38213,5 +38213,70 @@
+ A successful run should print two lines `[PASS] GT` and `[PASS] SR`, each including a maximum VTI round-trip difference; produce **two PD port-0 files** and **six MT port files** (three each for GT and SR); print `[PILOT] PASS`; and exit 0. **These are expected outcomes, not observed outcomes as of this note.** Preserve actual output and any warnings or mismatches verbatim when the user reports them.
+ 
+ ## Corrected-distance follow-up (not yet executed)
+ 
+ After the small pilot, verify exact pairs and persistence arrays, inspect the local `w22_full_sweep.py` CLI/source and archived manifest/environment (do not assume it supports newly named methods without modification), then establish a corrected-GUDHI comparison for the single test field. Only after this succeeds should all 168 GT/SR fields be extracted for the three new arms and the corrected-PD, audited MT and Phase 5E locality comparisons performed with their frozen conventions. The historical `w22_full_sweep.csv` is a benchmark reference, not new-arm output. For scientific reporting, preserve method/sample indices, per-file hashes, extracted diagram conventions and the audit's exact distance definitions.
++
++---
++
++# Part LXXIV — Phase 6: successful sample-0 extraction and corrected-GUDHI pilot gate (October 14, 2026)
++
++## LXXIV.1 Observed sample-0 extraction result
++
++The researcher ran the isolated Part LXXIII pilot on Spark and supplied the final terminal lines from the extraction. The new gradient-only method is `candidateF_grad_pairzero_expanded2688` (`CV=0`, `PERS=0`). The log showed TTK writing the SR merge-tree ports and a nonempty SR PD port-0 VTU, SR MT ports 0 and 1 VTUs, and SR MT port-2 VTI. The pilot finished with the explicit success lines:
++
++```text
++[PILOT] PASS: GT and SR sample 0 VTI, PD and three MT ports present.
++[PILOT] Historical TTK distances deliberately NOT computed.
++[PILOT] Files in: ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014
++Pilot exit status: 0
++```
++
++**Updated status:** The sample-0 pilot is now **EXECUTED / PASS**, superseding Part LXXIII's historical prepared-but-not-run snapshot. Its own verification confirms 2 speed VTIs (GT/SR), 2 PD port-0 VTUs (GT/SR), and 6 MT outputs (ports 0/1/2 for GT/SR). This is an **extraction success**, not a corrected PD-distance result, MT-distance result, or spatial correspondence result. The source conversation excerpt does not include the complete earlier VTI numerical `[PASS]` lines, so do not invent their exact round-trip errors.
++
++## LXXIV.2 Historical corrected-distance conventions to preserve
++
++The authoritative corrected PD audit (Part XXXV) uses the archived `$AUDIT/recompute_pd/canonical_pd_pilot.py` `read_pd()` implementation to read finite TTK D0/D1 birth/death pairs (excluding display diagonal and the global/nonfinite pair), and then independent GUDHI distance calls:
++
++- `d_B`: `gudhi.bottleneck_distance(A,B,e=0.0)`; aggregate = `max(D0,D1)`.
++- `W_{2,∞}`: `wasserstein_distance(A,B,matching=False,order=2.0,internal_p=np.inf,keep_essential_parts=False)`; aggregate = `hypot(D0,D1)`.
++- `W_{2,2}`: same with `internal_p=2.0`; separately named and **not** interchangeable with `W_{2,∞}`.
++
++These are distances **between the pairs extracted by TTK**, not a GUDHI re-extraction of topology from the `.vti` scalar field. Avoid the superseded `ttkBottleneckDistance` / Stage-3 `pd_distance` result. The historical full corrected/GUDHI audit covered 8,568 GT-SR comparisons with all PASS, but **none** of the new Phase 6 three ablation arms was included in that archived sweep.
++
++## LXXIV.3 Prepared next gate — historical CNN sample-0 regression, then new gradient-only sample 0
++
++Companion helper: `phase6_lxxiv_update/scripts/phase6_s0_corrected_pd_gudhi.py`. The helper has been syntax-checked outside Spark; no real GUDHI run of this new helper has occurred as of this entry. It reads the existing isolated pilot outputs and the two historical CNN sample-0 PDs under `ttk_runs_fixed/cnn/pd/`, and imports the actual archived canonical parser rather than writing a new parser.
++
++The historical regression reference from Part XXXV is:
++
++```text
++CNN sample 0:
++  GT D0=967, SR D0=703, GT D1=871, SR D1=632
++  dB_all    = 3.0914716720581055
++  W2inf_all = 17.467813434330861
++```
++
++The helper requires cardinality equality and numerical reproduction of these archived values (relative tolerance `1e-12`, absolute tolerance `1e-10`) before calculating/saving the new method's corrected `d_B`, `W_{2,∞}`, and `W_{2,2}`. All paths must resolve uniquely, VTI/PD/MT files must be nonempty, and all analyzed PD arrays must be finite N×2 with `death >= birth`. It preserves SHA-256 hashes for every pilot VTI, PD, and MT artifact, historical reference PDs, and the canonical parser. It writes only a **new** JSON summary and refuses to overwrite an existing one.
++
++Run from `~/PhIRE` after transferring the companion ZIP:
++
++```bash
++# Read-only preflight; no GUDHI import or write
++/usr/bin/python3 phase6_lxxiv_update/scripts/phase6_s0_corrected_pd_gudhi.py --preflight-only
++
++# Isolated corrected-GUDHI numerical pilot
++mkdir -p logs
++set -o pipefail
++PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
++  python phase6_lxxiv_update/scripts/phase6_s0_corrected_pd_gudhi.py \
++  2>&1 | tee logs/phase6_s0_corrected_pd_gudhi_20261014.log
++echo "Corrected-PD audit exit status: $?"
++```
++
++Expected output location *if the program executes and passes*:
++
++```text
++ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_corrected_pd_audit_20261014/phase6_s0_corrected_pd.json
++```
++
++**Next gate:** Inspect actual historical regression PASS, new sample-0 finite D0/D1 counts, corrected distance values and exit code. Only then expand VTI+PD+MT extraction to all 168 benchmark indices for each of the three new methods, with an explicit source-hash manifest, a validated corrected-PD pipeline, the matched MT distance parameterization, and Phase 5E's canonical locality solver. Keep corrected `W_{2,∞}` distinct from Euclidean-ground `W_{2,2}`; compare candidate and F1 topological values only under matched extraction/metric conventions. No corrected candidate distance, MT result, or spatial-locality win is asserted yet.

@@ -1,0 +1,17 @@
+# Part XCVI — Phase 7: seasonal16 development sources verified; six-checkpoint inference scaling pilot prepared (October 18, 2026)
+
+## XCV actual Spark closeout
+
+- On Spark, XCV 2010 development extraction **passed**: two development regions (`gulf_inland`, `southwest_borderland`) × February/May/August/November × 0h and 84h = 16 native HR500 `[u,v]` fields and exact MR100 factor-five pooled inputs. Four preserved LXXXVII previews were reused; 12 additional WTK fields were downloaded read-only via HSDS. Every archived screening speed mean/p99 agreed within 2e-8 m/s.
+- The independent `--mode verify` passed, with all 16 NPZ, one JSON manifest and one markdown report (18/18 SHA256). No model scores or locked-region predictions were generated. The subsequent repeated `extract` refused overwrite as designed (not a source-extraction failure). Terminal paste markers were cosmetic.
+- XCV is a **two-hours-per-region-week engineering sample**, not the frozen XCI full 168h/week primary evaluation or 2012 replication.
+
+## XCVI six-model inference workpack (prepared; real Spark inference pending)
+
+- Reuse the **unchanged** six archived checkpoints from XC: pretrained CNN/GAN and fine-tuned gradient-only, CV-only, PERS-only and F1. Original PhIRE paired-inference routine `PhIREGANs.test_paired(r=[5], batch_size=1)` and normalization `mu_sig=[[0.7684,-0.4575],[5.02455,5.9017]]` are unchanged. New standalone launcher and isolated output directory; never overwrite historical XC or frozen protocol.
+- Independent inputs are exactly the 16 XCV verified development NPZs in declared region-week-hour order. Reverify complete source-integrity hashes, XCI frozen protocol, original XC verification, six checkpoint sharded files and both original XC/XCV source-script hashes before any inference.
+- Build a 16-paired-record float64 native PhIRE TFRecord. For every checkpoint, require output shape (16,500,500,2), exact ordering, finite arrays, and MR/GT de-normalization differences <=2e-5 m/s.
+- **Four-field regression:** compare XCV indices 0,4,8,12 against archived XC indices 0,1,2,3, respectively, requiring bitwise source HR/MR identity and model-prediction maximum absolute differences <=1e-3 m/s. This is an engineering tolerance for possible inference-kernel rounding, **not** a new model-selection threshold. Stop to investigate if it fails.
+- Save 16 MR, 16 HR, 96 predictions and fieldwise full-500 UV-RMSE and speed-MAE with descriptive region-week grouping, plus manifest, report and 11 SHA256 entries. Publish atomically only after all six arms pass. The independent verifier recomputes every numeric metric and the old-four prediction regression. No GUDHI, TTK, merge-tree or locality scores are generated in XCVI.
+- The workpack passed local syntax, ZIP/notes-patch integrity, and a **synthetic 16-field six-model** end-to-end write/verify exercise (11 checksum entries, deliberate corruption detection, no-overwrite refusal). This does not demonstrate live checkpoint inference or geographic generalization; the real Spark run remains required.
+- No locked external-test model data, no change in model/radius/crop/season definitions, no new training or hyperparameter choice. Further development-only TTK/GUDHI/locality pilot is the next gate, before building the complete region-week benchmark. Historical original-PhIRE pretraining geography remains unknown.

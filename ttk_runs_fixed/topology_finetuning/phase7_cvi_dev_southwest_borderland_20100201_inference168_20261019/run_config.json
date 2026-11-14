@@ -1,0 +1,86 @@
+{
+  "gt_shape": [
+    168,
+    500,
+    500,
+    2
+  ],
+  "hours": 168,
+  "model_names": [
+    "cnn",
+    "gan",
+    "grad",
+    "cv",
+    "pers",
+    "f1"
+  ],
+  "mr_shape": [
+    168,
+    100,
+    100,
+    2
+  ],
+  "old_prediction_tolerance_mps": 0.001,
+  "r": [
+    5
+  ],
+  "region": "southwest_borderland",
+  "schema_version": 1,
+  "scope": "phase7_cvi_dev2010_seven_week_inference168_v1",
+  "source_sha256": {
+    "checkpoint_sha256": {
+      "cnn": {
+        "data_sha256": "cd0909314dee5c9fdf474de061424eb6fff5b7e1e228522c213475489b5ca98e",
+        "index_sha256": "e5ee08bd24450fb95987867bae76c00e53077de6dbd7f76de579e5316bd20ce2",
+        "prefix": "models/wind_mr-hr/trained_cnn/cnn"
+      },
+      "cv": {
+        "data_sha256": "d45cc6cc75c3a53170eccd0459b2017e1b42b5d7cbfea4681fff1a282624d561",
+        "index_sha256": "2747e8e49767771ce32b3e6f5283b65eb337052e1f72ca9f40a838047b465f58",
+        "prefix": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn/cnn"
+      },
+      "f1": {
+        "data_sha256": "dc4a58d28535c63e21147b0033859d757f29d403d7dd7d059348a2b893d065f0",
+        "index_sha256": "5c0e9bc6f0243df50edc0cab4e953f1e1b5438001ba00e5a8180a9708d825d91",
+        "prefix": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn"
+      },
+      "gan": {
+        "data_sha256": "b6c1e97bbc6030bb3a519216bf6d5886ffbca5e86675737dd99c84bb755f8492",
+        "index_sha256": "f452dddb83f5dfe4eb5d0f11181cb0c4c2628f0b061d03aaecab0519a6748679",
+        "prefix": "models/wind_mr-hr/trained_gan/gan"
+      },
+      "grad": {
+        "data_sha256": "454d09cf32e409e1f8f6037046327f54f7930ffb7db2b7fac831d7acefd3118a",
+        "index_sha256": "7dbbbb6bcfe7f75d4551f42c70994e05f1d3acdbc2912cc1d99e06c4b12c3b40",
+        "prefix": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn"
+      },
+      "pers": {
+        "data_sha256": "2630af4c32c95e71d13457b98fca4e1afb3d9c1dd50f30215b0e2f75e7a48829",
+        "index_sha256": "83664c3f784b1caa5d2f74575ff294f088d0e3eb2b181a498be1a1e29c1f38a5",
+        "prefix": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn/cnn"
+      }
+    },
+    "ci_script_sha256": "5a5174da40ce975440b6f66b86aeaf96da72942bdc17765d63d8c28419304dba",
+    "cv_manifest_sha256": "a24778da297c4cd5dce386b843f344cde2584a4f4b439f02e4e89f2caac1f016",
+    "cv_run_config_sha256": "b1f9a0ffff9b3e12b6c444648a2ad330d9b731eb369cef3606cb9b84ec597d7a",
+    "cv_script_sha256": "be862eff7da4f6ada2f2de20c91171ed6cf6b640d184a768f415bd25248fcdb0",
+    "cv_sha256s_sha256": "c53e422124ee8b41a1acb5480693ce17037383c435bf85b41af32e9a14ca0561",
+    "cvi_script_sha256": "3cf69b42c57a9ce16b6d37ca97285b8b54ce3696cc93d0ea6141a124a491b647",
+    "original_ci_manifest_sha256": "af8c23c9cd6000cee15eb5244e1daad6f2457fa92d3a0a63041e09aba26b57f4",
+    "region_week": {
+      "region": "southwest_borderland",
+      "week_start_utc": "2010-02-01T00:00:00",
+      "wtk_first": 27048
+    },
+    "xci_protocol_sha256": "3a73e834066576b0f8a968eab77283302a1d1473d946db30ab6ab4db01ac7a60",
+    "xcvi_manifest_sha256": "b6834485338f4109c1a900c841874f7240ab30474d204fe0c28f7ee1f38f032a",
+    "xcvi_sha256s_sha256": "e4334d1683ab423095890e7e81c5b8dfe3ae5f7d04db880f01f3d8e2c0da5da0"
+  },
+  "week_start_utc": "2010-02-01T00:00:00",
+  "wtk_first": 27048,
+  "wtk_last": 27215,
+  "xcvi_hour_regression_mapping": {
+    "0": 8,
+    "84": 9
+  }
+}

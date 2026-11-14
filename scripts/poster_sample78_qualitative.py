@@ -71,7 +71,7 @@ MIN_PERSISTENCE = 3.0        # m/s (display threshold, as in the audited figure)
 PSNR_DB = {}
 
 # Labels (match the Method pipeline wording)
-NAMES = ["Ground truth", "Pretrained CNN", "Reconstruction-only", "Topology-inspired"]
+NAMES = ["Ground truth", "Pretrained CNN", "Standard fine-tuning", "Topology-inspired"]
 COLORS = [INK, METHOD_COLORS["pretrained"], "#D08A2E", METHOD_COLORS["topology"]]
 LINESTYLES = ["-", (0, (5, 3)), (0, (1.5, 2)), "-"]
 

@@ -1,0 +1,1951 @@
+{
+  "analysis_kind": "evidence inventory, NOT training provenance certification",
+  "benchmark_alignment": {
+    "dataGT.npy": {
+      "equal": true,
+      "f1_sha256": "f2d3942ffec7f55d0f6955a2dc75d3a580a25f9e82f5fba5a9c47fb73e7ee2af",
+      "grad_sha256": "f2d3942ffec7f55d0f6955a2dc75d3a580a25f9e82f5fba5a9c47fb73e7ee2af"
+    },
+    "idx.npy": {
+      "equal": true,
+      "f1_sha256": "1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867",
+      "grad_sha256": "1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867"
+    }
+  },
+  "deep_hash": false,
+  "final_epoch3_index_match": true,
+  "logs": {
+    "cv_console": {
+      "bytes": 406148,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 4,
+        "input paths / constraints / checkpoint restore": 54,
+        "launch / branch / environment": 13,
+        "loss coefficients": 2056,
+        "training hyperparameters": 11
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 231,
+            "text": "Confirmed: 2688-sample training set matches candidateC_expanded2688 / candidateB_expanded2688 / the completed E2-low-2688 scripts."
+          },
+          {
+            "line": 252,
+            "text": "--- Constraints NPZ metadata validation: PASSED ---"
+          },
+          {
+            "line": 11418,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11421,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 15,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 93,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 158,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 172,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 175,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 188,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_cv_only' (method='candidateF_grad_CV_only_expanded2688')"
+          },
+          {
+            "line": 190,
+            "text": "Training data     : example_data_topology_expanded_2688/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 191,
+            "text": "Evaluation data   : example_data_fixed/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 192,
+            "text": "Source checkpoint : models/wind_mr-hr/trained_cnn/cnn"
+          },
+          {
+            "line": 193,
+            "text": "Output model dir  : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688"
+          },
+          {
+            "line": 194,
+            "text": "Inference output  : data_out/wind_finetune_candidateF_grad_CV_only_expanded2688"
+          },
+          {
+            "line": 195,
+            "text": "Cheap-eval dir    : ttk_runs_fixed/topology_finetuning/candidateF_grad_CV_only_expanded2688_eval"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 11,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 97, in <module>"
+          },
+          {
+            "line": 13,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 93, in main"
+          },
+          {
+            "line": 15,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 89,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 97, in <module>"
+          },
+          {
+            "line": 91,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 93, in main"
+          },
+          {
+            "line": 93,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 158,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 169,
+            "text": "Please report this to the TensorFlow team. When filing the bug, set the verbosity to 10 (on Linux, `export AUTOGRAPH_VERBOSITY=10`) and attach the full output."
+          },
+          {
+            "line": 172,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 175,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 11434,
+            "text": "--candidate-name candidateF_grad_CV_only_expanded2688 \\"
+          },
+          {
+            "line": 11435,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_CV_only_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 188,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_cv_only' (method='candidateF_grad_CV_only_expanded2688')"
+          },
+          {
+            "line": 193,
+            "text": "Output model dir  : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688"
+          },
+          {
+            "line": 194,
+            "text": "Inference output  : data_out/wind_finetune_candidateF_grad_CV_only_expanded2688"
+          },
+          {
+            "line": 195,
+            "text": "Cheap-eval dir    : ttk_runs_fixed/topology_finetuning/candidateF_grad_CV_only_expanded2688_eval"
+          },
+          {
+            "line": 196,
+            "text": "Topology VTI dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_CV_only_expanded2688_topology_vti"
+          },
+          {
+            "line": 197,
+            "text": "Topology out dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_CV_only_expanded2688_topology"
+          },
+          {
+            "line": 198,
+            "text": "Log file          : /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_CV_only_expanded2688.log"
+          },
+          {
+            "line": 201,
+            "text": "lambda_uv       = 1.0  (always on; normalized [u, v])"
+          },
+          {
+            "line": 202,
+            "text": "lambda_speed    = 0.0"
+          },
+          {
+            "line": 203,
+            "text": "lambda_grad     = 0.05"
+          },
+          {
+            "line": 205,
+            "text": "lambda_levelset = 0.0"
+          },
+          {
+            "line": 206,
+            "text": "lambda_crit     = 0.0  (DISABLED)"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 18,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 96,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 213,
+            "text": "learning_rate   = 1e-05"
+          },
+          {
+            "line": 214,
+            "text": "N_epochs        = 3"
+          },
+          {
+            "line": 217,
+            "text": "batch_size      = 4"
+          },
+          {
+            "line": 279,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3979,
+            "text": "Epoch total loss (with TTK) = 0.06436"
+          },
+          {
+            "line": 3981,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7681,
+            "text": "Epoch total loss (with TTK) = 0.05508"
+          },
+          {
+            "line": 7683,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11383,
+            "text": "Epoch total loss (with TTK) = 0.05134"
+          }
+        ]
+      },
+      "path": "logs/phase6_grad_cv_only_console.log",
+      "sha256": "09e0d79792549aab98c0a5ac3b471ecd300579eab5555cbe19519ece528a0e25"
+    },
+    "cv_train": {
+      "bytes": 386694,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 2,
+        "input paths / constraints / checkpoint restore": 28,
+        "launch / branch / environment": 3,
+        "loss coefficients": 2040,
+        "training hyperparameters": 6
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 11155,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11158,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_CV_only_expanded2688.log"
+          },
+          {
+            "line": 4,
+            "text": "Loading pretrained checkpoint \u2026 Done."
+          },
+          {
+            "line": 21,
+            "text": "Phase 1: Training on 2688 expanded samples \u2026"
+          },
+          {
+            "line": 2098,
+            "text": "L_crit:                2.662688"
+          },
+          {
+            "line": 3719,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00001/cnn"
+          },
+          {
+            "line": 7419,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00002/cnn"
+          },
+          {
+            "line": 7966,
+            "text": "L_grad:                0.352688"
+          },
+          {
+            "line": 7978,
+            "text": "L_wpd:                 158.026886"
+          },
+          {
+            "line": 9332,
+            "text": "L_levelset:            0.026882"
+          },
+          {
+            "line": 11119,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00003/cnn"
+          },
+          {
+            "line": 11122,
+            "text": "Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11126,
+            "text": "Fine-tuning complete. Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn/cnn"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 11171,
+            "text": "--candidate-name candidateF_grad_CV_only_expanded2688 \\"
+          },
+          {
+            "line": 11172,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_CV_only_expanded2688 \\"
+          },
+          {
+            "line": 11183,
+            "text": "--method     candidateF_grad_CV_only_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_CV_only_expanded2688.log"
+          },
+          {
+            "line": 15,
+            "text": "L_ttkcv                      12.328762"
+          },
+          {
+            "line": 16,
+            "text": "L_ttkpers                    12.232632"
+          },
+          {
+            "line": 31,
+            "text": "L_ttkcv:               10.320076"
+          },
+          {
+            "line": 32,
+            "text": "L_ttkpers:             12.619616"
+          },
+          {
+            "line": 42,
+            "text": "L_ttkcv:               17.011951"
+          },
+          {
+            "line": 43,
+            "text": "L_ttkpers:             19.364162"
+          },
+          {
+            "line": 53,
+            "text": "L_ttkcv:               15.494966"
+          },
+          {
+            "line": 54,
+            "text": "L_ttkpers:             15.877012"
+          },
+          {
+            "line": 64,
+            "text": "L_ttkcv:               12.184373"
+          },
+          {
+            "line": 65,
+            "text": "L_ttkpers:             12.190518"
+          },
+          {
+            "line": 75,
+            "text": "L_ttkcv:               10.615253"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 22,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3720,
+            "text": "Epoch total loss (with TTK) = 0.06436"
+          },
+          {
+            "line": 3722,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7420,
+            "text": "Epoch total loss (with TTK) = 0.05508"
+          },
+          {
+            "line": 7422,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11120,
+            "text": "Epoch total loss (with TTK) = 0.05134"
+          }
+        ]
+      },
+      "path": "logs/wind_finetune_candidateF_grad_CV_only_expanded2688.log",
+      "sha256": "fab49f544bc7ace7473dc51d6a0b4d7eeb4b811999bdbba492ef0e4ddeb2840e"
+    },
+    "f1_batch": {
+      "bytes": 408755,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 4,
+        "input paths / constraints / checkpoint restore": 67,
+        "launch / branch / environment": 11,
+        "loss coefficients": 2075,
+        "training hyperparameters": 11
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 235,
+            "text": "Confirmed: 2688-sample training set matches candidateC_expanded2688 / candidateB_expanded2688 / the completed E2-low-2688 scripts."
+          },
+          {
+            "line": 256,
+            "text": "--- Constraints NPZ metadata validation: PASSED ---"
+          },
+          {
+            "line": 11422,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11425,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 2,
+            "text": "Candidate F expanded-2688 batch"
+          },
+          {
+            "line": 23,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 1453, in <module>"
+          },
+          {
+            "line": 25,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 99,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 1453, in <module>"
+          },
+          {
+            "line": 101,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 166,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 176,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 179,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 192,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_e2_low' (method='candidateF_grad_E2_low_expanded2688')"
+          },
+          {
+            "line": 194,
+            "text": "Training data     : example_data_topology_expanded_2688/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 195,
+            "text": "Evaluation data   : example_data_fixed/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 196,
+            "text": "Source checkpoint : models/wind_mr-hr/trained_cnn/cnn"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 23,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 1453, in <module>"
+          },
+          {
+            "line": 25,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 99,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 1453, in <module>"
+          },
+          {
+            "line": 101,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 166,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 176,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 179,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 11438,
+            "text": "--candidate-name candidateF_grad_E2_low_expanded2688 \\"
+          },
+          {
+            "line": 11439,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_E2_low_expanded2688 \\"
+          },
+          {
+            "line": 11450,
+            "text": "--method     candidateF_grad_E2_low_expanded2688 \\"
+          },
+          {
+            "line": 11502,
+            "text": "--method     candidateF_grad_E2_low_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 5,
+            "text": "Variants to run    : grad_e2_low"
+          },
+          {
+            "line": 11,
+            "text": "# Variant: grad_e2_low"
+          },
+          {
+            "line": 192,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_e2_low' (method='candidateF_grad_E2_low_expanded2688')"
+          },
+          {
+            "line": 197,
+            "text": "Output model dir  : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688"
+          },
+          {
+            "line": 198,
+            "text": "Inference output  : data_out/wind_finetune_candidateF_grad_E2_low_expanded2688"
+          },
+          {
+            "line": 199,
+            "text": "Cheap-eval dir    : ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_eval"
+          },
+          {
+            "line": 200,
+            "text": "Topology VTI dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology_vti"
+          },
+          {
+            "line": 201,
+            "text": "Topology out dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_E2_low_expanded2688_topology"
+          },
+          {
+            "line": 202,
+            "text": "Log file          : /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log"
+          },
+          {
+            "line": 205,
+            "text": "lambda_uv       = 1.0  (always on; normalized [u, v])"
+          },
+          {
+            "line": 206,
+            "text": "lambda_speed    = 0.0"
+          },
+          {
+            "line": 207,
+            "text": "lambda_grad     = 0.05"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 28,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 104,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 217,
+            "text": "learning_rate   = 1e-05"
+          },
+          {
+            "line": 218,
+            "text": "N_epochs        = 3"
+          },
+          {
+            "line": 221,
+            "text": "batch_size      = 4"
+          },
+          {
+            "line": 283,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3983,
+            "text": "Epoch total loss (with TTK) = 0.08181"
+          },
+          {
+            "line": 3985,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7685,
+            "text": "Epoch total loss (with TTK) = 0.07055"
+          },
+          {
+            "line": 7687,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11387,
+            "text": "Epoch total loss (with TTK) = 0.06582"
+          }
+        ]
+      },
+      "path": "logs/candidateF_grad_E2_low_expanded2688_batch.log",
+      "sha256": "997296d9874a567f897fa4d10126c22feac11fce47f96f2dce8c3c2fb3d24275"
+    },
+    "f1_train": {
+      "bytes": 386713,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 2,
+        "input paths / constraints / checkpoint restore": 24,
+        "launch / branch / environment": 3,
+        "loss coefficients": 2040,
+        "training hyperparameters": 6
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 11155,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11158,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log"
+          },
+          {
+            "line": 4,
+            "text": "Loading pretrained checkpoint \u2026 Done."
+          },
+          {
+            "line": 21,
+            "text": "Phase 1: Training on 2688 expanded samples \u2026"
+          },
+          {
+            "line": 3719,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00001/cnn"
+          },
+          {
+            "line": 7419,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00002/cnn"
+          },
+          {
+            "line": 11119,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00003/cnn"
+          },
+          {
+            "line": 11122,
+            "text": "Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11126,
+            "text": "Fine-tuning complete. Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11131,
+            "text": "Checkpoint : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11132,
+            "text": "Eval data  : example_data_fixed/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 11133,
+            "text": "Output dir : data_out/wind_finetune_candidateF_grad_E2_low_expanded2688"
+          },
+          {
+            "line": 11160,
+            "text": "Final checkpoint : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 11171,
+            "text": "--candidate-name candidateF_grad_E2_low_expanded2688 \\"
+          },
+          {
+            "line": 11172,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_E2_low_expanded2688 \\"
+          },
+          {
+            "line": 11183,
+            "text": "--method     candidateF_grad_E2_low_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log"
+          },
+          {
+            "line": 15,
+            "text": "L_ttkcv                      16.579762"
+          },
+          {
+            "line": 16,
+            "text": "L_ttkpers                    17.197647"
+          },
+          {
+            "line": 31,
+            "text": "L_ttkcv:               11.230244"
+          },
+          {
+            "line": 32,
+            "text": "L_ttkpers:             10.550603"
+          },
+          {
+            "line": 42,
+            "text": "L_ttkcv:               10.974796"
+          },
+          {
+            "line": 43,
+            "text": "L_ttkpers:             12.556776"
+          },
+          {
+            "line": 53,
+            "text": "L_ttkcv:               9.432949"
+          },
+          {
+            "line": 54,
+            "text": "L_ttkpers:             10.251405"
+          },
+          {
+            "line": 64,
+            "text": "L_ttkcv:               9.387091"
+          },
+          {
+            "line": 65,
+            "text": "L_ttkpers:             8.929781"
+          },
+          {
+            "line": 75,
+            "text": "L_ttkcv:               12.040817"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 22,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3720,
+            "text": "Epoch total loss (with TTK) = 0.08181"
+          },
+          {
+            "line": 3722,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7420,
+            "text": "Epoch total loss (with TTK) = 0.07055"
+          },
+          {
+            "line": 7422,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11120,
+            "text": "Epoch total loss (with TTK) = 0.06582"
+          }
+        ]
+      },
+      "path": "logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log",
+      "sha256": "16efae6434db6fee1bd8d84b651e0b4f43dfbfc22ee9e41d93ba0d03db18d272"
+    },
+    "grad_console": {
+      "bytes": 406338,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 4,
+        "input paths / constraints / checkpoint restore": 51,
+        "launch / branch / environment": 13,
+        "loss coefficients": 2055,
+        "training hyperparameters": 11
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 231,
+            "text": "Confirmed: 2688-sample training set matches candidateC_expanded2688 / candidateB_expanded2688 / the completed E2-low-2688 scripts."
+          },
+          {
+            "line": 252,
+            "text": "--- Constraints NPZ metadata validation: PASSED ---"
+          },
+          {
+            "line": 11418,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11421,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 15,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 93,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 158,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 172,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 175,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 188,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_pair_zero' (method='candidateF_grad_pairzero_expanded2688')"
+          },
+          {
+            "line": 190,
+            "text": "Training data     : example_data_topology_expanded_2688/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 191,
+            "text": "Evaluation data   : example_data_fixed/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 192,
+            "text": "Source checkpoint : models/wind_mr-hr/trained_cnn/cnn"
+          },
+          {
+            "line": 193,
+            "text": "Output model dir  : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688"
+          },
+          {
+            "line": 194,
+            "text": "Inference output  : data_out/wind_finetune_candidateF_grad_pairzero_expanded2688"
+          },
+          {
+            "line": 195,
+            "text": "Cheap-eval dir    : ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_eval"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 11,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 97, in <module>"
+          },
+          {
+            "line": 13,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 93, in main"
+          },
+          {
+            "line": 15,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 89,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 97, in <module>"
+          },
+          {
+            "line": 91,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 93, in main"
+          },
+          {
+            "line": 93,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 158,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 169,
+            "text": "Please report this to the TensorFlow team. When filing the bug, set the verbosity to 10 (on Linux, `export AUTOGRAPH_VERBOSITY=10`) and attach the full output."
+          },
+          {
+            "line": 172,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 175,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 11434,
+            "text": "--candidate-name candidateF_grad_pairzero_expanded2688 \\"
+          },
+          {
+            "line": 11435,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_pairzero_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 188,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_pair_zero' (method='candidateF_grad_pairzero_expanded2688')"
+          },
+          {
+            "line": 193,
+            "text": "Output model dir  : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688"
+          },
+          {
+            "line": 194,
+            "text": "Inference output  : data_out/wind_finetune_candidateF_grad_pairzero_expanded2688"
+          },
+          {
+            "line": 195,
+            "text": "Cheap-eval dir    : ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_eval"
+          },
+          {
+            "line": 196,
+            "text": "Topology VTI dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_topology_vti"
+          },
+          {
+            "line": 197,
+            "text": "Topology out dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_topology"
+          },
+          {
+            "line": 198,
+            "text": "Log file          : /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log"
+          },
+          {
+            "line": 201,
+            "text": "lambda_uv       = 1.0  (always on; normalized [u, v])"
+          },
+          {
+            "line": 202,
+            "text": "lambda_speed    = 0.0"
+          },
+          {
+            "line": 203,
+            "text": "lambda_grad     = 0.05"
+          },
+          {
+            "line": 205,
+            "text": "lambda_levelset = 0.0"
+          },
+          {
+            "line": 206,
+            "text": "lambda_crit     = 0.0  (DISABLED)"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 18,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 96,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 213,
+            "text": "learning_rate   = 1e-05"
+          },
+          {
+            "line": 214,
+            "text": "N_epochs        = 3"
+          },
+          {
+            "line": 217,
+            "text": "batch_size      = 4"
+          },
+          {
+            "line": 279,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3979,
+            "text": "Epoch total loss (with TTK) = 0.03337"
+          },
+          {
+            "line": 3981,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7681,
+            "text": "Epoch total loss (with TTK) = 0.02937"
+          },
+          {
+            "line": 7683,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11383,
+            "text": "Epoch total loss (with TTK) = 0.02825"
+          }
+        ]
+      },
+      "path": "logs/phase6_grad_pairzero_console.log",
+      "sha256": "cc486f6fa6e897fe0d2c223ee37b841d933076402388bd366b9fcd70a6905dbc"
+    },
+    "grad_train": {
+      "bytes": 386876,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 2,
+        "input paths / constraints / checkpoint restore": 25,
+        "launch / branch / environment": 3,
+        "loss coefficients": 2039,
+        "training hyperparameters": 6
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 11155,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11158,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log"
+          },
+          {
+            "line": 4,
+            "text": "Loading pretrained checkpoint \u2026 Done."
+          },
+          {
+            "line": 21,
+            "text": "Phase 1: Training on 2688 expanded samples \u2026"
+          },
+          {
+            "line": 2769,
+            "text": "L_crit:                3.268838"
+          },
+          {
+            "line": 3719,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00001/cnn"
+          },
+          {
+            "line": 7419,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00002/cnn"
+          },
+          {
+            "line": 11119,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00003/cnn"
+          },
+          {
+            "line": 11122,
+            "text": "Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11126,
+            "text": "Fine-tuning complete. Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11131,
+            "text": "Checkpoint : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11132,
+            "text": "Eval data  : example_data_fixed/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 11133,
+            "text": "Output dir : data_out/wind_finetune_candidateF_grad_pairzero_expanded2688"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 11171,
+            "text": "--candidate-name candidateF_grad_pairzero_expanded2688 \\"
+          },
+          {
+            "line": 11172,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_pairzero_expanded2688 \\"
+          },
+          {
+            "line": 11183,
+            "text": "--method     candidateF_grad_pairzero_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log"
+          },
+          {
+            "line": 15,
+            "text": "L_ttkcv                      18.656094"
+          },
+          {
+            "line": 16,
+            "text": "L_ttkpers                    18.093243"
+          },
+          {
+            "line": 31,
+            "text": "L_ttkcv:               11.574254"
+          },
+          {
+            "line": 32,
+            "text": "L_ttkpers:             12.626558"
+          },
+          {
+            "line": 42,
+            "text": "L_ttkcv:               11.169500"
+          },
+          {
+            "line": 43,
+            "text": "L_ttkpers:             13.127578"
+          },
+          {
+            "line": 53,
+            "text": "L_ttkcv:               14.601936"
+          },
+          {
+            "line": 54,
+            "text": "L_ttkpers:             15.260389"
+          },
+          {
+            "line": 64,
+            "text": "L_ttkcv:               15.547695"
+          },
+          {
+            "line": 65,
+            "text": "L_ttkpers:             16.009600"
+          },
+          {
+            "line": 75,
+            "text": "L_ttkcv:               13.997806"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 22,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3720,
+            "text": "Epoch total loss (with TTK) = 0.03337"
+          },
+          {
+            "line": 3722,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7420,
+            "text": "Epoch total loss (with TTK) = 0.02937"
+          },
+          {
+            "line": 7422,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11120,
+            "text": "Epoch total loss (with TTK) = 0.02825"
+          }
+        ]
+      },
+      "path": "logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log",
+      "sha256": "a8a0873958fb07bd51593e8fc9a3b73827d3bcb7c7855bbcf75e97b848950c87"
+    },
+    "pers_console": {
+      "bytes": 406340,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 4,
+        "input paths / constraints / checkpoint restore": 53,
+        "launch / branch / environment": 13,
+        "loss coefficients": 2056,
+        "training hyperparameters": 11
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 231,
+            "text": "Confirmed: 2688-sample training set matches candidateC_expanded2688 / candidateB_expanded2688 / the completed E2-low-2688 scripts."
+          },
+          {
+            "line": 252,
+            "text": "--- Constraints NPZ metadata validation: PASSED ---"
+          },
+          {
+            "line": 11418,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11421,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 15,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 93,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 158,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 172,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 175,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 188,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_pers_only' (method='candidateF_grad_PERS_only_expanded2688')"
+          },
+          {
+            "line": 190,
+            "text": "Training data     : example_data_topology_expanded_2688/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 191,
+            "text": "Evaluation data   : example_data_fixed/wind_MR-HR.tfrecord"
+          },
+          {
+            "line": 192,
+            "text": "Source checkpoint : models/wind_mr-hr/trained_cnn/cnn"
+          },
+          {
+            "line": 193,
+            "text": "Output model dir  : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688"
+          },
+          {
+            "line": 194,
+            "text": "Inference output  : data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688"
+          },
+          {
+            "line": 195,
+            "text": "Cheap-eval dir    : ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_eval"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 11,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 97, in <module>"
+          },
+          {
+            "line": 13,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 93, in main"
+          },
+          {
+            "line": 15,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 89,
+            "text": "Traceback (most recent call last):  File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 97, in <module>"
+          },
+          {
+            "line": 91,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_cv_pers_ablation.py\", line 93, in main"
+          },
+          {
+            "line": 93,
+            "text": "File \"/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py\", line 510, in main"
+          },
+          {
+            "line": 158,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:591: tf_record_iterator (from tensorflow.python.lib.io.tf_record) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 169,
+            "text": "Please report this to the TensorFlow team. When filing the bug, set the verbosity to 10 (on Linux, `export AUTOGRAPH_VERBOSITY=10`) and attach the full output."
+          },
+          {
+            "line": 172,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_types (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 175,
+            "text": "WARNING:tensorflow:From /home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py:1138: DatasetV1.output_shapes (from tensorflow.python.data.ops.dataset_ops) is deprecated and will be removed in a future version."
+          },
+          {
+            "line": 11434,
+            "text": "--candidate-name candidateF_grad_PERS_only_expanded2688 \\"
+          },
+          {
+            "line": 11435,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 188,
+            "text": "Candidate F expanded-2688 fine-tuning: variant='grad_pers_only' (method='candidateF_grad_PERS_only_expanded2688')"
+          },
+          {
+            "line": 193,
+            "text": "Output model dir  : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688"
+          },
+          {
+            "line": 194,
+            "text": "Inference output  : data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688"
+          },
+          {
+            "line": 195,
+            "text": "Cheap-eval dir    : ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_eval"
+          },
+          {
+            "line": 196,
+            "text": "Topology VTI dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_topology_vti"
+          },
+          {
+            "line": 197,
+            "text": "Topology out dir  : ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_topology"
+          },
+          {
+            "line": 198,
+            "text": "Log file          : /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_PERS_only_expanded2688.log"
+          },
+          {
+            "line": 201,
+            "text": "lambda_uv       = 1.0  (always on; normalized [u, v])"
+          },
+          {
+            "line": 202,
+            "text": "lambda_speed    = 0.0"
+          },
+          {
+            "line": 203,
+            "text": "lambda_grad     = 0.05"
+          },
+          {
+            "line": 205,
+            "text": "lambda_levelset = 0.0"
+          },
+          {
+            "line": 206,
+            "text": "lambda_crit     = 0.0  (DISABLED)"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 18,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 96,
+            "text": "importlib.import_module(\"keras.src.optimizers\")"
+          },
+          {
+            "line": 213,
+            "text": "learning_rate   = 1e-05"
+          },
+          {
+            "line": 214,
+            "text": "N_epochs        = 3"
+          },
+          {
+            "line": 217,
+            "text": "batch_size      = 4"
+          },
+          {
+            "line": 279,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3979,
+            "text": "Epoch total loss (with TTK) = 0.05393"
+          },
+          {
+            "line": 3981,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7681,
+            "text": "Epoch total loss (with TTK) = 0.04800"
+          },
+          {
+            "line": 7683,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11383,
+            "text": "Epoch total loss (with TTK) = 0.04568"
+          }
+        ]
+      },
+      "path": "logs/phase6_grad_pers_only_console.log",
+      "sha256": "53f9a93f58f8d4fbad95dd319ca79d225f278c503812307595469de39688646b"
+    },
+    "pers_train": {
+      "bytes": 386868,
+      "exists": true,
+      "match_counts": {
+        "completion / validation": 2,
+        "input paths / constraints / checkpoint restore": 27,
+        "launch / branch / environment": 3,
+        "loss coefficients": 2040,
+        "training hyperparameters": 6
+      },
+      "matched_lines": {
+        "completion / validation": [
+          {
+            "line": 11155,
+            "text": "[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed."
+          },
+          {
+            "line": 11158,
+            "text": "Run complete."
+          }
+        ],
+        "input paths / constraints / checkpoint restore": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_PERS_only_expanded2688.log"
+          },
+          {
+            "line": 4,
+            "text": "Loading pretrained checkpoint \u2026 Done."
+          },
+          {
+            "line": 21,
+            "text": "Phase 1: Training on 2688 expanded samples \u2026"
+          },
+          {
+            "line": 2592,
+            "text": "L_levelset:            0.026888"
+          },
+          {
+            "line": 3719,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00001/cnn"
+          },
+          {
+            "line": 5535,
+            "text": "L_ttkcv:               11.026887"
+          },
+          {
+            "line": 7419,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00002/cnn"
+          },
+          {
+            "line": 8373,
+            "text": "L_grad:                0.268896"
+          },
+          {
+            "line": 11119,
+            "text": "Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00003/cnn"
+          },
+          {
+            "line": 11122,
+            "text": "Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11126,
+            "text": "Fine-tuning complete. Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn/cnn"
+          },
+          {
+            "line": 11131,
+            "text": "Checkpoint : models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn/cnn"
+          }
+        ],
+        "launch / branch / environment": [
+          {
+            "line": 11171,
+            "text": "--candidate-name candidateF_grad_PERS_only_expanded2688 \\"
+          },
+          {
+            "line": 11172,
+            "text": "--candidate-dir  data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688 \\"
+          },
+          {
+            "line": 11183,
+            "text": "--method     candidateF_grad_PERS_only_expanded2688 \\"
+          }
+        ],
+        "loss coefficients": [
+          {
+            "line": 1,
+            "text": "[log] Canonical training log opened: /home/adadhwal/PhIRE/logs/wind_finetune_candidateF_grad_PERS_only_expanded2688.log"
+          },
+          {
+            "line": 15,
+            "text": "L_ttkcv                      13.815626"
+          },
+          {
+            "line": 16,
+            "text": "L_ttkpers                    16.663092"
+          },
+          {
+            "line": 31,
+            "text": "L_ttkcv:               10.343120"
+          },
+          {
+            "line": 32,
+            "text": "L_ttkpers:             10.855334"
+          },
+          {
+            "line": 42,
+            "text": "L_ttkcv:               12.884408"
+          },
+          {
+            "line": 43,
+            "text": "L_ttkpers:             13.117381"
+          },
+          {
+            "line": 53,
+            "text": "L_ttkcv:               21.251972"
+          },
+          {
+            "line": 54,
+            "text": "L_ttkpers:             21.345247"
+          },
+          {
+            "line": 64,
+            "text": "L_ttkcv:               6.866954"
+          },
+          {
+            "line": 65,
+            "text": "L_ttkpers:             7.262928"
+          },
+          {
+            "line": 75,
+            "text": "L_ttkcv:               11.466641"
+          }
+        ],
+        "training hyperparameters": [
+          {
+            "line": 22,
+            "text": "Epoch: 1"
+          },
+          {
+            "line": 3720,
+            "text": "Epoch total loss (with TTK) = 0.05393"
+          },
+          {
+            "line": 3722,
+            "text": "Epoch: 2"
+          },
+          {
+            "line": 7420,
+            "text": "Epoch total loss (with TTK) = 0.04800"
+          },
+          {
+            "line": 7422,
+            "text": "Epoch: 3"
+          },
+          {
+            "line": 11120,
+            "text": "Epoch total loss (with TTK) = 0.04568"
+          }
+        ]
+      },
+      "path": "logs/wind_finetune_candidateF_grad_PERS_only_expanded2688.log",
+      "sha256": "b795142e0628f9b301ad47037a2fcad693a7e1f630d680ab99b7280519fad002"
+    }
+  },
+  "models": {
+    "cv": {
+      "arrays": {
+        "dataGT": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_CV_only_expanded2688/dataGT.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "dataSR": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_CV_only_expanded2688/dataSR.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "idx": {
+          "bytes": 1472,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_CV_only_expanded2688/idx.npy",
+          "sha256": "1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867"
+        }
+      },
+      "cnn": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn/cnn.data-00000-of-00001",
+            "sha256": "d45cc6cc75c3a53170eccd0459b2017e1b42b5d7cbfea4681fff1a282624d561"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn/cnn.index",
+        "sha256": "2747e8e49767771ce32b3e6f5283b65eb337052e1f72ca9f40a838047b465f58"
+      },
+      "cnn00001": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00001/cnn.data-00000-of-00001",
+            "sha256": "98fee207d8ea8bebd6ec581112e150164b9c32d4d5d727671171b6d8921885cb"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00001/cnn.index",
+        "sha256": "520a9f8ad37f12f73b00bcd841e967efceea567c8c6844650f19703d06e7a1c1"
+      },
+      "cnn00002": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00002/cnn.data-00000-of-00001",
+            "sha256": "f12ba8fa158e95535c63bbb203b4bd51d17d1c5c29bfdd9f5d975fd484f34592"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00002/cnn.index",
+        "sha256": "9c3a7c8e54a80a39827a3c4e9c50f397ce6f4c5ad1c1ce0f029d7ab5be67fd05"
+      },
+      "cnn00003": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00003/cnn.data-00000-of-00001",
+            "sha256": "d45cc6cc75c3a53170eccd0459b2017e1b42b5d7cbfea4681fff1a282624d561"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00003/cnn.index",
+        "sha256": "2747e8e49767771ce32b3e6f5283b65eb337052e1f72ca9f40a838047b465f58"
+      }
+    },
+    "f1": {
+      "arrays": {
+        "dataGT": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_E2_low_expanded2688/dataGT.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "dataSR": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_E2_low_expanded2688/dataSR.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "idx": {
+          "bytes": 1472,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_E2_low_expanded2688/idx.npy",
+          "sha256": "1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867"
+        }
+      },
+      "cnn": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn.data-00000-of-00001",
+            "sha256": "dc4a58d28535c63e21147b0033859d757f29d403d7dd7d059348a2b893d065f0"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn/cnn.index",
+        "sha256": "5c0e9bc6f0243df50edc0cab4e953f1e1b5438001ba00e5a8180a9708d825d91"
+      },
+      "cnn00001": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00001/cnn.data-00000-of-00001",
+            "sha256": "4767e116c3cb76ae40a5cc757084747602651e3ce743019f3fa73bdf552a0d9f"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00001/cnn.index",
+        "sha256": "ee7404ebfc83b7042cd1161bc4ec587c3e4871e619082d9dfc115fd25a828c76"
+      },
+      "cnn00002": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00002/cnn.data-00000-of-00001",
+            "sha256": "b4777ba2634a40e5411ba9fc08e9fb9cea9f9cf5ef2aab748b54c38961ddbd37"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00002/cnn.index",
+        "sha256": "59c1fe7075f390eaba47fc5f0367533a2cf8731da3de052844964302cd20cd97"
+      },
+      "cnn00003": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00003/cnn.data-00000-of-00001",
+            "sha256": "dc4a58d28535c63e21147b0033859d757f29d403d7dd7d059348a2b893d065f0"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_E2_low_expanded2688/cnn00003/cnn.index",
+        "sha256": "5c0e9bc6f0243df50edc0cab4e953f1e1b5438001ba00e5a8180a9708d825d91"
+      }
+    },
+    "grad": {
+      "arrays": {
+        "dataGT": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataGT.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "dataSR": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataSR.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "idx": {
+          "bytes": 1472,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/idx.npy",
+          "sha256": "1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867"
+        }
+      },
+      "cnn": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn.data-00000-of-00001",
+            "sha256": "454d09cf32e409e1f8f6037046327f54f7930ffb7db2b7fac831d7acefd3118a"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn.index",
+        "sha256": "7dbbbb6bcfe7f75d4551f42c70994e05f1d3acdbc2912cc1d99e06c4b12c3b40"
+      },
+      "cnn00001": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00001/cnn.data-00000-of-00001",
+            "sha256": "75b06253c8db2d32f7636618139d5bd47b6acfb1f508d0b3cca5f159603c8ae4"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00001/cnn.index",
+        "sha256": "beced36199eb7a9a7be721cc89b62e86a85c9b7389dc75fe0c8d0006011c84eb"
+      },
+      "cnn00002": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00002/cnn.data-00000-of-00001",
+            "sha256": "43f55d599bc7686cf821134cc475f378ba53af6e3bc927f9fa6bb60f592b1786"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00002/cnn.index",
+        "sha256": "fc83c8a329c86c926c4aab871552b4060f09970a7259ef2b093491d80b49d3a4"
+      },
+      "cnn00003": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00003/cnn.data-00000-of-00001",
+            "sha256": "454d09cf32e409e1f8f6037046327f54f7930ffb7db2b7fac831d7acefd3118a"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00003/cnn.index",
+        "sha256": "7dbbbb6bcfe7f75d4551f42c70994e05f1d3acdbc2912cc1d99e06c4b12c3b40"
+      }
+    },
+    "pers": {
+      "arrays": {
+        "dataGT": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688/dataGT.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "dataSR": {
+          "bytes": 672000128,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688/dataSR.npy",
+          "sha256": "SKIPPED (large file; --deep-hash to include)"
+        },
+        "idx": {
+          "bytes": 1472,
+          "exists": true,
+          "path": "data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688/idx.npy",
+          "sha256": "1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867"
+        }
+      },
+      "cnn": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn/cnn.data-00000-of-00001",
+            "sha256": "2630af4c32c95e71d13457b98fca4e1afb3d9c1dd50f30215b0e2f75e7a48829"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn/cnn.index",
+        "sha256": "83664c3f784b1caa5d2f74575ff294f088d0e3eb2b181a498be1a1e29c1f38a5"
+      },
+      "cnn00001": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00001/cnn.data-00000-of-00001",
+            "sha256": "e7ad8cf993859eb4be5984eff2bd863762e941855c8128013f40030c60160618"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00001/cnn.index",
+        "sha256": "bc0986883349b7247f9f4460e9ea0025b81d254328992b0b3d57b7aac3e8bf32"
+      },
+      "cnn00002": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00002/cnn.data-00000-of-00001",
+            "sha256": "9d797ced7b60e617086935bb1ff5f16e1487da635d35e1702b023cbd9cacc992"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00002/cnn.index",
+        "sha256": "b320c5d8e708320df8bcdd1e536c98663c73039f08824dc24758a1e72fcc3431"
+      },
+      "cnn00003": {
+        "bytes": 2830,
+        "checkpoint_data_files": [
+          {
+            "bytes": 8576776,
+            "exists": true,
+            "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00003/cnn.data-00000-of-00001",
+            "sha256": "2630af4c32c95e71d13457b98fca4e1afb3d9c1dd50f30215b0e2f75e7a48829"
+          }
+        ],
+        "exists": true,
+        "path": "models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00003/cnn.index",
+        "sha256": "83664c3f784b1caa5d2f74575ff294f088d0e3eb2b181a498be1a1e29c1f38a5"
+      }
+    }
+  },
+  "root": "/home/adadhwal/PhIRE",
+  "schema": 1,
+  "sources": {
+    "F1 evaluation report": {
+      "bytes": 9102,
+      "exists": true,
+      "path": "docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md",
+      "sha256": "2e71512450eec15f5057d700b656e313a50066441c5bca599ba1c8411a252b07"
+    },
+    "current ablation wrapper": {
+      "bytes": 4390,
+      "exists": true,
+      "path": "scripts/run_candidateF_cv_pers_ablation.py",
+      "sha256": "78666dad7d608f622fd564798205fcd3515ad2c44e1c17dac17947a02e653412"
+    },
+    "current base runner": {
+      "bytes": 71003,
+      "exists": true,
+      "path": "scripts/run_candidateF_expanded2688_finetune.py",
+      "sha256": "7ac9453799044985a0d79a62729036979eb4b7e12e0033fdb5b0ec4d91ba726a"
+    },
+    "evaluation TFRecord": {
+      "bytes": 698907760,
+      "exists": true,
+      "path": "example_data_fixed/wind_MR-HR.tfrecord",
+      "sha256": "SKIPPED (large file; --deep-hash to include)"
+    },
+    "fixed E2 targets": {
+      "bytes": 4883706,
+      "exists": true,
+      "path": "ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz",
+      "sha256": "7909fdfefb2dd2c3574feffacd4e316045904776eeaa70cdb5ec72941a47a43d"
+    },
+    "original CNN init index": {
+      "bytes": 2830,
+      "exists": true,
+      "path": "models/wind_mr-hr/trained_cnn/cnn.index",
+      "sha256": "e5ee08bd24450fb95987867bae76c00e53077de6dbd7f76de579e5316bd20ce2"
+    },
+    "training TFRecord": {
+      "bytes": 11182526080,
+      "exists": true,
+      "path": "example_data_topology_expanded_2688/wind_MR-HR.tfrecord",
+      "sha256": "SKIPPED (large file; --deep-hash to include)"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38700,5 +38700,60 @@
+ Before calculations, `--mode preflight` verifies the LXXXII frozen pilot, the historical Phase 5E 4,032-row reference, the LXXIX 840-row corrected PD CSV, and **all 1,008 original GT/SR persistence-diagram files** against LXXIX's per-file hashes. The 168-sample full computation requires per-sample direct checks against LXXIX GUDHI `W22` at infinity for **840** matches and against the historical CNN/F1 Phase 5E spatial table for **2,688** sample×model×radius comparisons, including original GT/SR feature coverage, locality gap and integer matching counts. The original eight pilot samples are also compared against the LXXXII saved results.
+ 
+ Output, only after actual Spark execution, would be **13,440 dimension rows** (168×5×2×8) and **6,720 aggregate rows** (168×5×8), a complete radius-wise macro and paired comparison, and new factorial contrasts of locality-constrained cost and GT coverage. Resume-safe per-sample JSON checkpoints are isolated under `ttk_runs_fixed/topology_finetuning/phase6_lxxxiii_spatial_all168_20261014/`. Final results use a separate output manifest and SHA-256 checksums; completed results will not be overwritten. Verification must be run before interpreting full-scale results.
+ 
+ **Open boundaries:** The archived F1 training/optimizer/checkpoint lineage has **not** been independently closed merely by artifact or numerical parity; this must be checked before strict causal attribution to the matched 2×2 fine-tuning protocol. No physical km distance without grid calibration; no independent random-seed replications or inferential independence of consecutive hours. New Phase 6 merge-tree distances remain pending. Preserve original TTK and Phase 5E archives, all model checkpoints, and the immutable publication tag `topoinvis-2026-arxiv-v1.1`.
++
++---
++
++# Part LXXXIV — Phase 6: complete all-168 spatial locality verified, closeout and F1 provenance inventory (October 14, 2026)
++
++## LXXXIV.1 Observed LXXXIII execution and verification
++
++The researcher's supplied Spark terminal transcript documents successful execution of `phase6_lxxxiii_update/scripts/phase6_lxxxiii_all168_locality.py`: preflight, complete run and independent `--mode verify` all exited **0**. The repository's unchanged original Phase 5E locality matcher `spatial_pd/phase5e_sparse_locality_solver.py` had SHA256 `47c73decca4ba151fd8b250cae2911b4c2307471fe9c881fc42bfc968e211c3a`. The observed gates were:
++
++- `[HIST-REGRESSION] PASS`: 2,688 CNN/F1 sample×radius Phase 5E comparisons.
++- `[INFINITY-GATE] PASS`: 840 exact-sample LXXIX corrected `W_{2,2}` values.
++- `[PILOT-CONTINUITY] PASS`: 320 LXXXII eight-sample aggregate comparisons, plus dimensional regressions.
++- `[FULL-GATE] PASS`: **13,440 dimension rows**, **6,720 aggregate rows** (168 samples × 5 models × 2 homology degrees × 8 radii).
++- `[VERIFY-GATE] PASS`: source hashes for 1,008 canonical GT/SR PD files, 168 sample checkpoints, CSV cardinality, final hashes and macro-mean recomputation. All seven `SHA256SUMS` output files were independently reported `OK`.
++
++The frozen Phase 5E diagrams, immutable publication tag, historical model checkpoints, and LXXIX corrected PD CSV are **not modified**. All aggregate spatial values are descriptive over 168 consecutive hourly fields. Radius is in grid-cell coordinate units, not geographic kilometers.
++
++Output directory: `ttk_runs_fixed/topology_finetuning/phase6_lxxxiii_spatial_all168_20261014/`; main files `all168_locality_aggregate.csv`, `all168_locality_dimension.csv`, `all168_macro_summary.csv`, `all168_paired_by_radius.csv`, `all168_factorial_by_radius.csv`, `summary.md`, `run_manifest.json` and `SHA256SUMS`.
++
++## LXXXIV.2 Verified full-benchmark spatial means
++
++The following values are directly from the supplied `summary.md`. Smaller constrained `W_{2,2}` is better; higher GT persistence-mass coverage is better, but **coverage is not physical location error**.
++
++| Model | r=4 cost | r=16 cost | r=32 cost | r=∞ corrected W22 | r=16 GT coverage |
++|---|---:|---:|---:|---:|---:|
++| CNN | 46.057465 | 35.218315 | 29.250278 | 24.552151 | 0.591272 |
++| Gradient-only (00) | **45.844483** | **31.008340** | 23.893099 | 18.306367 | **0.867886** |
++| CV-only (10) | 47.750779 | 31.572720 | 23.812289 | 17.875645 | 0.740639 |
++| PERS-only (01) | 48.570148 | 31.841850 | **23.707846** | **17.484939** | 0.747282 |
++| F1 (11) | 48.504946 | 31.947250 | 23.921293 | 17.831897 | 0.710923 |
++
++At `r=16`, gradient-only has lower mean constrained cost than PERS-only by **0.833510**, and higher mean GT persistence-mass coverage by **0.120604** (12.06 percentage points). At `r=∞`, PERS-only has lower mean `W_{2,2}` than gradient-only by **0.821428**. CNN-normalized reduction: gradient-only at `r=16` approximately **11.95%**, PERS-only at `r=32` approximately **18.95%**, PERS-only at infinity approximately **28.78%**. These are descriptive within-benchmark differences, not confidence intervals.
++
++## LXXXIV.3 F1-versus-PERS-only paired comparisons
++
++Full 168-field `F1 − PERS-only` constrained-cost means, and within-sample F1-lower / PERS-lower counts:
++
++| Radius | Mean F1−PERS | F1 lower | PERS lower |
++|---|---:|---:|---:|
++| 4 | −0.065202 | 86 | 82 |
++| 8 | −0.061573 | 85 | 83 |
++| 16 | +0.105400 | 78 | 90 |
++| 32 | +0.213447 | 74 | 94 |
++| 64 | +0.313022 | 38 | 130 |
++| 96 | +0.322591 | 38 | 130 |
++| 128 | +0.343584 | 33 | 135 |
++| ∞ | +0.346958 | 34 | 134 |
++
++The F1/PERS-only comparison is radius dependent and **not** a uniform win for either model. At very tight radii their mean differences and win counts are close; at larger radii PERS-only leads. The gradient-only model has the lowest mean constrained cost at `r=4` and `r=16`, despite PERS-only leading at `r=32` and infinity. A larger persistence-mass coverage ratio can reflect matching opportunities or retention, not necessarily correctly recovered meteorological locations.
++
++## LXXXIV.4 New read-only closeout workpack (prepared locally, not yet executed on Spark)
++
++Proposed package `Phase6_LXXXIV_Spatial_Closeout_And_F1_Evidence_20261014.zip`. Driver `phase6_lxxxiv_update/scripts/phase6_lxxxiv_spatial_closeout.py`. The read-only preflight validates all seven frozen LXXXIII final output digests, confirms the complete 6,720-row aggregate-key set and independently recomputes all 40 macro means. The report mode creates **only a new isolated LXXXIV report directory**, with all-eight-radius constrained costs and persistence-mass coverage, paired gradient/PERS and F1/PERS comparisons, 2×2 factorial contrasts, 24-hour sensitivity blocks, and a SHA-indexed inventory of historical F1 training logs/checkpoint index files where present. `--mode verify` checks the result digest and recomputed spatial report. Original LXXXIII/Phase5E/LXXIX sources are never rewritten; an existing LXXXIV report directory causes an overwrite refusal.
++
++The original F1 source/checkpoint and optimizer/seeding lineage remain **not independently closed**; presence and SHA256 of logs/checkpoints are not proof of identical training conditions. The post-run inventory can guide the targeted log/flag comparison. No Phase 6 new-arm merge-tree distance is asserted here. Follow-on work: F1 training-provenance audit, new-arm merge-tree pilot, multi-seed uncertainty or additional non-consecutive meteorological evaluations as feasible. Avoid converting radii to km without grid metadata.

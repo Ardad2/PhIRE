@@ -1,0 +1,53 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38757,3 +38757,50 @@
+ Proposed package `Phase6_LXXXIV_Spatial_Closeout_And_F1_Evidence_20261014.zip`. Driver `phase6_lxxxiv_update/scripts/phase6_lxxxiv_spatial_closeout.py`. The read-only preflight validates all seven frozen LXXXIII final output digests, confirms the complete 6,720-row aggregate-key set and independently recomputes all 40 macro means. The report mode creates **only a new isolated LXXXIV report directory**, with all-eight-radius constrained costs and persistence-mass coverage, paired gradient/PERS and F1/PERS comparisons, 2×2 factorial contrasts, 24-hour sensitivity blocks, and a SHA-indexed inventory of historical F1 training logs/checkpoint index files where present. `--mode verify` checks the result digest and recomputed spatial report. Original LXXXIII/Phase5E/LXXIX sources are never rewritten; an existing LXXXIV report directory causes an overwrite refusal.
+ 
+ The original F1 source/checkpoint and optimizer/seeding lineage remain **not independently closed**; presence and SHA256 of logs/checkpoints are not proof of identical training conditions. The post-run inventory can guide the targeted log/flag comparison. No Phase 6 new-arm merge-tree distance is asserted here. Follow-on work: F1 training-provenance audit, new-arm merge-tree pilot, multi-seed uncertainty or additional non-consecutive meteorological evaluations as feasible. Avoid converting radii to km without grid metadata.
++
++---
++
++# Part LXXXV — Phase 6: spatial closeout verified; historical F1 training-provenance audit prepared (October 15, 2026)
++
++## LXXXV.1 Observed execution of LXXXIV
++
++The researcher supplied real Spark terminal output for installation, preflight, report, independent verify, output SHA256 checks, and both LXXXIV generated Markdown reports. All user-shown steps exited `0`. The master-notes patch advanced the on-host document from LXXXIII to LXXXIV.
++
++- `[SOURCE] PASS`: seven immutable LXXXIII spatial output checksums, all 6,720 aggregate sample×arm×radius entries and 40 macro means recomputed.
++- `[ANALYSIS] PASS`: eight radii, paired cost/GT coverage, four-cell CV×PERS contrast, seven consecutive 24-hour block analyses.
++- `[REPORT] PASS`: output `ttk_runs_fixed/topology_finetuning/phase6_lxxxiv_spatial_closeout_20261014` created in isolation.
++- `[VERIFY-GATE] PASS`: inputs, report arithmetic, output SHA256 and F1 evidence inventory match. Report exit `0`; verify exit `0`; all three output `SHA256SUMS` entries `OK`.
++- F1 training logs at `logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log` (SHA256 `16efae6434db6fee1bd8d84b651e0b4f43dfbfc22ee9e41d93ba0d03db18d272`) and `logs/candidateF_grad_E2_low_expanded2688_batch.log` (SHA256 `997296d9874a567f897fa4d10126c22feac11fce47f96f2dce8c3c2fb3d24275`) were found. Their contents have **not yet** been compared against the new-arm training logs; existence and hash alone do not close lineage. Four saved `cnn.index` checkpoint files were inventoried (epochs 1, 2, 3 and final).
++
++## LXXXV.2 Full spatial interpretation, now including all eight radii
++
++The original SHA-pinned Phase 5E sparse matcher was used on 168 fields; all 840 unconstrained LXXIX GT–SR matches, 2,688 historical Phase 5E CNN/F1 spatial regressions and 320 pilot aggregate rows passed in Part LXXXIII. The source has 13,440 D0/D1 rows and 6,720 aggregate rows.
++
++The *lowest mean constrained W2,2* is gradient-only for radii `4`, `8`, and `16` grid cells, while PERS-only leads for `32`, `64`, `96`, `128`, and `inf`. The paired gradient-only vs PERS-only cost/win findings reported by the verified LXXXIV report include:
++
++| Radius | Mean grad−PERS cost | grad lower / PERS lower / ties | Mean GT persistence coverage difference |
++|---|---:|---:|---:|
++| 4 | -2.725665 | 166 / 2 / 0 | +0.110369 |
++| 8 | -2.230333 | 157 / 11 / 0 | +0.144143 |
++| 16 | -0.833510 | 126 / 42 / 0 | +0.120604 |
++| 32 | +0.185252 | 77 / 91 / 0 | +0.076794 |
++| 64 | +0.643034 | 63 / 105 / 0 | +0.041813 |
++| inf | +0.821428 | 63 / 105 / 0 | +0.027144 |
++
++The r=4 and r=16 gradient-minus-PERS cost block means were negative in each of the seven 24-hour blocks, reinforcing the *descriptive* tight-radius pattern. This is not physical feature identification, kilometer-calibrated distance, a new independent test period, or a causal training effect. GT coverage is matched GT persistence **mass**, not position error.
++
++The F1-vs-PERS difference is near zero at r=4,8 (F1 wins 86/168 and 85/168 respectively), then PERS has lower mean cost from r=16 through infinity; F1 wins only 34/168 at infinity. The factorial contrasts must be interpreted relative to the **gradient-only (00)** cell, not the pretrained CNN.
++
++## LXXXV.3 New read-only historical F1 training-log evidence workpack
++
++`Phase6_LXXXV_F1_Lineage_20261015.zip` is prepared locally in the assistant environment, **not executed** on Spark. It includes `scripts/phase6_lxxxv_f1_lineage_audit.py` under the `phase6_lxxxv_update/` unpack root, a short README, and the docs patch from LXXXIV to this section.
++
++The proposed script performs the following without running training or modifying any historical artifacts:
++
++- verifies all three previously generated LXXXIV report digests before proceeding;
++- fingerprints available F1 training/batch and corresponding new-arm logs, captures a limited set of provenance-bearing lines with original line numbers and basic secret masking;
++- inventories actual F1 and new-arm checkpoint indexes and data-shard presence, source files, training/evaluation TFRecord paths and repaired E2 pair targets (optionally hashing large artifacts with `--deep-hash`);
++- checks F1 vs gradient-only fixed evaluation benchmark `idx.npy` and `dataGT.npy` equality using complete file hashes;
++- generates isolated, SHA-indexed `f1_training_lineage.md` and `f1_lineage_manifest.json` for *manual* attribution review. Existing output refuses overwrite, and verify rechecks input fingerprints.
++
++The audit cannot alone prove identical optimizer initialization, training-time source code snapshot, pair-source bytes **at training time**, or stochastic seed. Even if the logs confirm matched architecture and hyperparameters, report nonreplicated within-benchmark contrasts unless matched random states and independent-seed replications are documented. Do not rewrite frozen `topoinvis-2026-arxiv-v1.1`, Phase 5E, LXXIX or LXXXIII results. Phase 6 new-arm merge-tree evaluation remains an independent next stage.

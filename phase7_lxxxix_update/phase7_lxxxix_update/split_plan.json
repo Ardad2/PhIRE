@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "study": "phase7_geographic_generalization",
+  "assignment_rule": "Declared using LXXXVII wind-field covariates and LXXXVIII footprints, before model inference or scores",
+  "original_reference": {"id":"mid_atlantic_legacy","rectangle":[720,1220,2102,2602],"role":"historical_development_only"},
+  "development_regions": ["gulf_inland", "southwest_borderland"],
+  "locked_external_test_regions": ["upper_midwest", "pacific_inland"],
+  "reference_separation_grid_cells": 80,
+  "primary_windows_utc": ["2010-02-01T00:00:00", "2010-05-01T00:00:00", "2010-08-01T00:00:00", "2010-11-01T00:00:00"],
+  "replication_windows_utc": ["2012-02-01T00:00:00", "2012-05-01T00:00:00", "2012-08-01T00:00:00", "2012-11-01T00:00:00"],
+  "hours_per_window": 168,
+  "dev_pilot_previews": ["preview_gulf_inland_20100201.npz", "preview_gulf_inland_20100801.npz", "preview_southwest_borderland_20100201.npz", "preview_southwest_borderland_20100801.npz"],
+  "test_access_rule": "No inference or model-scoring on locked external test regions until frozen metric, model and analysis protocols are documented using development fields",
+  "pretraining_caveat": "These regions are disjoint from documented PhIRE fine-tuning footprint, not proven absent from PhIRE original pretraining"
+}

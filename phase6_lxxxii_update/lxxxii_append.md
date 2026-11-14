@@ -1,0 +1,34 @@
+
+---
+
+# Part LXXXII — Phase 6: completed locality readiness and isolated 8-sample Phase 5E solver port prepared (October 14, 2026)
+
+## LXXXII.1 Observed LXXXI readiness outcome
+
+The researcher installed `Phase6_LXXXI_Locality_Readiness_20261014.zip`, verified its package checksum manifest, applied the LXXX→LXXXI notes patch, and ran its **read-only** preflight successfully (`Readiness exit: 0`). Exact evidence:
+
+- Frozen LXXIX CSV: **840 unique rows** with SHA-256 `3d53189ec69cc2f89c5561159d0768c973351d7b9998deceeaef42ebb6b379ea`.
+- LXXX paired report + output SHA256SUMS: **PASS**.
+- Phase 5E canonical GT, pretrained CNN and F1 archives: **168 PD files per class**.
+- New Phase 6 gradient-only, CV-only, PERS-only: **168 PD VTUs plus 168 scalar SR VTIs per class**.
+- Archived F1 source `idx.npy`, `dataGT.npy`, `dataSR.npy` and four `cnn.index` checkpoint manifests exist, but **F1 training-run lineage is not closed** by a file inventory alone.
+- Top candidate original sparse locality solver: `spatial_pd/phase5e_sparse_locality_solver.py`, with on-Spark SHA-256 `47c73decca4ba151fd8b250cae2911b4c2307471fe9c881fc42bfc968e211c3a`. The source inspection confirms the solver's `read_features`, `SparsePrepared`, `gudhi_w22`, `RADII` and `PILOT_SAMPLES` interface; its candidate discovery was not, by itself, a Phase 6 locality computation.
+
+## LXXXII.2 Eight-sample compatibility pilot (prepared, not yet executed)
+
+The independent `Phase6_LXXXII_Phase5E_Locality_Pilot8_20261014.zip` uses the **existing** on-Spark original Phase 5E sparse-savings source with strict SHA pinning. It does not replace the solver or recompute persistence diagrams. The new thin wrapper is `phase6_lxxxii_update/scripts/phase6_lxxxii_locality_pilot.py`.
+
+The predeclared samples are `0,24,48,69,96,120,144,167` and the exact radius grid is `4,8,16,32,64,96,128,∞`. Both D0 and D1 features are extracted with the original Phase 5E `read_features` coordinate convention. It uses original `SparsePrepared.solve` without mathematical changes and the original solver's per-dimension `gudhi_w22` independent infinity check.
+
+Required validation **before any output directory is created**:
+
+1. Pin the existing original solver source SHA-256 and the frozen LXXIX 840-row source CSV SHA-256.
+2. Check all **40** pilot GT–SR comparisons against frozen per-sample LXXIX `W22` at `r=∞` (all five models).
+3. Reproduce **128** CNN/F1 sample×radius entries from frozen Phase 5E locality CSV, including constrained W22, locality gap, GT and SR persistence-mass coverage, and integer matching counts.
+4. Require nonempty finite D0/D1 feature sets and basic constrained-cost invariants.
+
+The pilot, if all checks pass on Spark, writes **640 dimension rows** (8 samples × 5 arms × 2 dimensions × 8 radii) and **320 aggregate rows** (8 × 5 × 8), in a new isolated directory `ttk_runs_fixed/topology_finetuning/phase6_lxxxii_spatial_pilot8_20261014/`. It writes a compact Markdown summary, provenance manifest and checksum file. Neither historical Phase 5E nor the LXXIX/LXXX files are changed. A `--mode verify` command validates the pilot output after its creation.
+
+## LXXXII.3 Interpretation limits and next stage
+
+The eight-sample run is a **compatibility gate**, not evidence that spatial correspondence improved across 168 consecutive hours. If the pilot passes, extend using the same original sparse matching function across the full 168 benchmark fields, with all five method outputs and GT/SR persistence-mass coverage, constrained costs and locality gap recorded separately. Do not infer kilometer units without calibration. F1 checkpoint/training provenance remains a separate outstanding task. Merge-tree matching remains uncomputed for the new Phase 6 arms. Preserve frozen tag `topoinvis-2026-arxiv-v1.1` and all historical outputs.

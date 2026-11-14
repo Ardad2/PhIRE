@@ -1,6 +1,8 @@
 # Dataset Generation and Repair Notes
 
-**Last consolidated update:** September 15, 2026  
+**Last consolidated update:** October 21, 2026 (researcher-reported evidence through approximately 13:07 CDT)  
+**Historical Phase 6 snapshot (2026-10-13):** CV/PERS/fixed-pair workpack installed; static assertions passed; all three new ablation dry-runs validated the 2,688-sample TFRecord and fixed TTK constraints; TF2.20/NumPy2.4.2 compatibility caveats documented; pretrained CNN restoration, finite synthetic forward loss, and optimizer graph construction passed. **No new training/evaluation has run.** See Part LXV.  
+**Current Phase 6/7 executive status (as of October 21, 2026):** Phase 6 matched CNN/gradient/CV/PERS/F1 corrected persistence and spatial-locality evaluation on the original 168-hour benchmark is complete and verified (Parts LXXX–LXXXV). Phase 7 completed development-only wind/source acquisition and frozen six-model inference for 8 region-weeks × 168 consecutive hours, with all 9,408 GT/model canonical TTK diagram pairs verified. Seven additional CVIII numeric weeks have been computed and sealed; the last observed `verify-numeric-all` run had independently verified **2/7**, with five still pending. The combined preliminary eight-week corrected `W_{2,2}` mean is **10.006731 CNN versus 7.915321 gradient-only** (20.9% reduction), equal weighting by region-week. Seven-week Phase 7 locality and the final CX consolidated verified report were **not yet demonstrated complete**. Preserve frozen 2012 replication and external locked regions; see **Part CXI** for the cross-phase summary, presentation language, evidence and limitation ledger.  
 **Authoritative status:** Dataset provenance and repair complete; unified evaluation Phases 1, 2A, 2B, and 2C remain authoritative, archived, and checksum-verified. Phase 2D-A sample selection and Phase 2D-B figure production are technically complete on Spark: 21 manual merge-tree panels were validated, 81 scripted panels were rendered, and six final PNG/PDF composites passed automated validation. The corrected persistence-diagram distance layer has now also completed an independent GUDHI audit across all 8,568 GT-SR comparisons with 8,568 PASS, zero mismatches/errors, exact bottleneck agreement, and maximum aggregate W2 discrepancy 1.0178524689763435e-12. The GUDHI persistence-distance audit is now fully preserved with an exported environment, version manifest, per-artifact SHA-256 manifest, and a hash-frozen archive.  Final human visual review of the six composites and any separate repository/figure archival tasks should still be recorded independently. On September 14, 2026, the clean-environment SSIM audit for the current topology-inspired model was also closed: the exact historical SSIM implementation reproduced the frozen CNN and reconstruction-only controls to floating-point precision, and the accepted topology-inspired means are speed SSIM = 0.793188243 and mean-u/v SSIM = 0.827230145. Poster-preparation figures and their TikZ sources were also regenerated and preserved as a separate design-artifact bundle.
 
 
@@ -36733,3 +36735,2643 @@ presentation closeout summaries:
 
 No further Phase-5E numerical audit is required unless a concrete inconsistency
 is discovered during writing or figure generation.
+
+---
+
+# Part LXV — Phase 6: Fixed-Pair Critical-Value/Persistence-Gap Ablation Preflight and TF Compatibility (2026-10-13)
+
+**Evidence status: PRE-FLIGHT + GRAPH SMOKE TEST ONLY.** All three new-variant dry runs passed; the original pretrained CNN checkpoint was restored; the gradient-only PhIRE forward loss was finite; and an optimizer graph was built. **No Phase 6 optimizer step, training epoch, new checkpoint, paired inference, TTK evaluation, or new scientific metric was executed in the work reported here.** The previously frozen TopoInVis/arXiv v1.1 and Phase 5E conclusions remain unchanged. Date refers to the Oct 12 23:xx CDT Spark session continuing into Oct 13, 2026; the smoke log includes the timestamp `2026-10-12 23:57:38`.
+
+## LXV.1 Frozen repository baseline and newly added files
+
+- Source release: `https://github.com/Ardad2/PhIRE/releases/tag/topoinvis-2026-arxiv-v1.1`.
+- Master notes: repository root `dataset_generation_and_repair_notes.md`. The notes uploaded for this update had Git blob SHA-1 `ece956f1ba1ca624e6fc446203145074ade78d15`, **identical to the copy in the frozen release** before this addendum. Do not rewrite or force-move the publication release tag when recording new work; commit follow-up work to a separate active branch.
+- Workpack transferred to Spark: `Phase6_CV_PERS_Spatial_Workpack.zip`.
+- Extracted workpack: `phase6_workpack/`.
+- Files installed from workpack into existing repository `scripts/`:
+  - `scripts/run_candidateF_cv_pers_ablation.py` — parameterized wrapper for three new ablation variants; delegates to the existing Candidate F training runner.
+  - `scripts/test_phase6_2x2_static.py` — non-TensorFlow static check of the four factorial configurations.
+  - `scripts/plot_phase5_spatial_summary.py` — recreates presentation figures from frozen Phase 5E aggregate summaries.
+- Existing native runner **left unchanged**: `scripts/run_candidateF_expanded2688_finetune.py`. It owns preflight, safety/collision checks, TF1 compatibility training, paired inference and printed follow-up evaluation commands.
+- Workpack protocol and interpretation:
+  - `phase6_workpack/docs/README.md`
+  - `phase6_workpack/docs/phase6_cv_pers_ablation_protocol.md`
+  - `phase6_workpack/docs/phase5_presentation_findings.md`
+- Archived Phase 5E reference data in workpack:
+  - `phase6_workpack/data/phase5e_macro_from_tag.csv`
+  - `phase6_workpack/data/phase5e_stable_radius_from_tag.csv`
+- Regenerated spatial figures in `phase6_workpack/figures/` (each available as `.png` and `.svg`): `phase5_gt_coverage`, `phase5_sr_coverage`, `phase5_constrained_cost`, `phase5_stable_advantage`. These are graphical presentations of already-frozen Phase 5E results, **not evidence from new Phase 6 training**.
+
+Exact preparation and static validation transcript:
+
+```bash
+cd ~/PhIRE
+unzip Phase6_CV_PERS_Spatial_Workpack.zip -d phase6_workpack
+cp phase6_workpack/scripts/*.py scripts/
+python3 scripts/test_phase6_2x2_static.py
+python3 scripts/run_candidateF_cv_pers_ablation.py --print-config
+```
+
+Observed static-check output:
+
+```text
+PASS: four distinct arms; fixed constraints; no unintended auxiliary losses.
+NOTE: this checks configuration logic only; TF1 training/evaluation is NOT run.
+...
+All per-variant assertions verified: no unexpected loss is active in any variant.
+grad_crit confirmed: requires_e2=False, constraints_npz=NONE (no E2 constraint loader or E2 loss ops can execute for this variant).
+```
+
+The print-config includes three historical Candidate F variants (`grad_e2_low`, `grad_levelset_e2_low`, `grad_crit`) plus three **new** variants (`grad_pair_zero`, `grad_cv_only`, `grad_pers_only`). The separate `grad_crit` arm is *not* a member of the present fixed-pair 2×2 ablation.
+
+## LXV.2 Factorial objective and fixed experimental controls
+
+The proposed fixed-pair experiment tests whether critical-value supervision and persistence-gap supervision contribute independently or interact, **at the same fixed training schedule and dataset**. Every arm has the original vector reconstruction loss (`lambda_uv=1.0`) and gradient-magnitude loss (`lambda_grad=0.05`); all other scalar proxy weights are zero except the indicated fixed-pair term.
+
+| Arm | `lambda_ttkcv` | `lambda_ttkpers` | Meaning |
+|---|---:|---:|---|
+| `grad_pair_zero` | 0.000 | 0.000 | Gradient-only control **using the same E2-capable training code path** |
+| `grad_cv_only` | 0.004 | 0.000 | Gradient + fixed-pair birth/death critical-value supervision |
+| `grad_pers_only` | 0.000 | 0.002 | Gradient + fixed-pair persistence-gap supervision |
+| Published `grad_e2_low` / F1 | 0.004 | 0.002 | Gradient + both fixed-pair terms (already completed and frozen) |
+
+In all **three new variants**, `requires_e2=True` and both fixed-pair loss operators may be constructed even when one or both weights are zero; therefore a log label `repaired E2 ACTIVE` must **not** be interpreted as a nonzero loss contribution. It records the code path. This fourth-arm control is useful because the older independently trained gradient-only run took a different plain-training path.
+
+Controls confirmed during dry runs:
+
+```text
+training TFRecord:   example_data_topology_expanded_2688/wind_MR-HR.tfrecord
+training records:    2688
+evaluation TFRecord: example_data_fixed/wind_MR-HR.tfrecord
+evaluation fields:   168 (held out; no training)
+source checkpoint:   models/wind_mr-hr/trained_cnn/cnn
+constraints NPZ:     ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz
+optimizer:           Adam, learning rate 1e-5
+schedule:            3 epochs, batch size 4, save_every 1
+normalization mean:  [0.7684, -0.4575]
+normalization std:   [5.02455, 5.9017]
+other aux weights:   lambda_speed=0, lambda_wpd=0, lambda_levelset=0, lambda_crit=0
+```
+
+The constraints validator reported:
+
+```text
+stored n_samples:                     2688
+sample_idx.shape:                    (2688,)
+sample_start.shape:                  (2688,)
+sample_count.shape:                  (2688,)
+sample_idx range:                    [0, 2687]
+constraints/sample index alignment:   exact {0..2687}, each once
+pairs per sample:                    min=64, mean=64.00, max=64
+total fixed pairs:                   172032
+birth vertex ID bounds:              [0, 25599]
+death vertex ID bounds:              [1, 25597]
+finite birth/death/persistence:       True
+persistence nonnegative:             True
+TFRecord sample indices == NPZ set:  EXACT match
+NPZ metadata validation:             PASSED
+```
+
+## LXV.3 Initial failed dry-run: user-site packages disabled
+
+The first attempt was:
+
+```bash
+for VARIANT in grad_pair_zero grad_cv_only grad_pers_only; do
+    PYTHONNOUSERSITE=1 /usr/bin/python3 \
+        scripts/run_candidateF_cv_pers_ablation.py \
+        --variant "$VARIANT" --dry-run || break
+done
+```
+
+It **failed before preflight** on the first arm with:
+
+```text
+File ".../scripts/run_candidateF_expanded2688_finetune.py", line 510, in main
+    import tensorflow.compat.v1 as tf
+ModuleNotFoundError: No module named 'tensorflow'
+```
+
+Root cause: `PYTHONNOUSERSITE=1` hides TensorFlow from the user-site directory. This was an inappropriate launcher choice for the existing Spark installation, **not evidence that TensorFlow needed reinstalling**. The original dataset/checkpoints remained untouched.
+
+## LXV.4 Python/TensorFlow environment and import warnings
+
+Corrected environment invocation:
+
+```bash
+env -u PYTHONNOUSERSITE /usr/bin/python3 - <<'PY'
+import sys
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+print("Python:", sys.version)
+print("TensorFlow:", tf.__version__)
+print("TensorFlow path:", tf.__file__)
+print("TensorFlow import: SUCCESS")
+PY
+```
+
+Recorded successful output:
+
+```text
+Python: 3.12.3 (main, Jan  8 2026, 11:30:50) [GCC 13.3.0]
+TensorFlow: 2.20.0
+TensorFlow path: /home/adadhwal/.local/lib/python3.12/site-packages/tensorflow/_api/v2/compat/v1/__init__.py
+TensorFlow import: SUCCESS
+```
+
+**Dependency caveat, not silently resolved:** The import printed repeated NumPy 1.x-compiled extension incompatibility diagnostics under NumPy **2.4.2**. The failing optional modules in the shown stack traces were system copies of `numexpr` (`/usr/lib/python3/dist-packages/numexpr`) and `bottleneck` (`/usr/lib/python3/dist-packages/bottleneck`), imported during pandas/Keras startup. Matplotlib also warned about unavailable `Axes3D` from mixed installations; TF emitted v1/deprecation warnings. Despite those stack traces, TF2.20's `tensorflow.compat.v1` import and the subsequent smoke tests **completed successfully**. Do not infer that all training-time operations or the environment are entirely compatible merely from import success. Do not run `pip install --upgrade` or `pip install --user` against the system environment without a separate compatibility plan.
+
+## LXV.5 All three corrected ablation dry-runs: PASS
+
+Corrected invocation (retains user-site packages):
+
+```bash
+cd ~/PhIRE
+for VARIANT in grad_pair_zero grad_cv_only grad_pers_only; do
+    env -u PYTHONNOUSERSITE /usr/bin/python3 \
+        scripts/run_candidateF_cv_pers_ablation.py \
+        --variant "$VARIANT" --dry-run || break
+done
+```
+
+| New variant | Dry-run status | Candidate output method | Intended model output |
+|---|---|---|---|
+| `grad_pair_zero` | PASS | `candidateF_grad_pairzero_expanded2688` | `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/` |
+| `grad_cv_only` | PASS | `candidateF_grad_CV_only_expanded2688` | `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/` |
+| `grad_pers_only` | PASS | `candidateF_grad_PERS_only_expanded2688` | `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/` |
+
+The confirmed dry-run endpoint for each variant was:
+
+```text
+[safety] Output paths do not overlap any protected directory. OK.
+[collision-check] No completed-looking output exists yet ... OK to proceed.
+--- Constraints NPZ metadata validation: PASSED ---
+Training TFRecord index set == constraints NPZ index set EXACTLY
+[dry-run] All preflight/collision/NPZ-validation checks passed. No training performed.
+[dry-run] No canonical training log or any other file was created by this dry run.
+```
+
+These dry-runs do **not** validate actual convergence, scientific correctness of the loss implementation, optimizer execution, paired inference, VTI extraction, or corrected PD distance computation.
+
+### Explicit intended artifact paths (after future successful runs)
+
+```text
+model checkpoints (per arm):
+  models_fixed/topology_finetuning/wind_finetune_<method>/
+paired inference (per arm):
+  data_out/wind_finetune_<method>/{idx.npy,dataIN.npy,dataGT.npy,dataSR.npy}
+cheap scalar/domain evaluation:
+  ttk_runs_fixed/topology_finetuning/<method>_eval/
+TTK intermediate VTI:
+  ttk_runs_fixed/topology_finetuning/<method>_topology_vti/
+TTK output PD / MT:
+  ttk_runs_fixed/topology_finetuning/<method>_topology/
+canonical training log:
+  logs/wind_finetune_<method>.log
+```
+
+In these patterns, `<method>` is one of the three exact `candidateF_grad_*_expanded2688` method names in the table, and the checkpoint directory is prefixed with `wind_finetune_` as shown. The runner prints the exact per-arm paths at startup and after inference. The expensive TTK stage does **not** run automatically.
+
+## LXV.6 Actual generator/optimizer/checkpoint smoke test: PASS
+
+Command as provided and tested in the Spark PhIRE working directory (synthetic zero tensors; no training step):
+
+```bash
+cd ~/PhIRE
+env -u PYTHONNOUSERSITE /usr/bin/python3 - <<'PY'
+import numpy as np
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+from PhIREGANs import PhIREGANs
+from sr_network import SR_NETWORK, PhysicsLossConfig
+
+MU_SIG = [[0.7684, -0.4575], [5.02455, 5.9017]]
+tf.reset_default_graph()
+
+phire = PhIREGANs(
+    data_type="phase6_smoke",
+    learning_rate=1e-5,
+    mu_sig=MU_SIG,
+)
+phire.set_LR_data_shape(
+    "example_data_topology_expanded_2688/wind_MR-HR.tfrecord"
+)
+h, w, c = phire.LR_data_shape
+x_lr = tf.placeholder(tf.float32, [None, h, w, c])
+x_hr = tf.placeholder(tf.float32, [None, h*5, w*5, c])
+
+cfg = PhysicsLossConfig(
+    use_aux_losses=True,
+    mu=MU_SIG[0], sig=MU_SIG[1], lambda_grad=0.05,
+)
+model = SR_NETWORK(
+    x_lr, x_hr, r=[5], status="pretraining", phys_cfg=cfg,
+)
+optimizer = tf.train.AdamOptimizer(learning_rate=1e-5)
+train_op = optimizer.minimize(model.g_loss, var_list=model.g_variables)
+saver = tf.train.Saver(var_list=model.g_variables)
+
+with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())
+    saver.restore(sess, "models/wind_mr-hr/trained_cnn/cnn")
+    print("CHECKPOINT RESTORE: PASS")
+    lr = np.zeros((1, h, w, c), dtype=np.float32)
+    hr = np.zeros((1, h*5, w*5, c), dtype=np.float32)
+    loss = sess.run(model.g_loss, feed_dict={x_lr: lr, x_hr: hr})
+    assert np.isfinite(loss), f"Nonfinite loss: {loss}"
+    print("FORWARD LOSS: PASS", float(loss))
+    print("OPTIMIZER GRAPH: PASS (no update executed)")
+PY
+```
+
+Observed end of log (full import stack warnings omitted here but described in LXV.4):
+
+```text
+Loading data ... CHECKPOINT RESTORE: PASS
+FORWARD LOSS: PASS 3.05885259876959e-05
+OPTIMIZER GRAPH: PASS (no update executed)
+```
+
+**Interpretation:** The TensorFlow v1-compat generator/loss can be built, PhIRE pretrained CNN weights can be restored into the graph, a finite forward loss can be evaluated on synthetic all-zero inputs, and an optimizer update graph can be constructed. `train_op` was **never executed**; there is no evidence here of a successful backward training step, persistence-pair loss runtime, checkpoint save, or restored evaluation. The numerical loss above is a synthetic compatibility result, **not a scientific experiment metric**.
+
+## LXV.7 Next action: first actual fine-tuning run (NOT yet executed in this record)
+
+Recommendation: run **one arm at a time**, beginning with the new `grad_pair_zero` custom-loop control, and inspect the first batch/epoch and output log before launching the two other arms. Keep the frozen release tag intact and do not overwrite any existing checkpoints/artifacts.
+
+Example tmux session (commands proposed, not verified as executed by this record):
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+tmux new -s phase6_pairzero
+# Within tmux:
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+    scripts/run_candidateF_cv_pers_ablation.py \
+    --variant grad_pair_zero \
+    2>&1 | tee logs/phase6_grad_pairzero_console.log
+```
+
+The native runner also writes its canonical training log under `logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log`. Only proceed when the full training/inference run succeeds and the output alignment checks pass; do not interpret the smoke test as evidence that this full run has succeeded.
+
+After the run, invoke the printed cheap evaluation command and **only after checking the metrics** consider the expensive TTK PD/MT pipeline. Example cheap evaluation for the first arm (also not yet executed):
+
+```bash
+cd ~/PhIRE
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+    scripts/evaluate_finetune_candidate.py \
+    --candidate-name candidateF_grad_pairzero_expanded2688 \
+    --candidate-dir data_out/wind_finetune_candidateF_grad_pairzero_expanded2688 \
+    --cnn-dir data_out_fixed/wind_mrhr_cnn \
+    --gan-dir data_out_fixed/wind_mrhr_gan \
+    --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+    --out-dir ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_eval
+```
+
+TTK extraction (also not yet executed) must use the corresponding `--method`, `--data-dir`, `--vti-dir`, and `--out-base` from the runner's printed output; use `--n-samples 168 --threads 1 --skip-viz`. **Use the corrected PD-distance implementation/audited convention from the publication reproducibility guide for scientific PD comparisons, not superseded historical raw PD scores.** Do not assume that the cheap evaluation automatically computes corrected persistence distances.
+
+### Phase 6 status snapshot (as of this recorded session)
+
+| Component | Status |
+|---|---|
+| Phase 5E spatial-locality analysis and summary | FROZEN, completed previously |
+| New Phase 6 workpack extraction and static four-arm assertions | PASS |
+| TF2.20 import through TF1 compatibility API | PASS, dependency warnings persist |
+| All 3 new-arm preflights, checks and collisions | PASS |
+| Generator forward + checkpoint restore + optimizer graph smoke test | PASS (no weight update) |
+| Real `grad_pair_zero` custom-loop train / inference | **NOT RUN** |
+| Real `grad_cv_only` train / inference | **NOT RUN** |
+| Real `grad_pers_only` train / inference | **NOT RUN** |
+| New per-arm cheap scalar/domain metrics | **NOT RUN** |
+| New corrected PD / merge-tree results | **NOT RUN** |
+| Phase 6 scientific findings or published comparison | **NONE YET** |
+
+This section is an append-only run log for reproducibility. Future updates should record environment changes (including pip freeze if needed), first successful optimizer execution, checkpoint paths, sample-index alignment, canonical logs, numerical evaluation output, corrected TTK PD/MT output, and results with exact corresponding script versions and input hashes. Avoid modifying the released v1.1 tag or altering the frozen Phase 5E dataset-wide results.
+
+
+---
+
+# Part LXVI — Phase 6 First Real Training Run: `grad_pair_zero` (2026-10-13)
+
+**Evidence status (2026-10-13, approximately 18:05 CDT): End-of-run message observed; detailed training log, checkpoint inventory, and quantitative evaluation pending inspection.** This section updates (and supersedes the earlier as-of status in) Part LXV. It does not revise any frozen paper or Phase 5E results.
+
+## LXVI.1 Repository documentation update and local worktree state
+
+The author extracted `Phase6_Notes_Documentation_Update_20261013.zip` on Spark and applied its incremental patch to the repository-root `dataset_generation_and_repair_notes.md`:
+
+```bash
+cd ~/PhIRE
+unzip Phase6_Notes_Documentation_Update_20261013.zip -d phase6_docs_update
+git status --short
+git branch --show-current
+git apply --check phase6_docs_update/patches/phase6_notes_update_20261013.patch
+git apply --whitespace=nowarn phase6_docs_update/patches/phase6_notes_update_20261013.patch
+git diff --stat
+```
+
+Observed current branch: `master`. `git apply --check` and the actual `git apply` returned without error. The ensuing diff showed `dataset_generation_and_repair_notes.md | 315 +++++++++++-` and existing, unrelated local edits to `figures/paper_sample78/sample078_paper.pdf`, `.png`, and `scripts/paper_sample78_figure.py`. Several workpack ZIPs, workpack folders, supporting scripts, and patches are untracked. **Do not indiscriminately `git add .` or reset/overwrite those unrelated changes.** A patch applied in a working tree is not yet a Git commit or push. The frozen tag `topoinvis-2026-arxiv-v1.1` remains the reproducibility baseline.
+
+## LXVI.2 Actual `grad_pair_zero` training invocation and observed end
+
+The new first-arm run was initiated from a `tmux` session using the previously supplied command:
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+    scripts/run_candidateF_cv_pers_ablation.py \
+    --variant grad_pair_zero \
+    2>&1 | tee logs/phase6_grad_pairzero_console.log
+```
+
+The user-provided **final excerpt** of the Spark terminal showed the printed `scripts/evaluate_finetune_candidate.py` command for `candidateF_grad_pairzero_expanded2688`, followed by the reminder to run `scripts/run_candidate_topology_pipeline.sh` *only after* cheap evaluation, and then the shell prompt. No Python traceback appeared in the supplied excerpt. The tmux status at the end included `phase6_pa0:bash*` (the actual session name used on Spark may differ from the originally suggested one).
+
+**Source-code control-flow finding:** In the frozen runner `scripts/run_candidateF_expanded2688_finetune.py`, lines 1016–1052 invoke real training, paired inference, and `_validate_post_inference()`. Lines 1057–1091 print the `Run complete` report and the exact cheap-evaluation and TTK commands, then `return 0`. The presence of these *final commands* in the user transcript is therefore strong evidence that those earlier operations completed and the validation function returned normally. However, the provided excerpt does **not** include epoch-by-epoch losses, saved-checkpoint listing, full validation report, process exit status, or computed domain metrics; retain them as **not yet independently reviewed**.
+
+### Expected new output locations (verify actual existence, not yet inventoried here)
+
+```text
+Training and checkpoint:
+  models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/
+Canonical runner log:
+  logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log
+Full tee transcript:
+  logs/phase6_grad_pairzero_console.log
+Paired inference (168 fixed benchmark fields):
+  data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/idx.npy
+  data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataIN.npy
+  data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataGT.npy
+  data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataSR.npy
+```
+
+### Verify and preserve the final training validation
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_pairzero_expanded2688
+LOG=logs/wind_finetune_${METHOD}.log
+OUT=data_out/wind_finetune_${METHOD}
+MODEL=models_fixed/topology_finetuning/wind_finetune_${METHOD}
+
+grep -E 'Fine-tuning complete|Run complete|Post-inference validation complete|^\[OK\]|^\[WARNING\]|^\[report\]|Loss-magnitude diagnostic|Checkpoint:' "$LOG" | tail -45
+ls -lh "$OUT"/{idx,dataIN,dataGT,dataSR}.npy
+ls -lh "$MODEL"/cnn*
+```
+
+The runner's mandatory validation checks each output shape, finiteness, ordered indices `0..167`, and exact equality of GT and input arrays to the fixed CNN benchmark. Capture the full `[validate]` and `[report]` output before assigning numerical scientific claims to this run. Synthetic-smoke loss `3.05885259876959e-05` from LXV was not a training or evaluation metric and must not be conflated with this actual run.
+
+## LXVI.3 Next step: cheap scalar/domain evaluation (not observed executed yet)
+
+After the preceding verification, use the first-arm method name exactly:
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+METHOD=candidateF_grad_pairzero_expanded2688
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+echo "Evaluation exit status: $?"
+```
+
+The evaluation script generates a Markdown report (`docs/topology_finetuning_<method>_eval.md`) and per-sample and summary CSVs under the specified `_eval/` folder. Consult their actual numerical outputs before judging physical fidelity or deciding whether to proceed to costly topology extraction. **Do not interpret `pd_distance` inherited from the historical merged CSV as the newly computed corrected PD metric for this candidate.** Its corrected PD bottleneck/W₂ metrics and MT distance require separate evaluation; preserve the distinction from all previous audited manuscript scores.
+
+### Updated Phase 6 status
+
+| Phase | Status at time of this addendum |
+|---|---|
+| New wrapper, static assertions, three dry-runs | PASS (see Part LXV) |
+| TensorFlow import / generator checkpoint+loss+optimizer smoke | PASS (with NumPy ABI warning; see Part LXV) |
+| Actual `grad_pair_zero` training + paired inference | Final runner next-step block observed; very likely completed successfully; **full numeric log review pending** |
+| `grad_cv_only`, `grad_pers_only` training | Not observed executed |
+| New first-arm cheap scalar/domain evaluation | Not observed executed |
+| New corrected PD/MT evaluation | Not observed executed |
+
+**Research integrity:** New work belongs on the development branch; do not overwrite frozen models, benchmark data, release tags, paper tables, or unrelated local edits. Once logs and cheap evaluation have been reviewed, add a new status entry with the precise numerical outputs, executed command, saved-checkpoint path, TF/NumPy version manifest and flags, and any scientific interpretation.
+
+
+---
+
+# Part LXVII — Phase 6 `grad_pair_zero`: Verified Training/Inference and Cheap-Evaluation Completion (2026-10-13)
+
+**Evidence status:** Direct Spark terminal outputs, provided on October 13, 2026. This entry supersedes LXVI's "pending training verification" and "cheap evaluation not yet executed" statuses for **only** the `grad_pair_zero` variant; Parts LXV–LXVI are retained intact as chronological historical records. Other arm runs, corrected PD/MT analysis, and new spatial-locality analysis have **not** been established by the supplied logs.
+
+## LXVII.1 Trained arm and provenance
+
+- Variant: `grad_pair_zero`; method: `candidateF_grad_pairzero_expanded2688`.
+- Implementing wrapper: `scripts/run_candidateF_cv_pers_ablation.py`.
+- Shared trainer: `scripts/run_candidateF_expanded2688_finetune.py` (repaired E2 custom-loop training pathway).
+- Loss configuration confirmed in preflight (LXV): `lambda_uv=1`, `lambda_grad=0.05`, `lambda_TTKCV=0`, `lambda_TTKpers=0`; all other auxiliary losses 0; `requires_e2=True` to keep a matched runner and GT-pair data path. **This is a gradient-only *weighted-loss arm within the shared repaired-E2 pathway***, not proof that the network, optimizer graph or RNG is identical to every historical standalone gradient-only trainer.
+- Epoch count: 3; learning rate: `1e-5`; batch size: 4; 2,688 training fields; fixed separate 168-field evaluation benchmark; unchanged pretrained PhIRE CNN initialization (see LXV configuration and preflight).
+- Native canonical training log: `logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log`.
+- Optional full `tee` console transcript, if retained from initial invocation: `logs/phase6_grad_pairzero_console.log`.
+
+## LXVII.2 Verified checkpoint restoration, epoch snapshots, and final inference
+
+The author executed the exact read-only verification command from LXVI.2:
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_pairzero_expanded2688
+LOG=logs/wind_finetune_${METHOD}.log
+OUT=data_out/wind_finetune_${METHOD}
+MODEL=models_fixed/topology_finetuning/wind_finetune_${METHOD}
+grep -E 'Fine-tuning complete|Run complete|Post-inference validation complete|^\[OK\]|^\[WARNING\]|^\[report\]|Loss-magnitude diagnostic|Checkpoint:' "$LOG" | tail -45
+ls -lh "$OUT"/{idx,dataIN,dataGT,dataSR}.npy
+ls -lh "$MODEL"/cnn*
+```
+
+**Observed decisive log lines (verbatim values, condensed):**
+
+```text
+Loss-magnitude diagnostic (first batch, no training step)
+Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00001/cnn
+Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00002/cnn
+Checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn00003/cnn
+Fine-tuning complete (repaired E2 path).
+Fine-tuning complete. Final checkpoint: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn
+[OK] idx.npy  shape=(168,)
+[OK] dataIN.npy  shape=(168, 100, 100, 2)
+[OK] dataGT.npy  shape=(168, 500, 500, 2)
+[OK] dataSR.npy  shape=(168, 500, 500, 2)
+[OK] idx.npy values: exactly ordered 0..167 (no duplicate/missing samples).
+[OK] fixed CNN baseline idx.npy: exactly ordered 0..167.
+[OK] dataGT.npy exactly aligned with fixed CNN/GAN benchmark GT (np.array_equal=True, max_abs_diff=0.0000e+00 for diagnostics).
+[OK] dataIN.npy exactly aligned with fixed benchmark input (np.array_equal=True, max_abs_diff=0.0000e+00 for diagnostics).
+[report] dataGT.npy [u,v] range : u=[-16.1737, 30.8122] v=[-30.4676, 28.1310]
+[report] dataSR.npy [u,v] range : u=[-17.8825, 27.6427] v=[-26.8877, 28.6427]
+[report] GT scalar-speed range : [0.0122, 33.9885] m/s
+[report] SR scalar-speed range : [0.0018, 33.4720] m/s
+[report] Mean absolute scalar-speed error (SR vs GT): 0.5275 m/s
+[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and (where the baseline was available) GT/IN alignment all passed.
+Run complete.
+```
+
+**Observed output artifact sizes/times (`ls -lh`, human-rounded):**
+
+| Artifact | Reported size | Modification date |
+|---|---:|---|
+| `data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataGT.npy` | 641M | Oct 13 01:28 |
+| `data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataIN.npy` | 26M | Oct 13 01:28 |
+| `data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataSR.npy` | 641M | Oct 13 01:28 |
+| `data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/idx.npy` | 1.5K | Oct 13 01:28 |
+| `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn.{data-00000-of-00001,index,meta}` | 8.2M, 2.8K, 956K | Oct 13 01:27 |
+| `.../cnn00001/cnn.*`, `.../cnn00002/cnn.*`, `.../cnn00003/cnn.*` | ~9.2M each snapshot directory | Oct 13 00:33, 01:00, 01:27 |
+
+**Conclusion:** The actual custom E2-path training completed; epoch snapshots and final CNN weights exist; paired inference produced 168 outputs with finite values, correct shapes and order; GT and input tensors match the authoritative fixed benchmark **exactly**, not just within tolerance. The output speed range has no obvious catastrophic excursion relative to GT; the aggregate physical speed MAE is `0.5275 m/s`. No comparative claim against CNN/GAN/F1 or topology improvement follows from this single absolute metric. The first-batch *loss-magnitude diagnostic was printed*, but its individual loss values and epoch-by-epoch loss values were not included in the provided excerpt and remain to be extracted if needed.
+
+## LXVII.3 First-arm scalar/domain cheap evaluation: Completed, with SSIM unavailable
+
+Executed:
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+METHOD=candidateF_grad_pairzero_expanded2688
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+echo "Evaluation exit status: $?"
+```
+
+**Observed evaluation summary:**
+
+```text
+[warning] skimage SSIM unavailable — SSIM will be NaN.
+Reason: ValueError('numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject')
+Loading bicubic from .../data_out_fixed/wind_mrhr_bicubic
+Common samples: 168
+Checking GT alignment … OK (max_abs_diff=0.00e+00)
+Topology lookup loaded: 336 entries (from psnr_topology_physics_merged.csv)
+Computing metrics for [bicubic] … physics … done; components … done
+Computing metrics for [cnn] … physics … done; components … done
+Computing metrics for [gan] … physics … done; components … done
+Computing metrics for [candidateF_grad_pairzero_expanded2688] … physics … done; components … done
+Total metric rows: 672
+Evaluation complete.
+Evaluation exit status: 0
+```
+
+**Files written:**
+
+```text
+logs/phase6_candidateF_grad_pairzero_expanded2688_cheap_eval.log
+ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_eval/
+  all_sample_metrics_candidateF_grad_pairzero_expanded2688.csv
+  winner_counts_candidateF_grad_pairzero_expanded2688.csv
+  pairwise_cnn_vs_candidateF_grad_pairzero_expanded2688.csv
+  adjacent_cluster_table_candidateF_grad_pairzero_expanded2688.csv
+docs/topology_finetuning_candidateF_grad_pairzero_expanded2688_eval.md
+```
+
+The `672` rows equal `4 methods × 168 fields`. A successful exit confirms those **non-SSIM** calculations and output writes completed; it **does not** mean all expected metrics were numerically available. Specifically, scikit-image was binary-incompatible with the NumPy environment: the script warned that **SSIM will be NaN**. Do not rank the models by SSIM from these CSVs, silently replace missing values by zeros, or represent this as a successful SSIM calculation. Prefer the existing independently validated clean-environment SSIM procedure with consistent conventions, or repair the ABI issue in a **separate** environment after capturing a dependency manifest. Avoid system-wide `pip install --upgrade` while these trained outputs are being audited.
+
+**Topology caveat:** The `336` lookup entries came from the existing `psnr_topology_physics_merged.csv` (CNN/GAN historical topology references). This is **not** a new corrected PD or MT evaluation for `grad_pair_zero`; those fields require the dedicated topology/distance pipeline, using the paper's **corrected/audited** distance definitions.
+
+## LXVII.4 Reproducible numerical comparison extraction — pending execution
+
+Only output *file paths*, not the report's actual model-vs-model numerical table, were shown in the shared terminal logs. To inspect the new arm fairly, extract **the candidate versus CNN** from its generated pairwise CSV; the following command uses only Python's standard-library `csv`, avoiding NumPy/pandas ABI issues:
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_pairzero_expanded2688
+python3 - <<'PY'
+import csv
+from pathlib import Path
+method = 'candidateF_grad_pairzero_expanded2688'
+p = Path(f'ttk_runs_fixed/topology_finetuning/{method}_eval/pairwise_cnn_vs_{method}.csv')
+with p.open(newline='') as f:
+    table = {row['metric']: row for row in csv.DictReader(f)}
+for key in ('psnruv','speed_mae','speed_rmse','grad_mae','grad_w1',
+            'wpd_mae','wpd_w1','exceed_abs_t5','exceed_abs_t10',
+            'comp_curve_l1','ssim'):
+    row = table.get(key)
+    if not row:
+        print(f'{key:20s} [not in CSV]')
+        continue
+    print(f'{key:20s} CNN={row["mean_baseline_cnn"]}  '
+          f'pair-zero={row[f"mean_{method}"]}  delta={row["delta"]}  '
+          f'better={row["n_improved"]}  worse={row["n_worsened"]}  '
+          f'valid={row["n_valid"]}')
+PY
+sed -n '1,130p' "docs/topology_finetuning_${METHOD}_eval.md"
+```
+
+For reproducibility/provenance, also capture a small **post-run** checksum/version manifest (do not invent missing SHA-256 values):
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_pairzero_expanded2688
+sha256sum \
+  scripts/run_candidateF_cv_pers_ablation.py \
+  scripts/run_candidateF_expanded2688_finetune.py \
+  scripts/evaluate_finetune_candidate.py \
+  models_fixed/topology_finetuning/wind_finetune_${METHOD}/cnn/cnn.index \
+  models_fixed/topology_finetuning/wind_finetune_${METHOD}/cnn/cnn.data-00000-of-00001 \
+  ttk_runs_fixed/topology_finetuning/${METHOD}_eval/pairwise_cnn_vs_${METHOD}.csv
+/usr/bin/python3 -m pip show tensorflow numpy scikit-image pandas
+```
+
+A clean comparison with the archived F1 model must use the **same** 168 fields and metric definitions. Existing Phase 5E locality and published corrected PD numbers are a **separate evaluation dimension**, not computable from this cheap evaluation alone. After inspecting the report and extracting comparable aggregate metrics, assess whether to launch `grad_cv_only` and `grad_pers_only`, then run the corrected PD/MT and spatial-locality pipelines in a controlled, matched comparison. The TTK pipeline has **not** been run for this arm as of the evidence provided here.
+
+## LXVII.5 Git documentation status and explicit scientific boundaries
+
+The author then extracted `Phase6_GradPairZero_Notes_Update_20261013.zip` and successfully applied `phase6_grad_pairzero_notes_LXVI_incremental.patch` (`git apply --check` followed by `git apply`) to the repository-root `dataset_generation_and_repair_notes.md`. The author was on the `master` worktree in the earlier status report, with unrelated paper figure edits and untracked workpack files. These local changes should not be overwritten or accidentally committed together. **Applying the patch is not a commit or a GitHub push.** Do not alter `topoinvis-2026-arxiv-v1.1` or the frozen release artifacts.
+
+**Updated status (2026-10-13):**
+
+| Phase 6 component | Verified status |
+|---|---|
+| Static 2×2 arm checks; all three dry-runs; TF compatibility smoke | PASS (LXV) |
+| `grad_pair_zero` training, 3 epoch checkpoint series, final weights | **PASS** |
+| `grad_pair_zero` inference, 168 fields, shape/finiteness/ordered-index and exact GT/IN alignment | **PASS** |
+| `grad_pair_zero` cheap evaluation, 4 methods × 168 fields, CSV/report output | **PASS, SSIM MISSING (NaN)** |
+| Mean scalar-speed MAE for `grad_pair_zero` | **0.5275 m/s** (absolute, not comparative) |
+| Model-vs-CNN/F1 numerical comparisons from new CSV | **Pending inspection** |
+| New corrected PD / merge-tree distances, Phase 6 spatial matching | **NOT EXECUTED / NOT REPORTED** |
+| `grad_cv_only` and `grad_pers_only` real training | **NOT REPORTED** |
+
+Retain the original run logs and generated CSVs. The next record should quote actual candidate-vs-CNN, candidate-vs-GAN/F1 metrics, exact CSV filenames, any relevant constraints/checkpoint hashes, and separately tracked topology evaluations. Do not infer improved scientific fidelity from checkpoint existence or a successful exit code alone.
+
+
+---
+
+# Part LXVIII — Phase 6 gradient-only ablation: quantitative scalar/domain assessment and archived F1 comparison (October 13, 2026)
+
+**Evidence received:** The author's read-only CSV extraction transcript for `grad_pair_zero`, and the complete generated cheap-evaluation report `docs/topology_finetuning_candidateF_grad_pairzero_expanded2688_eval.md` (generated 2026-10-13). Historical context comes from the independently archived `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md` (generated 2026-07-16; frozen `topoinvis-2026-arxiv-v1.1` release). The latter is a *report-level historical comparator*, **not** a fresh paired significance analysis or a guarantee that training random-state conditions were identical. This entry supersedes only LXVII's “comparative results pending” status; all preceding provenance remains unchanged.
+
+## LXVIII.1 Arm definitions and verification scope
+
+| Arm | Loss terms | Current status |
+|---|---|---|
+| Pretrained CNN | Original frozen PhIRE baseline; no Phase 6 fine-tuning | Existing benchmark reference |
+| `grad_pair_zero` | `L_uv + 0.05 L_grad + 0 L_TTKCV + 0 L_TTKpers` | **Trained (3 epochs), 168-field inference verified, cheap evaluation complete** |
+| `grad_cv_only` | `L_uv + 0.05 L_grad + 0.004 L_TTKCV + 0 L_TTKpers` | Dry-run only; **no completed real training reported** |
+| `grad_pers_only` | `L_uv + 0.05 L_grad + 0 L_TTKCV + 0.002 L_TTKpers` | Dry-run only; **no completed real training reported** |
+| `grad_e2_low` / F1 (historical) | `L_uv + 0.05 L_grad + 0.004 L_TTKCV + 0.002 L_TTKpers` | Archived prior evaluation; **not rerun in Phase 6** |
+
+For the three new arms, the matched configuration is 2,688 training records, 3 epochs, learning rate `1e-5`, batch size 4, same pretrained CNN initialization and fixed 168-field test set, and the same repaired-E2 custom training pathway (the gradient-only arm still enters the pathway with zero-weight E2 losses to maintain matching conditions). The static check and dry-run passed earlier (Part LXV). No assertion of identical RNG streams between this October run and the historical July F1 run is established.
+
+## LXVIII.2 Complete available four-method summary from October's cheap-evaluation report
+
+**Metric directions:** `↑` higher is better, `↓` lower is better. Repeated scores are means over the same 168 held-out wind fields. The `GAN` and `bicubic` columns are contextual baselines, **not** independently trained new Phase 6 arms. `WPD` is the evaluator's wind-power-density proxy (speed-cubed-related), not a directly computed power-production claim.
+
+| Metric | Bicubic | CNN | GAN | Gradient-only | Direction |
+|---|---:|---:|---:|---:|:---:|
+| PSNRuv (dB) | 32.2202 | 31.1925 | 29.1380 | **33.3872** | ↑ |
+| Speed MAE (m/s) | 0.5963 | 0.6941 | 0.9026 | **0.5275** | ↓ |
+| Speed RMSE (m/s) | 1.0156 | 1.1078 | 1.3775 | **0.8939** | ↓ |
+| WPD-proxy MAE | 193.5403 | 231.6709 | 310.7328 | **169.3772** | ↓ |
+| WPD-proxy W1 | 55.5103 | 45.2713 | 85.6191 | **22.3588** | ↓ |
+| WPD-proxy abs bias | 41.2244 | 35.3439 | 78.7236 | **16.4208** | ↓ |
+| Gradient MAE | 0.3696 | 0.3491 | 0.3806 | **0.3107** | ↓ |
+| Gradient W1 | 0.3282 | 0.2329 | **0.0564** | 0.1809 | ↓ |
+| Gradient kurtosis abs Δ | 6.6163 | 3.7004 | 4.2010 | **2.5295** | ↓ |
+| PSD log-L2 | 1.3625 | **0.8335** | 0.5139 | 0.8992 | ↓ |
+| PSD slope abs Δ | 1.6684 | **0.9150** | 0.9482 | 1.4924 | ↓ |
+| Exceedance abs Δ at 5 m/s | 0.0095 | 0.0042 | 0.0082 | **0.0039** | ↓ |
+| Exceedance abs Δ at 10 m/s | 0.0085 | 0.0066 | 0.0243 | **0.0032** | ↓ |
+| Exceedance abs Δ at 15 m/s | 0.0074 | 0.0062 | 0.0096 | **0.0030** | ↓ |
+| Exceedance abs Δ at GT p90 | 0.0109 | 0.0103 | 0.0123 | **0.0040** | ↓ |
+| Superlevel component-count curve L1 | 173.1855 | 115.5278 | 124.6567 | **97.6548** | ↓ |
+| SSIM (speed) | N/A | N/A | N/A | N/A | ↑ |
+| **Candidate PD / MT** | N/A | historical | historical | **NOT EVALUATED** | ↓ |
+
+**Correction on visual emphasis:** The bold entry denotes the new control's value or an important reference, **not necessarily the best among all four methods**. For PSD log-L2 and gradient W1, GAN is better than the gradient-only arm (GAN PSD log-L2 `0.5139`, GAN gradient W1 `0.0564`). For PSD slope, CNN is the better of these four. The new control improves fidelity and many domain metrics but **regresses spectrally**.
+
+## LXVIII.3 Exact candidate-vs-CNN pairwise statistics from the user's transcript
+
+The actual `pairwise_cnn_vs_*.csv` file records `mean_baseline_cnn`, `mean_candidate`, `delta` (candidate minus CNN), `n_improved`, and `n_valid`. The printed figures are **not** newly estimated from screenshots; they are the stdout of Python's standard-library CSV reader applied on Spark.
+
+| Metric | CNN mean | Control mean | Control − CNN | Improved / valid |
+|---|---:|---:|---:|---:|
+| `psnruv` | 31.19250043 | 33.38722367 | +2.19472324 | **168/168** |
+| `speed_mae` | 0.69407016 | 0.52748124 | −0.16658893 | **168/168** |
+| `speed_rmse` | 1.10775860 | 0.89386073 | −0.21389787 | **168/168** |
+| `grad_mae` | 0.34905572 | 0.31069253 | −0.03836319 | **168/168** |
+| `grad_w1` | 0.23294292 | 0.18093229 | −0.05201063 | 154/168 |
+| `wpd_mae` | 231.67091095 | 169.37715803 | −62.29375292 | **168/168** |
+| `wpd_w1` | 45.27127092 | 22.35884094 | −22.91242998 | 141/168 |
+| `exceed_abs_t5` | 0.00424233 | 0.00388783 | −0.00035450 | 98/168 |
+| `exceed_abs_t10` | 0.00658081 | 0.00323424 | −0.00334657 | 130/168 |
+| `comp_curve_l1` | 115.52777778 | 97.65476190 | −17.87301587 | 141/168 |
+| `ssim` | NaN | NaN | NaN | **0/0, UNAVAILABLE, not 0 wins out of 168** |
+
+Additional fields in the uploaded *full report*, omitted by the user's short terminal extraction, must be preserved when interpreting trade-offs:
+
+- `psd_log_l2`: CNN `0.8335`, control `0.8992`, Δ `+0.0657`, improves **49/168**, worsens **119/168**.
+- `psd_slope_abs_delta`: CNN `0.9150`, control `1.4924`, Δ `+0.5774`, improves **0/168**, worsens **168/168**.
+- `grad_kurtosis_abs_delta`: CNN `3.7004`, control `2.5295`, improves **96/168**, worsens **72/168**.
+- `exceed_abs_t15`: CNN `0.0062`, control `0.0030`, improves **126/168**.
+- `exceed_abs_p90`: CNN `0.0103`, control `0.0040`, improves **144/168**.
+- `comp_curve_l1`: 141 improved, 26 worsened; **one unaccounted-for case is a tie**, not missing data (168 = 141 + 26 + 1). Winner counts exclude ties.
+
+**Derived relative improvements vs pretrained CNN:** speed MAE drops by about `24.0%`; WPD-proxy MAE by about `26.9%`; component-count curve L1 by about `15.5%`. PSNR rises `2.1947 dB` and should not be described as a percent improvement in dB.
+
+## LXVIII.4 Controlled interpretation against *archived* full-loss F1
+
+Historical reference: repository-root file `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md`, tagged `topoinvis-2026-arxiv-v1.1`; metrics are from its four-method summary table, generated 2026-07-16. The two reports use the same 168-sample evaluation convention and same metric definitions, but no independent paired per-field test or exact random-state matching has been supplied. The following is **comparison of reported means** only, *not causal attribution*.
+
+| Metric | CNN | Gradient-only (`CV=0,PERS=0`) | Archived F1 (`CV=.004,PERS=.002`) | Gradient-only − F1 |
+|---|---:|---:|---:|---:|
+| PSNRuv ↑ (dB) | 31.1925 | **33.3872** | 32.4949 | **+0.8923** |
+| Speed MAE ↓ (m/s) | 0.6941 | **0.5275** | 0.5899 | **−0.0624** |
+| Speed RMSE ↓ | 1.1078 | **0.8939** | 0.9891 | **−0.0952** |
+| Gradient MAE ↓ | 0.3491 | **0.3107** | 0.3125 | **−0.0018** |
+| Gradient W1 ↓ | 0.2329 | 0.1809 | **0.1381** | +0.0428 |
+| WPD MAE ↓ | 231.6709 | **169.3772** | 190.6897 | **−21.3125** |
+| WPD W1 ↓ | 45.2713 | **22.3588** | 24.7322 | **−2.3734** |
+| Component-count curve L1 ↓ | 115.5278 | 97.6548 | **81.1815** | +16.4733 |
+| PSD log-L2 ↓ | 0.8335 | 0.8992 | **0.8147** | +0.0845 |
+| PSD slope abs Δ ↓ | **0.9150** | 1.4924 | 1.1385 | +0.3539 |
+| Exceedance abs Δ 5 m/s ↓ | 0.0042 | 0.0039 | **0.0025** | +0.0014 |
+| Exceedance abs Δ 10 m/s ↓ | 0.0066 | **0.0032** | 0.0052 | −0.0020 |
+| Exceedance abs Δ 15 m/s ↓ | 0.0062 | 0.0030 | **0.0027** | +0.0003 |
+
+**Scientific reading:** The gradient-only arm is substantially stronger on PSNRuv, speed MAE/RMSE and WPD-proxy error. The archived combined-loss F1 is stronger on the superlevel component-count proxy, gradient-distribution W1, and both PSD metrics. At present, this is a **plausible fidelity–structural trade-off**, not evidence that TTK-CV or TTK-PERS independently improves true topology, nor proof of how much any loss causes the difference. The loss-isolating arms and true corrected topology evaluation are necessary.
+
+Do **not** conflate `comp_curve_l1` with PD bottleneck / corrected PD-W₂ distances: connected-component counts over speed thresholds are a coarse superlevel-set proxy and omit feature pairings, births/deaths, and spatial correspondences. Also, GAN has the lowest gradient W1 and PSD log-L2 of the four October report columns; the full-loss F1 cannot be called an across-the-board best structural model.
+
+## LXVIII.5 Documentation and exact output files
+
+Primary user-supplied source is the report file:
+
+```text
+docs/topology_finetuning_candidateF_grad_pairzero_expanded2688_eval.md
+```
+
+The generated artifacts (preserve raw bytes; do not overwrite/recalculate without versioning):
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_eval/
+  all_sample_metrics_candidateF_grad_pairzero_expanded2688.csv
+  pairwise_cnn_vs_candidateF_grad_pairzero_expanded2688.csv
+  winner_counts_candidateF_grad_pairzero_expanded2688.csv
+  adjacent_cluster_table_candidateF_grad_pairzero_expanded2688.csv
+logs/wind_finetune_candidateF_grad_pairzero_expanded2688.log
+logs/phase6_candidateF_grad_pairzero_expanded2688_cheap_eval.log
+models_fixed/topology_finetuning/wind_finetune_candidateF_grad_pairzero_expanded2688/cnn/cnn.*
+```
+
+To reproduce the human-readable comparison between the current control report and the historical F1 report **without importing NumPy, pandas or TensorFlow**, use the attached standard-library script `scripts/compare_phase6_scalar_reports.py` from the documentation package:
+
+```bash
+cd ~/PhIRE
+/usr/bin/python3 scripts/compare_phase6_scalar_reports.py \
+  --control docs/topology_finetuning_candidateF_grad_pairzero_expanded2688_eval.md \
+  --f1 docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md
+```
+
+To preserve hashes of all input/report/checkpoint metadata (record actual output on Spark rather than inventing checksum values):
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_pairzero_expanded2688
+sha256sum \
+  scripts/run_candidateF_cv_pers_ablation.py \
+  scripts/run_candidateF_expanded2688_finetune.py \
+  scripts/evaluate_finetune_candidate.py \
+  docs/topology_finetuning_${METHOD}_eval.md \
+  ttk_runs_fixed/topology_finetuning/${METHOD}_eval/pairwise_cnn_vs_${METHOD}.csv \
+  models_fixed/topology_finetuning/wind_finetune_${METHOD}/cnn/cnn.index \
+  models_fixed/topology_finetuning/wind_finetune_${METHOD}/cnn/cnn.data-00000-of-00001
+```
+
+Version manifests and actual SHA-256 values have **not** yet been provided and must not be reported as verified.
+
+## LXVIII.6 Next steps: complete the matched 2×2 ablation
+
+**Recommendation:** Train `grad_cv_only` and `grad_pers_only` **one at a time**, using separate `tmux` sessions and separate console logs. Keep the exact original `grad_pair_zero` outputs and original full F1 checkpoint frozen. Successful dry-runs for both remaining arms were documented in LXV. For each new arm, verify final checkpoints, the ordered 168-element `idx.npy`, finite tensors, and exact GT/IN equality to the fixed CNN benchmark *before* running cheap evaluation. Keep SSIM marked unavailable if the NumPy/scikit-image ABI is still broken; do not attempt an ad-hoc environment repair mid-experiment.
+
+Example **first arm** to execute (on Spark in a tmux session, not in this chat):
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+tmux new -s phase6_cv_only
+# Inside tmux:
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/run_candidateF_cv_pers_ablation.py --variant grad_cv_only \
+  2>&1 | tee logs/phase6_grad_cv_only_console.log
+printf 'Training pipeline exit status: %s\n' "$?"
+```
+
+Then run a matching cheap evaluation (only **after** training + fixed-benchmark validation succeeded):
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_CV_only_expanded2688
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+```
+
+Next train/evaluate `grad_pers_only` analogously, with method `candidateF_grad_PERS_only_expanded2688`. Avoid the costly topology stage until the scalar/domain outputs for all three new arms are reviewed. Thereafter run the **corrected, independently audited** PD distance and MT pipelines followed by the same 168-field spatial/locality protocol as Phase 5E for all four arms: gradient-only, CV-only, PERS-only and archived full F1. No new Phase 6 PD/MT/locality results are claimed as of October 13, 2026.
+
+**Archival hygiene:** `master` has other uncommitted figures/scripts and untracked packages; add only intentional documentation/script paths. The frozen `topoinvis-2026-arxiv-v1.1` tag remains unchanged. All findings above are **single-checkpoint descriptive comparisons**, not replicated seed variance estimates, not independent hourly samples for inferential statistics, and not geographically generalized wind-field findings.
+
+
+---
+
+# Part LXIX — Phase 6 CV-Only Fine-Tuning: Exit 0, Evaluation Pending (October 13, 2026)
+
+**Recorded on Spark:** October 13, 2026, 19:48 local timestamp. **Variant:** `grad_cv_only`; method `candidateF_grad_CV_only_expanded2688`. **Evidence:** the user-supplied tail of the real training command ends with `Training pipeline exit status: 0` after the runner prints its paired-inference output paths and next-step instructions. **Important:** the printed cheap-evaluation and TTK commands are recommendations, **not** evidence that either stage ran.
+
+## LXIX.1 Experiment design, fixed configuration, historical controls
+
+This is a matched member of the fixed-pair E2 training-loop 2×2 ablation. In each cell, the model starts from the original pretrained CNN checkpoint and uses the identical 2,688-field training TFRecord, 168-field fixed benchmark, 64 selected GT pairs per training field, `lambda_uv=1`, `lambda_grad=0.05`, learning rate `1e-5`, 3 epochs, batch size 4, and a common repaired E2 training code path (`requires_e2=True`). The only two varied loss weights are `lambda_ttkcv` and `lambda_ttkpers`. `lambda_speed=lambda_levelset=lambda_crit=0`. These configuration details were previously verified by the passed static and dry-run checks; no new training hyperparameters were supplied in the present terminal tail.
+
+| Arm | Method | Grad | CV | PERS | Evidence/status |
+|---|---|---:|---:|---:|---|
+| Gradient-only | `candidateF_grad_pairzero_expanded2688` | .05 | 0 | 0 | Training, paired inference, cheap evaluation completed; see LXVII–LXVIII |
+| **CV-only** | **`candidateF_grad_CV_only_expanded2688`** | **.05** | **.004** | **0** | **Training pipeline exited 0; post-run log inspection and cheap evaluation pending** |
+| PERS-only | `candidateF_grad_PERS_only_expanded2688` | .05 | 0 | .002 | Static preflight passed; no real training result supplied |
+| Full F1 (frozen) | `candidateF_grad_E2_low_expanded2688` | .05 | .004 | .002 | Historical trained and evaluated comparator |
+
+**Relevant source and immutable inputs:** `scripts/run_candidateF_cv_pers_ablation.py` (wrapper), `scripts/run_candidateF_expanded2688_finetune.py` (released base runner, Git blob `b7c5359952a4e2cf30e2b6f4341c66bcbe7ee7c8`), `scripts/evaluate_finetune_candidate.py` (cheap evaluator), `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` (training), `example_data_fixed/wind_MR-HR.tfrecord` (held-out benchmark), `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` (fixed GT persistence constraints).
+
+## LXIX.2 Exact training command, end-of-run proof and interpretation
+
+Run reported from a `tmux` session named `phase6_cv_only`:
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/run_candidateF_cv_pers_ablation.py \
+  --variant grad_cv_only \
+  2>&1 | tee logs/phase6_grad_cv_only_console.log
+printf 'Training pipeline exit status: %s\n' "$?"
+```
+
+End of supplied output (excerpt):
+
+```text
+  LR inputs        : data_out/wind_finetune_candidateF_grad_CV_only_expanded2688/dataIN.npy
+  Sample indices   : data_out/wind_finetune_candidateF_grad_CV_only_expanded2688/idx.npy
+Next steps:
+  Cheap scalar/domain evaluation (run this first):
+    ... --candidate-name candidateF_grad_CV_only_expanded2688 ...
+  Only run the expensive TTK topology pipeline AFTER confirming
+  the cheap evaluation above is non-catastrophic:
+    ... --method candidateF_grad_CV_only_expanded2688 ...
+========================================================================
+Training pipeline exit status: 0
+```
+
+The source runner emits these instructions **after** model training, 168-field paired inference, and `_validate_post_inference()` complete without raising. Thus the exit code strongly supports successful processing. The user has *not yet supplied* the per-epoch checkpoint inventory, exact GT/IN alignment lines, wind-speed ranges or actual CV-only metric values, so those findings must remain *unverified in this notes entry*. The 168-field benchmark is not used to train any ablation arm.
+
+## LXIX.3 Verify existing checkpoints and saved arrays (non-destructive)
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_CV_only_expanded2688
+LOG="logs/wind_finetune_${METHOD}.log"
+OUT="data_out/wind_finetune_${METHOD}"
+MODEL="models_fixed/topology_finetuning/wind_finetune_${METHOD}"
+
+grep -E \
+  'Fine-tuning complete|Run complete|Post-inference validation complete|^\[OK\]|^\[WARNING\]|^\[report\]|Checkpoint:' \
+  "$LOG" | tail -45
+ls -lh "$OUT"/{idx,dataIN,dataGT,dataSR}.npy
+ls -lh "$MODEL"/cnn/cnn.*
+```
+
+The released runner checks `idx.npy` shape `(168,)` and ordered indices `0..167`, `dataIN.npy (168,100,100,2)`, `dataGT.npy/dataSR.npy (168,500,500,2)`, finite values, and exact GT/IN equality relative to `data_out_fixed/wind_mrhr_cnn/`. The expected final checkpoint prefix is `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn/cnn`. These are validation criteria, not additional numerical observations in this report. Preserve the actual log and file inventory.
+
+## LXIX.4 Execute and save the cheap numerical/domain evaluation (still pending)
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+METHOD=candidateF_grad_CV_only_expanded2688
+
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+printf 'Evaluation exit status: %s\n' "$?"
+```
+
+Expected *only if evaluation succeeds*:
+
+```text
+docs/topology_finetuning_candidateF_grad_CV_only_expanded2688_eval.md
+ttk_runs_fixed/topology_finetuning/candidateF_grad_CV_only_expanded2688_eval/
+  all_sample_metrics_candidateF_grad_CV_only_expanded2688.csv
+  winner_counts_candidateF_grad_CV_only_expanded2688.csv
+  pairwise_cnn_vs_candidateF_grad_CV_only_expanded2688.csv
+  adjacent_cluster_table_candidateF_grad_CV_only_expanded2688.csv
+logs/phase6_candidateF_grad_CV_only_expanded2688_cheap_eval.log
+```
+
+**Known issue, not a newly observed CV-only failure:** on gradient-only, scikit-image's NumPy ABI mismatch caused `SSIM=NaN`. If it recurs, record it as missing; `0/0` valid comparisons is not a zero-valued metric or evidence of model failure. Likewise, the candidate's true PD bottleneck, corrected PD-W2, merge-tree distances and spatial-locality outcomes are **not computed by this cheap evaluator**. Do not equate its component-count curve L1 proxy with persistence metrics. Do not run the expensive TTK stage before reviewing cheap-evaluation results, and do not casually reinstall or upgrade packages in the working TF environment.
+
+## LXIX.5 Reproducible comparison extraction (after CV-only eval)
+
+The following uses the Python standard library only, and reports means and per-field CNN win counts for the two newly trained arms. It is safe even with broken `skimage`, `numexpr` and `bottleneck` imports:
+
+```bash
+cd ~/PhIRE
+/usr/bin/python3 - <<'PYEXTRACT'
+import csv
+from pathlib import Path
+for method in ('candidateF_grad_pairzero_expanded2688',
+               'candidateF_grad_CV_only_expanded2688'):
+    path = Path('ttk_runs_fixed/topology_finetuning') / (
+        f'{method}_eval/pairwise_cnn_vs_{method}.csv')
+    with path.open(newline='') as f:
+        rows = {r['metric']: r for r in csv.DictReader(f)}
+    print('\n###', method)
+    for m in ('psnruv', 'speed_mae', 'speed_rmse', 'grad_mae', 'grad_w1',
+              'wpd_mae', 'wpd_w1', 'psd_log_l2', 'psd_slope_abs_delta',
+              'exceed_abs_t5', 'exceed_abs_t10', 'exceed_abs_t15',
+              'comp_curve_l1', 'ssim'):
+        r = rows.get(m)
+        if r is not None:
+            print(f'{m:22s} CNN={r["mean_baseline_cnn"]} '
+                  f'Candidate={r[f"mean_{method}"]} '
+                  f'Improved={r["n_improved"]}/{r["n_valid"]}')
+PYEXTRACT
+```
+
+Reference verified *prior to CV-only*: CNN PSNRuv `31.1925`, speed MAE `0.6941`, comp-curve L1 `115.5278`; gradient-only PSNRuv `33.3872`, speed MAE `0.5275`, comp-curve L1 `97.6548`; historical full F1 PSNRuv `32.4949`, speed MAE `0.5899`, comp-curve L1 `81.1815`. The published F1 scalar/domain report is `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md`. These are *historical comparators*, **not CV-only results**.
+
+## LXIX.6 Next-step safeguards and scientific limitations
+
+The next research question is whether adding critical-value supervision preserves gradient-only fidelity while improving distributional or structural proxies; later compare CV-only against PERS-only and full F1 to isolate interaction. Evaluate spectral-error regressions (`psd_log_l2`, `psd_slope_abs_delta`) and component-count curve error in addition to PSNR/speed/gradient MAE. No causal conclusion can be made until matched arm comparisons are complete; no new corrected PD/MT or spatial-locality results exist yet. There is just one training instance per configuration (seed variability unassessed), and the 168 hourly fields are temporally correlated.
+
+Save the full canonical log `logs/wind_finetune_candidateF_grad_CV_only_expanded2688.log`, console log `logs/phase6_grad_cv_only_console.log`, output array inventory, evaluator outputs and checksums. The actual file hashes have not yet been supplied and should not be invented. Keep `topoinvis-2026-arxiv-v1.1` frozen. Add only desired notes/code paths in git: `master` also contains separate uncommitted edits to `figures/paper_sample78/*` and `scripts/paper_sample78_figure.py`.
+
+---
+
+# Part LXX — Phase 6 CV-only model: verified training, scalar/domain results, 2×2 ablation interim comparison, and patch correction (October 13, 2026)
+
+## LXX.1 Evidence and status (new observations, not speculative)
+
+The researcher completed the **`grad_cv_only`** fine-tuning arm, with `Training pipeline exit status: 0`, followed by a successful independent scalar/domain evaluation (`Evaluation exit status: 0`). The network was fine-tuned from the original pretrained PhIRE CNN, retaining `L_uv=1`, `L_grad=0.05`, adding only the **fixed-index critical-value** loss `L_TTKCV=0.004` and disabling the fixed-pair persistence-gap loss `L_TTKpers=0`. The prior static tests also showed no unintended auxiliary losses. This is a **CNN fine-tuning ablation, not a new SR architecture**.
+
+Experiment identifier: `candidateF_grad_CV_only_expanded2688`.
+
+- Training set: `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` (**2,688** fields, three training epochs); fixed held-out evaluation: `example_data_fixed/wind_MR-HR.tfrecord` (**168** fields).
+- Checkpoints: `models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn00001/cnn`, `cnn00002/cnn`, `cnn00003/cnn`, plus final `cnn/cnn`. All three epoch checkpoints and the final checkpoint were reported.
+- Outputs: `data_out/wind_finetune_candidateF_grad_CV_only_expanded2688/idx.npy` shape `(168,)`; `dataIN.npy` shape `(168,100,100,2)`; `dataGT.npy` and `dataSR.npy` each shape `(168,500,500,2)`. All arrays passed shape/finiteness checks. Indices exactly `0..167`.
+- **Exact paired benchmark validation:** candidate `dataGT.npy` and `dataIN.npy` matched `data_out_fixed/wind_mrhr_cnn/` via `np.array_equal=True`, with maximum absolute difference `0.0000e+00`.
+- GT vector ranges: `u=[-16.1737,30.8122]`, `v=[-30.4676,28.1310]`; CV-only SR vector ranges: `u=[-16.8503,29.5821]`, `v=[-29.7248,28.4144]`.
+- GT scalar-speed range: `[0.0122,33.9885] m/s`; CV-only SR range: `[0.0010,39.3331] m/s`. CV-only SR's maximum is **5.3446 m/s (~15.7%) above** this benchmark GT maximum. This passed the training runner's nonfatal plausibility reporting, but **extreme-value overshoot deserves targeted per-field examination** before treating this as unqualified physical improvement. A reconstructed maximum may legitimately exceed the dataset's maximum; this alone does not prove a nonphysical prediction.
+- CV-only speed MAE: `0.5714 m/s` (more precisely see the generated metric CSV); evaluation wrote **672 rows = 4 methods × 168 samples** for bicubic, CNN, GAN and CV-only.
+- SSIM **not computed** (`skimage` NumPy binary incompatibility, `Expected 96 from C header, got 88 from PyObject`). SSIM `NaN` and pairwise `0/0` valid comparisons are **missing data**, not zero-valued results. Preserve this limitation; do not mix in SSIM from a different convention without reproducing the same metric.
+- The pre-existing topology CSV supplied **336 lookup entries** for CNN and GAN; **no new candidate CV-only PD bottleneck, corrected W₂, merge-tree, or spatially constrained matching values** have been computed.
+
+Primary new numerical source (generated on Spark and supplied by author):
+
+`docs/topology_finetuning_candidateF_grad_CV_only_expanded2688_eval.md`
+
+Additional output artifacts:
+
+```text
+logs/wind_finetune_candidateF_grad_CV_only_expanded2688.log
+logs/phase6_grad_cv_only_console.log
+logs/phase6_candidateF_grad_CV_only_expanded2688_cheap_eval.log
+ttk_runs_fixed/topology_finetuning/candidateF_grad_CV_only_expanded2688_eval/
+  all_sample_metrics_candidateF_grad_CV_only_expanded2688.csv
+  pairwise_cnn_vs_candidateF_grad_CV_only_expanded2688.csv
+  winner_counts_candidateF_grad_CV_only_expanded2688.csv
+  adjacent_cluster_table_candidateF_grad_CV_only_expanded2688.csv
+models_fixed/topology_finetuning/wind_finetune_candidateF_grad_CV_only_expanded2688/cnn/cnn.*
+```
+
+## LXX.2 Matched scalar/domain comparison (same 168-field benchmark)
+
+The table compares the new uploaded CV-only report and the prior uploaded gradient-only report with the frozen archived `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md` (historical full F1). The first three columns' numbers are from current eval reports; F1 is rounded to four decimals as in its archived evaluation report. **↑ means higher is better; ↓ means lower is better.** Columns are per-field means, not standard errors.
+
+| Metric | CNN | Grad-only | Grad + CV | Grad + CV + PERS (F1) |
+|---|---:|---:|---:|---:|
+| PSNRuv (dB) ↑ | 31.1925 | 33.3872 | 32.7620 | 32.4949 |
+| Speed MAE (m/s) ↓ | 0.6941 | 0.5275 | 0.5714 | 0.5899 |
+| Speed RMSE (m/s) ↓ | 1.1078 | 0.8939 | 0.9592 | 0.9891 |
+| WPD MAE (m³/s³) ↓ | 231.6709 | 169.3772 | 184.5553 | 190.6897 |
+| WPD Wasserstein-1 ↓ | 45.2713 | 22.3588 | 22.6663 | 24.7322 |
+| WPD bias abs (m³/s³) ↓ | 35.3439 | 16.4208 | 20.6194 | 22.6377 |
+| Gradient MAE ↓ | 0.3491 | 0.3107 | 0.3111 | 0.3125 |
+| Gradient W1 ↓ | 0.2329 | 0.1809 | 0.1494 | 0.1381 |
+| Gradient kurtosis abs Δ ↓ | 3.7004 | 2.5295 | 3.1057 | 3.2601 |
+| PSD log-L2 ↓ | 0.8335 | 0.8992 | 0.8433 | 0.8147 |
+| PSD slope abs Δ ↓ | 0.9150 | 1.4924 | 1.3487 | 1.1385 |
+| Exceedance abs Δ s>5 ↓ | 0.0042 | 0.0039 | 0.0022 | 0.0025 |
+| Exceedance abs Δ s>10 ↓ | 0.0066 | 0.0032 | 0.0052 | 0.0052 |
+| Exceedance abs Δ s>15 ↓ | 0.0062 | 0.0030 | 0.0025 | 0.0027 |
+| Exceedance abs Δ p90 ↓ | 0.0103 | 0.0040 | 0.0039 | 0.0047 |
+| Component-count curve L1 ↓ | 115.5278 | 97.6548 | 77.8165 | 81.1815 |
+
+Useful **CV-only versus gradient-only** mean differences (CV minus grad-only; from rounded report values):
+
+| Metric | CV − gradient-only | Interpretation |
+|---|---:|---|
+| PSNRuv (dB) | −0.6252 | Worse reconstruction PSNR |
+| Speed MAE (m/s) | +0.0439 | Worse mean scalar-speed error |
+| Speed RMSE (m/s) | +0.0653 | Worse mean scalar-speed error |
+| WPD MAE | +15.1781 | Worse magnitude-proxy error |
+| Gradient W1 | −0.0315 | Better gradient-distribution agreement |
+| Component-count curve L1 | −19.8383 | Better superlevel component-count proxy |
+| PSD log-L2 | −0.0559 | Better than gradient-only, but still worse than original CNN |
+| PSD slope abs delta | −0.1437 | Better than gradient-only, but still worse than original CNN |
+
+**CV-only vs F1:** CV-only has *better* PSNRuv (`32.7620` vs `32.4949`), scalar-speed MAE (`0.5714` vs `0.5899`) and component-count curve L1 (`77.8165` vs `81.1815`); F1 is *better* for gradient W1 (`0.1381` vs `0.1494`), PSD log-L2 (`0.8147` vs `0.8433`), and PSD slope error (`1.1385` vs `1.3487`). These are **descriptive aggregate comparisons**, not formal per-sample paired win counts and not proof that CV-only has lower PD/MT distances.
+
+**CV-only vs pretrained CNN (168 fields):** PSNRuv `32.7620` vs `31.1925` (higher on `168/168`); scalar-speed MAE `0.5714` vs `0.6941` (lower on `168/168`); component-count L1 `77.8165` vs `115.5278` (lower on `162/168`). In contrast, PSD slope error `1.3487` vs `0.9150` is worse on **168/168** samples. These counts are from the CV-only report's *comparisons against CNN*, not direct CV-versus-gradient-only comparisons.
+
+**Scientific interpretation:** CV supervision appears to exchange part of gradient-only's direct-fidelity advantage for improved **selected** topology-adjacent proxies (component counts) and gradient-distribution agreement. However, the original F1 and CV-only models also differ across metrics in different directions. True persistence/merge-tree and locality comparisons, plus the matched PERS-only training arm, are required to assess the specific CV/PERS contributions. The 168 hourly fields are temporally correlated and these are single runs per arm (no seed-replicate inference).
+
+## LXX.3 Exact terminal procedure used for CV-only evaluation
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+METHOD=candidateF_grad_CV_only_expanded2688
+
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+echo "Evaluation exit status: $?"
+```
+
+Observed concluding output:
+
+```text
+  Common samples: 168
+  Checking GT alignment … OK (max_abs_diff=0.00e+00)
+  Topology lookup loaded: 336 entries
+  Total metric rows: 672
+  Written: docs/topology_finetuning_candidateF_grad_CV_only_expanded2688_eval.md
+  Evaluation complete.
+  Evaluation exit status: 0
+```
+
+A supplementary standard-library-only report comparator is included at `scripts/compare_phase6_cheap_reports.py` **in the accompanying documentation package**. It reads the three Markdown reports without importing NumPy/pandas/TF. The code is not automatically installed to the Spark repository; copy it deliberately if useful. Comparisons of paired *per-field* candidate deltas require the generated `all_sample_metrics_*.csv` files, which have **not been supplied in this chat**. Do not invent per-field CV-versus-gradient-only counts.
+
+## LXX.4 Git patch failure, diagnosis, and non-destructive recovery
+
+The user's local repository-root `dataset_generation_and_repair_notes.md` showed Part `LXVII` as the most recently applied heading. The package `Phase6_CV_Only_Training_Notes_LXIX_20261013.zip` included mutually exclusive transition patches, but the author attempted the `LXVIII_to_LXIX` patch:
+
+```text
+error: patch failed: dataset_generation_and_repair_notes.md:37531
+error: dataset_generation_and_repair_notes.md: patch does not apply
+```
+
+The wrong starting revision caused a missing context block; `git apply --check` is non-mutating and the failed plain `git apply` also rejected the patch, so **the prior notes remain intact**. The correct old package patch would have been `phase6_grad_cv_only_LXVII_to_LXIX.patch`. However, because complete CV-only results are now available, prefer the **single cumulative `LXVII_to_LXX` patch** in the newer documentation package. It adds missing LXVIII, LXIX, and the present LXX in one operation. Other cumulative patches from LXVIII and LXIX are also provided only for alternative starting versions. Never apply more than one.
+
+Example check on Spark (after transferring/unzipping new package):
+
+```bash
+cd ~/PhIRE
+PATCH=phase6_cv_eval_docs/patches/phase6_notes_LXVII_to_LXX.patch
+git apply --check "$PATCH" && git apply "$PATCH"
+grep '^# Part LX' dataset_generation_and_repair_notes.md | tail -6
+git diff --stat -- dataset_generation_and_repair_notes.md
+```
+
+If `git apply --check` fails, do **not** use `git apply --reject`, `git reset --hard`, or overwrite the master file with a provided full file; inspect the local difference first. Keep `master`'s unrelated figure changes and the immutable `topoinvis-2026-arxiv-v1.1` release unchanged.
+
+## LXX.5 Next Phase 6 arm and deferred topology work
+
+The remaining PERS-only variant is `grad_pers_only`, method `candidateF_grad_PERS_only_expanded2688`, objective `L_uv + 0.05 L_grad + 0.002 L_TTKpers` (CV weight zero). It uses the same 2,688-sample training TFRecord, 168-sample fixed benchmark and repaired 64-pair-per-training-sample E2 constraints. Its dry-run was validated in Part LXV but a **real PERS-only run is not yet reported**. After running, first validate saved checkpoints, exact GT/IN alignment, and scalar-speed range, then run the matching cheap evaluation.
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+tmux new -s phase6_pers_only
+# Inside tmux:
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/run_candidateF_cv_pers_ablation.py --variant grad_pers_only \
+  2>&1 | tee logs/phase6_grad_pers_only_console.log
+printf 'Training pipeline exit status: %s\n' "$?"
+```
+
+Keep the completed CNN, gradient-only, CV-only and full-F1 checkpoints/arrays immutable; train one variant at a time. No expensive TTK recomputation has been performed for the new two arms. After PERS-only cheap evaluation, run **matched, corrected** PD bottleneck/W₂ and merge-tree measures and, especially for the geospatial research direction, the same locality-constrained PD matching across all four arms. Consider comparing extreme overshoots and negative PSD deviations alongside pointwise and topology scores.
+
+**Scientific status as of the supplied evidence:** Two of three new Phase 6 arms trained and cheap-evaluated; PERS-only training and all new-arm corrected PD/MT/spatial evaluations remain pending.
+
+---
+
+# Part LXXI — Phase 6 PERS-only: successful training and paired-inference pipeline; quantitative evaluation pending (October 14, 2026)
+
+## LXXI.1 New user-supplied evidence and scope
+
+On **October 14, 2026, at approximately 00:11 Central Time**, the third new Phase 6 arm, `grad_pers_only`, returned to a Spark `tmux` shell and printed **`Training pipeline exit status: 0`**. The final user-supplied excerpt contains the native runner's post-completion commands for cheap evaluation and expensive topology extraction. These commands appear only at the end of `scripts/run_candidateF_expanded2688_finetune.py`, after its three-epoch training, paired inference, and `_validate_post_inference(...)` call. A successful process exit strongly supports completion of all steps; **the detailed PERS-only validation log, model-output inventory, loss statistics, and cheap-evaluation results were not included in the supplied excerpt**. This section deliberately distinguishes those uninspected values from verified facts.
+
+Source of executable variant wrapper (Spark local): `scripts/run_candidateF_cv_pers_ablation.py`. Underlying validated runner: `scripts/run_candidateF_expanded2688_finetune.py`. Source workpack: `Phase6_CV_PERS_Spatial_Workpack.zip`; its `docs/phase6_cv_pers_ablation_protocol.md` defines the matched 2x2 design. Static checks and full PERS-only dry run passed earlier; see Part LXV.
+
+## LXXI.2 Fixed experimental definition (unchanged)
+
+| Configuration | Value |
+|---|---|
+| Variant | `grad_pers_only` |
+| Method | `candidateF_grad_PERS_only_expanded2688` |
+| Model | Existing pretrained PhIRE CNN, **fine-tuned** (no new SR architecture) |
+| Objective | `L_uv + 0.05 L_grad + 0.002 L_TTKpers` |
+| `lambda_uv` / `lambda_grad` | `1.0` / `0.05` |
+| `lambda_ttkcv` / `lambda_ttkpers` | `0.0` / `0.002` |
+| Other auxiliary lambdas | `lambda_speed=0`, `lambda_levelset=0`, `lambda_crit=0` (plus WPD disabled) |
+| Training TFRecord | `example_data_topology_expanded_2688/wind_MR-HR.tfrecord` (2,688 samples) |
+| Fixed benchmark TFRecord | `example_data_fixed/wind_MR-HR.tfrecord` (168 samples; not used for training) |
+| Fixed-pair constraints | `ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz` |
+| Constraints | Repaired E2 GT-value anchors, 64 selected persistence pairs per training sample; validated earlier |
+| Fine-tuning | Three epochs, minibatch size four, Adam learning rate `1e-5`, pretrained normalization `mu=[[0.7684,-0.4575]]`, `sig=[[5.02455,5.9017]]` |
+| Execution path | Matched E2 custom TF1-compatibility training path; **not** the older plain `pretrain()` gradient-only run |
+| Runtime | Spark ARM64, `/usr/bin/python3` Python 3.12, TensorFlow 2.20 via user site; `env -u PYTHONNOUSERSITE` preserves visibility |
+
+All four matched cells:
+
+| Cell | Variant | Gradient | Critical value (CV) | Persistence gap (PERS) | Status of training / cheap eval (at this entry) |
+|---|---|---:|---:|---:|---|
+| 00 | `grad_pair_zero` | 0.05 | 0 | 0 | **PASS / PASS**, see Parts LXVII–LXVIII |
+| 10 | `grad_cv_only` | 0.05 | 0.004 | 0 | **PASS / PASS**, see Part LXX |
+| 01 | `grad_pers_only` | 0.05 | 0 | 0.002 | **EXIT 0 / NOT YET REPORTED** |
+| 11 | `grad_e2_low` (original F1) | 0.05 | 0.004 | 0.002 | Archived completed / archived completed |
+
+This is a **single-run exploratory ablation**, without replicated training seeds. The 168 fields are consecutive hours and should not be treated as 168 statistically independent meteorological events. The F1 model was previously selected using the same established benchmark; this is not a new independent test set.
+
+## LXXI.3 Actual execution status and expected artifacts
+
+Invoked in the separate `tmux` session `phase6_pers_only`, with console logging:
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/run_candidateF_cv_pers_ablation.py \
+  --variant grad_pers_only \
+  2>&1 | tee logs/phase6_grad_pers_only_console.log
+printf 'Training pipeline exit status: %s\n' "$?"
+```
+
+**Observed terminal result (exact):**
+
+```text
+Training pipeline exit status: 0
+```
+
+The excerpt also printed `Next steps: Cheap scalar/domain evaluation (run this first)` and the TTK command. The commands were advisory only: neither evaluator nor TTK runs as a consequence of the training launcher. No PERS-only cheap-evaluation/PD/MT/spatial measurements are reported at this point.
+
+Paths to inspect, **not claimed independently verified until the inventory command runs**:
+
+```text
+logs/phase6_grad_pers_only_console.log
+logs/wind_finetune_candidateF_grad_PERS_only_expanded2688.log
+models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn/cnn.{data-00000-of-00001,index,meta}
+models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00001/cnn.*
+models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00002/cnn.*
+models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/cnn00003/cnn.*
+data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688/{idx,dataIN,dataGT,dataSR}.npy
+```
+
+### Verification command (read-only)
+
+```bash
+cd ~/PhIRE
+METHOD=candidateF_grad_PERS_only_expanded2688
+LOG="logs/wind_finetune_${METHOD}.log"
+OUT="data_out/wind_finetune_${METHOD}"
+MODEL="models_fixed/topology_finetuning/wind_finetune_${METHOD}"
+
+grep -E \
+  'Fine-tuning complete|Run complete|Post-inference validation complete|^\[OK\]|^\[WARNING\]|^\[report\]|Checkpoint:' \
+  "$LOG" | tail -45
+ls -lh "$OUT"/{idx,dataIN,dataGT,dataSR}.npy
+ls -lh "$MODEL"/cnn/cnn.*
+```
+
+Check exact `idx.npy == 0..167`, finite arrays of shapes `(168,)`, `(168,100,100,2)` and `(168,500,500,2)`, and `np.array_equal=True`, `max_abs_diff=0` for both evaluation GT and IN against the fixed baseline. Inspect **GT/SR scalar-speed ranges** and `Mean absolute scalar-speed error` for severe overshoot. The CV-only run's max SR speed was 39.3331 m/s vs GT max 33.9885 m/s; this should prompt per-sample inspection but is **not** an automatic fatal failure. The PERS-only max is as yet unknown.
+
+## LXXI.4 Next action: inexpensive numerical/domain evaluation (not yet run)
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+METHOD=candidateF_grad_PERS_only_expanded2688
+
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+
+printf 'Evaluation exit status: %s\n' "$?"
+```
+
+Expected **only after successful execution**:
+
+```text
+docs/topology_finetuning_candidateF_grad_PERS_only_expanded2688_eval.md
+ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_eval/all_sample_metrics_candidateF_grad_PERS_only_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_eval/pairwise_cnn_vs_candidateF_grad_PERS_only_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_eval/winner_counts_candidateF_grad_PERS_only_expanded2688.csv
+ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_eval/adjacent_cluster_table_candidateF_grad_PERS_only_expanded2688.csv
+logs/phase6_candidateF_grad_PERS_only_expanded2688_cheap_eval.log
+```
+
+The evaluator should produce four methods × 168 benchmark fields = **672 rows** if successful. This is an **expectation**, not an observed result for PERS-only. As with gradient-only and CV-only, the local NumPy 2.4.2/scikit-image ABI mismatch may cause SSIM to be `NaN`; do not equate missing SSIM with a scientifically measured zero, and do not modify the successful TF installation merely to suppress that warning. Extract the new report's actual PSNRuv, speed MAE/RMSE, gradient MAE/W1, WPD MAE/W1/bias, PSD errors, exceedance errors, component curve L1, and within-168 win counts.
+
+For quick inspection after the cheap evaluation, without importing NumPy or pandas:
+
+```bash
+cd ~/PhIRE
+/usr/bin/python3 - <<'PYMETRICS'
+import csv
+from pathlib import Path
+method='candidateF_grad_PERS_only_expanded2688'
+p=(Path('ttk_runs_fixed/topology_finetuning') / (method+'_eval') /
+   ('pairwise_cnn_vs_'+method+'.csv'))
+with p.open(newline='') as f:
+    rows={r['metric']: r for r in csv.DictReader(f)}
+for metric in ('psnruv','speed_mae','speed_rmse','grad_mae','grad_w1',
+               'wpd_mae','wpd_w1','psd_log_l2','psd_slope_abs_delta',
+               'exceed_abs_t5','exceed_abs_t10','exceed_abs_t15',
+               'comp_curve_l1','ssim'):
+    r=rows.get(metric)
+    if r:
+        print(f"{metric:22s} CNN={r['mean_baseline_cnn']}  "
+              f"PERS={r['mean_'+method]}  delta={r['delta']}  "
+              f"improved={r['n_improved']}/{r['n_valid']}")
+PYMETRICS
+```
+
+After obtaining the report, complete matched side-by-side analysis of control, CV-only, PERS-only and archived F1 (historical F1 report: `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md`). For lower-is-better metric `Y`, cell-effect analysis should explicitly report:
+
+```text
+CV main effect   = ((Y_CV - Y_control) + (Y_F1 - Y_PERS))/2
+PERS main effect = ((Y_PERS - Y_control) + (Y_F1 - Y_CV))/2
+interaction      = Y_F1 - Y_CV - Y_PERS + Y_control
+```
+
+These are descriptive within-benchmark factorial contrasts; controlling training randomness and accounting for temporal dependence are future work. **Do not infer PD, MT or spatial persistence improvements from component-count proxy metrics.**
+
+## LXXI.5 Not started: corrected topology and spatial persistence evaluations
+
+The runner's printed TTK command is not evidence that TTK ran. The historical TTK output `pd_distance` is **not** the accepted corrected-PD analysis. When the cheap evaluations are confirmed non-catastrophic, compute topology consistently across the three new variants using the same 160×160 top-left scalar-speed patch and TTK conventions as F1, then recompute corrected `d_B`, `W_{2,∞}`, `W_{2,2}`, and MT distance. Validate new diagrams with the independently audited GUDHI procedure; do **not** quote the legacy pipeline's superseded PD distance as the corrected value. Follow with the identical Phase 5E locality-constrained matching (radii 4, 8, 16, 32, 64, infinity), reporting GT coverage separately from constrained matching cost.
+
+Do not begin expensive TTK work solely because training exited 0: first inspect PERS-only numerical/domain metrics, including spectral regressions and possible wind-speed overshoots. Keep original published checkpoints, fixed benchmark data, F1 results and frozen tag `topoinvis-2026-arxiv-v1.1` untouched.
+
+## LXXI.6 Provenance / Git worktree / outstanding evidence
+
+This documentation addition is generated separately from Spark; it is **not** evidence of executing a command or editing the user's remote repository. User previously worked on `master`, with unrelated uncommitted changes under `figures/paper_sample78/` and `scripts/paper_sample78_figure.py`. Apply only a patch matching the local document's latest `# Part ...` section (`git apply --check` first). The last explicitly shown successful documentation update was earlier than the optional Part LXX patch: do not assume Part LXX is already present until checking. Do not run `git reset --hard`, discard unrelated work, or stage every untracked file.
+
+**Evidence still requested:** PERS-only validation `grep`/checkpoint inventory; PERS-only evaluator output and full Markdown report; any overshoot samples; eventually checkpoint/data hashes and corrected PD/MT/spatial results. The completed training of all three new arms is an important milestone, but **scientific comparison of all four factorial cells is not finished until PERS-only evaluation and paired topology metrics are available**.
+
+
+---
+
+# Part LXXII — Phase 6 PERS-only: verified numerical evaluation and full four-arm CV×PERS ablation (October 14, 2026)
+
+## LXXII.1 Status, evidence, and chronology
+
+**Authoritative new finding:** The researcher supplied the PERS-only training-validation terminal output, a successful cheap evaluator transcript (`Evaluation exit status: 0`), and the generated report `docs/topology_finetuning_candidateF_grad_PERS_only_expanded2688_eval.md` (generated 2026-10-14). **The new 2×2 study now has complete training, paired inference, and scalar/domain evaluation for all four arms.** Section LXXI is retained as a historical, timestamped *pre-evaluation* snapshot; its statement that PERS-only evaluation was pending is superseded by this LXXII entry. Do not change LXXI retrospectively.
+
+A separate Git patch attempt failed because the user selected the `phase6_notes_LXVII_to_LXXI.patch` file even though `grep '^# Part LX' ... | tail` showed the local file **already ended at Part LXX**. The failed `git apply --check` rejected the wrong-base patch, so the LXXI entry was **not** added to the Spark copy in that attempt. This update includes a **single verified LXX→LXXII** patch to add both LXXI and LXXII; no manual deletion/reset is required. The earlier worktree includes unrelated uncommitted figure and code changes; neither those nor the frozen `topoinvis-2026-arxiv-v1.1` tag should be modified by the docs-only patch.
+
+New arm: `grad_pers_only`, method `candidateF_grad_PERS_only_expanded2688`. This is fine-tuning of the original pretrained PhIRE CNN, **not a new SR architecture**. The loss configuration is normalized `L_uv` (coefficient 1.0), scalar-speed gradient `L_grad` (0.05), fixed-index TTK persistence-gap supervision `L_TTKpers` (0.002), with `L_TTKCV=0.0`, `L_crit=0.0`, `L_speed=0.0`, `L_levelset=0.0` and `L_wpd=0.0`. See `scripts/run_candidateF_cv_pers_ablation.py` and `scripts/run_candidateF_expanded2688_finetune.py`. Uses the repaired paired-constraint file and exactly 64 constraints per training field, as validated in Part LXV.
+
+The fixed datasets and experiment outputs are:
+
+```text
+Training: example_data_topology_expanded_2688/wind_MR-HR.tfrecord          # 2,688 fields
+Benchmark: example_data_fixed/wind_MR-HR.tfrecord                        # 168 fields
+E2 targets: ttk_runs_fixed/topology_finetuning/candidateE2_fixed_lowlambda_expanded2688_constraints/ttk_pd_critical_pairs_gtvalues.npz
+Training script: scripts/run_candidateF_cv_pers_ablation.py --variant grad_pers_only
+Primary log: logs/wind_finetune_candidateF_grad_PERS_only_expanded2688.log
+Console log: logs/phase6_grad_pers_only_console.log
+Checkpoint root: models_fixed/topology_finetuning/wind_finetune_candidateF_grad_PERS_only_expanded2688/
+  cnn00001/cnn, cnn00002/cnn, cnn00003/cnn, cnn/cnn
+Inference: data_out/wind_finetune_candidateF_grad_PERS_only_expanded2688/
+  idx.npy, dataIN.npy, dataGT.npy, dataSR.npy
+Cheap-eval script: scripts/evaluate_finetune_candidate.py
+Cheap-eval log: logs/phase6_candidateF_grad_PERS_only_expanded2688_cheap_eval.log
+Cheap-eval results: ttk_runs_fixed/topology_finetuning/candidateF_grad_PERS_only_expanded2688_eval/
+  all_sample_metrics_candidateF_grad_PERS_only_expanded2688.csv
+  pairwise_cnn_vs_candidateF_grad_PERS_only_expanded2688.csv
+  winner_counts_candidateF_grad_PERS_only_expanded2688.csv
+  adjacent_cluster_table_candidateF_grad_PERS_only_expanded2688.csv
+Report: docs/topology_finetuning_candidateF_grad_PERS_only_expanded2688_eval.md
+```
+
+**Validated runtime results (user's Spark output):** `Training pipeline exit status: 0`; three epoch checkpoints and final `cnn/cnn` checkpoint present; `idx.npy` shape `(168,)` exactly ordered `0..167`, `dataIN.npy` `(168,100,100,2)`, `dataGT.npy` and `dataSR.npy` `(168,500,500,2)` each, all finite; `dataGT.npy` and `dataIN.npy` **exactly equal** to fixed CNN benchmark (`np.array_equal=True`, max absolute difference `0`). GT wind components: `u=[-16.1737,30.8122]`, `v=[-30.4676,28.1310]`; PERS-only SR `u=[-17.6968,28.4375]`, `v=[-29.2251,28.2943]`. GT scalar-speed range `[0.0122,33.9885] m/s`, PERS-only SR `[0.0006,37.9284] m/s`; mean speed MAE **0.5805 m/s**. PERS-only maximum exceeds this particular fixed benchmark's GT maximum by **3.9399 m/s (~11.6%)**. This merits per-field high-speed checks but is not, by itself, proof of physically invalid winds; similarly CV-only has a larger +5.3446 m/s (~15.7%) maximum overshoot. Gradient-only's max was 33.4720 m/s.
+
+The cheap evaluator confirmed `Common samples: 168`, benchmark `GT alignment ... max_abs_diff=0.00e+00`, 336 existing CNN/GAN topology lookup entries, **672 output rows** (bicubic/CNN/GAN/PERS-only × 168 fields), and `Evaluation exit status: 0`. **SSIM was not computed for any candidate** because of the `skimage`/NumPy binary ABI mismatch (`Expected 96 from C header, got 88 from PyObject`); NaN/0-valid comparisons are *missing*, not measured zeros. Avoid changing the working TF1-compat installation merely to silence these errors; use an isolated clean SSIM replay with the paper's validated metric convention later.
+
+## LXXII.2 Exact PERS-only evaluation command and terminal checkpoints
+
+```bash
+cd ~/PhIRE
+mkdir -p logs
+set -o pipefail
+METHOD=candidateF_grad_PERS_only_expanded2688
+
+env -u PYTHONNOUSERSITE /usr/bin/python3 \
+  scripts/evaluate_finetune_candidate.py \
+  --candidate-name "$METHOD" \
+  --candidate-dir "data_out/wind_finetune_${METHOD}" \
+  --cnn-dir data_out_fixed/wind_mrhr_cnn \
+  --gan-dir data_out_fixed/wind_mrhr_gan \
+  --merged-csv ttk_runs_fixed/combined/psnr_topology_physics_merged.csv \
+  --out-dir "ttk_runs_fixed/topology_finetuning/${METHOD}_eval" \
+  2>&1 | tee "logs/phase6_${METHOD}_cheap_eval.log"
+
+echo "Evaluation exit status: $?"
+```
+
+Key observed lines, selectively reproduced from user-supplied terminal output:
+
+```text
+[validate] Post-inference validation complete: shapes, exact idx order, finiteness, and ... GT/IN alignment all passed.
+Run complete.
+GT scalar-speed range : [0.0122, 33.9885] m/s
+SR scalar-speed range : [0.0006, 37.9284] m/s
+Mean absolute scalar-speed error (SR vs GT): 0.5805 m/s
+Common samples: 168
+Checking GT alignment … OK (max_abs_diff=0.00e+00)
+Total metric rows: 672
+Written: docs/topology_finetuning_candidateF_grad_PERS_only_expanded2688_eval.md
+Evaluation complete.
+Evaluation exit status: 0
+```
+
+## LXXII.3 Complete four-cell matched scalar/domain comparison
+
+All candidate values below are arithmetic means **as rounded to four decimals in the respective Markdown evaluation reports**. The three new reports were supplied in chat. The fourth is the archived `docs/topology_finetuning_candidateF_grad_E2_low_expanded2688_eval.md` (F1, generated 2026-07-16). All four use the same fixed 168-sample benchmark, evaluator conventions, pretrained CNN reference and gradient coefficient `0.05`, at 2,688 training samples. The four arms are: `(CV=0,PERS=0)=grad_pair_zero`; `(1,0)=grad_cv_only`; `(0,1)=grad_pers_only`; `(1,1)=grad_e2_low` (F1). ↑ is higher is better; ↓ is lower is better. The baseline CNN is **not** the factorial zero cell, which is the fine-tuned gradient-only control.
+
+| Metric | CNN | Grad-only (00) | Grad+CV (10) | Grad+PERS (01) | Full F1 (11) |
+|---|---:|---:|---:|---:|---:|
+| PSNRuv (dB) ↑ | 31.1925 | 33.3872 | 32.7620 | 32.6119 | 32.4949 |
+| Speed MAE (m/s) ↓ | 0.6941 | 0.5275 | 0.5714 | 0.5805 | 0.5899 |
+| Speed RMSE (m/s) ↓ | 1.1078 | 0.8939 | 0.9592 | 0.9781 | 0.9891 |
+| WPD MAE (m³/s³) ↓ | 231.6709 | 169.3772 | 184.5553 | 188.9087 | 190.6897 |
+| WPD Wasserstein-1 ↓ | 45.2713 | 22.3588 | 22.6663 | 16.4613 | 24.7322 |
+| WPD bias abs (m³/s³) ↓ | 35.3439 | 16.4208 | 20.6194 | 10.5507 | 22.6377 |
+| Gradient MAE ↓ | 0.3491 | 0.3107 | 0.3111 | 0.3116 | 0.3125 |
+| Gradient W1 ↓ | 0.2329 | 0.1809 | 0.1494 | 0.1412 | 0.1381 |
+| Gradient kurtosis abs Δ ↓ | 3.7004 | 2.5295 | 3.1057 | 3.1732 | 3.2601 |
+| PSD log-L2 ↓ | 0.8335 | 0.8992 | 0.8433 | 0.8699 | 0.8147 |
+| PSD slope abs Δ ↓ | 0.9150 | 1.4924 | 1.3487 | 1.4574 | 1.1385 |
+| Exceedance abs Δ s>5 ↓ | 0.0042 | 0.0039 | 0.0022 | 0.0021 | 0.0025 |
+| Exceedance abs Δ s>10 ↓ | 0.0066 | 0.0032 | 0.0052 | 0.0020 | 0.0052 |
+| Exceedance abs Δ s>15 ↓ | 0.0062 | 0.0030 | 0.0025 | 0.0019 | 0.0027 |
+| Exceedance abs Δ p90 ↓ | 0.0103 | 0.0040 | 0.0039 | 0.0033 | 0.0047 |
+| Component-count curve L1 ↓ | 115.5278 | 97.6548 | 77.8165 | 77.0109 | 81.1815 |
+| SSIM (speed) | N/A | N/A | N/A | N/A | N/A |
+
+Interpretation, with important limitations:
+
+- **Fidelity:** Gradient-only is best of the four fine-tuned cells on PSNRuv (`33.3872`) and speed MAE (`0.5275 m/s`), with all **168/168** benchmark fields improved versus the pretrained CNN for both measures. This does not establish a direct per-field win count against the other three fine-tuned cells; that would require comparing their saved per-field CSVs by sample ID.
+- **CV-only structural proxy:** Component-count curve L1 drops from `97.6548` (gradient-only) to `77.8165` (CV-only), even below the historical F1 value `81.1815`. **PERS-only improves it still further to `77.0109`**, the lowest of the four. These are connected-component curve proxies, **not** persistence-diagram/merge-tree distances and **not** proof of spatial placement correctness.
+- **PERS-only wind-power/distribution agreement:** WPD Wasserstein-1 is the best of the four at `16.4613` (gradient-only `22.3588`, CV-only `22.6663`, F1 `24.7322`), and WPD bias absolute error is lowest at `10.5507` (gradient-only `16.4208`, CV-only `20.6194`, F1 `22.6377`). PERS-only also leads these four on exceedance errors at `s>10`, `s>15` and p90 in the rounded reports. These are substantive *scalar/domain* advantages, not yet verified true topological gains.
+- **Full F1 strengths:** It has the lowest gradient W1 `0.1381`, PSD log-L2 `0.8147`, and PSD slope deviation `1.1385` *among the four fine-tuned cells*. The pretrained CNN PSD slope deviation `0.9150` remains **better than all four fine-tuned cells**; compared with CNN, the three new single-auxiliary arms worsen PSD slope on `168/168` benchmark fields. Do not describe F1's PSD-slope result as a universal improvement over the unmodified CNN.
+- **Wind extremes and SSIM:** PERS-only and CV-only each reach a larger scalar-speed maximum than the maximum observed in this benchmark GT; inspect extremes by sample and space. SSIM is missing for the whole table due to the local broken dependency.
+
+## LXXII.4 Descriptive factorial effects from rounded aggregate means
+
+For a metric `Y` with the four cells `Y_00` (gradient-only), `Y_10` (CV-only), `Y_01` (PERS-only), and `Y_11` (full F1), use:
+
+```text
+CV averaged main effect    = ((Y_10 - Y_00) + (Y_11 - Y_01))/2
+PERS averaged main effect  = ((Y_01 - Y_00) + (Y_11 - Y_10))/2
+CV×PERS interaction       = Y_11 - Y_10 - Y_01 + Y_00
+```
+
+| Metric | CV averaged main effect | PERS averaged main effect | CV×PERS interaction |
+|---|---:|---:|---:|
+| PSNRuv (dB) | -0.3711 | -0.5212 | +0.5082 |
+| Speed MAE (m/s) | +0.0267 | +0.0358 | -0.0345 |
+| Gradient W1 | -0.0173 | -0.0255 | +0.0284 |
+| WPD Wasserstein-1 | +4.2892 | -1.9158 | +7.9634 |
+| WPD bias abs (m³/s³) | +8.1428 | -1.9259 | +7.8884 |
+| Component-count curve L1 | -7.8338 | -8.6394 | +24.0089 |
+| PSD log-L2 | -0.0555 | -0.0290 | +0.0007 |
+| PSD slope abs Δ | -0.2313 | -0.1226 | -0.1752 |
+| Exceedance abs Δ s>10 | +0.0026 | -0.0006 | +0.0012 |
+
+The effects are **descriptive mean contrasts from rounded source reports**; the underlying unrounded sample-level means may change the final reported digits slightly. For PSNR, positive differences are better; for every other listed error metric, negative differences are better. The interaction is a difference-in-differences in the metric's own units, **not a p-value**, and is only meaningful conditional on the fixed gradient loss/training setup. These 168 fields include temporal dependence and there is only one completed training run per arm: uncertainty, seed sensitivity, statistical significance, and generalizability **have not been established**. A robust follow-on should calculate paired per-field contrasts from matching `sample_idx` across the generated CSVs and, if warranted, repeat training with controlled seeds and temporally aware inference.
+
+The optional standard-library-only reproducibility script supplied alongside this notes update is `scripts/compare_phase6_2x2_reports.py`. It reads four existing report Markdown files from the Spark repository, validates that CNN anchor values match, prints the 2×2 summary, averaged effects and interactions, and does not write files or import TensorFlow/NumPy/scikit-image. Run it without copying it into the repository:
+
+```bash
+cd ~/PhIRE
+/usr/bin/python3 phase6_lxxii_update/scripts/compare_phase6_2x2_reports.py --repo-root "$PWD"
+```
+
+## LXXII.5 What **has not** been measured, and next reproducibility checkpoints
+
+- The new gradient-only, CV-only and PERS-only arms have **no newly computed PD bottleneck, corrected W₂, merge-tree, or Phase 5E locality-constrained matching metrics**. The 336 historical lookup entries in the cheap evaluator come from the CNN/GAN baseline CSV only, not from candidate topology. Treat all new-cell candidate PD/MT values as **pending**.
+- The old TTK `pd_distance` printed for historical CNN/GAN and the historical F1 topology report are **not substitutes** for the accepted corrected/GUDHI-audited PD-distance procedure. To compare topology, first run each candidate's TTK VTI/PD/MT generation consistently, with frozen 160×160 speed patch conventions, then apply the **corrected** PD distance audit and matching merge-tree method across the same 168 sample indices. Match sample order and version/hash all inputs; then run the same Phase 5E radii `r ∈ {4,8,16,32,64,∞}` on the feature-anchor localities, explicitly separating ground-truth feature coverage from locality-constrained matching cost. Record the pixel-to-geographic distance calibration before referring to physical kilometers.
+- Preserve training checkpoints, per-field arrays and all original reports unchanged. Optionally create a manifest with `sha256sum` for critical data/CSV/checkpoint artifacts; store logs and package/version manifests separately, including the TF 2.20.0 `compat.v1` runtime and NumPy ABI limitation. Do not commit large ignored `.npy` arrays to Git by accident.
+- Inspect high-speed extremes: the PERS-only `37.9284 m/s` and CV-only `39.3331 m/s` maxima are *dataset-wide maxima*, not evidence that a particular sample/position has been located. A per-field maximum and absolute-error audit is needed to identify overshoot locations before scientific interpretation.
+- For a future manuscript figure, characterize the trade-off honestly: gradient-only = best pointwise fidelity; CV-only and PERS-only = stronger selected structural proxies, with PERS-only leading WPD distribution/bias; F1 = strongest gradient W1 and PSD among these four fine-tuned cells. No claim of individual CV/PERS contributions to true topology can be made until the matched corrected topological results exist.
+
+**Status at the close of LXXII:** Three newly trained arms, plus archived full F1, are now available with **all four scalar/domain evaluations**. SSIM, new-arm corrected PD/MT, spatially constrained persistence and uncertainty analysis remain incomplete. The failed wrong-base LXVII→LXXI Git patch did not update the repository; use the bundled **LXX→LXXII cumulative patch** only after its `git apply --check` succeeds.
+
+---
+
+# Part LXXIII — Phase 6: topology preflight and isolated sample-0 extraction pilot prepared (October 14, 2026)
+
+**Status:** Preflight evidence supplied from Spark and reviewed. **The sample-0 pilot is prepared but has not yet been run.** The existing three trained arms and four scalar/domain reports remain unchanged. No new candidate PD/MT distance, corrected PD audit, or locality metric is yet reported.
+
+## Preflight observed on `spark-345b` in `~/PhIRE`
+
+| Check | Observed output | Interpretation |
+|---|---|---|
+| `bash -n scripts/run_candidate_topology_pipeline.sh` | `Shell syntax: PASS` | Shell syntax valid; not an execution test |
+| `docker image inspect phire-ttk:latest` | `sha256:858d3154edb75c098ccda15f9f812eecbd0d102af77055906d42a67a390d5c86` | Required extraction image present |
+| `df -h .` | `/dev/nvme0n1p2`: 3.6T total; 980G used; 2.5T available; 29% used | No immediate disk-space obstacle evident; future output volume unmeasured |
+| Gradient-only input | `dataGT.npy`, `dataSR.npy` each 641M, `idx.npy` 1.5K | All three files exist |
+| CV-only input | `dataGT.npy`, `dataSR.npy` each 641M, `idx.npy` 1.5K | All three files exist |
+| PERS-only input | `dataGT.npy`, `dataSR.npy` each 641M, `idx.npy` 1.5K | All three files exist |
+| Corrected-PD historical audit | `$HOME/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_full_sweep.py` (30K), `w22_full_sweep.csv` (6.9M) | Existing auditor and historical output found; NOT yet applied to new arms |
+| Pipeline SHA-256 | `830be1026b33a39ea7a15d193980baa0a249e90bbb9a2c6b07a480abec67646f` | `scripts/run_candidate_topology_pipeline.sh` |
+| Historical distance-script SHA-256 | `6a0a3277ff19998a4d781002bd5db7d8072ea9c83d950921a4e23ba7710cde75` | `scripts/compute_composite_tree_distance.py` — preservation/identification only, NOT a corrected-PD reference |
+
+Earlier run logs independently validated all 168 index positions, exact benchmark GT/input alignment, finite outputs and shape checks. This preflight checks **file presence**, not hashes or contents. Do not infer that the files were successfully extracted or that the historical audit CSV contains these three new candidates.
+
+## Why isolate Stage 1/2 instead of calling the entire historical wrapper?
+
+The current `scripts/run_candidate_topology_pipeline.sh` couples (1) `scripts/convert_phire_to_vti.py`, (2) TTK `ttkPersistenceDiagramCmd`/`ttkMergeTreeCmd`, (3) `scripts/compute_composite_tree_distance.py`, and (4–5) legacy summary/reporting. Its Stage 3 calls `ttkBottleneckDistance` and writes the historical `pd_distance` outputs. Those outputs cannot substitute for the later independently audited, corrected persistence distances. **Do not use `bash scripts/run_candidate_topology_pipeline.sh --n-samples 1` as a corrected-distance pilot**: its later stages are not the audited pipeline. Reuse only its VTI and TTK extraction conventions.
+
+The reviewed `scripts/convert_phire_to_vti.py` generates speed from physical `[u,v]`, crops `160 × 160` at `(x0,y0)=(0,0)`, creates active scalar array **`wind_speed`**, and writes VTK points in correct row-major/`x`-fastest orientation. The script's exact output naming pattern for the first field is `<method>_<GT|SR>_s0_speed_p160_x0_y0.vti`. Preserve all these conventions for baseline/F1/new-arm comparability.
+
+## Prepared pilot — sample 0 of gradient-only (`CV=0,PERS=0`)
+
+The delivered (not yet executed on Spark) helper script:
+
+- `scripts/phase6_topology_s0_extraction_pilot.sh`
+
+was shell syntax-checked with `bash -n`. It creates only a **new, isolated** directory:
+
+```
+ttk_runs_fixed/topology_finetuning/
+  candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/
+    vti/
+    pd/
+    mt/
+```
+
+It reads existing `data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataGT.npy`, `dataSR.npy`, `idx.npy` without editing them, writes only sample 0 GT and SR `160×160` speed VTI files via Docker, reopens both VTI files in the same image, checks `(160,160,1)`, active point array `wind_speed`, numerical fidelity (maximum error and `np.testing.assert_allclose`), and **spatial orientation against NumPy**. It then extracts each field's PD port 0 and MT ports 0/1/2 using the same `ttkPersistenceDiagramCmd`/`ttkMergeTreeCmd`, `-t 1`, `-a wind_speed` conventions as the main wrapper. It refuses to declare success when expected files are absent or empty; it skips complete existing results to support safe reruns. It does not run Stage 3/5 or generate any historical PD/MT distance.
+
+From `~/PhIRE`, after transferring the companion bundle and extracting to `phase6_lxxiii_update/`, run:
+
+```bash
+cd ~/PhIRE
+bash -n phase6_lxxiii_update/scripts/phase6_topology_s0_extraction_pilot.sh
+mkdir -p logs
+set -o pipefail
+bash phase6_lxxiii_update/scripts/phase6_topology_s0_extraction_pilot.sh \
+  2>&1 | tee logs/phase6_topology_s0_extraction_pilot_20261014.log
+printf 'Pilot exit status: %s\n' "$?"
+```
+
+A successful run should print two lines `[PASS] GT` and `[PASS] SR`, each including a maximum VTI round-trip difference; produce **two PD port-0 files** and **six MT port files** (three each for GT and SR); print `[PILOT] PASS`; and exit 0. **These are expected outcomes, not observed outcomes as of this note.** Preserve actual output and any warnings or mismatches verbatim when the user reports them.
+
+## Corrected-distance follow-up (not yet executed)
+
+After the small pilot, verify exact pairs and persistence arrays, inspect the local `w22_full_sweep.py` CLI/source and archived manifest/environment (do not assume it supports newly named methods without modification), then establish a corrected-GUDHI comparison for the single test field. Only after this succeeds should all 168 GT/SR fields be extracted for the three new arms and the corrected-PD, audited MT and Phase 5E locality comparisons performed with their frozen conventions. The historical `w22_full_sweep.csv` is a benchmark reference, not new-arm output. For scientific reporting, preserve method/sample indices, per-file hashes, extracted diagram conventions and the audit's exact distance definitions.
+
+---
+
+# Part LXXIV — Phase 6: successful sample-0 extraction and corrected-GUDHI pilot gate (October 14, 2026)
+
+## LXXIV.1 Observed sample-0 extraction result
+
+The researcher ran the isolated Part LXXIII pilot on Spark and supplied the final terminal lines from the extraction. The new gradient-only method is `candidateF_grad_pairzero_expanded2688` (`CV=0`, `PERS=0`). The log showed TTK writing the SR merge-tree ports and a nonempty SR PD port-0 VTU, SR MT ports 0 and 1 VTUs, and SR MT port-2 VTI. The pilot finished with the explicit success lines:
+
+```text
+[PILOT] PASS: GT and SR sample 0 VTI, PD and three MT ports present.
+[PILOT] Historical TTK distances deliberately NOT computed.
+[PILOT] Files in: ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014
+Pilot exit status: 0
+```
+
+**Updated status:** The sample-0 pilot is now **EXECUTED / PASS**, superseding Part LXXIII's historical prepared-but-not-run snapshot. Its own verification confirms 2 speed VTIs (GT/SR), 2 PD port-0 VTUs (GT/SR), and 6 MT outputs (ports 0/1/2 for GT/SR). This is an **extraction success**, not a corrected PD-distance result, MT-distance result, or spatial correspondence result. The source conversation excerpt does not include the complete earlier VTI numerical `[PASS]` lines, so do not invent their exact round-trip errors.
+
+## LXXIV.2 Historical corrected-distance conventions to preserve
+
+The authoritative corrected PD audit (Part XXXV) uses the archived `$AUDIT/recompute_pd/canonical_pd_pilot.py` `read_pd()` implementation to read finite TTK D0/D1 birth/death pairs (excluding display diagonal and the global/nonfinite pair), and then independent GUDHI distance calls:
+
+- `d_B`: `gudhi.bottleneck_distance(A,B,e=0.0)`; aggregate = `max(D0,D1)`.
+- `W_{2,∞}`: `wasserstein_distance(A,B,matching=False,order=2.0,internal_p=np.inf,keep_essential_parts=False)`; aggregate = `hypot(D0,D1)`.
+- `W_{2,2}`: same with `internal_p=2.0`; separately named and **not** interchangeable with `W_{2,∞}`.
+
+These are distances **between the pairs extracted by TTK**, not a GUDHI re-extraction of topology from the `.vti` scalar field. Avoid the superseded `ttkBottleneckDistance` / Stage-3 `pd_distance` result. The historical full corrected/GUDHI audit covered 8,568 GT-SR comparisons with all PASS, but **none** of the new Phase 6 three ablation arms was included in that archived sweep.
+
+## LXXIV.3 Prepared next gate — historical CNN sample-0 regression, then new gradient-only sample 0
+
+Companion helper: `phase6_lxxiv_update/scripts/phase6_s0_corrected_pd_gudhi.py`. The helper has been syntax-checked outside Spark; no real GUDHI run of this new helper has occurred as of this entry. It reads the existing isolated pilot outputs and the two historical CNN sample-0 PDs under `ttk_runs_fixed/cnn/pd/`, and imports the actual archived canonical parser rather than writing a new parser.
+
+The historical regression reference from Part XXXV is:
+
+```text
+CNN sample 0:
+  GT D0=967, SR D0=703, GT D1=871, SR D1=632
+  dB_all    = 3.0914716720581055
+  W2inf_all = 17.467813434330861
+```
+
+The helper requires cardinality equality and numerical reproduction of these archived values (relative tolerance `1e-12`, absolute tolerance `1e-10`) before calculating/saving the new method's corrected `d_B`, `W_{2,∞}`, and `W_{2,2}`. All paths must resolve uniquely, VTI/PD/MT files must be nonempty, and all analyzed PD arrays must be finite N×2 with `death >= birth`. It preserves SHA-256 hashes for every pilot VTI, PD, and MT artifact, historical reference PDs, and the canonical parser. It writes only a **new** JSON summary and refuses to overwrite an existing one.
+
+Run from `~/PhIRE` after transferring the companion ZIP:
+
+```bash
+# Read-only preflight; no GUDHI import or write
+/usr/bin/python3 phase6_lxxiv_update/scripts/phase6_s0_corrected_pd_gudhi.py --preflight-only
+
+# Isolated corrected-GUDHI numerical pilot
+mkdir -p logs
+set -o pipefail
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit \
+  python phase6_lxxiv_update/scripts/phase6_s0_corrected_pd_gudhi.py \
+  2>&1 | tee logs/phase6_s0_corrected_pd_gudhi_20261014.log
+echo "Corrected-PD audit exit status: $?"
+```
+
+Expected output location *if the program executes and passes*:
+
+```text
+ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_corrected_pd_audit_20261014/phase6_s0_corrected_pd.json
+```
+
+**Next gate:** Inspect actual historical regression PASS, new sample-0 finite D0/D1 counts, corrected distance values and exit code. Only then expand VTI+PD+MT extraction to all 168 benchmark indices for each of the three new methods, with an explicit source-hash manifest, a validated corrected-PD pipeline, the matched MT distance parameterization, and Phase 5E's canonical locality solver. Keep corrected `W_{2,∞}` distinct from Euclidean-ground `W_{2,2}`; compare candidate and F1 topological values only under matched extraction/metric conventions. No corrected candidate distance, MT result, or spatial-locality win is asserted yet.
+
+---
+
+# Part LXXV — Phase 6: corrected sample-0 GUDHI result and GT parity gate (October 14, 2026)
+
+## LXXV.1 Researcher-observed corrected-PD completion
+
+From a real Spark execution of the `phase6_lxxiv_update` corrected-PD script:
+
+```text
+[PREFLIGHT] Canonical parser and historical CNN sample-0PDs found
+[PREFLIGHT] 10 pilot artifacts (2 VTI + 2 PD + 6 MT) present and nonempty
+[PREFLIGHT] SHA256 manifest prepared in memory
+[REGRESSION] PASS CNN sample-0 dB=3.09147167206 W2inf=17.4678134343
+[NEW MODEL] D0 GT/SR=968/1493 D1 GT/SR=871/1569
+[NEW MODEL] dB_all=2.58057403564
+[NEW MODEL] W2inf_all=15.6249480697
+[NEW MODEL] W22_all=18.6702768797
+[OUTPUT] /home/adadhwal/PhIRE/ttk_runs_fixed/topology_finetuning/candidateF_grad_pairzero_expanded2688_s0_corrected_pd_audit_20261014/phase6_s0_corrected_pd.json
+[AUDIT] PASS: historical GUDHI reference reproduced and gradient-only sample-0 corrected PD values saved
+[AUDIT] Merge-tree and spatial-locality distances NOT computed
+Corrected-PD audit exit status: 0
+```
+
+These are genuine new **sample-0 corrected PD distance results** for gradient-only. The reported canonical count mismatch is noteworthy: historical CNN sample-0 GT finite D0=967, D1=871, while new gradient-only sample-0 GT finite D0=968, D1=871. A passed reference-distance regression does **not** establish GT scalar or GT diagram identity across runs. The historical pipeline default was `-t 20` while the isolated new pilot used `-t 1`; no causal explanation for the one-pair discrepancy is yet established. Differences relative to historical CNN distances (CNN dB 3.0914716721, W2inf 17.4678134343) must remain **provisional** until the GT-equivalence check is completed. W22 historical CNN was not rechecked by this run.
+
+## LXXV.2 Prepared read-only parity diagnostic
+
+The companion bundle `Phase6_S0_GT_Parity_Gate_LXXV_20261014.zip` contains `scripts/phase6_s0_gt_parity.py`, which reads the archived fixed CNN `dataGT.npy`, current gradient-only `dataGT.npy`, benchmark index arrays, historical CNN and new sample-0 VTI speed fields, and their TTK PD port-0 VTUs. It compares arrays, field identity and canonical finite D0/D1 multisets. Exact artifact SHA-256s are inventoried. All diagnostics are read-only and are run from the repository; no Spark experiment is executed as part of preparing this bundle.
+
+Running instructions are in `phase6_lxxv_update/README.md`. Python and Bash extraction script syntax / archive are tested outside Spark; actual data results are still pending.
+
+## LXXV.3 Interpretation gate
+
+If the GT source vector and VTI fields match but PD pairs differ, inspect the TTK extraction settings, tie-handling and repeatability, and if needed run an **isolated** matched-threads regeneration. If the GT source vector or fields themselves differ, resolve input/crop/orientation/precision provenance first. If both finite GT diagrams and GT fields match, assess candidate-vs-CNN one-sample comparisons as preliminary and proceed to staged three-arm extraction with corrected distances and Phase 5E-locality evaluation. Do not edit the 8,568-comparison historical audit, historical VTI/PD artifacts, or fixed CNN checkpoint. Full 168, merge-tree distance, and spatial-locality stages remain pending.
+
+---
+
+# Part LXXVI — Phase 6: sample-0 GT parity resolution and Phase 5E reuse gate (October 14, 2026)
+
+## LXXVI.1 Observed Spark execution (LXXV hotfix)
+
+The researcher successfully installed `Phase6_LXXV_GT_Parity_Hotfix_20261014.zip`; `python3 -m py_compile` exited normally. All three hotfix diagnostics ran and exited 0 (inventory, Docker NumPy/VTI parity, and canonical-PD multiset comparison).
+
+The historical CNN GT and gradient-only GT `.npy` files have the **same whole-file SHA-256**:
+`f2d3942ffec7f55d0f6955a2dc75d3a580a25f9e82f5fba5a9c47fb73e7ee2af`.
+The corresponding `idx.npy` files also share the same whole-file SHA-256:
+`1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867`.
+The sample-0 arrays are shape `(168,500,500,2)` overall, float64, first sample index 0, and sample-0 GT vectors match exactly (`max_abs_diff=0`). The new sample-0 GT VTI reads back to exactly the expected C-order `(160,160)` physical wind-speed field (`max_abs_diff=0`, `exact_transpose=False`). The original historical CNN VTI was not located under the conventional `ttk_runs_fixed/cnn/vti/`, but its historical GT PD VTU was available.
+
+Observed canonical finite GT persistence pairs:
+
+```text
+D0 historical=967, new=968
+D0 zero-persistence historical/new=3/4
+D0 unmatched historical=[]
+D0 unmatched new=[(birth=4.782249450683594, death=4.782249450683594), multiplicity=1]
+D1 historical=871, new=871
+D1 zero-persistence historical/new=2/2
+D1 birth/death multisets match exactly; sorted_pair_max_abs_diff=0
+```
+
+Thus the nonzero-persistence finite D0/D1 birth/death multisets are **exactly equal** for historical and new GT. The only extra stored point lies exactly on the persistence diagonal and has zero cost to the diagonal. Under the standard persistence-diagram matching equivalence, adding this point does not affect bottleneck distance or the specified order-2 Wasserstein distances to any fixed SR diagram. This is a mathematical consequence; the independent GUDHI recalculation comparing historical vs new GT conventions has **not yet run** as of this documentation update. The audit does not determine whether threads, old orientation, or tie handling caused the extra stored zero point.
+
+The previous corrected sample-0 distances remain:
+
+```text
+historical pretrained CNN: dB_all=3.09147167206, W2inf_all=17.4678134343
+new gradient-only:         dB_all=2.58057403564, W2inf_all=15.6249480697, W22_all=18.6702768797
+```
+
+These are **one-sample** descriptive distances, not full-benchmark comparisons. GT scalar/persistence parity is now established up to zero-persistence diagonal equivalence, but shared SR extraction conventions and canonical critical-point coordinate conventions remain important for a controlled spatial study.
+
+## LXXVI.2 Opportunity to reuse the frozen Phase 5E canonical archive
+
+The earlier **completed** Phase 5E all-168 extraction (Parts LIX–LXI) produced 672 canonical C-order PD port-0 VTUs: one GT and CNN/UV/F1 SR for all 168 samples. Those outputs passed the 672/672 schema gate, the 8-sample pilot continuity gate, and the completed locality-solver validations. They may be reused as frozen canonical GT/CNN/F1 references **if exact archive contents, sample-0 positive-diagram agreement, benchmark input provenance, and extraction configurations are confirmed**. Do not assume that `ttk_runs_fixed/cnn/pd/` historical pre-Phase-5E diagrams have canonical x/y critical-vertex coordinates merely because their scalar persistence distances agree.
+
+Phase 5E locality used the **eight** tested radii `4,8,16,32,64,96,128,infinity` (not a truncated six-radius list). The validated sparse locality solver should be reused without changing its admissibility or coverage definitions. GT persistence coverage and constrained matching cost must be reported separately.
+
+## LXXVI.3 Prepared read-only numerical/reuse gates (not yet executed on Spark)
+
+Bundled helper: `phase6_lxxvi_update/scripts/phase6_s0_diagonal_equivalence_and_phase5e_reuse.py`.
+
+`--mode metric` imports the frozen canonical parser and independent GUDHI implementation, requires equality of the nonzero GT pairs, reproduces the historical CNN sample-0 regression, and recomputes gradient-only `d_B`, `W2inf`, and `W22` against the new, historical, and zero-filtered GT to verify the diagonal invariance numerically.
+
+`--mode phase5e` inventories all 672 canonical Phase 5E PD port-0 VTUs (0–167 for GT, CNN_SR, UV_SR, F1_SR), hashes the sample-0 reference files, and requires the Phase 5E GT and new Phase 6 GT sample-0 **nonzero** D0/D1 pair multisets to agree. It does not run extraction or compare spatial coordinates; it is a read-only reuse eligibility gate.
+
+From `~/PhIRE` after installing the bundle, run in the isolated GUDHI environment:
+
+```bash
+mkdir -p logs
+set -o pipefail
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit python \
+  phase6_lxxvi_update/scripts/phase6_s0_diagonal_equivalence_and_phase5e_reuse.py \
+  --mode metric 2>&1 | tee logs/phase6_lxxvi_metric_20261014.log
+printf 'Metric gate exit: %s\n' "$?"
+
+PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit python \
+  phase6_lxxvi_update/scripts/phase6_s0_diagonal_equivalence_and_phase5e_reuse.py \
+  --mode phase5e 2>&1 | tee logs/phase6_lxxvi_phase5e_reuse_20261014.log
+printf 'Phase5E reuse gate exit: %s\n' "$?"
+```
+
+If Phase 5E archive naming/path differs, supply `--phase5e-root /actual/archive/root` after inspecting the directory. Do not silently point to historical noncanonical TTK directories. The helper writes **nothing** inside repository experiments; console logs are captured by `tee` only.
+
+## LXXVI.4 Next scientific work after both gates pass
+
+Plan an isolated all-168 canonical extraction only for new Phase 6 gradient-only, CV-only, PERS-only reconstructed speed fields (reusing the frozen Phase 5E canonical GT/CNN/F1 PDs if their provenance is verified). Retain 160×160 top-left `wind_speed`, explicit indices 0..167 (`--samples` must be passed), matched TTK settings, and separate output directories. Run corrected GUDHI distances, then independently validate merge-tree distance conventions and apply the validated Phase 5E locality solver to all four matched fine-tuning cells. Never call the original wrapper's superseded TTK `pd_distance` a corrected bottleneck distance. Preserve all archived outputs and frozen releases.
+
+No new 168-sample candidate PD/MT/locality results, or numerical Part LXXVI outputs, are claimed at this point.
+
+---
+
+# Part LXXVII — Phase 6 canonical Phase5E reference verified, new-arm PD extraction workpack prepared (October 14, 2026)
+
+## LXXVII.1 Observed Spark result (Part LXXVI execution)
+
+The researcher installed the LXXVI workpack, all four SHA-256 manifest checks passed, the Python script compiled, and the LXXV→LXXVI Git patch applied cleanly. Both actual Spark numerical gates completed with exit status 0.
+
+**Metric gate**:
+
+```text
+[HIST-NEW-GT] D0 historical/new total=967/968, zero=3/4; positive_multiset_equal=True
+[HIST-NEW-GT] D1 historical/new total=871/871, zero=2/2; positive_multiset_equal=True
+[METRIC] historical-CNN: dB=3.09147167206 W2inf=17.4678134343 W22=21.0247316731
+[METRIC] new-GT-vs-gradient: dB=2.58057403564 W2inf=15.6249480697 W22=18.6702768797
+[METRIC] historical-GT-vs-gradient: same three distances as new GT
+[METRIC] positive-only-GT-vs-gradient: same three distances as new GT
+[INVARIANT] all six corrected-distance differences zero
+[METRIC-GATE] PASS
+Metric gate exit: 0
+```
+
+The CNN-to-gradient-only sample-0 reductions are approximately 16.5% bottleneck, 10.5% W2inf and 11.2% W22, descriptive for **sample 0 only**. The extra zero-persistence GT D0 point is mathematically and empirically inert to all three tested persistence distances; its historical cause was not established.
+
+**Phase5E gate**:
+
+```text
+[PHASE5E] root=spatial_pd/phase5e_all168_canonical_pd count_pd_port0=672
+[PHASE5E] GT 168/168, CNN_SR 168/168, UV_SR 168/168, F1_SR 168/168
+phase5e_GT_s0 SHA256 = 85db754ceac029a8deeea85896c03af9993fc953a323a1000d8b9c1b310638af
+new gradient-only GT_s0 SHA256 = same hash (byte-identical)
+[PHASE5E-NEW-GT] D0 968/968, D1 871/871, both whole diagrams exact
+[PHASE5E-GATE] PASS
+Phase5E reuse gate exit: 0
+```
+
+Canonical C-order Phase5E GT PDs can therefore be reused as the fixed ground-truth reference for new-arm persistence extraction, subject to the same sample provenance and extraction settings. The frozen baseline CNN/F1 SR diagrams are reuse candidates; no Phase 6 dataset-wide comparison has yet been computed.
+
+## LXXVII.2 Prepared isolated extraction (not yet executed on Spark)
+
+The accompanying bundle `Phase6_LXXVII_NewArms_Canonical_PD_20261014.zip` provides `scripts/phase6_canonical_newarms_pd.py`, a staged driver to extract **only** the 3×168 newly fine-tuned SR persistence diagrams, and `scripts/phase6_pilot_pd_gudhi_gate.py` to validate three new sample-0 PDs and reproduce the frozen gradient-only corrected metric regression before scaling.
+
+Dataset methods: gradient-only `candidateF_grad_pairzero_expanded2688`, CV-only `candidateF_grad_CV_only_expanded2688`, PERS-only `candidateF_grad_PERS_only_expanded2688`. Uses the corrected 168-array fixed benchmark, canonical speed writer with `--samples` explicitly specified, 160×160 top-left crop, scalar `wind_speed`, and TTK `ttkPersistenceDiagramCmd -t 1`. The extraction writes under an isolated `ttk_runs_fixed/topology_finetuning/phase6_lxxvii_canonical_pd_newarms_20261014/` root and reuses `spatial_pd/phase5e_all168_canonical_pd/pd/phase5_GT_s<i>_speed_p160_x0_y0_pd_port_0.vtu` read-only.
+
+Stages: `--mode preflight` (read-only SHA, source shape/finiteness/index, Phase5E reference checks), `--mode pilot` (only index 0), isolated sample-0 GUDHI continuity gate, `--mode full` (resumable indices 0..167), and `--mode verify` (read-only inventory/VTI validation). Manifests encode source array checksums, driver/checkpoint-independent extraction script hash, writer checksum and settings. The full run requires the three-arm GUDHI pilot marker tied to current PD hashes.
+
+This new extraction package was syntax-checked and its static naming/manifest behavior checked locally, but the actual Docker/TTK run was **not** performed in the chat container. No new candidate dataset-wide PD/MT/locality metrics are claimed. The historical `pd_distance` stage is omitted entirely; a future corrected 504-comparison GUDHI sweep must be independently computed. Do not modify frozen Phase 5E, historical CNN, F1, preprints, or model checkpoints.
+
+---
+
+# Part LXXVIII — Phase 6 LXXVII VTU reader compatibility diagnosis and safe continuation (October 14, 2026)
+
+## LXXVIII.1 Spark evidence (supplied by the user)
+
+* Part LXXVII README/script hashes and documentation patch verified. Preflight passed all three new-arm source tensor SHA/alignment/finiteness checks and preserved Phase 5E GT reference.
+* The gradient-only sample-0 VTI and TTK PD port-0 extraction completed. The LXXVII script then failed during its *new* `vtkXMLUnstructuredGridReader` readback with an XML parser error at line 29, column 13, byte 2508; the CV and PERS extractions were not reached.
+* A subsequent SHA-256 and byte comparison established that the newly extracted gradient-only VTI and PD VTU are **byte-identical** to the earlier LXXIII pilot files. The SR VTI SHA-256 is `26e2af52cccaca6120ea4bc009a55215ebbae716bd9eaef44d91a4e2408e2030`. The PD VTU SHA-256 is `79b2b685968dad0387be8b5460881d3d641272807cd08e1e155efe7b6eabc00b` (140,589 bytes). The VTU XML header advertises appended base64 zlib-compressed data. These facts do not establish an underlying field mismatch.
+* The separate LXXVII canonical `read_pd()` / GUDHI pilot gate successfully read the newly generated gradient-only VTU and printed `dB=2.58057403564`, `W2inf=15.6249480697`, `W22=18.6702768797`. It then exited 1 due to a missing CV-only sample-0 VTU, a downstream consequence of the earlier pilot stop. No CV/PERS sample-0 metric was computed in that aborted gate.
+* LXXIII extraction had checked nonempty artifacts and exit code, not validated the VTU using the exact later LXXVII Docker VTK XML reader. Therefore the observed failure is newly exposed readback incompatibility, not demonstrated numeric-regression evidence. The exact underlying VTK reader compatibility cause remains unconfirmed until the independent XML structural probe runs.
+
+## LXXVIII.2 Compatible validation protocol (prepared locally; not executed on Spark)
+
+New package `Phase6_LXXVIII_PD_XML_Reader_Hotfix_20261014.zip` provides a small *in-memory* compatibility launcher for the original `phase6_lxxvii_update/scripts/phase6_canonical_newarms_pd.py` file. The original driver stays byte-for-byte unchanged, which preserves its SHA-256 commitment inside already-created `input_manifest.json`. The launcher replaces **only** `verify_pd()` in memory, using Python standard-library XML parsing and schema checks instead of the failing container `vtkXMLUnstructuredGridReader`. Sample arrays, VTI generation and exact orientation checks, TTK command, hash manifests, separate output directory, resume rules, and GUDHI pilot marker requirements remain as before.
+
+Required ordered gates:
+
+1. **Read-only XML probe** compares both old/new gradient-only sample-0 VTUs, ensuring well-formed VTK UnstructuredGrid XML, positive geometry counts, expected persistence fields, appended base64 framing, and exact old/new file hashes. If XML parsing fails, stop rather than bypass validation.
+2. **Sample-0 pilot** resumes gradient-only and generates CV-only and PERS-only PDs, without modifying original LXXVII code or any Phase 5E archives.
+3. **Independent GUDHI gate** runs the *unchanged* `phase6_lxxvii_update/scripts/phase6_pilot_pd_gudhi_gate.py` for all three arms, rechecking gradient numerical continuity and writing `pilot_verified.json` only on success.
+4. Only then may the guarded, resumable **168-sample extraction** run, to be followed by a complete canonical diagram parser/schema check and corrected GUDHI distance computation for every new PD. XML structural parsing **does not** prove the compressed appended data are numerically intact and cannot replace this audit.
+
+No LXXVIII hotfix execution or new CV/PERS topology data is claimed by this documentation entry. Original Phase 5E diagrams, model checkpoints, fixed benchmark, archived metrics and frozen paper artifacts must remain unchanged.
+
+---
+
+# Part LXXIX — Phase 6 complete canonical PD extraction and preparation for all-168 corrected GUDHI sweep (October 14, 2026)
+
+## LXXIX.1 New Spark evidence supplied by the researcher
+
+The LXXVIII compatible PD XML reader hotfix was successfully used to complete the isolated LXXVII canonical SR persistence-diagram extraction for all three new Phase 6 ablation arms. The original extraction driver remains byte-for-byte unchanged; the compatibility launcher replaced only its VTU readback validator in memory. The final full-extraction log includes `[FULL] PASS pers: 168 SR VTIs and PD port-0 VTUs`, `[LXXVII] PASS mode=full arm=all`, `[COMPAT] PASS`, and `Full extraction exit: 0`.
+
+A separate read-only verification across all three arms also completed with `Verification exit: 0`, reporting:
+
+- `[VERIFY] PASS grad: 168 SR VTIs and PD port-0 VTUs`
+- `[VERIFY] PASS cv: 168 SR VTIs and PD port-0 VTUs`
+- `[VERIFY] PASS pers: 168 SR VTIs and PD port-0 VTUs`
+- `[LXXVII] PASS mode=verify arm=all`
+- `[COMPAT] PASS: XML-level validation complete`
+
+Thus **504/504 new SR VTIs and 504/504 new SR PD port-0 VTUs** have completed the configured file-inventory, VTI value/orientation and XML/schema validations. They occupy the isolated output root `ttk_runs_fixed/topology_finetuning/phase6_lxxvii_canonical_pd_newarms_20261014/`. No superseded historical `pd_distance` calculation was run. The separate Phase5E 168 GT diagrams, 168 CNN diagrams, and 168 F1 diagrams remain reference candidates without regeneration.
+
+**Scientific limitation:** XML/schema completion is NOT an independent parse-and-distance audit of the compressed persistence payloads. The previously validated GUDHI pilot covers only sample 0 of each new arm. No new-arm full-168 corrected persistence-distance means or factorial effects are claimed by this entry.
+
+## LXXIX.2 Isolated five-arm corrected GUDHI sweep — prepared, pending Spark execution
+
+The `Phase6_LXXIX_Corrected_PD_FullSweep_20261014.zip` workpack contains a Python driver that reuses **unchanged** the `parse()` and `distance()` routines from the validated LXXVII GUDHI pilot. It uses the frozen canonical parser in `$HOME/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py`, preserving the corrected finite D0/D1 pair policy and the three distance definitions:
+
+- Bottleneck `dB`: GUDHI bottleneck with L-infinity ground metric and diagonal matches, aggregate maximum of D0 and D1.
+- `W2inf`: GUDHI q=2 Wasserstein with L-infinity ground metric, aggregate Euclidean norm across D0 and D1.
+- `W22`: GUDHI q=2 Wasserstein with Euclidean ground metric, aggregate Euclidean norm across D0 and D1.
+
+Matched canonical PDs and sample indices 0–167 are mapped as follows:
+
+| Method | PD source | Count |
+|---|---|---:|
+| GT | frozen Phase5E `phase5_GT_s<i>_..._pd_port_0.vtu` | 168 |
+| CNN | frozen Phase5E `phase5_CNN_SR_s<i>_..._pd_port_0.vtu` | 168 |
+| Gradient-only | LXXVII new `grad/pd/candidateF_grad_pairzero_expanded2688_SR_s<i>_...` | 168 |
+| CV-only | LXXVII new `cv/pd/candidateF_grad_CV_only_expanded2688_SR_s<i>_...` | 168 |
+| PERS-only | LXXVII new `pers/pd/candidateF_grad_PERS_only_expanded2688_SR_s<i>_...` | 168 |
+| Full F1 | frozen Phase5E `phase5_F1_SR_s<i>_..._pd_port_0.vtu` | 168 |
+
+The 504 new-arm + 336 frozen CNN/F1 comparisons total **840 GT-SR corrected distance rows**. Input fingerprinting covers 1,008 total PD VTUs (168 GT + 840 SR); only the 504 new-arm diagrams are newly extracted. The full F1 identification should be supported by the Phase5E source array/checkpoint provenance before attributing effects to a particular training objective in a manuscript.
+
+The three workpack phases are `--mode preflight` (read-only all-input checksum inventory, pilot hash and numerical regression), `--mode sweep` (sample-wise resume with a complete five-model checkpoint per sample, isolated new CSV/summary/manifest outputs), and `--mode verify` (read-only hash and result-table verification). All writes are isolated to `ttk_runs_fixed/topology_finetuning/phase6_lxxix_corrected_pd_gudhi_20261014/`.
+
+The planned 2×2 fixed loss ablation uses `grad` (0 CV, 0 PERS), `cv` (1 CV, 0 PERS), `pers` (0 CV, 1 PERS), and `f1` (1 CV, 1 PERS). For each lower-is-better metric Y, the script computes the descriptive per-field effects:
+
+```text
+CV main       = ((Y_cv   - Y_grad) + (Y_f1 - Y_pers)) / 2
+PERS main     = ((Y_pers - Y_grad) + (Y_f1 - Y_cv))   / 2
+CV x PERS     = Y_f1 - Y_cv - Y_pers + Y_grad
+```
+
+No statistical significance, causality or geographical generalization is implied: these are one-checkpoint measurements on 168 successive hourly fields, not independent climate draws. Merge-tree metrics and spatially constrained persistence/locality remain separate deferred stages.
+
+**LXXIX workpack status:** Syntax and synthetic control-flow/CSV tests performed locally; complete Spark GUDHI sweep not run in chat. Do not report any dataset-wide corrected distance or ablation result until the real sweep and verification both exit 0.
+
+---
+
+# Part LXXX — Phase 6: verified all-168 corrected PD metrics and paired-effect interpretation (October 14, 2026)
+
+## LXXX.1 New user-supplied Spark evidence
+
+The Part LXXIX source preflight, full corrected GUDHI distance sweep, and post-run integrity verification each exited with code `0`. The observed gates were:
+
+```text
+[SOURCE] PASS: 1008 input PD VTUs (168 GT + 840 SR) hashed, including all 504 new-arm SR files
+[PILOT] PASS: frozen GT and all three sample-0 SR hashes match independent GUDHI gate
+[PREFLIGHT] PASS: no files written; corrected GUDHI s0 regression and full input inventory passed
+[SWEEP] PASS 168/168 complete five-arm samples (840 rows)
+[AUDIT] PASS: 840 unique (sample,arm) rows; 504 new-arm GUDHI comparisons; 336 Phase5E CNN/F1 controls
+[SWEEP-GATE] PASS: CSV, summary and SHA256 generated
+[VERIFY-GATE] PASS: all input hashes, rows, pilot regressions, invariants and CSV SHA256
+```
+
+Outputs were isolated under `ttk_runs_fixed/topology_finetuning/phase6_lxxix_corrected_pd_gudhi_20261014/`. The values below were read from the researcher-provided `summary.md`, not recomputed here on the Spark server.
+
+## LXXX.2 Full five-arm corrected PD mean distances
+
+All metrics are lower-is-better. The benchmark consists of 168 consecutive hourly fields; models include the pretrained CNN comparator and the fixed 2×2 topology-loss design with gradient-only (00), CV-only (10), PERS-only (01), and archived full F1 (11).
+
+| Arm | Mean corrected bottleneck dB | Mean W2inf | Mean W22 |
+|---|---:|---:|---:|
+| cnn | 3.124108 | 19.152145 | 24.552151 |
+| grad (00) | 2.562506 | 14.889700 | 18.306367 |
+| cv (10) | 2.188473 | 14.407073 | 17.875645 |
+| pers (01) | 2.196119 | **14.153230** | **17.484939** |
+| f1 (11) | **2.149744** | 14.325676 | 17.831897 |
+
+The full F1 model has the lowest *mean* bottleneck distance; PERS-only has the lowest mean Wasserstein distances. The new topology-only components provide better mean PD distances than the gradient-only 00 arm, while the previous scalar/domain comparison found gradient-only strongest for several pointwise measures. This pattern is descriptive and metric-specific; it does not establish spatial feature correctness, merge-tree fidelity, independent climate generalization, or robustness to random seeds.
+
+## LXXX.3 Matched two-by-two effects
+
+All contrasts use gradient-only as cell 00 and F1 as cell 11. The pretrained CNN is *not* the factorial control. A negative main effect improves the reported distance; a positive interaction means reduced additive benefit of CV+PERS relative to the 00 additive prediction.
+
+| Metric | CV main | PERS main | Interaction |
+|---|---:|---:|---:|
+| dB | -0.210205 | -0.202558 | +0.327658 |
+| W2inf | -0.155090 | -0.408934 | +0.655073 |
+| W22 | -0.041882 | -0.432587 | +0.777680 |
+
+The mathematical contrasts represent differences among these specific trained outputs; without replicated trainings and temporal dependence handling, they should not be interpreted as significance tests or causal estimates. In particular, positive interaction does not imply that F1 is always worse than individual losses: F1 still leads on mean bottleneck distance.
+
+## LXXX.4 Verification scope and outstanding gates
+
+The GUDHI calculations were completed on all 840 rows. The post-run `verify` command is a **hash, row-integrity, pilot-regression and invariant check of the already-computed output**, not a second independent recomputation of all 840 distances. The previous historical 8,568-comparison custom/GUDHI audit independently validated the distance implementation on different archived cases. Preserve these distinctions when documenting methods.
+
+Prior to manuscript causal attribution, inspect the archived F1 checkpoint, training script/options and source provenance against the matched two-by-two 2688-sample protocol. This is a provenance requirement, not evidence that F1 is invalid. The F1 PDs are the frozen canonical Phase 5E diagrams and match the established Phase 5E mean W22 of approximately 17.8319, supporting metric continuity but not by itself proving identical model training conditions.
+
+An independent read-only paired-field descriptive audit is prepared in `Phase6_LXXX_Paired_PD_Audit_20261014.zip`. It checks the exact LXXIX CSV SHA-256, sample pairing, row means, factorial means and per-input provenance hashes. It can produce an isolated report with field-wise win/loss/tie counts, median paired changes, worst-case examples, and seven contiguous 24-hour block means. It does not run GUDHI or TTK, alter prior outputs, or calculate statistical p-values. As of this Part LXXX note, **the actual Spark paired-field audit has not been run**.
+
+After the paired audit and F1 lineage check, prioritize Phase 5E locality-constrained comparisons using the validated radii `4,8,16,32,64,96,128,infinity`, with GT coverage separated from constrained W22; independently plan matching merge-tree evaluation. Neither has been executed for the three new arms at this entry. Keep publication tag `topoinvis-2026-arxiv-v1.1`, historical checkpoints, original fixed arrays and frozen Phase 5E outputs unchanged.
+
+---
+
+# Part LXXXI — Phase 6: verified all-168 paired persistence audit and Phase 5E locality-port readiness (October 14, 2026)
+
+## LXXXI.1 Observed completion of Part LXXX on Spark
+
+The researcher executed the LXXX source/paired-audit preflight and report command; both exited `0`. Exact observed markers included:
+
+```text
+[SOURCE] PASS: 840 matched rows, 168 indices, all source hashes and LXXIX means/effects verified
+[PAIRED] dB best_counts={'cnn': 2, 'grad': 20, 'cv': 34, 'pers': 53, 'f1': 59, 'tie': 0}
+[PAIRED] W2inf best_counts={'cnn': 1, 'grad': 41, 'cv': 31, 'pers': 68, 'f1': 27, 'tie': 0}
+[PAIRED] W22 best_counts={'cnn': 1, 'grad': 53, 'cv': 24, 'pers': 66, 'f1': 24, 'tie': 0}
+[LXXX] PREFLIGHT PASS
+[LXXX] REPORT PASS
+```
+
+The exact frozen input CSV digest displayed in both executions is:
+
+```text
+3d53189ec69cc2f89c5561159d0768c973351d7b9998deceeaef42ebb6b379ea
+```
+
+The independently run `sha256sum -c SHA256SUMS` in the new LXXX output folder reported `OK` for `source_csv_sha256.txt`, `paired_audit.json`, and `paired_audit.md`. The report lives under `ttk_runs_fixed/topology_finetuning/phase6_lxxx_paired_effect_audit_20261014/` and is purely derived from LXXIX. **No new TTK/GUDHI computation** was performed by LXXX.
+
+## LXXXI.2 Paired-field scientific findings
+
+All 168 same-hour fields are paired across the five methods; lower is better.
+
+| Metric | Best-of-five by sample: CNN / grad / CV / PERS / F1 | Paired F1 wins vs PERS | Mean winner |
+|---|---|---:|---|
+| Corrected bottleneck `dB` | 2 / 20 / 34 / 53 / 59 | 101 / 168 | F1 |
+| Corrected `W2inf` | 1 / 41 / 31 / 68 / 27 | 49 / 168 | PERS-only |
+| Corrected `W22` | 1 / 53 / 24 / 66 / 24 | 34 / 168 | PERS-only |
+
+The aggregate corrected `W22` means were 17.484939 for PERS-only and 17.831897 for F1. PERS-only outperformed F1 on 134 / 168 individual fields for `W22`, and 119 / 168 for `W2inf`, strengthening the descriptive observation that this is not merely a mean driven by a few unusually large outliers. F1 outperformed PERS-only on 101 / 168 fields for `dB`. Reported F1-minus-PERS paired means and medians were:
+
+| Metric | Mean difference | Paired median | Better/worse/tied F1 |
+|---|---:|---:|---|
+| dB | -0.046375 | -0.075414 | 101 / 67 / 0 |
+| W2inf | +0.172446 | +0.151641 | 49 / 119 / 0 |
+| W22 | +0.346958 | +0.330417 | 34 / 134 / 0 |
+
+In the seven contiguous 24-hour blocks, both individual CV and PERS main effects for bottleneck `dB` were negative in every block; for Wasserstein, some block effects changed sign. CV×PERS interaction means were positive across all seven blocks for all three metrics. This is less-than-additive *descriptive* performance at the current weights, not evidence of statistically significant antagonism, replicated training variability, or a universal property of the loss combination. Do not treat 168 consecutive hours as independent realizations.
+
+The pretrained CNN is a comparator and not cell 00; 00 is the gradient-only model. The archived F1 checkpoint/data provenance remains subject to a separate documentation verification before manuscript attribution.
+
+## LXXXI.3 Planned next gate: Phase 5E source compatibility, not yet an execution
+
+The new `Phase6_LXXXI_Locality_Readiness_20261014.zip` workpack is **prepared locally, not executed on Spark**. Its Python script performs a read-only source CSV hash/paired audit manifest check, counts all canonical GT/CNN/F1 and new-arm PD outputs, checks new-arm VTIs, locates plausible existing Phase 5E locality/sparse-matching source scripts and prints their hashes/possible CLI flags, and inventories F1 source/checkpoint paths where available. No locality objective is evaluated and source candidates are **not** declared validated merely because they were found. If an expected F1 source directory is absent, the script reports unverified provenance rather than deleting any artifact.
+
+The mathematical and procedural target remains the existing Phase 5E *sparse-savings matching* objective, evaluated for both D0/D1 and `r={4,8,16,32,64,96,128,infinity}`, with GT-side and SR-side persistence-mass coverage separately measured. Phase 5E's 8-sample dense-vs-sparse parity and its existing 168-field CNN/F1 locality outputs are the appropriate regression references. **At r=infinity, the new calculation must match LXXIX's canonical per-sample W22 to numerical tolerance, for every model/sample, not merely the mean.**
+
+Do not replace the spatial matching with unconstrained birth/death Wasserstein, do not substitute a different radius grid, do not infer kilometer units without grid calibration, and do not overwrite Phase 5E or LXXIX archives. A matched new-arm locality pilot should precede all-168 locality execution; merge-tree evaluation remains a distinct outstanding task.
+
+---
+
+# Part LXXXII — Phase 6: completed locality readiness and isolated 8-sample Phase 5E solver port prepared (October 14, 2026)
+
+## LXXXII.1 Observed LXXXI readiness outcome
+
+The researcher installed `Phase6_LXXXI_Locality_Readiness_20261014.zip`, verified its package checksum manifest, applied the LXXX→LXXXI notes patch, and ran its **read-only** preflight successfully (`Readiness exit: 0`). Exact evidence:
+
+- Frozen LXXIX CSV: **840 unique rows** with SHA-256 `3d53189ec69cc2f89c5561159d0768c973351d7b9998deceeaef42ebb6b379ea`.
+- LXXX paired report + output SHA256SUMS: **PASS**.
+- Phase 5E canonical GT, pretrained CNN and F1 archives: **168 PD files per class**.
+- New Phase 6 gradient-only, CV-only, PERS-only: **168 PD VTUs plus 168 scalar SR VTIs per class**.
+- Archived F1 source `idx.npy`, `dataGT.npy`, `dataSR.npy` and four `cnn.index` checkpoint manifests exist, but **F1 training-run lineage is not closed** by a file inventory alone.
+- Top candidate original sparse locality solver: `spatial_pd/phase5e_sparse_locality_solver.py`, with on-Spark SHA-256 `47c73decca4ba151fd8b250cae2911b4c2307471fe9c881fc42bfc968e211c3a`. The source inspection confirms the solver's `read_features`, `SparsePrepared`, `gudhi_w22`, `RADII` and `PILOT_SAMPLES` interface; its candidate discovery was not, by itself, a Phase 6 locality computation.
+
+## LXXXII.2 Eight-sample compatibility pilot (prepared, not yet executed)
+
+The independent `Phase6_LXXXII_Phase5E_Locality_Pilot8_20261014.zip` uses the **existing** on-Spark original Phase 5E sparse-savings source with strict SHA pinning. It does not replace the solver or recompute persistence diagrams. The new thin wrapper is `phase6_lxxxii_update/scripts/phase6_lxxxii_locality_pilot.py`.
+
+The predeclared samples are `0,24,48,69,96,120,144,167` and the exact radius grid is `4,8,16,32,64,96,128,∞`. Both D0 and D1 features are extracted with the original Phase 5E `read_features` coordinate convention. It uses original `SparsePrepared.solve` without mathematical changes and the original solver's per-dimension `gudhi_w22` independent infinity check.
+
+Required validation **before any output directory is created**:
+
+1. Pin the existing original solver source SHA-256 and the frozen LXXIX 840-row source CSV SHA-256.
+2. Check all **40** pilot GT–SR comparisons against frozen per-sample LXXIX `W22` at `r=∞` (all five models).
+3. Reproduce **128** CNN/F1 sample×radius entries from frozen Phase 5E locality CSV, including constrained W22, locality gap, GT and SR persistence-mass coverage, and integer matching counts.
+4. Require nonempty finite D0/D1 feature sets and basic constrained-cost invariants.
+
+The pilot, if all checks pass on Spark, writes **640 dimension rows** (8 samples × 5 arms × 2 dimensions × 8 radii) and **320 aggregate rows** (8 × 5 × 8), in a new isolated directory `ttk_runs_fixed/topology_finetuning/phase6_lxxxii_spatial_pilot8_20261014/`. It writes a compact Markdown summary, provenance manifest and checksum file. Neither historical Phase 5E nor the LXXIX/LXXX files are changed. A `--mode verify` command validates the pilot output after its creation.
+
+## LXXXII.3 Interpretation limits and next stage
+
+The eight-sample run is a **compatibility gate**, not evidence that spatial correspondence improved across 168 consecutive hours. If the pilot passes, extend using the same original sparse matching function across the full 168 benchmark fields, with all five method outputs and GT/SR persistence-mass coverage, constrained costs and locality gap recorded separately. Do not infer kilometer units without calibration. F1 checkpoint/training provenance remains a separate outstanding task. Merge-tree matching remains uncomputed for the new Phase 6 arms. Preserve frozen tag `topoinvis-2026-arxiv-v1.1` and all historical outputs.
+
+---
+
+# Part LXXXIII — Phase 6: eight-sample spatial pilot validated, all-168 locality sweep prepared (October 14, 2026)
+
+## LXXXIII.1 Observed LXXXII pilot evidence (successful)
+
+The researcher's supplied Spark transcript establishes that the LXXXII eight-sample Phase 5E sparse-locality port executed and passed, with **`Pilot exit: 0`**. It reused the unchanged SHA-256-pinned `spatial_pd/phase5e_sparse_locality_solver.py` (`47c73decca4ba151fd8b250cae2911b4c2307471fe9c881fc42bfc968e211c3a`) and the `gudhi-audit` environment (`VTK 9.6.0`, `GUDHI 3.13.0`). The preflight passed; all eight predeclared samples `0,24,48,69,96,120,144,167` each passed the same-sample five-model, D0/D1, eight-radius matching computation and the frozen reference checks. Terminal gates:
+
+- `[PHASE5E-REGRESSION] PASS`: **128** CNN/F1 sample×radius historical comparisons, with cost, coverage, locality gap, and matching-count parity.
+- `[INFINITY-GATE] PASS`: **40** sample×model comparisons reproduced the frozen LXXIX `W22` at `r=∞`.
+- `[PILOT-GATE] PASS`: **640 dimension rows**, **320 aggregate rows**, in `ttk_runs_fixed/topology_finetuning/phase6_lxxxii_spatial_pilot8_20261014/`.
+- `[VERIFY-GATE] PASS`, `Verify exit: 0`, and four `SHA256SUMS` entries all `OK`.
+
+The researcher unintentionally invoked `--mode pilot` a second time after success; it correctly **refused overwrite of the completed output directory** and exited `1`. This second invocation does not invalidate the successful pilot or its subsequent clean verification. Do not delete/recreate the saved pilot to silence this expected safeguard.
+
+## LXXXIII.2 Preliminary eight-sample locality findings (not all-168)
+
+Means taken **only from the eight-sample** validated `pilot_summary.md`, not yet from the full 168-hour benchmark. All spatial costs are the *original* Phase 5E locality-constrained `W_{2,2}` (Euclidean birth/death ground cost), separate from the LXXIX `W_{2,∞}`. Lower constrained cost is better, higher GT-side persistence-mass coverage is better; the latter is **not** a spatial displacement metric.
+
+| Model | r=4 constrained W22 | r=16 constrained W22 | r=∞ corrected W22 | r=16 GT persistence coverage |
+|---|---:|---:|---:|---:|
+| Pretrained CNN | 48.75961 | 36.31615 | 25.20037 | 0.61297 |
+| Gradient-only (00) | **47.64018** | **32.15893** | 19.26840 | **0.88809** |
+| CV-only (10) | 50.40156 | 32.99659 | 19.08425 | 0.75456 |
+| PERS-only (01) | 51.17329 | 33.37535 | **18.75371** | 0.77340 |
+| F1 combined (11) | 50.53062 | 33.28444 | 18.96689 | 0.73128 |
+
+The eight-field pilot illustrates a ranking reversal: gradient-only has the smallest spatially constrained cost at `r=4,16` and highest GT persistence coverage at `r=16`, while PERS-only has the smallest *unconstrained* cost. This does **not** prove dataset-wide superior location preservation or geographically calibrated distances. Constrained matching costs and persistence-mass coverage must remain distinct outcomes; PERS-only remains best by mean unconstrained `W22` on the already completed 168-sample LXXIX results.
+
+## LXXXIII.3 New full-168 locality computation workpack (prepared, NOT yet executed)
+
+Proposed package: `Phase6_LXXXIII_All168_Locality_20261014.zip`. Driver: `phase6_lxxxiii_update/scripts/phase6_lxxxiii_all168_locality.py`. It imports the on-Spark **unchanged** LXXXII pilot and the SHA-pinned original Phase 5E sparse locality solver, rather than rewriting the matching objective. This is an isolated wrapper, not a new solver.
+
+Before calculations, `--mode preflight` verifies the LXXXII frozen pilot, the historical Phase 5E 4,032-row reference, the LXXIX 840-row corrected PD CSV, and **all 1,008 original GT/SR persistence-diagram files** against LXXIX's per-file hashes. The 168-sample full computation requires per-sample direct checks against LXXIX GUDHI `W22` at infinity for **840** matches and against the historical CNN/F1 Phase 5E spatial table for **2,688** sample×model×radius comparisons, including original GT/SR feature coverage, locality gap and integer matching counts. The original eight pilot samples are also compared against the LXXXII saved results.
+
+Output, only after actual Spark execution, would be **13,440 dimension rows** (168×5×2×8) and **6,720 aggregate rows** (168×5×8), a complete radius-wise macro and paired comparison, and new factorial contrasts of locality-constrained cost and GT coverage. Resume-safe per-sample JSON checkpoints are isolated under `ttk_runs_fixed/topology_finetuning/phase6_lxxxiii_spatial_all168_20261014/`. Final results use a separate output manifest and SHA-256 checksums; completed results will not be overwritten. Verification must be run before interpreting full-scale results.
+
+**Open boundaries:** The archived F1 training/optimizer/checkpoint lineage has **not** been independently closed merely by artifact or numerical parity; this must be checked before strict causal attribution to the matched 2×2 fine-tuning protocol. No physical km distance without grid calibration; no independent random-seed replications or inferential independence of consecutive hours. New Phase 6 merge-tree distances remain pending. Preserve original TTK and Phase 5E archives, all model checkpoints, and the immutable publication tag `topoinvis-2026-arxiv-v1.1`.
+
+---
+
+# Part LXXXIV — Phase 6: complete all-168 spatial locality verified, closeout and F1 provenance inventory (October 14, 2026)
+
+## LXXXIV.1 Observed LXXXIII execution and verification
+
+The researcher's supplied Spark terminal transcript documents successful execution of `phase6_lxxxiii_update/scripts/phase6_lxxxiii_all168_locality.py`: preflight, complete run and independent `--mode verify` all exited **0**. The repository's unchanged original Phase 5E locality matcher `spatial_pd/phase5e_sparse_locality_solver.py` had SHA256 `47c73decca4ba151fd8b250cae2911b4c2307471fe9c881fc42bfc968e211c3a`. The observed gates were:
+
+- `[HIST-REGRESSION] PASS`: 2,688 CNN/F1 sample×radius Phase 5E comparisons.
+- `[INFINITY-GATE] PASS`: 840 exact-sample LXXIX corrected `W_{2,2}` values.
+- `[PILOT-CONTINUITY] PASS`: 320 LXXXII eight-sample aggregate comparisons, plus dimensional regressions.
+- `[FULL-GATE] PASS`: **13,440 dimension rows**, **6,720 aggregate rows** (168 samples × 5 models × 2 homology degrees × 8 radii).
+- `[VERIFY-GATE] PASS`: source hashes for 1,008 canonical GT/SR PD files, 168 sample checkpoints, CSV cardinality, final hashes and macro-mean recomputation. All seven `SHA256SUMS` output files were independently reported `OK`.
+
+The frozen Phase 5E diagrams, immutable publication tag, historical model checkpoints, and LXXIX corrected PD CSV are **not modified**. All aggregate spatial values are descriptive over 168 consecutive hourly fields. Radius is in grid-cell coordinate units, not geographic kilometers.
+
+Output directory: `ttk_runs_fixed/topology_finetuning/phase6_lxxxiii_spatial_all168_20261014/`; main files `all168_locality_aggregate.csv`, `all168_locality_dimension.csv`, `all168_macro_summary.csv`, `all168_paired_by_radius.csv`, `all168_factorial_by_radius.csv`, `summary.md`, `run_manifest.json` and `SHA256SUMS`.
+
+## LXXXIV.2 Verified full-benchmark spatial means
+
+The following values are directly from the supplied `summary.md`. Smaller constrained `W_{2,2}` is better; higher GT persistence-mass coverage is better, but **coverage is not physical location error**.
+
+| Model | r=4 cost | r=16 cost | r=32 cost | r=∞ corrected W22 | r=16 GT coverage |
+|---|---:|---:|---:|---:|---:|
+| CNN | 46.057465 | 35.218315 | 29.250278 | 24.552151 | 0.591272 |
+| Gradient-only (00) | **45.844483** | **31.008340** | 23.893099 | 18.306367 | **0.867886** |
+| CV-only (10) | 47.750779 | 31.572720 | 23.812289 | 17.875645 | 0.740639 |
+| PERS-only (01) | 48.570148 | 31.841850 | **23.707846** | **17.484939** | 0.747282 |
+| F1 (11) | 48.504946 | 31.947250 | 23.921293 | 17.831897 | 0.710923 |
+
+At `r=16`, gradient-only has lower mean constrained cost than PERS-only by **0.833510**, and higher mean GT persistence-mass coverage by **0.120604** (12.06 percentage points). At `r=∞`, PERS-only has lower mean `W_{2,2}` than gradient-only by **0.821428**. CNN-normalized reduction: gradient-only at `r=16` approximately **11.95%**, PERS-only at `r=32` approximately **18.95%**, PERS-only at infinity approximately **28.78%**. These are descriptive within-benchmark differences, not confidence intervals.
+
+## LXXXIV.3 F1-versus-PERS-only paired comparisons
+
+Full 168-field `F1 − PERS-only` constrained-cost means, and within-sample F1-lower / PERS-lower counts:
+
+| Radius | Mean F1−PERS | F1 lower | PERS lower |
+|---|---:|---:|---:|
+| 4 | −0.065202 | 86 | 82 |
+| 8 | −0.061573 | 85 | 83 |
+| 16 | +0.105400 | 78 | 90 |
+| 32 | +0.213447 | 74 | 94 |
+| 64 | +0.313022 | 38 | 130 |
+| 96 | +0.322591 | 38 | 130 |
+| 128 | +0.343584 | 33 | 135 |
+| ∞ | +0.346958 | 34 | 134 |
+
+The F1/PERS-only comparison is radius dependent and **not** a uniform win for either model. At very tight radii their mean differences and win counts are close; at larger radii PERS-only leads. The gradient-only model has the lowest mean constrained cost at `r=4` and `r=16`, despite PERS-only leading at `r=32` and infinity. A larger persistence-mass coverage ratio can reflect matching opportunities or retention, not necessarily correctly recovered meteorological locations.
+
+## LXXXIV.4 New read-only closeout workpack (prepared locally, not yet executed on Spark)
+
+Proposed package `Phase6_LXXXIV_Spatial_Closeout_And_F1_Evidence_20261014.zip`. Driver `phase6_lxxxiv_update/scripts/phase6_lxxxiv_spatial_closeout.py`. The read-only preflight validates all seven frozen LXXXIII final output digests, confirms the complete 6,720-row aggregate-key set and independently recomputes all 40 macro means. The report mode creates **only a new isolated LXXXIV report directory**, with all-eight-radius constrained costs and persistence-mass coverage, paired gradient/PERS and F1/PERS comparisons, 2×2 factorial contrasts, 24-hour sensitivity blocks, and a SHA-indexed inventory of historical F1 training logs/checkpoint index files where present. `--mode verify` checks the result digest and recomputed spatial report. Original LXXXIII/Phase5E/LXXIX sources are never rewritten; an existing LXXXIV report directory causes an overwrite refusal.
+
+The original F1 source/checkpoint and optimizer/seeding lineage remain **not independently closed**; presence and SHA256 of logs/checkpoints are not proof of identical training conditions. The post-run inventory can guide the targeted log/flag comparison. No Phase 6 new-arm merge-tree distance is asserted here. Follow-on work: F1 training-provenance audit, new-arm merge-tree pilot, multi-seed uncertainty or additional non-consecutive meteorological evaluations as feasible. Avoid converting radii to km without grid metadata.
+
+---
+
+# Part LXXXV — Phase 6: spatial closeout verified; historical F1 training-provenance audit prepared (October 15, 2026)
+
+## LXXXV.1 Observed execution of LXXXIV
+
+The researcher supplied real Spark terminal output for installation, preflight, report, independent verify, output SHA256 checks, and both LXXXIV generated Markdown reports. All user-shown steps exited `0`. The master-notes patch advanced the on-host document from LXXXIII to LXXXIV.
+
+- `[SOURCE] PASS`: seven immutable LXXXIII spatial output checksums, all 6,720 aggregate sample×arm×radius entries and 40 macro means recomputed.
+- `[ANALYSIS] PASS`: eight radii, paired cost/GT coverage, four-cell CV×PERS contrast, seven consecutive 24-hour block analyses.
+- `[REPORT] PASS`: output `ttk_runs_fixed/topology_finetuning/phase6_lxxxiv_spatial_closeout_20261014` created in isolation.
+- `[VERIFY-GATE] PASS`: inputs, report arithmetic, output SHA256 and F1 evidence inventory match. Report exit `0`; verify exit `0`; all three output `SHA256SUMS` entries `OK`.
+- F1 training logs at `logs/wind_finetune_candidateF_grad_E2_low_expanded2688.log` (SHA256 `16efae6434db6fee1bd8d84b651e0b4f43dfbfc22ee9e41d93ba0d03db18d272`) and `logs/candidateF_grad_E2_low_expanded2688_batch.log` (SHA256 `997296d9874a567f897fa4d10126c22feac11fce47f96f2dce8c3c2fb3d24275`) were found. Their contents have **not yet** been compared against the new-arm training logs; existence and hash alone do not close lineage. Four saved `cnn.index` checkpoint files were inventoried (epochs 1, 2, 3 and final).
+
+## LXXXV.2 Full spatial interpretation, now including all eight radii
+
+The original SHA-pinned Phase 5E sparse matcher was used on 168 fields; all 840 unconstrained LXXIX GT–SR matches, 2,688 historical Phase 5E CNN/F1 spatial regressions and 320 pilot aggregate rows passed in Part LXXXIII. The source has 13,440 D0/D1 rows and 6,720 aggregate rows.
+
+The *lowest mean constrained W2,2* is gradient-only for radii `4`, `8`, and `16` grid cells, while PERS-only leads for `32`, `64`, `96`, `128`, and `inf`. The paired gradient-only vs PERS-only cost/win findings reported by the verified LXXXIV report include:
+
+| Radius | Mean grad−PERS cost | grad lower / PERS lower / ties | Mean GT persistence coverage difference |
+|---|---:|---:|---:|
+| 4 | -2.725665 | 166 / 2 / 0 | +0.110369 |
+| 8 | -2.230333 | 157 / 11 / 0 | +0.144143 |
+| 16 | -0.833510 | 126 / 42 / 0 | +0.120604 |
+| 32 | +0.185252 | 77 / 91 / 0 | +0.076794 |
+| 64 | +0.643034 | 63 / 105 / 0 | +0.041813 |
+| inf | +0.821428 | 63 / 105 / 0 | +0.027144 |
+
+The r=4 and r=16 gradient-minus-PERS cost block means were negative in each of the seven 24-hour blocks, reinforcing the *descriptive* tight-radius pattern. This is not physical feature identification, kilometer-calibrated distance, a new independent test period, or a causal training effect. GT coverage is matched GT persistence **mass**, not position error.
+
+The F1-vs-PERS difference is near zero at r=4,8 (F1 wins 86/168 and 85/168 respectively), then PERS has lower mean cost from r=16 through infinity; F1 wins only 34/168 at infinity. The factorial contrasts must be interpreted relative to the **gradient-only (00)** cell, not the pretrained CNN.
+
+## LXXXV.3 New read-only historical F1 training-log evidence workpack
+
+`Phase6_LXXXV_F1_Lineage_20261015.zip` is prepared locally in the assistant environment, **not executed** on Spark. It includes `scripts/phase6_lxxxv_f1_lineage_audit.py` under the `phase6_lxxxv_update/` unpack root, a short README, and the docs patch from LXXXIV to this section.
+
+The proposed script performs the following without running training or modifying any historical artifacts:
+
+- verifies all three previously generated LXXXIV report digests before proceeding;
+- fingerprints available F1 training/batch and corresponding new-arm logs, captures a limited set of provenance-bearing lines with original line numbers and basic secret masking;
+- inventories actual F1 and new-arm checkpoint indexes and data-shard presence, source files, training/evaluation TFRecord paths and repaired E2 pair targets (optionally hashing large artifacts with `--deep-hash`);
+- checks F1 vs gradient-only fixed evaluation benchmark `idx.npy` and `dataGT.npy` equality using complete file hashes;
+- generates isolated, SHA-indexed `f1_training_lineage.md` and `f1_lineage_manifest.json` for *manual* attribution review. Existing output refuses overwrite, and verify rechecks input fingerprints.
+
+The audit cannot alone prove identical optimizer initialization, training-time source code snapshot, pair-source bytes **at training time**, or stochastic seed. Even if the logs confirm matched architecture and hyperparameters, report nonreplicated within-benchmark contrasts unless matched random states and independent-seed replications are documented. Do not rewrite frozen `topoinvis-2026-arxiv-v1.1`, Phase 5E, LXXIX or LXXXIII results. Phase 6 new-arm merge-tree evaluation remains an independent next stage.
+
+---
+
+# Part LXXXVI — Phase 7: geographic generalization research plan and read-only WTK region inventory prepared (October 15, 2026)
+
+## LXXXVI.1 Why the priority changed
+
+Following the complete verified Phase 6 four-cell persistence and spatial-locality evaluations and the historical F1 startup-log review, the research priority shifted from further topology-loss optimization to **independent geographic and seasonal evaluation**. The existing fixed 168-hour January 2007 benchmark and repaired 2,688-field fine-tuning set share a Mid-Atlantic source footprint. Although temporal sampling spans seasons for fine-tuning, one geographic area and the `[0:160,0:160]` topology crop are insufficient to establish broad geographic/field-scale generalization.
+
+The original Stengel et al. (2020) PhIRE article reports 42,355 WIND Toolkit 500×500 patches (37,972 training, 4,383 held-out), with 100-m wind fields sampled in 2007–2013 every four hours, and 5× MR→HR and 10× LR→MR stages. Thus new locations can be outside the *later fine-tuning region* without necessarily being absent from the pretrained CNN/GAN's original training. Do not claim fully unseen regions in all model-training stages without original pretraining-patch provenance.
+
+## LXXXVI.2 Design commitments
+
+1. Freeze existing LXXIX/LXXXIII/LXXXIV and Phase 5E findings and all model checkpoints. Do **not** retrain now. First evaluate six frozen models (original CNN and GAN; gradient-only, CV-only, PERS-only and F1) on independently selected new regions.
+2. Choose geographic candidates using **native WTK grid rectangles**, not city-center distances; require source window validity and explicit intersection/buffer checks against the original `rows 720:1220, cols 2102:2602` footprint. All current geographic candidates are provisional and must not be treated as guaranteed isolated atmospheric regimes.
+3. Inspect WTK `datetime` metadata to map proposed seven-day, 168-hour seasonal windows to actual time indices, and audit overlaps with archived training-window indices before freezing partitions.
+4. Keep the original 160×160 `[0,0]` PD/MT crop for reproducibility; add predeclared spatially distributed 160×160 tiles and a full-500×500 pilot as *separate scales*. Full-field persistence/merge trees are not equivalent to sums or unions of patch descriptors.
+5. Match input preprocessing, normalization, GT coordinate orientation and inference before comparing metrics. Only then assess whether gradient-only's tight-radius advantage and PERS-only's unconstrained-distance advantage generalize across new regions/seasons.
+6. Reserve a separate development region for selecting subsequent models/losses and keep final external test regions locked and unavailable for tuning. Original pretraining geography remains a limitation unless independently reconstructed.
+
+## LXXXVI.3 Initial read-only WTK inventory workpack — proposed, not executed on Spark
+
+Prepared `Phase7_LXXXVI_WTK_Region_Inventory_20261015.zip` containing `phase7_lxxxvi_update/scripts/phase7_region_inventory.py`, `region_candidates.json`, README, SHA256SUMS and this additive master-notes patch. The script has `--mode preflight` (offline only), `--mode probe` (WTK HSDS coordinate/datetime access only) and `--mode verify` (offline output/source hashes). It never reads meteorological field arrays or computes SR/PD/MT results.
+
+The proposed targets span Rocky Mountains, Plains, inland Gulf/Southeast, upper Midwest and Western basin environments; the program resolves their actual native-grid rectangles and prints a provisional disjoint subset. Four seasonal weeks each in 2010 and 2012 are candidate timestamps, **not locked evaluation periods**. The remote probe must reproduce the existing WTK reference near row 970, column 2352; a mismatch causes a fail-closed error. An 80-grid-cell buffer is used as a screening heuristic, not a meteorological independence claim. The report output, when run, is isolated under `ttk_runs_fixed/topology_finetuning/phase7_lxxxvi_region_inventory_20261015/` and cannot overwrite existing outputs.
+
+Subsequent experiment, after observing and approving the inventory: a small, matched full-500×500 six-model inference pilot, with validation of source geometry, temporally disjoint samples, and comparison of original 160×160, multi-tile, and separate full-field topology scales. **No result, geographic generalization, or new regional extraction is claimed here.**
+
+---
+
+# Part LXXXVII — Phase 7: LXXXVI geography/time inventory verified; wind-field screening workpack prepared (October 15, 2026)
+
+## LXXXVII.1 Completed live WTK inventory and timestamp hotfix
+
+On Spark, the source-pinned LXXXVI inventory ran successfully after an **additive datetime compatibility wrapper** recognized the WTK `YYYYMMDDHHMMSS` strings. The resulting historical rectangle check passed exactly at WTK center `(970,2352)` and archived extraction rectangle `[720:1220,2102:2602]`. The live grid was `(61368,1602,2976)`, with 14 valid 500×500 candidates, and a provisional four-region 80-cell-buffer-separated combination: `gulf_inland`, `upper_midwest`, `pacific_inland`, `southwest_borderland`. All eight proposed week-long windows in 2010/2012 have contiguous 168 hourly timestamps. **No meteorological fields or model outputs were generated.** The unchanged LXXXVI `--mode verify` passed (`0`), and both `inventory.json` and `inventory.md` passed SHA-256 verification. The hotfix did not change the LXXXVI scripts or candidate list on disk.
+
+The archived 2,688-example fine-tuning dataset uses sixteen seven-day windows with WTK indices `336:503`, `504:671`, `672:839`, `840:1007`, `2160:2327`, `2328:2495`, `2496:2663`, `2664:2831`, `4344:4511`, `4512:4679`, `4680:4847`, `4848:5015`, `6552:6719`, `6720:6887`, `6888:7055`; all are in 2007. The proposed 2010/2012 indices are disjoint from those and the historical evaluation indices `0:167`. **This is temporal nonoverlap with later fine-tuning, not proof of no original PhIRE pretraining exposure.**
+
+## LXXXVII.2 Next workpack: meteorological screening, no model evaluation
+
+`Phase7_LXXXVII_WTK_Wind_Screening_20261015.zip` contains `phase7_lxxxvii_update/scripts/phase7_wtk_wind_screen.py`, a README, this additive master-notes patch, and a SHA-256 manifest. It is **prepared but not yet executed on live Spark/WIND Toolkit**. Its `--mode preflight` only validates the immutable LXXXVI report/sources, four full native-grid rectangles, mutual 80-cell separation, and timestamp exclusion. Its `--mode pilot` samples two predetermined times (offsets 0 and 84 hours) from each of the eight predeclared 2010/2012 week-long windows in **each** provisional region: 4 regions × 8 windows × 2 times = **64 native 500×500 WTK fields**. It reads only `windspeed_100m`, `winddirection_100m` and timestamp slots from HSDS, computes validity, wind-speed quantiles, high-speed fractions and finite-adjacency spatial gradient summaries. It saves only eight selected 500×500 `(u,v)` and factor-5 block-averaged 100×100 MR preview pairs, not complete TFRecords. The predeclared preview anchors are February and August 2010 at week offset 0 for each region. Output is isolated, atomic, checksum indexed, and refuses overwrites. `--mode verify` independently rechecks file hashes, exact region/time inventory and arithmetic consistency without HSDS access. Neither models, physics/topology extraction nor region/split assignments are performed.
+
+After live screening, manually inspect actual footprint coordinates/corners, NaN/validity percentages, speed and spatial-gradient distributions, and environment suitability; if a selected target is problematic, make a separately versioned amended inventory. **Do not select development/test splits after inspecting model rankings.** Next perform a tiny frozen CNN/GAN/gradient/CV/PERS/F1 full-field inference pilot against the preview MR/GT pairs, with exact PhIRE downsampling/orientation parity and unchanged normalization. Only thereafter commit geographic validation and locked external-test regions and expand the seasonal test dataset. Preserve prior PhIRE training checkpoints, master Phase5E and Phase6 evaluations unchanged.
+
+# Part LXXXVIII — Phase 7: live 64-field wind screening verified, preview parity and footprint review prepared (October 15, 2026)
+
+## LXXXVIII.1 Confirmed Spark-side meteorological inventory
+
+The previous Part LXXXVII screening was completed successfully and verified independently. Its `[PILOT] PASS` reported **64/64** WTK snapshots in four provisional, 500×500, 80-grid-cell-buffer-separated regions (Gulf inland, Upper Midwest, Pacific inland, Southwest borderland), all finite, and saved eight full-500×500 `[u,v]` + factor-5 block-average MR previews. The offline verifier passed (`0`) with **all 11** output files matching `SHA256SUMS`. No inference, model ranking, PD/MT, training, or locked test split has occurred.
+
+| Candidate | Native mean speed (m/s) | Mean per-field p99 speed (m/s) | Mean per-field p95 absolute neighbor speed difference (m/s) |
+|---|---:|---:|---:|
+| gulf_inland | 6.494 | 12.345 | 0.896 |
+| upper_midwest | 6.830 | 13.017 | 0.783 |
+| pacific_inland | 6.043 | 15.612 | 2.011 |
+| southwest_borderland | 5.277 | 13.437 | 1.566 |
+
+These are selected 16-field **meteorological screening** statistics, not population estimates or confirmation of mountainous/coastal conditions. Original fine-tuning region remains frozen, and the proposed 2010/2012 windows do not overlap documented 2007 fine-tuning times. Original PhIRE pretraining patch membership remains unknown.
+
+## LXXXVIII.2 Next proposed read-only compatibility gate
+
+`Phase7_LXXXVIII_Preview_Parity_20261015.zip` prepares an isolated gate to verify eight preview fields and their WTK/time IDs against the hashed LXXXVII screening data, print exact native-grid geographic center/corners, and compare archived 100×100 MR to **PhIRE's own unchanged TensorFlow `utils.downscale_image()`** (K=5) on 500×500 `[u,v]`, tolerance 1e-8. It includes `--mode preflight` without TensorFlow, `--mode parity` with TensorFlow, and `--mode verify` to recheck the separately written report. It does not read the remote WTK, run any model, train, generate TFRecords, or finalize evaluation splits; source SHA and output digests are preserved. A successful gate will justify an isolated development-only six-model inference pilot, after the geographic split is frozen separately. No actual Spark parity result is claimed here.
+
+Before exposing model-level metrics, manually review geographic footprint corners and ancillary environmental information and declare which regions are development vs locked final test. A **provisional discussion-only** split is Gulf/Southwest development vs Upper Midwest/Pacific final test. Locked regions should not be used to select weights, checkpoints, or model variants. Do not alter archived Phase 5E / Phase 6 records.
+
+# Part LXXXIX — Phase 7: LXXXVIII preprocessing parity verified and geographic development/test split prepared (October 15, 2026)
+
+## LXXXIX.1 Completed real WTK/PhIRE preview parity
+
+The original LXXXVIII preview preflight passed with four actual full-500×500 native footprints; the real TensorFlow `utils.downscale_image()` comparison passed 8/8 original native HR→MR factor-5 checks (`max_abs ≤ 1.066e-14`). Independent `--mode verify` passed (`0`) and report SHA256SUMS passed 2/2. The base Python environment displayed NumPy-2/compiled optional-package compatibility stack traces during TensorFlow import, but it completed TensorFlow 2.20 initialization and all numerical comparisons correctly. **Do not mutate global NumPy/TensorFlow installations**; diagnose/use isolated environment before full inference. MR preprocessing equivalence does not prove model inference, two-stage LR→MR→HR equivalence, or full-500 topology orientation.
+
+The printed footprint corners represent WTK *grid* corners, not guaranteed cardinal NW/NE/SW/SE on a projection: do not assign compass or geographic terrain descriptors solely from the corner-key strings. Screening across four regions and 64 samples is a covariate diagnostic, not a model validation result.
+
+## LXXXIX.2 Proposed frozen development and external geographic test protocol
+
+Before any new-region model scores are inspected, version-lock the proposed split: `gulf_inland` and `southwest_borderland` are development; `upper_midwest` and `pacific_inland` are locked external-test regions. Region rectangles are the exact native WTK full-500 footprints from LXXXVII. Each region has four primary seven-day seasonal windows (2010-02-01, 05-01, 08-01, 11-01), plus four predeclared 2012 replication windows at the same month-days; 168 consecutive hourly fields per window. The initial inference pilot is **only four development-region preview files** from February and August 2010 (the original LXXXVII test previews remain available as artifacts, not test predictions). Six archived frozen checkpoints will be used once inference and analysis plans are defined; no model selection or threshold tuning against locked test-region performance is allowed.
+
+The proposed, source-pinned `Phase7_LXXXIX_Geographic_Split_Freeze_20261015.zip` includes a JSON plan, a Python script with `--mode preflight|freeze|verify`, README, SHA256SUMS, and this additive notes patch. Preflight verifies historical LXXXVI/LXXXVII/LXXXVIII SHA256, prior LXXXVIII independent audit, actual WTK rectangles and 80-cell separation, original fine-tuning area, seasonal WTK hour indexes, and development-only initial pilot set. Freeze atomically creates the isolated manifest in `ttk_runs_fixed/topology_finetuning/phase7_lxxxix_locked_region_split_20261015` without HSDS, TensorFlow, TFRecords, training or inference. Verify checks integrity of both sources and frozen decision. Freeze refuses overwrites.
+
+The original PhIRE pretrained CNN/GAN were trained on WIND Toolkit 2007–2013, so the new 2010/2012 windows are only documented as **unseen by the later 2007 fine-tuning**, not necessarily unseen by PhIRE pretraining. Original historical crop-based results remain a development benchmark. The proposed locked test set is a geographic fine-tuning holdout, not a proven never-pretrained geographic test.
+
+## LXXXIX.3 Next steps
+
+After validating/freezing region assignments and before looking at any locked scores, validate development-only six-model inference with exactly the original model normalization and source checkpoints, preserve full-500 `(u,v)` GT and SR orientation, and produce immutable per-model numerical checks. Declare all model, metric, spatial tile, radii, primary statistical aggregation and sampling conventions before finally unsealing external-test predictions. Full-500 TTK/PD/MT remains a separate computational pilot. The region names and footprint labels remain provisional meteorological hypotheses until independent terrain/coastline checks.
+# Part XC — Phase 7: locked geographic split verified; four-field development-only six-model inference pilot prepared (October 15, 2026)
+
+## XC.1 Frozen split verified on Spark
+
+Part LXXXIX split ZIP was extracted into a nested `phase7_lxxxix_update/phase7_lxxxix_update/` folder; use its explicit `--repo-root` path. After verifying package hashes and applying the LXXXIX notes patch, the **real Spark** preflight/freeze/verify ran with exit 0. Both `locked_region_split.json` and `locked_region_split.md` passed SHA256 checks. Fixed roles: Gulf inland + Southwest borderland **development**, Upper Midwest + Pacific inland **locked external test**. The full 500x500 native-grid regions are disjoint by the chosen 80-grid-cell buffer. Each region has four 168-hour 2010 primary windows and four 168-hour 2012 replication windows. Freeze occurred before any Phase 7 model predictions. This is geographic separation from the *fine-tuning* footprint, not proven pretraining exclusion.
+
+## XC.2 Prepared six-model inference pilot (NOT run on Spark)
+
+`Phase7_XC_Development_Six_Model_Inference_20261015.zip` ships a **flat** set of package files, to unpack only once into `phase7_xc_update`. The Python driver has `--mode selftest|preflight|infer|verify` and a `--repo-root` override. Preflight is read-only and TensorFlow-free; it independently invokes the LXXXIX frozen-split verifier, checks the source/checkpoint shard fingerprints and checks the four allowlisted LXXXVII development previews. It will not load, infer or score the Upper Midwest or Pacific inland samples. The four sampled times are Gulf/Southwest 2010-02-01 and 2010-08-01 UTC, one full 500x500 native field each. Their previously verified downscaled 100x100 MR inputs are used **without regeneration** in the actual TFRecord records.
+
+The `infer` mode creates an isolated, no-overwrite staging directory. It constructs the paired four-example float64 PhIRE TFRecord using the original seven-field `data_LR/data_HR/index/...` schema, invokes `PhIREGANs.test_paired(r=[5], batch_size=1, save_inputs=True)` on **six frozen** checkpoint prefixes: original CNN, original GAN, gradient-only, CV-only, PERS-only, and F1. It explicitly uses pretrained `mu_sig=[[0.7684,-0.4575],[5.02455,5.9017]]`. It then enforces exact sample-index ordering, full-500x500 arrays, finite outputs, and closeness of model-returned input/GT to original unmodified LXXXVII previews (max absolute discrepancy <=2e-5). It saves a single reference MR/GT pair, six `pred_*.npy` arrays, the temporary TFRecord, per-field and per-method descriptive UV RMSE and speed MAE, JSON/MD reports and SHA256. Only after six passes does the staging directory atomically become the final report. Failure clears its temporary staging directory; no existing experiment artifacts are touched. `verify` rereads exact inputs, checks the hashes and independently recomputes those preliminary metrics. No PD, MT, locality or weather-generalization claim from four fields.
+
+TensorFlow 2.20 in the existing Spark Python 3.12 environment prints NumPy 2.4.2/compiled-extension warnings yet previously completed the eight LXXXVIII original-PhIRE downsampling checks. Do **not** downgrade system NumPy or modify the historical source packages as part of this pilot. Stop and inspect the actual failure if six-model inference errors, rather than bypass parity. Original `PhIREGANs.test_paired()` uses in-memory full-500 inference, appropriate here; do not substitute independently cropped model inference.
+
+## XC.3 Next protocol gate
+
+After a verified four-field **development-only** inference and geometry gate, predeclare the large-scale metric definitions, crop/tiling positions, 500x500 topological feasibility scope, persistence thresholds, constrained-matching radii, statistical grouping and model-decision criteria. Process further development-region data first, without exposing locked-region model scores. Only after the protocol is frozen expand to the external 2010 test and the predeclared 2012 replication windows. Later geographically diverse training must regenerate repaired E2 fixed-pair constraints for *each new training field*. Preserve archived Phase 5E, Phase 6 and arXiv-release results unchanged.
+
+# Part XCI — Phase 7: six-model 500×500 development inference verified; geographic evaluation protocol freeze prepared (October 15, 2026)
+
+The **real Spark** Part XC development-only inference completed with six `[MODEL-PASS]` records, `[INFER-GATE] PASS`, `Inference exit: 0`, independent `[VERIFY-GATE] PASS`, `Verify exit: 0`, and all eleven output checksums OK. Four predeclared development fields: Gulf inland and Southwest borderland, February and August 2010. Native paired PhIRE full-500×500 inference used the original six checkpoints; max GT/MR discrepancy was 3.55e−15, and no Upper Midwest or Pacific inland model scores were accessed.
+
+XC four-field descriptive pooled values (UV RMSE m/s; speed MAE m/s): CNN (0.90463,0.58800), GAN (1.13549,0.75754), gradient-only (0.66814,0.41495), CV-only (0.71809,0.46076), PERS-only (0.72577,0.47043), F1 (0.73967,0.48084). Do not claim statistical generalization from four development fields.
+
+Part XCI is a **protocol-freeze** package, not a new model run. It predeclares source/hash and full-500 inference conventions; the original top-left 160×160 speed crop as the **primary PD/locality benchmark**; dB, W2inf, W22; original Phase5E locality radii [4,8,16,32,64,96,128,∞]; nine 160×160 tiles as a separate secondary spatial-sensitivity analysis; full 500×500 topology extraction only as an initially development-only feasibility study; 2010 season-stratified primary and 2012 replication weeks; immutable geographic roles; and region-by-week paired summaries. No metric selection or model tuning on external scores. The original pretrained PhIRE membership remains unknown. Pilot and future analysis tools must be validated on development data before external evaluation.
+
+Run `phase7_xci_update/scripts/phase7_freeze_evaluation_protocol.py` with `--mode preflight|freeze|verify --repo-root "$PWD"` after verifying package hashes. Output is an isolated SHA-256 index under `ttk_runs_fixed/topology_finetuning/phase7_xci_frozen_evaluation_protocol_20261015`. It must be frozen and verified before test-region inference; no modification to the previous frozen data or checkpoints.
+
+# Part XCII — Phase 7: XCI external-evaluation protocol verified; development-only canonical PD pilot (October 15, 2026)
+
+Spark execution of Part XCI: original package `sha256sum -c` PASS, script `--mode selftest` PASS, `--mode preflight` PASS, `--mode freeze` `[PROTOCOL-FREEZE] PASS` exit 0, and `--mode verify` `[VERIFY-GATE] PASS` exit 0; both frozen report SHA-256 entries OK. This protocol is immutable, retains the original upper-left 160×160 speed crop as primary topology support, and reserves `upper_midwest` and `pacific_inland` for locked external testing. Development regions are `gulf_inland` and `southwest_borderland`. The historical 2007 reference and the four XC development samples are not clean external tests.
+
+Part XCII is an **extraction-only, development-only pilot**: use `reference_gt.npy` and the six source-frozen `pred_{cnn,gan,grad,cv,pers,f1}.npy` arrays from the successfully verified Phase 7 XC pilot. All arrays contain four ordered 500×500 [u,v] fields, from Gulf and Southwest only. Extract **28** canonical top-left 160×160 scalar-speed image-data VTIs and the corresponding **28** TTK `ttkPersistenceDiagramCmd` port-0 VTUs. Preserve the original validated `scripts/convert_phire_to_vti.py` writer, using `wind_speed`, float32 scalar speed and row-major `x=columns, y=rows`; require the writer SHA-256 to match the previously verified Phase 6 LXXVII extraction manifest. Execute with one TTK thread and verify numeric orientation by reading every VTI into NumPy and testing exact equality to the computed source-speed crop. Verify each port-0 diagram is readable and nonempty.
+
+`phase7_xcii_update/scripts/phase7_xcii_dev_canonical_pd.py` provides `--mode selftest|preflight|extract|verify --repo-root /work`; use the installed `phire-ttk:latest` Docker image, mounting the repository read-only for preflight/selftest and read-write as the host user only for extraction, then read-only for verification. Preflight verifies XC and XCI reports and hashes and the old canonical converter without touching locked-region data. Extraction stages and atomically publishes a single isolated SHA-indexed output at `ttk_runs_fixed/topology_finetuning/phase7_xcii_dev_canonical_pd_20261015`. It refuses an existing output and deletes only its own incomplete staging tree on error. Independent verification rehashes all 56 VTI/PD files plus the report files and rechecks each source field and VTI/PD. No source, checkpoint, existing experiment or frozen protocol can be overwritten.
+
+**Important:** This phase does not yet calculate corrected GUDHI `dB`, `W2inf`, `W22`, Phase5E locality, merge-tree distances, distributed tiles, or full-500 topology. The ensuing Part XCIII should port the **unchanged** validated Phase 6 canonical PD parser/GUDHI distance definitions and Phase5E locality matcher to these new 28 development diagrams, with regression gates against prior LXXIX/LXXXIII reference results. Do not infer geographic generalization or select models on these four pilot samples. Do not run inference on `upper_midwest` or `pacific_inland` until the new implementation gates pass and any necessary XCI protocol amendments are recorded *before* external access.
+
+# Part XCIII — Phase 7: canonical 28-diagram extraction verified; corrected GUDHI development-distance gate (October 16, 2026)
+
+## XCIII.1 Completed Spark XCII extraction with additive XML compatibility
+
+The original Part XCII VTK-based selftest/extraction failed at the XML reader; its preflight passed. Rather than altering the frozen XCII driver or source artifacts, an additive source-hash-pinned launcher `phase7_xcii_xml_compat_20261016/scripts/phase7_xcii_vtk_xml_compat.py` replaced only the VTI/VTU readback checks **in memory**, preserving the original converter, TTK command, source files and output location. The live Spark launcher selftest and preflight both passed (0), as did the full **28/28** diagram extraction and verification (0). Its VTI reader checked full 160x160 float32 scalar values/orientation, while the VTU gate checked XML structure and four required arrays **without decoding compressed diagram numerical payloads**. All **58** output SHA256SUMS members passed: 28 VTIs + 28 PD port-0 VTUs + 2 reports. No locked Upper Midwest or Pacific inland fields entered this process, and no full-field or distributed-tile topology was performed. Therefore the XCII success is an extraction/structural gate, **not** corrected persistence-distance or scientific generalization evidence.
+
+## XCIII.2 Prepared numerical GUDHI audit (NOT yet run on Spark)
+
+The new `Phase7_XCIII_Development_Corrected_PD_20261016.zip` ships `phase7_xciii_update/scripts/phase7_xciii_dev_corrected_pd.py`, a flat archive, README, SHA manifest, and additive master-notes patch. Execute with the existing `PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit python` environment. The script reuses the **unchanged** Phase 6 LXXVII `phase6_pilot_pd_gudhi_gate.py` `parse()`/`distance()` functions and canonical runtime decoder `~/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py` (verified against Phase 6 pilot parser SHA). Before processing new samples it recomputes all **five** archived Phase 6 sample-0 CNN/grad/CV/PERS/F1 GUDHI distances and compares dB/W2inf/W22 against the checksum-pinned LXXIX 840-row CSV. It then numerically decodes the **28** XCII diagrams and computes **24** paired model-vs-GT comparisons over four predeclared development fields, using exactly the original Phase 6 metric combination across H0/H1. It checks source hashes, shapes, finite/nonnegative distances, metric bounds, sample identity, and protocol scope. Atomic no-overwrite output includes `per_field_corrected_pd.csv`, `numeric_manifest.json`, `numeric_report.md` and SHA256SUMS; `--mode verify` independently rereads and recomputes all 24 distances using the same trusted implementation. This does **not** amount to a separate independent numeric algorithm. No new TTK execution, TFRecord, HSDS, model inference or locked test access is permitted.
+
+Once real numerical XCIII verification passes, the next distinct gate is the original Phase5E spatial-locality cost/coverage analysis at XCI's frozen eight radii. Its archived Phase5E solver requires critical-pair birth/death *positions*, and the VTK compressed-VTU reader has previously been incompatible with the live Docker output. Validate a numerically equivalent coordinate-capable reader independently before carrying out locality matching; never substitute positionless PD coordinates or claim locality from GUDHI results alone. Four development fields are a feasibility pilot; the larger season-stratified geographically held-out benchmark remains necessary for any generalization claim. Do not modify XCI's frozen protocol or run locked-region inference as part of XCIII.
+
+# Part XCIV — Phase 7: verified corrected GUDHI development PD, spatial endpoint/locality gate (October 17, 2026)
+
+## XCIV.1 Observed real Spark Part XCIII completion
+
+The original Part XCIII installation, self-test, five historical Phase6 sample-0 LXXIX GUDHI regressions, numerical compute and verification all **passed** on Spark. The run reported `[COMPUTE-GATE] PASS`, `Compute exit: 0`, `[VERIFY-GATE] PASS`, `Verify exit: 0`, all **three** output hash entries OK, and no locked-region access. Exactly 24 model/GT corrected GUDHI comparisons were calculated on four predeclared development fields (Gulf inland and Southwest borderland, Feb/Aug 2010, top-left 160×160). Historical Phase6 canonical parser continuity held. Pilot mean corrected (dB, W2inf, W22) values: CNN (1.541602, 7.535081, 9.560749); GAN (3.191603, 8.791652, 11.388065); grad-only (1.301406, 6.097335, 7.412320); CV-only (1.221196, 6.335671, 7.806714); PERS-only (1.309084, 6.427607, 7.919260); F1 (1.259638, 6.400259, 7.905475). This is **not** geographic-generalization evidence or a basis for model selection. It does not itself evaluate spatial-locality fidelity.
+
+## XCIV.2 Prepared development-only spatial-locality gate (NOT yet run on Spark)
+
+The `Phase7_XCIV_Development_Spatial_Locality_20261017.zip` workpack contains `phase7_xciv_update/scripts/phase7_xciv_dev_locality.py`, manifest and additive notes patch. Its preflight independently verifies frozen XCI/XCII/XCIII hashes and historical Phase6 LXXXIII locality reference hashes; pins the **unchanged** Phase5E `spatial_pd/phase5e_sparse_locality_solver.py` SHA256. It requires the original `read_features` VTK reader to decode birth/death critical-point coordinates for all 28 new XCII VTUs and requires that its finite positive H0/H1 birth/death values match the previously numerically corrected PD parser, including spatial bounds. **If incompatible with the Spark VTK environment, stop without running locality; do not invent coordinates from diagrams.** If successful, `--mode compute` applies the original Phase5E sparse assignment at eight predeclared grid-cell radii [4,8,16,32,64,96,128,∞], checks each of the 24 infinite-radius W22 values against frozen XCIII GUDHI W22, requires squared-cost decomposition and non-increasing costs, and outputs 192 aggregate plus 384 per-dimension rows with persistence-mass coverages. Results publish atomically to a separate SHA-indexed XCIV folder without overwriting other phases. `--mode verify` recomputes all assignments using the same archived optimizer, checks source continuity, CSV and report, and all four result hashes. No locked external-region model inference, geodesic distance claims or training is permitted. The 4-field report is descriptive only.
+# Part XCV — Phase 7: four-field global/locality development pilot verified; 2010 seasonal source expansion prepared (October 18, 2026)
+
+## Prior-stage result verified on Spark
+- XCIV zero-persistence compatibility finished: 28/28 diagrams' retained H0/H1 birth/death values and endpoint coordinates match the corrected numerical diagram convention, 24/24 unconstrained W22 values match XCIII, 192 aggregate locality and 384 dimension-level rows, four output SHA256 entries verified. No locked-region model predictions examined.
+- XCIV four-field mean constrained W22 (lower is better):
+
+| Model | r=4 | r=16 | r=32 | r=inf | GT persistence-mass coverage at r=16 |
+|---|---:|---:|---:|---:|---:|
+| cnn | 15.872628 | 13.065990 | 11.488728 | 9.560749 | 0.521896 |
+| gan | 22.701018 | 16.753153 | 14.003156 | 11.388065 | 0.823593 |
+| grad | 16.165423 | 11.531220 | 9.632986 | 7.412320 | 0.801454 |
+| cv | 16.302017 | 12.256537 | 9.938167 | 7.806714 | 0.731901 |
+| pers | 16.346778 | 11.956780 | 10.175161 | 7.919260 | 0.738989 |
+| f1 | 16.568133 | 12.269268 | 10.029004 | 7.905475 | 0.709210 |
+
+- The four fields are exploratory validation checks, **not** a conclusion that the historical 168-field trade-offs have reversed geographically. A low matching cost and high GT persistence coverage are distinct observations, not interchangeable estimates of correctly localized meteorological structures.
+
+## Part XCV workpack plan
+- Inputs pinned to LXXXVII 64-field screening CSV and NPZ checksums, LXXXIX locked region assignment, and XCI frozen protocol. Never selects new regions or timestamp windows based on model performance.
+- Only 2010 **development** regions `gulf_inland`, `southwest_borderland`; February, May, August, November seven-day windows; predeclared UTC offsets 0 and 84 h within each window. Total 2 × 4 × 2 = **16 fields**, compared with the four-field numerical smoke test.
+- Four February/August offset-zero native LXXXVII fields are copied byte-for-byte; the other 12 native 500×500 speed and wind-direction slices are re-read from WTK through read-only HSDS, converted to `[u,v]` using the original LXXXVII routine, and pooled to 100×100 inputs. Each resulting 500×500/100×100 pair must match its original screening mean and p99 speed within 2e-8 m/s, verify UTC index, region and grid footprint, and retain exact SHA256 integrity.
+- No TensorFlow/model inference, GT-to-model metrics, topology extraction, merge-tree distances, 2012 replication data, or external-test predictions in XCV. This is only a data-availability/scaling pilot; **XCI's full 168 hourly fields per region-week are still the final predeclared benchmark**, not replaced by these two pilot hours per region-week.
+- Expected isolated output: `ttk_runs_fixed/topology_finetuning/phase7_xcv_development_seasonal16_20261018/` with 16 NPZ, JSON manifest, markdown report and SHA256SUMS. Refuse overwrite and purge unfinished staging artifacts only.
+- Current archive was syntax checked, hashed, mock-HSDS integration tested end-to-end for 12 remote-read equivalents plus four cached previews, and verified under checksum-tamper tests. **Real HSDS extraction is pending**.
+- Follow-up after verification: process the fixed 16 development inputs through unchanged six-model checkpoints, then numerical/topological smoke checks using the already validated XC→XCIV methods before scaling to complete seasonal weeks. No changes to XCI frozen outcomes or locked region assignments.
+
+# Part XCVI — Phase 7: seasonal16 development sources verified; six-checkpoint inference scaling pilot prepared (October 18, 2026)
+
+## XCV actual Spark closeout
+
+- On Spark, XCV 2010 development extraction **passed**: two development regions (`gulf_inland`, `southwest_borderland`) × February/May/August/November × 0h and 84h = 16 native HR500 `[u,v]` fields and exact MR100 factor-five pooled inputs. Four preserved LXXXVII previews were reused; 12 additional WTK fields were downloaded read-only via HSDS. Every archived screening speed mean/p99 agreed within 2e-8 m/s.
+- The independent `--mode verify` passed, with all 16 NPZ, one JSON manifest and one markdown report (18/18 SHA256). No model scores or locked-region predictions were generated. The subsequent repeated `extract` refused overwrite as designed (not a source-extraction failure). Terminal paste markers were cosmetic.
+- XCV is a **two-hours-per-region-week engineering sample**, not the frozen XCI full 168h/week primary evaluation or 2012 replication.
+
+## XCVI six-model inference workpack (prepared; real Spark inference pending)
+
+- Reuse the **unchanged** six archived checkpoints from XC: pretrained CNN/GAN and fine-tuned gradient-only, CV-only, PERS-only and F1. Original PhIRE paired-inference routine `PhIREGANs.test_paired(r=[5], batch_size=1)` and normalization `mu_sig=[[0.7684,-0.4575],[5.02455,5.9017]]` are unchanged. New standalone launcher and isolated output directory; never overwrite historical XC or frozen protocol.
+- Independent inputs are exactly the 16 XCV verified development NPZs in declared region-week-hour order. Reverify complete source-integrity hashes, XCI frozen protocol, original XC verification, six checkpoint sharded files and both original XC/XCV source-script hashes before any inference.
+- Build a 16-paired-record float64 native PhIRE TFRecord. For every checkpoint, require output shape (16,500,500,2), exact ordering, finite arrays, and MR/GT de-normalization differences <=2e-5 m/s.
+- **Four-field regression:** compare XCV indices 0,4,8,12 against archived XC indices 0,1,2,3, respectively, requiring bitwise source HR/MR identity and model-prediction maximum absolute differences <=1e-3 m/s. This is an engineering tolerance for possible inference-kernel rounding, **not** a new model-selection threshold. Stop to investigate if it fails.
+- Save 16 MR, 16 HR, 96 predictions and fieldwise full-500 UV-RMSE and speed-MAE with descriptive region-week grouping, plus manifest, report and 11 SHA256 entries. Publish atomically only after all six arms pass. The independent verifier recomputes every numeric metric and the old-four prediction regression. No GUDHI, TTK, merge-tree or locality scores are generated in XCVI.
+- The workpack passed local syntax, ZIP/notes-patch integrity, and a **synthetic 16-field six-model** end-to-end write/verify exercise (11 checksum entries, deliberate corruption detection, no-overwrite refusal). This does not demonstrate live checkpoint inference or geographic generalization; the real Spark run remains required.
+- No locked external-test model data, no change in model/radius/crop/season definitions, no new training or hyperparameter choice. Further development-only TTK/GUDHI/locality pilot is the next gate, before building the complete region-week benchmark. Historical original-PhIRE pretraining geography remains unknown.
+
+# Part XCVII — Phase 7: seasonal16 six-model development inference verified; canonical 112-diagram extraction prepared (October 18, 2026)
+
+## XCVI real Spark completion
+
+- Part XCVI passed with all six frozen original CNN/GAN and Phase 6 grad/CV/PERS/F1 checkpoints. There were **96 finite 500×500 development predictions** across the sixteen 2010 XCV fields, MR/GT maximum discrepancy 3.55e-15, and zero regression drift versus all four archived XC fields for every arm. Independent verification passed, 11/11 output SHA-256. Original XCI locked external-test regions were not accessed.
+- Full-500 field descriptive UV RMSE / speed MAE (m/s): CNN `1.005078/0.694239`; GAN `1.260284/0.889043`; grad `0.767223/0.505430`; CV `0.836607/0.556942`; PERS `0.851250/0.569289`; F1 `0.866208/0.579233`. Gradient-only is best on these two pointwise metrics over this sixteen-field development sample. **No topological or geographic generalization claim** follows from this two-hours-per-region-week engineering study.
+- No interventions to the NumPy/TensorFlow environment are warranted because inference and revalidation succeeded; warnings about optional NumPy 1.x binary extensions did not interrupt operations.
+
+## XCVII new workpack (prepared, live Spark extraction pending)
+
+- Scope: existing **sixteen XCVI development fields**, exact `(x0,y0)=(0,0)` top-left 160×160 scalar speed, original C-order canonical VTI conversion and `ttkPersistenceDiagramCmd -t 1 -i ... -a wind_speed -o ...` under `phire-ttk:latest`. GT plus six model predictions yields **112 VTI + 112 VTU port-0 diagrams**.
+- **Bitwise regression first:** map XCII old field indices `0,1,2,3` to XCVI new indices `0,4,8,12` (the four original Gulf/Southwest 2010 Feb/Aug snapshots). Require XCVI GT/SR numerical arrays equal their original XC arrays, copy the 28 XCII VTI and 28 PD files *bit-for-bit*, verify old SHA-256 and numerically compare the VTI field values/orientation against the corresponding XCVI fields. Execute TTK only on 12 additional fields × 7 sources = **84 new VTI/VTU pairs**. No historical files are modified.
+- Input checks include full original XC, XCII, XCI, XCVI SHA manifests; original XCII XML compatibility launcher, original XCVI script and canonical converter source hashes; frozen geographic roles/canonical primary crop and 2010 region/week/hours. Refuse any changed input and any existing completed XCVII directory. Never load locked-region predictions or run inference/training.
+- **XML reader compatibility:** reuse the original SHA-pinned XCII XML reader hotfix to validate complete ASCII Float32 `wind_speed` VTI values and `y,x` orientation numerically. Persistence VTU verification checks structural XML, positive point/cell counts and required arrays, **not decompressed numeric persistence pairs**. Numerical validation, independent XCIII GUDHI regression, 96 development-field distances and optional XCIV locality remain mandatory future gates.
+- Write isolated `ttk_runs_fixed/topology_finetuning/phase7_xcvii_dev_seasonal16_pd_20261018/{vti,pd,extraction_manifest.json,extraction_report.md,SHA256SUMS}` with **226 checksum entries**. Verify independently. Shell execution requires Docker `phire-ttk:latest`, read-only mounts for selftest/preflight/verify, writable mount for extraction. Stage-and-rename commit, no overwrite/resume.
+- Package syntax, archive integrity and notes patch tested. A **synthetic 112-diagram full flow** using mock TTK passed, including 28 copy regressions, 84 new mock files, 226 SHA checks, tamper detection and no-overwrite; it is not a live TTK numerical validation. Only a real successful Spark `extract` + `verify` certifies this stage.
+- The frozen XCI evaluation protocol, original PhIRE unknown pretraining exposure and the 168h/week primary/2012 replication targets remain unchanged. All sixteen fields are **development-only engineering samples** (not full weekly sample/independent hourly replications).
+
+# Part XCVIII — Phase 7: verified seasonal16 canonical extraction; corrected numerical GUDHI expansion (October 18, 2026)
+
+## XCVII real Spark completion
+
+- Part XCVII completed with all **112/112** canonical top-left 160×160 wind-speed VTIs and TTK port-0 persistence diagrams (16 frozen development fields × GT and six frozen model predictions), including **28/28 original XCII bitwise-reused pairs** and **84/84 new single-threaded TTK extractions**. Four-field source equality checks passed.
+- Independent XCVII `verify` passed with **226/226 SHA-256** checks and exact numerical VTI scalar/orientation agreement. Persistence VTU structural checks passed; **the new TTK diagrams are not numerically decoded/validated yet**. Locked external-test regions were not evaluated.
+- The ZIP had an extra nested `phase7_xcvii_update/` directory; the user resolved it by using the actual `phase7_xcvii_update/phase7_xcvii_update/scripts/` and `patches/` paths. No changes to XCI, historical data, models, or earlier results were needed.
+
+## XCVIII numerical workpack (prepared; real Spark GUDHI computation pending)
+
+- Input: immutable XCVII 112 canonical diagrams, frozen XCI split/protocol, XCVI 16-field source lineage, original independently verified XCIII 4-field numeric results. Reuse the **unchanged, SHA-pinned** original Phase 6 LXXVII `parse`/`distance` and canonical `read_pd` implementation through original XCIII. Run in micromamba `gudhi-audit` with `PYTHONNOUSERSITE=1`.
+- Preflight verifies every one of XCVII's 226 SHA entries, XCIII source/results SHA, original XCVII/XCIII script hashes, geographic roles/time indices/field order, and historical Phase 6 LXXIX sample-0 regression of five shared arms. It also ensures **all 28 historical XCVII PDs at indices 0,4,8,12 have SHA identical to the original XCIII-published input PDs**. No outputs or WTK/TF/TTK calls in preflight.
+- Numerically decode all **112 TTK diagrams** and compute corrected `dB`, `W2inf`, `W22` for **16 × 6 = 96 GT-to-model field comparisons** on exactly the canonical top-left 160×160 speed crop. Require the original 4-field **24/24 XCIII metrics and feature counts** to agree at indices 0,4,8,12 (within 1e-8 absolute numeric tolerance). Fail closed if any mismatches, malformed pairs, nonfinite distances or unsatisfied `dB <= W2inf <= W22` bound.
+- Save `per_field_corrected_pd.csv` (96 rows), `region_week_corrected_pd.csv` (8 development region-weeks × 6 arms = **48** rows, each averaging the two predeclared 0h/84h snapshots), `numeric_manifest.json`, `numeric_report.md` and SHA256SUMS (4 entries) in the new isolated `ttk_runs_fixed/topology_finetuning/phase7_xcviii_dev_seasonal16_corrected_pd_20261018/`. Refuse overwrite; stage then atomic rename. Verifier recomputes all 96 distances with the same original algorithm, independently checks summaries/lineage/checksums and repeats archived regressions. **Numerical reexecution is not a second independent algorithm.**
+- Package syntax, archive/hash integrity and master-notes patch tested. Synthetic 16×6 fixture passed output/verify, 24 historical-regression checks, 48 block-aggregation rows, intentional tampering detection and overwrite refusal. This **does not establish live GUDHI results**: actual numerical preflight, compute, verify pending on Spark.
+- XCVIII does not compute locality, full-500 topology, merge trees, training, or any locked external-test predictions/scores. The 16 development snapshots are two temporally separated hours per region-week and **not the frozen 168-hour-per-week benchmark**; original pretraining membership unknown. Phase 7 XCIV locality expansion and full seasonal benchmark remain future work.
+
+# Part XCIX — Phase 7: verified 16-field corrected GUDHI results; original spatial-locality expansion prepared (October 18, 2026)
+
+## Part XCVIII real Spark verification
+
+- XCVIII `selftest`, `preflight`, `compute`, `verify` all completed successfully with exits 0. All **112** TTK diagrams numerically decoded using the archived corrected Phase6 parser; all **96** model/GT corrected `dB`, `W2inf`, `W22` comparisons recomputed and verified, including all **24** original XCIII four-field regression anchors; original Phase6 s0 regression of five arms passed. Eight region-week pairs × six arms = **48** summary rows. All **4 SHA256** result checks passed, no locked external-region predictions or scores accessed.
+- Descriptive mean results on sixteen predeclared 160×160 top-left speed crops, across two development regions and four 2010 seasonal weeks with two hours per region-week (not a generalization estimate):
+
+  | Model | Mean dB ↓ | Mean W2inf ↓ | Mean W22 ↓ |
+  |---|---:|---:|---:|
+  | cnn | 2.218899 | 8.349543 | 10.462440 |
+  | gan | 3.371328 | 9.788407 | 12.211472 |
+  | grad | **1.540991** | **6.892901** | **8.375874** |
+  | cv | 1.597790 | 6.981211 | 8.502258 |
+  | pers | 1.570721 | 6.955128 | 8.483273 |
+  | f1 | 1.603079 | 7.033517 | 8.607247 |
+
+- Gradient-only has the lowest global persistence distances on these descriptive means, but block-specific differences exist (e.g., PERS-only leads Gulf May and November in `W22`), and neither seasonality nor geographical generalization is established by these paired snapshots.
+
+## Part XCIX locality expansion workpack (prepared; Spark not yet run)
+
+- Scope: exactly the existing sixteen 2010 **development-only** fields and their **112** numerically audited XCVII canonical TTK diagrams. Reuse pinned original XCIV `compute_rows` and the unchanged Phase5E sparse matching solver (`SHA256 47c73decca4ba151fd8b250cae2911b4c2307471fe9c881fc42bfc968e211c3a`), including original radius grid **4, 8, 16, 32, 64, 96, 128, infinity** (grid cells, not kilometers).
+- Before matching, independently decode **all 112** GT/model spatial birth/death critical coordinates using the original Phase5E reader. Require all H0/H1 nonzero features to match corrected canonical numeric persistence values, all coordinates finite and within the 160×160 crop, and the original `TOL=1e-10` zero/near-zero persistence counts to match the corrected canonical parser **for every diagram**. Do not modify archived reader, optimizer, XCIV/XCVIII data, or frozen XCI protocol.
+- Compute **96** model-to-GT comparisons × **8** radii = **768** aggregate locality rows, and **1536** H0/H1 dimension rows. Require *all* infinite-radius `W22` values to match frozen XCVIII, and all **192** original XCIV aggregate rows plus **384** dimension-level rows to be reproduced for the four original fields mapped to seasonal16 indices 0, 4, 8, 12. Produce **48** region-week × model summary rows (two snapshots per block); report GT persistence-mass coverage separately from matching cost.
+- Save isolated, atomic, overwrite-protected `ttk_runs_fixed/topology_finetuning/phase7_xcix_dev_seasonal16_locality_20261018/`, with five SHA-256-indexed result files plus `SHA256SUMS`, and full numerical verifier recomputation using the same original solver. This is not a second independent matching algorithm.
+- Package integrity, Python syntax, flat-path extraction, master research-notes patch checks and synthetic regression/aggregation/overwrite/manifest tests are local-only; real Spark source/coordinate/matching gates are pending. If any one fails, stop without claiming locality rankings.
+- No new inference, training, HSDS, topology hyperparameters, full500 TDA, merge trees, or locked test-region access. The benchmark's complete 2010 168-hour primary / 2012 replication full-week tests have not been conducted, and pretrained PhIRE training-set membership for these regions remains unknown.
+
+# Part C — Phase 7: verified sixteen-field development topology/locality; first complete development week source pilot prepared (October 18, 2026)
+
+## Part XCIX real Spark closeout
+
+- XCIX was executed and verified on Spark with successful selftest, preflight, computation and independent verification. All **112** canonical PD diagrams have verified birth/death critical feature values/coordinates for H0 and H1 after the original zero-persistence filter. The unchanged SHA-pinned Phase5E sparse solver produced **96 model-to-GT comparisons × 8 radii = 768 aggregate locality rows** and **1536 dimension-level rows**; all **96** infinity-radius values agree with XCVIII corrected GUDHI `W22`; all **192** original XCIV aggregate and **384** dimension-level regressions reproduced. Eight region-week × six model summaries (48 rows) verified. Five output SHA256 checks passed. No locked external-region scores accessed.
+- Descriptive, equal-snapshot means from 16 fields (two per 2010 region-week, two development regions):
+
+  | model | r4 W22 ↓ | r16 W22 ↓ | r32 W22 ↓ | r∞ W22 ↓ | GT persistence-mass coverage r16 ↑ |
+  |---|---:|---:|---:|---:|---:|
+  | cnn | 19.523399 | 15.817982 | 13.593439 | 10.462440 | 0.489421 |
+  | gan | 26.324920 | 20.457178 | 16.810830 | 12.211472 | 0.798443 |
+  | grad | **18.869274** | **14.002953** | **11.729558** | **8.375874** | 0.792718 |
+  | cv | 19.407128 | 14.623993 | 11.965772 | 8.502258 | 0.741817 |
+  | pers | 19.712260 | 14.615091 | 12.088795 | 8.483273 | 0.747704 |
+  | f1 | 19.570265 | 14.393966 | 11.853859 | 8.607247 | 0.724932 |
+
+- Progress log displays `[LOCALITY] 25/24` to `96/24` because of an incorrect diagnostic denominator. The verified CSV count, XCVIII infinity anchors, XCIV historical regressions and numerical metrics are unaffected; keep validated XCIX data unchanged. No inference should treat the sixteen hours as full independent meteorological temporal replication.
+
+## Part C first complete development source-week workpack — prepared; LIVE Spark not yet run
+
+- Goal: test the full 168-hour WTK source-acquisition, streaming, storage, failure recovery and provenance path **before** launching 168-hour inference/TTK/GUDHI. No model predictions or new topological metrics in Part C.
+- Frozen target from LXXXIX/XCI: development `gulf_inland` WTK rectangle `[205,705,1471,1971]`, February 1, 2010 00:00 UTC through February 7, 2010 23:00 UTC inclusive, WTK indices **27048–27215**, 168 consecutive hourly records; no locked-region arrays read. Full 500×500×2 float64 HR `[u,v]`, 100×100×2 factor-five MR `[u,v]`, original LXXXVII direction/vector convention, numeric pooling parity checks.
+- Reuse XCV's already verified `gulf_inland` 2010-Feb offset hours **0 and 84** bit-for-bit. Fetch only the remaining **166** native WTK slices, with read-only HSDS `datetime` verification before data acquisition, numeric finite/range checks, and immutable per-hour SHA256 ledger. Do not silently skip or replace an hour. Supports `--max-new-hours 6` first batch and idempotent resumption from validated staging after expected interruption.
+- Offline preflight recomputes SHA256 lineage of frozen geographic split, frozen XCI protocol, XCV sixteen source fields and completed XCIX locality artifact; prints local RAM/disk availability and exact uncompressed source/model-output array byte budgets. HSDS online probe is separately invoked; extraction does not run before these gates and refuses completed-output overwrite.
+- Exact source-only raw HR+MR uncompressed payload per week = **698,880,000 bytes (~666.5 MiB)**; six eventual uncompressed full500 model output arrays = **4,032,000,000 bytes (~3.75 GiB)**. These are bytes for raw numeric arrays, **not** predictions of NPZ/TFRecord/TTK disk size, runtime, network throughput, or peak neural-network memory; measure actual usage and wall time on Spark.
+- Complete source-only output (after Spark run): `ttk_runs_fixed/topology_finetuning/phase7_c_dev_gulf_inland_feb2010_week168_20261018/`, 168 per-hour `.npz` plus four reports/config/ledger and SHA256 index, **173 checksum entries**. Stage is `ttk_runs_fixed/topology_finetuning/.phase7_c_dev_gulf_inland_feb2010_week168_20261018.staging/` and is resumable; no auto-deletion on failure. Verification rechecks each numerical field and XCV byte provenance, exact hours/region, reports, and checksums without WTK/TF/TTK.
+- Local packaging and synthetic 168-hour HSDS-mock interruption/resume, corruption/overwrite and verification tests are **engineering-only**. Live Spark extraction and measurements remain pending. No locked external tests, no training, no changes to frozen XCI plan, no model selection, and no scientific generalization claim. Original PhIRE pretrained temporal/geographic sample membership is still unknown.
+
+# Part CI — Phase 7: verified full-week 168-hour Gulf development source; guarded resumable six-model inference pilot (October 18, 2026)
+
+## Part C: actual full-week source extraction completed on Spark
+
+- Part C package, `selftest`, read-only `preflight` and online HSDS timestamp probe all succeeded. The first extraction of six new hours stopped intentionally at `[PARTIAL-GATE] PASS` with **7 of 168** source hours recorded (including cached hour zero). Resuming from the 7/168 per-hour SHA-256 ledger succeeded without discarding completed fields.
+- The frozen `gulf_inland` 2010-Feb-01 UTC through Feb-07 23:00 UTC window was extracted completely: WTK indices **27048–27215**, 168 consecutive hourly native HR 500×500×2 / MR 100×100×2 float64 `[u,v]` samples. Two original XCV development anchors (hours 0 and 84) were preserved bit-for-bit; 166 additional remote WTK slices passed shape, finite-value, pooling and timestamp checks.
+- `[SOURCE-WEEK-GATE] PASS`, `[VERIFY-GATE] PASS`, both exit **0**. Independent source-week verifier checked all 168 samples and metadata, frozen role/rectangle/week, XCV anchor bytes and **173/173 SHA256** manifest entries. It made no model inference or locked external-geography requests. The displayed ~80-second elapsed duration applies to the resumed **161-hour source acquisition** only, not TensorFlow/TTK computation or future full seasonal evaluation.
+- Immutable source output: `ttk_runs_fixed/topology_finetuning/phase7_c_dev_gulf_inland_feb2010_week168_20261018/`; **698,880,000 bytes** combined raw uncompressed HR/MR payload. Original PhIRE pretrained geographic/temporal exposure is unknown. No topology predictions or scientific comparisons have been made on this full week as of this note.
+
+## Part CI six frozen checkpoints on the verified 168-hour development source (prepared, pending Spark)
+
+- Goal: one complete **development** region-week (`gulf_inland`, 2010-Feb-01..07 UTC, 168 continuous hourly records) using precisely the six XC/ XCVI frozen checkpoints `cnn`, `gan`, `grad`, `cv`, `pers`, `f1`, the identical `mu_sig` normalization and original `PhIREGANs.test_paired(r=[5],batch_size=1)` inference with native paired `[u,v]` float64 TFRecords. No WTK reads, model training, new hyperparameter selection, TTK/GUDHI, or locked external tests.
+- Read-only preflight re-verifies Part C (168 numeric fields, their hashes and XCV byte-identical hours 0/84), the complete 16-field XCVI six-model report and checkpoint/source hashes, XCI evaluation protocol/geographic roles, and the output directory absence; checks disk free ≥12 GiB and MemAvailable ≥10 GiB before inference. Checksums and preflight do not require TensorFlow.
+- Each inference run validates paired MR/GT array shapes, original source ordering (indices 0..167), exact MR/GT recovery with tolerance 2e-5 m/s, finiteness, and **two checkpoint-specific predictions** at week hours **0 and 84** against the corresponding XCVI 16-field original predictions at indices **0 and 1** (max absolute drift ≤1e-3 m/s). Any violation blocks publication.
+- Safe staged model resumption: first call `--max-new-models 1` computes only CNN, validates/saves/hash-indexes the completed model; subsequent `--mode infer` resumes all remaining models with checked immutable source/config/progress. Per-model output is written atomically; unexpected orphan/partial staging files cause fail-closed inspection rather than implicit overwrite/deletion. Completed result is atomically published and immutable. Six 168-hour arrays = **1008 full500 predictions**; this is model-output count, not 1008 independent observations.
+- Save `reference_mr.npy`, `reference_gt.npy`, `development_168_paired.tfrecord`, six model `pred_*.npy`, versioned config/progress/lineage and per-hour+pooled metric manifest/report plus SHA-256 (13 indexed files) in `ttk_runs_fixed/topology_finetuning/phase7_ci_dev_gulf_inland_feb2010_inference168_20261018/`. Independent verifier recomputes all 168 hourly reconstructed UV and speed metrics for all six models and rechecks both XCVI prediction anchors, exact source bytes/checkpoint hashes, sealed reports and SHA-256 entries without TensorFlow. Same numerical metric implementation is reused, not independently reimplemented.
+- Engineering-only local checks: Python compilation, local source hash pins, synthetic two-sample six-arm mock-PhIRE inference with one-model resumption, 13-file output/verification, intentional tampering and overwrite refusal. The mock is **not real Spark/TensorFlow model execution**. Actual Spark preflight, 168-hour six-model inference, memory/runtime and scientific results remain pending. No claim of geographic generalization or hourly independence is allowed.
+
+# Part CII — Phase 7: verified 168-hour six-model Gulf development inference; resumable canonical TTK persistence extraction (October 18, 2026)
+
+## Part CI real Spark verification closeout
+
+- The frozen `gulf_inland`, 2010-Feb-01..07 UTC week of **168 consecutive hourly fields** was successfully processed with all six original PhIRE checkpoints (`cnn`, `gan`, `grad`, `cv`, `pers`, `f1`), producing **1008** full500 vector predictions. A CNN-only first pass and model-by-model resumption both passed. Original XCVI predicted fields at week hours 0 and 84 were **exactly unchanged** for all six models. The completed CI output's independent verifier returned `[VERIFY-GATE] PASS`, exit `0`, and **13/13** checksums passed.
+- Mean **hourly** UV RMSE (m/s), in frozen model order: CNN **0.538996**, GAN **0.742781**, grad **0.387756**, CV **0.415355**, PERS **0.421153**, F1 **0.426202**. Mean hourly speed MAE (m/s): **0.401217**, **0.555596**, **0.286138**, **0.307329**, **0.312106**, **0.315816**, respectively. These values are means of 168 within-week hours, not independent replicates; pooled RMSE is distinct. Gradient-only leads these two descriptive full-week pointwise measures. No topology scores were computed by CI.
+- CI output: `ttk_runs_fixed/topology_finetuning/phase7_ci_dev_gulf_inland_feb2010_inference168_20261018/`. Original pretrained PhIRE geographic/temporal sample exposure remains unknown. No locked external-region predictions have been accessed.
+
+## Part CII canonical persistence extraction — engineering workpack prepared, real Spark pending
+
+- Scope: **168** development-only source hours × **7** frozen scalar-speed fields (`gt` plus six models) = **1176** canonical top-left 160×160 VTI and TTK port-0 VTU persistence-diagram pairs. Reuse **14** original XCVII diagram pairs from hours **0, 84**, corresponding exactly to seasonal16 indices **0, 1**, with bitwise SHA256 preservation and input-value equality; generate **1162** additional pairs. Source and conversion hashes are checked against immutable CI, XCVII and frozen XCI lineage.
+- The converter `scripts/convert_phire_to_vti.py` and `ttkPersistenceDiagramCmd -t 1 -i <VTI> -a wind_speed -o <prefix>` are unchanged. Numeric VTI payload/orientation is independently read back as ASCII Float32 and compared with the original vector-to-speed conversion. VTU `Birth`, `Persistence`, `PairIdentifier`, `PairType` and XML structure are checked but **compressed PD persistence values are not yet numerically decoded**; independent corrected numerical GUDHI audit and old XCIII/XCVIII regression remain mandatory afterward.
+- Interruption/resumption is **atomic at the per-pair directory level** (`.phase7_cii_dev_gulf_inland_feb2010_pd168_20261018.staging/pairs/`): only complete, SHA-protected VTI+VTU+pair-manifest directories are committed. On restart, all prior pair hashes, source scalar payloads and geometry are revalidated; unexpected partial directories fail closed for inspection. Initial live smoke test can run `--max-new-pairs 13` (seven reused and six new pairs), followed by an unbounded resume. No completed original research output is overwritten.
+- When fully complete, outputs publish once to `ttk_runs_fixed/topology_finetuning/phase7_cii_dev_gulf_inland_feb2010_pd168_20261018/`, with **2354 SHA256-indexed files**: 1176 VTIs, 1176 PD VTUs, manifest and report. A separate verifier repeats VTI numeric and VTU structural checks and validates the bitwise XCVII anchors. Staging remains preserved after publication for forensic provenance; do not casually delete it.
+- Locally, Python syntax and synthetic 1176-slot interruption/resume, publish/verify, 2354-file checksum, tamper, and no-overwrite controls passed using **mock TTK output**, not actual Spark TTK execution. Runtime, real TTK outputs, structural gate and GUDHI numerical pairing for 168 hours remain untested until Spark reports success. No WTK/HSDS reads, TensorFlow inference, training, topology hyperparameter change or external locked-test access in Part CII.
+
+# Part CIII — Phase 7: verified full-week canonical TTK extraction; corrected full-week GUDHI audit prepared (October 19, 2026)
+
+## Part CII actual Spark TTK extraction closeout
+
+- Part CII installation, pinned source preflight, smoke extraction of 13 VTI/PD pairs, checkpointed resume, full TTK extraction, independent verification and SHA256 all **passed** on `spark-345b` with exit codes 0.
+- Frozen `gulf_inland` Feb 1–7 2010 168h development week × 7 scalar speed fields (GT plus `cnn`, `gan`, `grad`, `cv`, `pers`, `f1`) = **1,176** canonical top-left 160×160 VTI + PD port-0 VTU pairs. Fourteen original XCVII hour-0/84 GT/model pairs were reused **bitwise**, and the other **1,162** TTK pairs were generated using the unchanged converter and `ttkPersistenceDiagramCmd -t 1`.
+- `[EXTRACT-GATE] PASS`, `[VERIFY-GATE] PASS`, full index `sha256sum -c` exit 0, **2,354/2,354** checked files. The verification checked all VTI numeric values and scalar crop/orientation; TTK PD port-0 VTU compressed pairs were *only structurally checked*. Existing CII output is immutable: `ttk_runs_fixed/topology_finetuning/phase7_cii_dev_gulf_inland_feb2010_pd168_20261018/`.
+- CII did not run corrected GUDHI numerical decoding, matching distances or constrained Phase5E locality; none of these follow merely from having PD files. Locked external regions remain untouched; original pretrained PhIRE WTK geography/time exposure remains unknown.
+
+## Part CIII corrected numerical full-week GUDHI workpack — prepared, Spark pending
+
+- Scope: 168 contiguous development hours in **one** Gulf inland February 2010 region-week, 7 diagrams/h = **1,176** decoded diagrams, 6 original models/h = **1,008** model-to-GT numerical comparisons using the **unchanged** corrected Phase6 canonical decoder/GUDHI implementation (`dB`, `W2inf`, `W22`), anchored to the historical 2007 Phase6 regression and original XCIII/XCVIII numerical source chain.
+- Retain exact 2010-Feb WTK indices 27048..27215, original XCI frozen 160×160 top-left scalar crop, source/method/checkpoint lineage, and all 2,354 archived CII + 4 XCVIII checksums. Compare week hours 0/84 to XCVIII Gulf development indices 0/1, requiring all 12 six-arm score+feature-count+PD-hash regressions.
+- Use SHA-protected atomic **one full six-arm hour per stage file**; first run `--max-new-hours 3`, then full resume. A partial/interrupted run retains valid hours and checks all existing hour records before continuing. Fail closed on any source/anchor/stage corruption, and refuse to overwrite a completed result.
+- Final output is new directory `ttk_runs_fixed/topology_finetuning/phase7_ciii_dev_gulf_inland_feb2010_corrected_pd168_20261019/`: **1,008** per-hour numerical CSV rows, **42** daily descriptive summary rows (7 calendar days × 6 models), versioned provenance manifest and human report; **four** SHA256 entries. Verifier independently recomputes all 1,008 distances using the same trusted algorithm (not an independent numerical implementation), including the old anchor regressions.
+- No TTK regeneration, TensorFlow, HSDS/WTK network reads, retraining, new hyperparameters, full500 topology claim, spatial-locality claims or external locked test access. Daily summaries are descriptive within one correlated time window; no independent geographic/seasonal generalization conclusion. The original pretrained PhIRE geographic/temporal WTK footprint is unresolved.
+- Development tooling and synthetic 168-hour mock-decoder interruption/restart, publication, numerical verification, checksum tamper/overwrite and notes patch checks are **engineering-only**; real numerical results must await Spark `gudhi-audit` execution.
+
+# Part CIV — Phase 7: verified 168-hour corrected GUDHI; full-week spatial-locality matching (October 19, 2026)
+
+## Part CIII actual Spark numerical verification closeout
+
+- Part CIII full `gulf_inland`, 2010-Feb-01..07, 168-hour corrected global persistence analysis **passed**. It numerically decoded all **1,176** canonical TTK diagrams, computed all **1,008** six-model-to-GT distances, verified historical 2007 Phase6 and **12** XCVIII hour-0/84 anchor comparisons, independently recomputed all results with the same GUDHI method and verified **4/4** SHA-256 outputs. No external locked-region data was accessed.
+- Verified mean hourly `dB` (`cnn`, `gan`, `grad`, `cv`, `pers`, `f1`): `1.317913`, `1.382009`, `0.973180`, `1.008254`, `1.009105`, `1.024358`. Mean hourly corrected `W2inf`: `5.192943`, `5.327205`, `4.081367`, `4.164934`, `4.194375`, `4.252456`. Mean hourly `W22`: `6.662873`, `6.633682`, `4.993435`, `5.090495`, `5.154307`, `5.228484`. These metrics assess only the canonical top-left 160×160 scalar-speed crop; not full500 vector topology.
+- Gradient-only has the lowest **whole-week mean** on all three global PD measures; within-week daily W22 winners vary (PERS-only Feb 1; CV-only Feb 3 and Feb 5; gradient-only the remaining days). The 168 hours are correlated observations within **one development region-week**, not 168 independent generalization replicates. Original PhIRE pretrained-model WTK geographic/temporal exposure remains unknown.
+- Immutable completed output: `ttk_runs_fixed/topology_finetuning/phase7_ciii_dev_gulf_inland_feb2010_corrected_pd168_20261019/`. No Phase5E spatial-locality matching was performed in CIII.
+
+## Part CIV original Phase5E full-week spatial-locality workpack — prepared, Spark pending
+
+- Retain original frozen XCI roles, six model checkpoints, canonical 160×160 top-left crop, corrected CII/CIII sources and the **unchanged original Phase5E sparse assignment and feature-coordinate reader**. No new model selection or metric tuning. Use exact original radii `[4,8,16,32,64,96,128,inf]` **WTK grid cells (not km)** and zero-persistence tolerance `1e-10` via the XCIV compatibility policy, with numerical filtered birth/death/coordinate agreement for every diagram.
+- Scope exactly one full `gulf_inland`, Feb 2010 development region-week: **168 hours × six models × eight radii = 8,064 aggregate** spatial-locality rows; **16,128 H0/H1 dimension-level** rows; **42** day-by-arm descriptive summaries. Every one of the **1,008** infinite-radius locality W22 values must reproduce frozen CIII corrected GUDHI W22. All **96** aggregate and **192** H0/H1 rows from hours **0 and 84** must match frozen XCIX seasonal indices **0 and 1**. Preflight checks the two anchors before computing new hours.
+- Atomic, digest-protected one-complete-six-model-hour stage files; first compute `--max-new-hours 2`, then resume the remaining 166 hours. Every restart verifies all previously sealed hour records and upstream lineage; no overwrite of completed output, no implicit deletion of failed partial state. New immutable output: `ttk_runs_fixed/topology_finetuning/phase7_civ_dev_gulf_inland_feb2010_locality168_20261019/` containing full aggregate, dimension and daily CSVs, report, manifest and **5** SHA-256 checksums.
+- A post-computation verifier recomputes **all** locality rows using the **same** frozen Phase5E algorithm (not an independently implemented optimizer); rechecks the XCVIII/XCIX heritage, all coordinate and zero-pair counts, all CIII infinity anchors and output digests. Persistence-mass GT coverage is *not* spatial positional correctness.
+- No TTK regeneration, TF inference, WTK/HSDS reads, model retraining, merge-tree evaluation, locked external region access or new hyperparameter search. Daily summaries are descriptive because hourly samples are serially dependent; no claim of independent seasonal/geographic generalization.
+- Local Python compilation and synthetic **168-hour** full staging/resumption/publication/verification, **8,064+16,128** CSV rows, deliberate checksum tamper and overwrite refusal passed. **Real Phase5E compute has not run on Spark**; these mock values carry no research conclusions.
+
+# Part CV — Phase 7: verified full-week spatial locality; remaining 2010 development source-weeks (October 19, 2026)
+
+## Actual CIV Spark verification closeout
+
+- The original Part CIV whole-week Gulf inland February 1–7 2010 development locality calculation and separate same-method verification **passed** with exit codes 0. All **168** contiguous hours, **1,008** model-to-GT comparisons, **8,064** aggregate radius-specific locality entries and **16,128** dimension-specific entries were computed and verified. Every original XCIX hour-0/84 anchor and all **1,008** CIII infinite-radius scores agreed, and the five CIV SHA256-indexed output files were intact. The external locked regions were not accessed.
+- Across these 168 correlated hours, mean original Phase5E spatially constrained W22 at r=4 WTK cells was cnn=10.531914, gan=14.233724, grad=10.611706, cv=10.617959, pers=10.683903, f1=10.683088. At r=16: cnn=9.022663, gan=10.966813, grad=7.644812, cv=7.816083, pers=7.874390, f1=7.973749. At infinity (must equal CIII corrected GUDHI W22): cnn=6.662873, gan=6.633682, grad=4.993435, cv=5.090495, pers=5.154307, f1=5.228484.
+- The weekly mean has a **radius-dependent reversal**: original pretrained CNN narrowly has lower r=4 constrained W22 than gradient-only, whereas gradient-only has lower r=16 and unconstrained W22. GT persistence-mass coverage at radius 16 is cnn=0.437959, gan=0.789305, grad=0.840827, cv=0.771318, pers=0.771487, f1=0.749903. GT matched mass is not physical positional accuracy. Radii are grid cells, not km.
+- The week is **one development region-week**, not 168 independent geographic/time replications. The pretrained PhIRE models' WTK temporal/geographic exposure remains unknown. Frozen XCI evaluation definitions and locked external-test fields remain untouched. No new model/hyperparameter selection was made.
+
+## Part CV seven-week source expansion workpack — locally validated, Spark execution pending
+
+- The original complete Gulf February 2010 source and downstream C/CI/CII/CIII/CIV outputs are immutable. The next controller supports **only the other seven of eight XCI-predeclared 2010 primary development region-weeks**: Gulf May/August/November and Southwest February/May/August/November. Region rectangles and starts are read/checked against frozen XCI, original LXXXIX and the 16-field XCV SHA-indexed hour-0/84 anchors; the controller has no command-line option for `upper_midwest`, `pacific_inland` or 2012 replication and does not access their field arrays.
+- Part CV uses the exact original SHA-pinned, unmodified Part C extractor script `phase7_c_update/scripts/phase7_c_dev_fullweek_source.py` (SHA256 `dfb073530be638a87d51d90916af1e5b9293cb837a4cde8663b4dc7c4778b54b`) **loaded into memory** with its week-specific region/time/output constants bound from verified XCV metadata. It does not patch or alter that original archived file. Each source week preserves two XCV anchor snapshots bit-for-bit, fetches 166 remaining WTK HSDS hours, performs float64 wind-vector shape/finite/pooling and timestamp/index validation, stages files atomically, and permits resumable runs. Each completed week is published once under `phase7_cv_dev_{region}_{YYYYMMDD}_week168_20261019`, with 168 NPZ fields plus five accompanying metadata/report files (173 SHA256 entries).
+- For each week, read-only `preflight` and `probe` are separate from networked extraction. The controller supports `inventory`, `preflight-all`, `extract-all`, `verify-all`, or single explicitly selected development week. A `--max-new-hours 6` batch runs six new HSDS hours per selected week before subsequent resumes. Completed outputs are SHA-reverified and skipped, not overwritten, on batch restart. Any source hash, stage-progress, timestamp, anchor parity or corruption failure halts the run.
+- The workpack's syntax, seven-frozen-week identity and collision self-test, explicit rebindings of all week dates/WTK indices, original source NPZ pooling and metadata round-trips, and checksum corruption rejection were tested locally. **These are fixture tests only.** Real HSDS access, seven actual source weeks, source runtime, seven independent verifications, 2010 downstream model inference/PD/GUDHI/locality and 2012 replication remain pending until executed on Spark and verified.
+- The correct scientific aggregation after subsequent 2010 development evaluation is **eight equal-weighted region-week blocks**, not treating hours as independent. Replication 2012 is separately predeclared and must not be silently merged with 2010. No external locked field scores until the predeclared analysis and implementation gates are final.
+
+# Part CVI — Phase 7: 2010 seven development-week source verification; guarded batch six-model inference (October 19, 2026)
+
+## Actual Part CV Spark verification closeout
+
+- All seven remaining, frozen 2010 **development-only** region-weeks (Gulf inland May/August/November and Southwest borderland February/May/August/November) completed acquisition and independent source verification, with `[ALL-EXTRACT] PASS: 7/7`, `[ALL-VERIFY] PASS: 7/7`, exit codes 0. Each has 168 native HR/MR fields, 2 original XCV bitwise anchors, 166 additional HSDS WTK slices and 173 SHA256-indexed files. Together with the previously verified original Gulf February week, this makes all **8 × 168 = 1,344** hours in the 2010 development portion. No external locked region was evaluated. This closes *source acquisition only*; it does not constitute seven additional completed inference/topology weeks.
+
+## Part CVI new workpack: safe seven-week six-model inference
+
+- The frozen Phase 7 XCI geographic split, regions, 2010 UTC weeks, six checkpoint prefixes and normalization are unchanged. The original Part CI inference code (SHA256 `5a5174da40ce975440b6f66b86aeaf96da72942bdc17765d63d8c28419304dba`) and Part CV controller (SHA256 `be862eff7da4f6ada2f2de20c91171ed6cf6b640d184a768f415bd25248fcdb0`) are loaded unmodified; explicit region/week/source fields and output report bindings are applied to the in-memory CI module, never to the archived source files.
+- CVI verifies all seven published CV sources plus the original complete CI February output, the XCVI 16-field inference, immutable model checkpoint identities and XCI split before allowing a new week. It binds hour-0/hour-84 regression indices by exact region/WTK/filename equality with XCVI (two anchors per week, six models = 12 regression outputs). Each week produces its own immutable `phase7_cvi_dev_{region}_{YYYYMMDD}_inference168_20261019` directory with the same 13-file full-week CI schema, 168 references, 6 × 168 full500 predictions, paired TFRecord, paired metrics, exact hashes, checkpoint/lineage provenance, and resumable model-level stages. The first live week should run CNN-only before batch `infer-all`, then `verify-all` independently recomputes per-hour/pooled reconstruction metrics and validates all model outputs and hashes.
+- CVI only runs six-model **development inference**; it does not compute the seven new weeks' TTK diagrams, GUDHI distances, or Phase5E locality results, which require subsequent dedicated numerical validation. All temporal week conclusions must use equal-weighted region-week blocks, rather than treating hours or days as independent geographic replications. Original pretrained PhIRE WTK training membership remains unknown. Frozen 2012 replication and locked external evaluation are not accessed.
+- This package was statically checked and its script's local self-test passed. The seven-week live inference/verification and genuine TensorFlow compatibility **must be verified on Spark**; no current result is claimed for them.
+# Part CVII — Phase 7: frozen seven-week CVI inference and resumable 2010 canonical TTK extraction (October 20, 2026)
+
+## Evidence boundary at workpack preparation
+
+- The preceding CV controller completed and verified all seven additional 2010 development-only 168-hour HR/MR source weeks. Together with the independently verified Gulf February reference week, this is **8 × 168 = 1,344** development source hours.
+- The user's latest CVI excerpt ends with Southwest borderland November `state=SEALED` and the XCVI 14/15 prediction-anchor binding. This excerpt does **not by itself document** the separate final `[ALL-VERIFY-ALL] PASS: 7/7` gate. Require a successful CVI `verify-all` before using CVII.
+- The original Gulf inland February 2010 CI–CIV inference, canonical diagrams, corrected GUDHI distances and Phase5E locality were verified separately and must not be modified. The original 2010 February results include gradient-only performing best on mean global corrected PD distances and on intermediate/unconstrained locality; the pretrained CNN narrowly led at radius 4. This is one development region-week, not independent geographic generalization.
+
+## Part CVII methodology and guards
+
+- Part CVII binds the seven new 2010 development region-weeks (Gulf inland May/August/November and Southwest borderland February/May/August/November) to the archived **unchanged Part CII canonical diagram extraction** (`SHA256 f0e5ae86874c7e4d853320ce0bdc45b2a4fbfec3efc9b7ce6c7630edbdc39f2d`), using verified Part CVI outputs (`SHA256 3cf69b42c57a9ce16b6d37ca97285b8b54ce3696cc93d0ea6141a124a491b647`). Explicit region/week and input hashes are bound in memory, never by editing the original scripts or changing model checkpoints.
+- Each of seven weeks has 168 hours × (GT + CNN, GAN, gradient, CV, PERS, F1) = **1,176 VTI/port-0 VTU pairs**; 14 are bitwise reused from XCVII at **source-specific XCVI indices** determined and rechecked by the CVI manifest, and 1,162 are new original TTK extractions. Total seven-week target: 8,232 pairs, 98 reused, 8,134 new. Each sealed week has exactly 2,354 SHA256-indexed data/metadata files, per-pair atomic resumption and a separate immutable destination.
+- The seven-week batch allows a first 13-pair smoke test, resumed `extract-all` and independent `verify-all`. Input CVI checkpoint/model/reference array and SHA256 metrics are reverified before each week, and XCVII's old diagram pair numerically checked for the anchor hours. Completed weeks are reverified/ignored, not overwritten. Any broken source/anchor/VTU/XML/manifest/compatibility/sha gate must halt execution.
+- **CVII does not numerically decode the persistence pairs.** Its verifier is structural for VTU and numerical for scalar VTI; corrected GUDHI and Phase5E spatial-locality evaluation are dedicated *later* gates. The unchanged XCI crop top-left 160×160 and TTK `-t 1` policy continue. No inference or WTK acquisition; no locked geographical holdout, no 2012 replication, no tuning or training, and no generalization claim.
+- Package-level syntax, SHA-pin, frozen source CII self-test, synthetic CVI→CII index binding (Gulf May 2/3) and locked-region rejection were checked locally. **Real seven-week TTK computation and verification must run on Spark** before these outputs may be considered available.
+
+# Part CVIII–CX — Phase 7: seven-week 2010 corrected PD and spatial locality batch; equal-weighted development summary (October 20–21, 2026)
+
+## Part CVII actual Spark closeout (from user's October 20 log)
+
+- The seven additional 2010 development-only canonical TTK region-weeks have **all passed independent CVII verification**: `[ALL-VERIFY-ALL] PASS: 7/7 sealed canonical PD weeks`, `Verify-all exit: 0`, with no locked-region data accessed. Each new week contains 168 hours × seven GT/model sources = **1,176 structurally verified diagrams**, 14 reused XCVII anchors and 1,162 freshly extracted port-0 VTUs; each has the original 2,354 SHA-indexed outputs. All seven together have **8,232** diagram pairs, **98** historical reused pairs and **8,134** newly extracted pairs. Together with the immutable Gulf February 2010 CII reference week, 2010 development has **9,408** GT/model diagrams across **1,344** source hours and eight region-weeks.
+- CVII independently verifies the **scalar VTI numerical readback and VTU XML structure**, but does **not** validate numerical persistence-pair decoding or derive GUDHI/Phase5E scores. Those are separate gates below. No original source, model checkpoint, frozen region/time assignment, or locked external benchmark has been modified.
+
+## Part CVIII: prepared seven-week numerical GUDHI expansion (not yet run on Spark)
+
+- The new `phase7_cviii_update/scripts/phase7_cviii_cix_2010_dev_topology.py` SHA-pins and loads unchanged previous CVII (`4f06a60878a98c639931cc048c190a219347dff90b9d4749334d59f4802ae`), CIII (`59518de2eed0c5ff24e00a5e75c9889226bd1d456f252d6be7449f72afbce632`) and CIV (`6381c75d84d10e812bed3c93d53bc6d03544cd8bf5f53f515cbf2bd952cec7d5`) drivers. It compiles week-adapted copies *only in memory*, checking frozen source strings and changing only region, start date, WTK index, source/output paths, and historical two-snapshot sample indices. Underlying Phase6/GUDHI numerical distance algorithms are unchanged.
+- All seven 2010 development region-weeks are frozen: Gulf May/August/November and Southwest February/May/August/November. Corrected distances decode all **8,232** new port-0 persistence VTUs, then compute **7,056** model-to-GT corrected GUDHI distances (`dB`, `W2inf`, `W22`), with 84 XCVIII historical numerical anchor scores (two fields ×six models×seven weeks). Each week yields 1,008 hourly-model score rows and 42 day-arm descriptive rows. Separate immutable outputs, stage checksum guards, complete same-method verifier and four SHA-indexed report/data outputs per week; no overwrite of completed data.
+- Original XCVIII exact birth/death numerical and diagram-hash anchors are obligatory. No separate GT/model evaluation outside the development regions. Original pretrained PhIRE WTK exposure remains unverified. Real Spark GUDHI execution/verification required before scientific claims.
+
+## Part CIX: prepared seven-week original Phase5E spatial-locality expansion (not yet run on Spark)
+
+- Depends on an independently **sealed and verified CVIII numeric result for each corresponding week**. Applies original XCIV/Phase5E sparse spatial assignment, original coordinate reader and zero-persistence policy without changing the solver/radii. Uses the exact canonical 160×160 top-left scalar wind-speed crop, radii `[4,8,16,32,64,96,128,∞]` measured in original WTK grid cells (not km), homology dimensions H0/H1 and original `1e-10` zero tolerance.
+- Per week, compute 168h ×six frozen models×eight radii = **8,064** aggregate rows and **16,128** dimension rows. Seven-week totals **56,448 aggregate** and **112,896 dimension** rows; each week has 42 daily summary rows. All **7,056** unconstrained-infinity values must match sealed CVIII W22; 672 XCIX historical aggregate rows and 1,344 H0/H1 rows for the two anchors (96+192 per week) must reproduce. Atomic per-six-model-hour resumption, independent same-method recomputation and five SHA-indexed output files per week. Feature persistence coverage is not ground-truth spatial localization accuracy.
+
+## Part CX: immutable equal-weighted 2010 development summary (not yet generated on Spark)
+
+- Combine the **original verified Gulf Feb** CIII/CIV reference week with all **seven** independently sealed CVIII/CIX weeks. Produce `phase7_cx_dev2010_eightweek_summary_20261021/` with `per_region_week.csv` (**48** rows = eight region-weeks ×six models), `summary_report.md`, `summary_manifest.json`, `SHA256SUMS`, cross-stage numeric/locality infinite-radius checks, and all source ledger checks.
+- Compute model means by **equal-weighting each of eight week means**, not pooling hourly observations or treating 1,344 temporally correlated hours as independent replications. Report conventional UV RMSE/speed MAE separately from global PD and radius-constrained locality/covariance; preserve each region-week's values to show heterogeneity. Eight weeks from one year in two chosen regions are **development-only**, not independent temporal or external geographic generalization.
+- Engineering tests on the new package: original SHA/checksum pins, week-specific CIII/CIV code compilation for all seven frozen bindings and explicit sample-map checks; synthetic eight-block report generation and cross-stage checksum/infinity-value checks. These are **not** substitutes for real Spark regression gates. First live numerical smoke (Gulf May two hours), completed and independently verified Gulf May GUDHI, first live locality smoke (two hours with XCIX hour0/84 preflight), then ordered fail-fast automatic numerical-all→verify-all→locality-all→verify-all→summary. Stop on any gate or source mismatch.
+- No 2012 replication, external locked-region scores, new model selection, full-500 topology, meteorological event interpretation, physical-distance calibration, merge-tree evaluation or retraining is included here. The separate frozen 2012 replication and methodologically authorized locked-region evaluation are still pending; any generalized scientific conclusion must wait for those gates.
+
+
+---
+
+# Part CXI — Phase 6 / Phase 7 synthesis, expanded 2010 numerical findings, and professor-meeting brief (October 21, 2026)
+
+**Evidence date:** This section consolidates the uploaded historical research log and *new* user-reported Spark terminal evidence through approximately **13:07 CDT, October 21, 2026**. It is intentionally a **status snapshot**, not a claim that a running numerical audit or locality computation finished after that timestamp. Historical per-part records above retain their original as-of dates. No new results were calculated on Spark by writing this note.
+
+## CXI.1 Spoken opening (approximately 60–75 seconds)
+
+> Professor, I've been expanding the wind super-resolution project in two directions. First, I separated the topology-inspired losses to understand which components actually contribute to the improvements. In Phase 6, I evaluated gradient-only, gradient plus critical-value supervision, gradient plus persistence supervision, and the combined model, alongside the original CNN. Interestingly, the best model depends on what we measure: some variants preserve global persistence better, while gradient-only is stronger when we impose tight spatial matching constraints.
+>
+> Second, in Phase 7 I've expanded the evaluation from our original fixed benchmark to two additional development regions and four seasons, taking a full week of hourly data from each region-season combination. That's 1,344 hourly fields evaluated with six frozen models. All canonical persistence diagrams are verified, and the corrected numerical distances have been computed for all eight weeks. In the preliminary equal-week comparison, gradient-only improves the global persistence distance by about 21% over the pretrained CNN and wins five of eight weeks. However, CV-only and PERS-only win some individual weeks. The remaining question is whether this result also holds under *spatially constrained* matching across those weeks, and later in the frozen 2012 and external-region tests.
+
+**Shorter opening (20 seconds):** “Phase 6 showed that the topology losses have different effects: global persistence and geographically local feature matching do not always favor the same model. Phase 7 tests whether the effect persists across new regions and seasons. We've completed 1,344 development hours and have a preliminary 21% global persistence improvement for gradient-only over CNN, with some seasonal variation; broader spatial-locality scoring and truly locked tests are the next steps.”
+
+**Phrase to retain:** *Phase 6 asks which loss component helps; Phase 7 asks whether the improvement persists across locations, seasons and spatial matching scales.*
+
+## CXI.2 Phase 6: what was trained and evaluated?
+
+### Matched loss-component ablation
+
+- **Scientific objective:** Test the individual and combined effects of topology-inspired fine-tuning, without assuming that adding every loss is better.
+- **Base architecture:** the pretrained PhIRE CNN; the fine-tuning ablation changes the loss, **not** the SR architecture.
+- **Training:** 2,688-sample repaired TFRecord (`example_data_topology_expanded_2688/wind_MR-HR.tfrecord`); 3 epochs, batch 4, Adam learning rate `1e-5`, normalized `u,v`. The 168-hour fixed benchmark is *evaluation*, not training.
+- **Loss design:** gradient-only `L_uv + 0.05 L_grad` as cell `00`; CV-only adds `0.004 L_TTK-CV` as cell `10`; PERS-only adds `0.002 L_TTK-PERS` as cell `01`; combined **F1** adds both as cell `11`. The **pretrained CNN** is a separate reference, not cell `00`. This is a single-run exploratory ablation; independent training seeds are **not** established.
+- **TTK usage:** GT persistence-pair indices are calculated offline and fixed for differentiable scalar-field training supervision. TTK/GUDHI distances are downstream evaluation measures, not differentiable PD optimization during these runs.
+- **Fixed benchmark:** 168 consecutive January 2007 Mid-Atlantic hours; repaired data and canonical top-left 160×160 speed crop. Do not mix its raw distance magnitudes with 2010 region-week distances and call them an apples-to-apples generalization estimate.
+
+### Verified Phase 6 corrected global persistence distances
+
+Mean across the 168 paired fields; lower is better. See historical Parts LXXX/LXXXI for the original evidence and per-field audit.
+
+| Arm | Corrected bottleneck `d_B` | Corrected `W_{2,∞}` | Corrected `W_{2,2}` |
+|---|---:|---:|---:|
+| Pretrained CNN | 3.124108 | 19.152145 | 24.552151 |
+| Gradient-only (`00`) | 2.562506 | 14.889700 | 18.306367 |
+| CV-only (`10`) | 2.188473 | 14.407073 | 17.875645 |
+| PERS-only (`01`) | 2.196119 | **14.153230** | **17.484939** |
+| Combined F1 (`11`) | **2.149744** | 14.325676 | 17.831897 |
+
+The combined F1 model led on *bottleneck*, while PERS-only led on the two mean Wasserstein metrics. This is a **metric-specific**, not universal, ranking. Here “CV-only” and “PERS-only” mean only that **one of those two TTK-based terms** is switched on; **both retain the gradient loss**. The matched two-by-two descriptive interaction term was positive for `W_{2,2}` (+0.777680): combining the two losses at these weights did not yield the sum of their individual improvements. That result is not a multi-seed causal significance claim.
+
+### Verified Phase 6 spatial-locality experiment
+
+- Exact original Phase 5E locality procedure, both H0/H1 and radii **4, 8, 16, 32, 64, 96, 128, infinity**, on the **same 168 paired fields**. Radii are **WTK grid cells**, not kilometers.
+- **6,720** aggregate rows and **13,440** dimension-specific rows; checksummed output `ttk_runs_fixed/topology_finetuning/phase6_lxxxiii_spatial_all168_20261014/`; numerical and checksum gates verified in Parts LXXXIV–LXXXV.
+
+| Model | Radius 4 cost ↓ | Radius 16 cost ↓ | Radius 32 cost ↓ | Unconstrained `W_{2,2}` ↓ | Radius 16 GT persistence-mass coverage ↑ |
+|---|---:|---:|---:|---:|---:|
+| CNN | 46.057465 | 35.218315 | 29.250278 | 24.552151 | 0.591272 |
+| Gradient-only | **45.844483** | **31.008340** | 23.893099 | 18.306367 | **0.867886** |
+| CV-only | 47.750779 | 31.572720 | 23.812289 | 17.875645 | 0.740639 |
+| PERS-only | 48.570148 | 31.841850 | **23.707846** | **17.484939** | 0.747282 |
+| F1 | 48.504946 | 31.947250 | 23.921293 | 17.831897 | 0.710923 |
+
+**Interpretation:** Gradient-only has the lowest mean constrained cost at radii **4, 8, 16**, but PERS-only leads at **32, 64, 96, 128 and infinity**. The spatial-radius crossover is central: global persistence agreement does not establish accurate spatial localization. Coverage quantifies matched persistence *mass*, **not geographical displacement error**. Old Phase 6 results cannot on their own establish regional generalization.
+
+**Outstanding Phase 6 scientific caveats:** single training seed per arm; consecutive correlated benchmark hours; full training-lineage identity of historic F1 not completely proven; additional merge-tree ablation, physical geospatial calibration, uncertainty estimates and independent testing remain separate tasks. The original poster and arXiv results should be labeled with their own benchmark and methods, not blended into Phase 7 absolute distances.
+
+## CXI.3 Phase 7: expanding geography, time and frozen evaluation scope
+
+### Experimental plan and safeguards
+
+- **Regions:** `gulf_inland` and `southwest_borderland` are frozen **development** regions. `upper_midwest` and `pacific_inland` remain **locked external** regions, never used for present rankings or loss selection.
+- **Windows:** February, May, August and November 2010, each a **consecutive 168-hour week** per region; total **8 region-weeks, 1,344 hours**. The frozen 2012 windows are a *later temporal replication*, not included here.
+- **Source/inference:** native 500×500 `u,v` HR and 100×100 MR (factor-5 PhIRE preprocessing) → six frozen checkpoints (CNN, GAN, gradient-only, CV-only, PERS-only, F1) → full 500×500 predictions. The numerical persistence/locality comparison is still on the original **top-left 160×160** speed crop, not a full-500 topology domain or spatially distributed multi-tile experiment.
+- **Interpretation:** 168 hours from a week are temporally correlated. Equal-weight **region-week means** for comparisons; no hourly-independent significance test. The original PhIRE pretrained model's geographic and temporal WTK training membership is **not established**, despite documented nonoverlap with the later 2007 fine-tuning windows.
+
+### Experiments performed, in order
+
+| Experiment | Purpose | Last observed status |
+|---|---|---|
+| LXXXVI–LXXXIX WTK inventory, 64-field geographic/weather screening, preprocessing parity and frozen split | Ensure valid native rectangles, timestamps, meteorological data and no development/locked leakage | **Verified** |
+| XC–XCIX development pilot: initially 4, then 16 snapshots, six-checkpoint inference, TTK, GUDHI and locality | Test methods across 2 regions × 4 seasonal windows (2 selected hours each) | **Verified**: 16 fields, 112 diagrams, 96 global distance comparisons, 768 locality aggregate rows |
+| C–CIV Gulf inland Feb 2010 complete week | Verify end-to-end 168-hour WTK→six-model→TTK→GUDHI→locality pipeline | **Verified end to end** |
+| CV seven remaining development source weeks | Expand source coverage to all eight 2010 region-weeks | **Verified 7/7**, 1,344 total source hours |
+| CVI seven-week inference | Run six checkpoints on the other 1,176 hourly fields | Outputs sealed and **verified as upstream inputs by CVII**; all 8×168×6=8,064 2010 predictions now computed |
+| CVII seven-week canonical TTK extraction | Extract GT + six model diagrams for the seven new weeks using original CII and XCVII anchors | **Independent verify-all PASS 7/7**, October 20 log, `Verify-all exit: 0`; 9,408 total GT/model diagram pairs across 2010 |
+| CVIII seven-week corrected GUDHI computation | Compute `d_B`, `W_{2,∞}`, `W_{2,2}` for 7×168×6=7,056 GT/model comparisons | **`[ALL-NUMERIC-ALL] PASS: 7/7`**; seven numerical output dirs sealed, Oct 21 log |
+| CVIII independent `verify-numeric-all` | Recompute saved distances and validate 7 weeks | **IN PROGRESS** at latest check: **2 of 7** new weeks had `[WEEK-CVIII] PASS ... verify`; 5 not yet confirmed. The process was CPU-active, not stalled. |
+| CIX seven-week locality | Eight radii/H0/H1 on seven new weeks; infinity must match GUDHI | **Not yet reported complete**; no 2010 eight-week locality conclusion |
+| CX equal-week summary | Combine seven new weeks + original Gulf February into immutable 8-week report | **Not yet reported complete**; below is a read-only preliminary manifest aggregation |
+| 2012 development replication; separately locked external regions | Temporal and geographical robustness | **Not run** |
+
+**Counts:** Seven new CVII weeks = **8,232** GT/model diagram pairs, **98** bitwise historical pairs reused and **8,134** newly extracted. Combined with 1,176 already verified Gulf-Feb pairs = **9,408** pairs across eight weeks. Seven new numeric weeks = **7,056** model/GT comparisons; with the original 1,008 Gulf-Feb comparisons = **8,064** 2010 comparisons. CVIII numeric outputs sealed is *not the same* as independent re-verification, so both statuses must be carried forward.
+
+### Phase 7 initial 16-snapshot verified pilot
+
+- Corrected mean `W_{2,2}`: CNN **10.462440**, gradient-only **8.375874**, CV **8.502258**, PERS **8.483273**, F1 **8.607247**, GAN **12.211472**.
+- Mean constrained matching cost at radius 4: CNN **19.523399**, gradient-only **18.869274**; at radius 16: CNN **15.817982**, gradient-only **14.002953**. These 16 snapshots are a selected-hours pilot, not 16 independent region-week samples.
+
+### Full Gulf February 168-hour verified locality nuance
+
+- Mean corrected global `W_{2,2}` CNN **6.662873**, gradient-only **4.993435** (~25.1% lower).
+- At tight radius **4**, CNN **10.531914** narrowly beats gradient-only **10.611706** (~0.8% gap).
+- At radius **16**, gradient-only **7.644812** beats CNN **9.022663** (~15.3% lower).
+- Radius-16 GT persistence-mass coverage: gradient-only **0.840827** vs CNN **0.437959**. It measures matched persistence mass, not displacement correctness.
+- **Scientific message:** A model can look best on global topology but not at a strict locality cutoff. Notably, the 16-snapshot pilot favored gradient-only at r=4, whereas this full-week Gulf February evaluation slightly favors CNN there. This justifies dense time coverage and testing every region-week.
+
+## CXI.4 Eight-week 2010 preliminary global persistence result (new, October 21)
+
+**Source:** Researcher executed read-only Python aggregation of `numeric_manifest.json` from all seven sealed CVIII weeks plus the original sealed CIII Gulf-Feb reference. Each week contributed its *mean of 168 hourly fields*, and the eight region-weeks were weighted equally. These values have **not been presented as passing the still-running independent `verify-numeric-all` gate** or the later formal CX summary gate.
+
+| Model | Equal-week mean corrected `W_{2,2}` ↓ | Mean reduction vs pretrained CNN |
+|---|---:|---:|
+| CNN | 10.006731 | reference |
+| GAN | 11.012592 | **10.1% higher (worse)** |
+| **Gradient-only** | **7.915321** | **20.9% lower (better)** |
+| CV-only | 8.011084 | 19.9% lower (better) |
+| PERS-only | 8.015590 | 19.9% lower (better) |
+| F1 | 8.107298 | 19.0% lower (better) |
+
+**Lowest weekly `W_{2,2}` across six models:** Gradient-only **5/8** weeks; CV-only **2/8**; PERS-only **1/8**; CNN/GAN/F1 **0/8**. This is a **winner count for region-week means**, not independent statistical validation.
+
+Region-week subset from the user's eight-week printout (four-digit rounding):
+
+| Development region-week | CNN `W22` | Gradient `W22` | CV `W22` | Weekly global winner |
+|---|---:|---:|---:|---|
+| Gulf inland Feb 2010 | 6.6629 | **4.9934** | 5.0905 | Gradient |
+| Gulf inland May 2010 | 8.1949 | **6.3198** | 6.5309 | Gradient |
+| Gulf inland Aug 2010 | 8.0913 | **5.8429** | 6.0711 | Gradient |
+| Gulf inland Nov 2010 | 9.9988 | **7.6353** | 7.9197 | Gradient |
+| Southwest borderland Feb 2010 | 11.2523 | 9.0352 | 9.0674 | PERS |
+| Southwest borderland May 2010 | 12.2736 | 10.1770 | **10.1615** | CV |
+| Southwest borderland Aug 2010 | 11.2691 | **9.1737** | 9.2003 | Gradient |
+| Southwest borderland Nov 2010 | 12.3110 | 10.1452 | **10.0472** | CV |
+
+**Provisional interpretation:** All four fine-tuned models have better eight-week mean global persistence distance than CNN. Gradient-only leads overall, but individual weeks vary; this differs from the Phase 6 fixed-benchmark pattern, where PERS led on mean global `W22`. This is useful evidence of *descriptive robustness and heterogeneity within development*, **not proof** that geographic position *causes* model-ranking changes or that original PhIRE pretraining never included these areas. Absolute distances from different datasets are not directly comparable without matched field distributions.
+
+## CXI.5 What to show Professor Summa on Thursday, October 22
+
+1. **Original research context:** One existing poster panel showing ground truth, pretrained CNN and topology-inspired predictions and PD feature intuition. Distinguish the original paper's benchmark from Phase 6 and Phase 7.
+2. **Phase 6 loss ablation table:** Explain that F1 led bottleneck, PERS led unconstrained `W22`, gradient led strict matching (r4/8/16). This is the evidence that “more losses” does not necessarily mean a universally better solution.
+3. **Phase 7 evaluation expansion diagram:** 2 development regions × 4 seasonal windows × 168 consecutive hours = 1,344 hourly inputs; six frozen models; original fixed 160×160 topology crop.
+4. **New eight-week bar plot:** CNN `10.0067`, gradient `7.9153`, CV `8.0111`, PERS `8.0156`, F1 `8.1073`, GAN `11.0126`, equal-weighted week means; mark **preliminary pending independent CVIII completion**.
+5. **New per-region-week table/plot:** Gradient wins 5/8, CV 2/8, PERS 1/8. Small differences among fine-tuned models matter; avoid claims of significance.
+6. **Verified Gulf-Feb radius curve:** r4 CNN slightly wins; r16 and infinity gradient wins. No new seven-week locality curves until CIX passes.
+7. **Questions:** (i) whether to prioritize the radius crossover and spatial displacement/split-merge controlled experiment, (ii) how to calibrate WTK-grid radius to physical distance and use multiple tiles, (iii) order for 2012 temporal replication and locked external regions, and (iv) whether model seed replication is required.
+
+**If asked “Have you increased geographical extent and sample count?”** “Yes: two additional development regions, four seasonal week-long windows, 1,344 hourly fields and six frozen model evaluations, with canonical topology and corrected global persistence scores computed. However, I have **not** enlarged the per-diagram 160×160 spatial crop. The 2010 development results suggest the improvement persists, but full eight-week locality and locked external geographic validation remain outstanding.”
+
+**If asked “Have you tested feature shifts or missing weather stations?”** “Not as controlled Phase 7 experiments yet. The constrained matching evaluation is designed to make spatial separation visible, but directly testing shifted/split/merged high-wind regions and missing stations is the next application-oriented study.”
+
+## CXI.6 Current operational next steps and archival policy
+
+- **Do not restart** sealed CVI/CVII inference/TTK or seven completed CVIII numeric computations. The uploaded 2010 summary is obtainable read-only from the saved manifests.
+- **At latest observed status**, running `verify-numeric-all` had two new weeks independently verified and was CPU-active. Avoid interpreting its silent loop as an error. Confirm all seven final `[WEEK-CVIII] PASS ... verify` entries and `[ALL-VERIFY-NUMERIC-ALL] PASS: 7/7` before using “independently verified across all eight weeks.”
+- Repeated all-hour GUDHI recomputation in CIX numerical input validation adds significant cost. Any optimization must be separately audited, keep the original frozen distance/locality algorithms and input digests, and retain at least one full independent verification per new week. Do not bypass still-unverified inputs or claim scientific correctness from checksums alone.
+- Then run and fully verify CIX (seven weeks; 56,448 aggregate and 112,896 dimension rows anticipated); verify *infinite-radius numerical equality* to CVIII and historical XCIX anchors. Complete CX immutable eight-week summary and revisit geographic/seasonal model rankings at each radius.
+- After the Thursday meeting, perform 2012 frozen development temporal replication, followed by separately authorized locked external-region evaluation **without selecting models on external results**. Multi-tile/full-500 topology, physically calibrated locality and controlled spatial-shift/missing-station evaluation are distinct future studies.
+- Original model weights, release tags, benchmark repair lineage, split manifests and earlier Phase 5E/6/7 outputs remain immutable. Append future completion evidence with dates and exact PASS markers; do not edit retrospective “prepared but pending” entries as if they were false at the time.
+
+**Last evidence checkpoint for this note:** October 21, 2026 — CVIII numeric compute PASS 7/7; independent verify PASS 2/7 in the observed log; eight-week manifest global `W22` summary computed locally on Spark and pasted; CIX/CX final stages not yet confirmed.

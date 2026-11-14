@@ -1,0 +1,334 @@
+{
+  "historical_benchmark_window": [
+    0,
+    167
+  ],
+  "input_dataset": "/nrel/wtk-us.h5",
+  "n_regions": 4,
+  "n_samples": 64,
+  "n_times_per_region": 16,
+  "original_train_window_ranges": [
+    [
+      336,
+      503
+    ],
+    [
+      504,
+      671
+    ],
+    [
+      672,
+      839
+    ],
+    [
+      840,
+      1007
+    ],
+    [
+      2160,
+      2327
+    ],
+    [
+      2328,
+      2495
+    ],
+    [
+      2496,
+      2663
+    ],
+    [
+      2664,
+      2831
+    ],
+    [
+      4344,
+      4511
+    ],
+    [
+      4512,
+      4679
+    ],
+    [
+      4680,
+      4847
+    ],
+    [
+      4848,
+      5015
+    ],
+    [
+      6552,
+      6719
+    ],
+    [
+      6720,
+      6887
+    ],
+    [
+      6888,
+      7055
+    ],
+    [
+      7056,
+      7223
+    ]
+  ],
+  "previews": [
+    "preview_gulf_inland_20100201.npz",
+    "preview_gulf_inland_20100801.npz",
+    "preview_upper_midwest_20100201.npz",
+    "preview_upper_midwest_20100801.npz",
+    "preview_pacific_inland_20100201.npz",
+    "preview_pacific_inland_20100801.npz",
+    "preview_southwest_borderland_20100201.npz",
+    "preview_southwest_borderland_20100801.npz"
+  ],
+  "region_summary": [
+    {
+      "actual_center": {
+        "latitude": 32.00639,
+        "longitude": -91.002563
+      },
+      "corners": [
+        {
+          "col": 1471,
+          "corner": "northwest_grid",
+          "latitude": 27.643902,
+          "longitude": -96.331421,
+          "row": 205
+        },
+        {
+          "col": 1970,
+          "corner": "northeast_grid",
+          "latitude": 27.127483,
+          "longitude": -86.355316,
+          "row": 205
+        },
+        {
+          "col": 1471,
+          "corner": "southwest_grid",
+          "latitude": 36.691231,
+          "longitude": -96.378845,
+          "row": 704
+        },
+        {
+          "col": 1970,
+          "corner": "southeast_grid",
+          "latitude": 36.080818,
+          "longitude": -84.991516,
+          "row": 704
+        }
+      ],
+      "grid_center": {
+        "col": 1721,
+        "row": 455
+      },
+      "grid_rect": [
+        205,
+        705,
+        1471,
+        1971
+      ],
+      "intended_environment": "Gulf-influenced inland/coastal transition",
+      "mean_grad_p95_over_fields": 0.895909309387207,
+      "mean_p99_speed_over_fields": 12.34454965591431,
+      "mean_speed_over_fields": 6.494271521883011,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "gulf_inland",
+      "suggested_data_suitability": true
+    },
+    {
+      "actual_center": {
+        "latitude": 43.996811,
+        "longitude": -93.993713
+      },
+      "corners": [
+        {
+          "col": 1315,
+          "corner": "northwest_grid",
+          "latitude": 39.287479,
+          "longitude": -100.128815,
+          "row": 849
+        },
+        {
+          "col": 1814,
+          "corner": "northeast_grid",
+          "latitude": 39.075306,
+          "longitude": -88.202972,
+          "row": 849
+        },
+        {
+          "col": 1315,
+          "corner": "southwest_grid",
+          "latitude": 48.554726,
+          "longitude": -100.851776,
+          "row": 1348
+        },
+        {
+          "col": 1814,
+          "corner": "southeast_grid",
+          "latitude": 48.304329,
+          "longitude": -86.845612,
+          "row": 1348
+        }
+      ],
+      "grid_center": {
+        "col": 1565,
+        "row": 1099
+      },
+      "grid_rect": [
+        849,
+        1349,
+        1315,
+        1815
+      ],
+      "intended_environment": "Upper Midwest / Great Lakes transition",
+      "mean_grad_p95_over_fields": 0.7833700180053711,
+      "mean_p99_speed_over_fields": 13.016908645629885,
+      "mean_speed_over_fields": 6.829844391450882,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "upper_midwest",
+      "suggested_data_suitability": true
+    },
+    {
+      "actual_center": {
+        "latitude": 40.993176,
+        "longitude": -119.009521
+      },
+      "corners": [
+        {
+          "col": 315,
+          "corner": "northwest_grid",
+          "latitude": 35.184029,
+          "longitude": -122.799591,
+          "row": 820
+        },
+        {
+          "col": 814,
+          "corner": "northeast_grid",
+          "latitude": 37.602203,
+          "longitude": -111.788025,
+          "row": 820
+        },
+        {
+          "col": 315,
+          "corner": "southwest_grid",
+          "latitude": 43.826946,
+          "longitude": -127.032013,
+          "row": 1319
+        },
+        {
+          "col": 814,
+          "corner": "southeast_grid",
+          "latitude": 46.661736,
+          "longitude": -114.44162,
+          "row": 1319
+        }
+      ],
+      "grid_center": {
+        "col": 565,
+        "row": 1070
+      },
+      "grid_rect": [
+        820,
+        1320,
+        315,
+        815
+      ],
+      "intended_environment": "Western basin and range",
+      "mean_grad_p95_over_fields": 2.011359214782715,
+      "mean_p99_speed_over_fields": 15.61232566833497,
+      "mean_speed_over_fields": 6.043126852338791,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "pacific_inland",
+      "suggested_data_suitability": true
+    },
+    {
+      "actual_center": {
+        "latitude": 30.505024,
+        "longitude": -109.996368
+      },
+      "corners": [
+        {
+          "col": 572,
+          "corner": "northwest_grid",
+          "latitude": 25.257706,
+          "longitude": -113.93634,
+          "row": 173
+        },
+        {
+          "col": 1071,
+          "corner": "northeast_grid",
+          "latitude": 26.694355,
+          "longitude": -104.26976,
+          "row": 173
+        },
+        {
+          "col": 572,
+          "corner": "southwest_grid",
+          "latitude": 33.956936,
+          "longitude": -116.377441,
+          "row": 672
+        },
+        {
+          "col": 1071,
+          "corner": "southeast_grid",
+          "latitude": 35.652069,
+          "longitude": -105.432159,
+          "row": 672
+        }
+      ],
+      "grid_center": {
+        "col": 822,
+        "row": 423
+      },
+      "grid_rect": [
+        173,
+        673,
+        572,
+        1072
+      ],
+      "intended_environment": "Southern Arizona / borderland transition (domain suitability unverified)",
+      "mean_grad_p95_over_fields": 1.565600872039795,
+      "mean_p99_speed_over_fields": 13.437119483947763,
+      "mean_speed_over_fields": 5.276889558649064,
+      "min_valid_fraction": 1.0,
+      "n_fields": 16,
+      "region": "southwest_borderland",
+      "suggested_data_suitability": true
+    }
+  ],
+  "sampling": "two UTC hours (offset 0,84) per seven-day window across eight 2010/2012 seasonal windows",
+  "schema_version": 1,
+  "scope": "meteorology screening only, no train/eval split frozen",
+  "source_fingerprints": {
+    "legacy_builder": {
+      "path": "build_example_data_extension_500.py",
+      "sha256": "556aa9874e03fe8ca1bcc214d494da2a90cb0924b5acca68ef2cea9fac72b9d1"
+    },
+    "lxxxvi_candidates": {
+      "path": "phase7_lxxxvi_update/region_candidates.json",
+      "sha256": "ba0fb5e1236acda290c8220bca1a89587f71ca42cc98ea8f540295834f519b59"
+    },
+    "lxxxvi_inventory": {
+      "path": "ttk_runs_fixed/topology_finetuning/phase7_lxxxvi_region_inventory_20261015/inventory.json",
+      "sha256": "c1892f7b843ac9174d5f9b3de9d27d45e9e992f2f41f47d41da3b88c25b8b857"
+    },
+    "lxxxvi_notes": {
+      "path": "ttk_runs_fixed/topology_finetuning/phase7_lxxxvi_region_inventory_20261015/inventory.md",
+      "sha256": "9bb4730c3066270c481818344e8e721019438241e32e1ca697270d3b18401b39"
+    },
+    "lxxxvi_script": {
+      "path": "phase7_lxxxvi_update/scripts/phase7_region_inventory.py",
+      "sha256": "24ba066d5aa3030b32d5ef0ece7ec6ba7c86b9f9c2f7d049319f8ff845f5c57c"
+    },
+    "screen_script": {
+      "path": "phase7_lxxxvii_update/scripts/phase7_wtk_wind_screen.py",
+      "sha256": "c5966d9e709589aa4da35b8c13843d10d5620d4f819f930775f388fec344bc56"
+    }
+  },
+  "timestamps_checked_against_WTK": true
+}

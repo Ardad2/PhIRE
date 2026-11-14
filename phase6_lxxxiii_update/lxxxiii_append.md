@@ -1,0 +1,39 @@
+
+---
+
+# Part LXXXIII — Phase 6: eight-sample spatial pilot validated, all-168 locality sweep prepared (October 14, 2026)
+
+## LXXXIII.1 Observed LXXXII pilot evidence (successful)
+
+The researcher's supplied Spark transcript establishes that the LXXXII eight-sample Phase 5E sparse-locality port executed and passed, with **`Pilot exit: 0`**. It reused the unchanged SHA-256-pinned `spatial_pd/phase5e_sparse_locality_solver.py` (`47c73decca4ba151fd8b250cae2911b4c2307471fe9c881fc42bfc968e211c3a`) and the `gudhi-audit` environment (`VTK 9.6.0`, `GUDHI 3.13.0`). The preflight passed; all eight predeclared samples `0,24,48,69,96,120,144,167` each passed the same-sample five-model, D0/D1, eight-radius matching computation and the frozen reference checks. Terminal gates:
+
+- `[PHASE5E-REGRESSION] PASS`: **128** CNN/F1 sample×radius historical comparisons, with cost, coverage, locality gap, and matching-count parity.
+- `[INFINITY-GATE] PASS`: **40** sample×model comparisons reproduced the frozen LXXIX `W22` at `r=∞`.
+- `[PILOT-GATE] PASS`: **640 dimension rows**, **320 aggregate rows**, in `ttk_runs_fixed/topology_finetuning/phase6_lxxxii_spatial_pilot8_20261014/`.
+- `[VERIFY-GATE] PASS`, `Verify exit: 0`, and four `SHA256SUMS` entries all `OK`.
+
+The researcher unintentionally invoked `--mode pilot` a second time after success; it correctly **refused overwrite of the completed output directory** and exited `1`. This second invocation does not invalidate the successful pilot or its subsequent clean verification. Do not delete/recreate the saved pilot to silence this expected safeguard.
+
+## LXXXIII.2 Preliminary eight-sample locality findings (not all-168)
+
+Means taken **only from the eight-sample** validated `pilot_summary.md`, not yet from the full 168-hour benchmark. All spatial costs are the *original* Phase 5E locality-constrained `W_{2,2}` (Euclidean birth/death ground cost), separate from the LXXIX `W_{2,∞}`. Lower constrained cost is better, higher GT-side persistence-mass coverage is better; the latter is **not** a spatial displacement metric.
+
+| Model | r=4 constrained W22 | r=16 constrained W22 | r=∞ corrected W22 | r=16 GT persistence coverage |
+|---|---:|---:|---:|---:|
+| Pretrained CNN | 48.75961 | 36.31615 | 25.20037 | 0.61297 |
+| Gradient-only (00) | **47.64018** | **32.15893** | 19.26840 | **0.88809** |
+| CV-only (10) | 50.40156 | 32.99659 | 19.08425 | 0.75456 |
+| PERS-only (01) | 51.17329 | 33.37535 | **18.75371** | 0.77340 |
+| F1 combined (11) | 50.53062 | 33.28444 | 18.96689 | 0.73128 |
+
+The eight-field pilot illustrates a ranking reversal: gradient-only has the smallest spatially constrained cost at `r=4,16` and highest GT persistence coverage at `r=16`, while PERS-only has the smallest *unconstrained* cost. This does **not** prove dataset-wide superior location preservation or geographically calibrated distances. Constrained matching costs and persistence-mass coverage must remain distinct outcomes; PERS-only remains best by mean unconstrained `W22` on the already completed 168-sample LXXIX results.
+
+## LXXXIII.3 New full-168 locality computation workpack (prepared, NOT yet executed)
+
+Proposed package: `Phase6_LXXXIII_All168_Locality_20261014.zip`. Driver: `phase6_lxxxiii_update/scripts/phase6_lxxxiii_all168_locality.py`. It imports the on-Spark **unchanged** LXXXII pilot and the SHA-pinned original Phase 5E sparse locality solver, rather than rewriting the matching objective. This is an isolated wrapper, not a new solver.
+
+Before calculations, `--mode preflight` verifies the LXXXII frozen pilot, the historical Phase 5E 4,032-row reference, the LXXIX 840-row corrected PD CSV, and **all 1,008 original GT/SR persistence-diagram files** against LXXIX's per-file hashes. The 168-sample full computation requires per-sample direct checks against LXXIX GUDHI `W22` at infinity for **840** matches and against the historical CNN/F1 Phase 5E spatial table for **2,688** sample×model×radius comparisons, including original GT/SR feature coverage, locality gap and integer matching counts. The original eight pilot samples are also compared against the LXXXII saved results.
+
+Output, only after actual Spark execution, would be **13,440 dimension rows** (168×5×2×8) and **6,720 aggregate rows** (168×5×8), a complete radius-wise macro and paired comparison, and new factorial contrasts of locality-constrained cost and GT coverage. Resume-safe per-sample JSON checkpoints are isolated under `ttk_runs_fixed/topology_finetuning/phase6_lxxxiii_spatial_all168_20261014/`. Final results use a separate output manifest and SHA-256 checksums; completed results will not be overwritten. Verification must be run before interpreting full-scale results.
+
+**Open boundaries:** The archived F1 training/optimizer/checkpoint lineage has **not** been independently closed merely by artifact or numerical parity; this must be checked before strict causal attribution to the matched 2×2 fine-tuning protocol. No physical km distance without grid calibration; no independent random-seed replications or inferential independence of consecutive hours. New Phase 6 merge-tree distances remain pending. Preserve original TTK and Phase 5E archives, all model checkpoints, and the immutable publication tag `topoinvis-2026-arxiv-v1.1`.

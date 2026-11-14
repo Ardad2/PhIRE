@@ -1,0 +1,81 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38315,3 +38315,78 @@
+ ## LXXV.3 Interpretation gate
+ 
+ If the GT source vector and VTI fields match but PD pairs differ, inspect the TTK extraction settings, tie-handling and repeatability, and if needed run an **isolated** matched-threads regeneration. If the GT source vector or fields themselves differ, resolve input/crop/orientation/precision provenance first. If both finite GT diagrams and GT fields match, assess candidate-vs-CNN one-sample comparisons as preliminary and proceed to staged three-arm extraction with corrected distances and Phase 5E-locality evaluation. Do not edit the 8,568-comparison historical audit, historical VTI/PD artifacts, or fixed CNN checkpoint. Full 168, merge-tree distance, and spatial-locality stages remain pending.
++
++---
++
++# Part LXXVI — Phase 6: sample-0 GT parity resolution and Phase 5E reuse gate (October 14, 2026)
++
++## LXXVI.1 Observed Spark execution (LXXV hotfix)
++
++The researcher successfully installed `Phase6_LXXV_GT_Parity_Hotfix_20261014.zip`; `python3 -m py_compile` exited normally. All three hotfix diagnostics ran and exited 0 (inventory, Docker NumPy/VTI parity, and canonical-PD multiset comparison).
++
++The historical CNN GT and gradient-only GT `.npy` files have the **same whole-file SHA-256**:
++`f2d3942ffec7f55d0f6955a2dc75d3a580a25f9e82f5fba5a9c47fb73e7ee2af`.
++The corresponding `idx.npy` files also share the same whole-file SHA-256:
++`1aaf1948edbda5321b2a304ac37240bd7644e5dca0669c0b96d68dedb88e4867`.
++The sample-0 arrays are shape `(168,500,500,2)` overall, float64, first sample index 0, and sample-0 GT vectors match exactly (`max_abs_diff=0`). The new sample-0 GT VTI reads back to exactly the expected C-order `(160,160)` physical wind-speed field (`max_abs_diff=0`, `exact_transpose=False`). The original historical CNN VTI was not located under the conventional `ttk_runs_fixed/cnn/vti/`, but its historical GT PD VTU was available.
++
++Observed canonical finite GT persistence pairs:
++
++```text
++D0 historical=967, new=968
++D0 zero-persistence historical/new=3/4
++D0 unmatched historical=[]
++D0 unmatched new=[(birth=4.782249450683594, death=4.782249450683594), multiplicity=1]
++D1 historical=871, new=871
++D1 zero-persistence historical/new=2/2
++D1 birth/death multisets match exactly; sorted_pair_max_abs_diff=0
++```
++
++Thus the nonzero-persistence finite D0/D1 birth/death multisets are **exactly equal** for historical and new GT. The only extra stored point lies exactly on the persistence diagonal and has zero cost to the diagonal. Under the standard persistence-diagram matching equivalence, adding this point does not affect bottleneck distance or the specified order-2 Wasserstein distances to any fixed SR diagram. This is a mathematical consequence; the independent GUDHI recalculation comparing historical vs new GT conventions has **not yet run** as of this documentation update. The audit does not determine whether threads, old orientation, or tie handling caused the extra stored zero point.
++
++The previous corrected sample-0 distances remain:
++
++```text
++historical pretrained CNN: dB_all=3.09147167206, W2inf_all=17.4678134343
++new gradient-only:         dB_all=2.58057403564, W2inf_all=15.6249480697, W22_all=18.6702768797
++```
++
++These are **one-sample** descriptive distances, not full-benchmark comparisons. GT scalar/persistence parity is now established up to zero-persistence diagonal equivalence, but shared SR extraction conventions and canonical critical-point coordinate conventions remain important for a controlled spatial study.
++
++## LXXVI.2 Opportunity to reuse the frozen Phase 5E canonical archive
++
++The earlier **completed** Phase 5E all-168 extraction (Parts LIX–LXI) produced 672 canonical C-order PD port-0 VTUs: one GT and CNN/UV/F1 SR for all 168 samples. Those outputs passed the 672/672 schema gate, the 8-sample pilot continuity gate, and the completed locality-solver validations. They may be reused as frozen canonical GT/CNN/F1 references **if exact archive contents, sample-0 positive-diagram agreement, benchmark input provenance, and extraction configurations are confirmed**. Do not assume that `ttk_runs_fixed/cnn/pd/` historical pre-Phase-5E diagrams have canonical x/y critical-vertex coordinates merely because their scalar persistence distances agree.
++
++Phase 5E locality used the **eight** tested radii `4,8,16,32,64,96,128,infinity` (not a truncated six-radius list). The validated sparse locality solver should be reused without changing its admissibility or coverage definitions. GT persistence coverage and constrained matching cost must be reported separately.
++
++## LXXVI.3 Prepared read-only numerical/reuse gates (not yet executed on Spark)
++
++Bundled helper: `phase6_lxxvi_update/scripts/phase6_s0_diagonal_equivalence_and_phase5e_reuse.py`.
++
++`--mode metric` imports the frozen canonical parser and independent GUDHI implementation, requires equality of the nonzero GT pairs, reproduces the historical CNN sample-0 regression, and recomputes gradient-only `d_B`, `W2inf`, and `W22` against the new, historical, and zero-filtered GT to verify the diagonal invariance numerically.
++
++`--mode phase5e` inventories all 672 canonical Phase 5E PD port-0 VTUs (0–167 for GT, CNN_SR, UV_SR, F1_SR), hashes the sample-0 reference files, and requires the Phase 5E GT and new Phase 6 GT sample-0 **nonzero** D0/D1 pair multisets to agree. It does not run extraction or compare spatial coordinates; it is a read-only reuse eligibility gate.
++
++From `~/PhIRE` after installing the bundle, run in the isolated GUDHI environment:
++
++```bash
++mkdir -p logs
++set -o pipefail
++PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit python \
++  phase6_lxxvi_update/scripts/phase6_s0_diagonal_equivalence_and_phase5e_reuse.py \
++  --mode metric 2>&1 | tee logs/phase6_lxxvi_metric_20261014.log
++printf 'Metric gate exit: %s\n' "$?"
++
++PYTHONNOUSERSITE=1 micromamba run -n gudhi-audit python \
++  phase6_lxxvi_update/scripts/phase6_s0_diagonal_equivalence_and_phase5e_reuse.py \
++  --mode phase5e 2>&1 | tee logs/phase6_lxxvi_phase5e_reuse_20261014.log
++printf 'Phase5E reuse gate exit: %s\n' "$?"
++```
++
++If Phase 5E archive naming/path differs, supply `--phase5e-root /actual/archive/root` after inspecting the directory. Do not silently point to historical noncanonical TTK directories. The helper writes **nothing** inside repository experiments; console logs are captured by `tee` only.
++
++## LXXVI.4 Next scientific work after both gates pass
++
++Plan an isolated all-168 canonical extraction only for new Phase 6 gradient-only, CV-only, PERS-only reconstructed speed fields (reusing the frozen Phase 5E canonical GT/CNN/F1 PDs if their provenance is verified). Retain 160×160 top-left `wind_speed`, explicit indices 0..167 (`--samples` must be passed), matched TTK settings, and separate output directories. Run corrected GUDHI distances, then independently validate merge-tree distance conventions and apply the validated Phase 5E locality solver to all four matched fine-tuning cells. Never call the original wrapper's superseded TTK `pd_distance` a corrected bottleneck distance. Preserve all archived outputs and frozen releases.
++
++No new 168-sample candidate PD/MT/locality results, or numerical Part LXXVI outputs, are claimed at this point.

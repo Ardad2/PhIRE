@@ -1,0 +1,33 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38804,3 +38804,30 @@
+ - generates isolated, SHA-indexed `f1_training_lineage.md` and `f1_lineage_manifest.json` for *manual* attribution review. Existing output refuses overwrite, and verify rechecks input fingerprints.
+ 
+ The audit cannot alone prove identical optimizer initialization, training-time source code snapshot, pair-source bytes **at training time**, or stochastic seed. Even if the logs confirm matched architecture and hyperparameters, report nonreplicated within-benchmark contrasts unless matched random states and independent-seed replications are documented. Do not rewrite frozen `topoinvis-2026-arxiv-v1.1`, Phase 5E, LXXIX or LXXXIII results. Phase 6 new-arm merge-tree evaluation remains an independent next stage.
++
++---
++
++# Part LXXXVI — Phase 7: geographic generalization research plan and read-only WTK region inventory prepared (October 15, 2026)
++
++## LXXXVI.1 Why the priority changed
++
++Following the complete verified Phase 6 four-cell persistence and spatial-locality evaluations and the historical F1 startup-log review, the research priority shifted from further topology-loss optimization to **independent geographic and seasonal evaluation**. The existing fixed 168-hour January 2007 benchmark and repaired 2,688-field fine-tuning set share a Mid-Atlantic source footprint. Although temporal sampling spans seasons for fine-tuning, one geographic area and the `[0:160,0:160]` topology crop are insufficient to establish broad geographic/field-scale generalization.
++
++The original Stengel et al. (2020) PhIRE article reports 42,355 WIND Toolkit 500×500 patches (37,972 training, 4,383 held-out), with 100-m wind fields sampled in 2007–2013 every four hours, and 5× MR→HR and 10× LR→MR stages. Thus new locations can be outside the *later fine-tuning region* without necessarily being absent from the pretrained CNN/GAN's original training. Do not claim fully unseen regions in all model-training stages without original pretraining-patch provenance.
++
++## LXXXVI.2 Design commitments
++
++1. Freeze existing LXXIX/LXXXIII/LXXXIV and Phase 5E findings and all model checkpoints. Do **not** retrain now. First evaluate six frozen models (original CNN and GAN; gradient-only, CV-only, PERS-only and F1) on independently selected new regions.
++2. Choose geographic candidates using **native WTK grid rectangles**, not city-center distances; require source window validity and explicit intersection/buffer checks against the original `rows 720:1220, cols 2102:2602` footprint. All current geographic candidates are provisional and must not be treated as guaranteed isolated atmospheric regimes.
++3. Inspect WTK `datetime` metadata to map proposed seven-day, 168-hour seasonal windows to actual time indices, and audit overlaps with archived training-window indices before freezing partitions.
++4. Keep the original 160×160 `[0,0]` PD/MT crop for reproducibility; add predeclared spatially distributed 160×160 tiles and a full-500×500 pilot as *separate scales*. Full-field persistence/merge trees are not equivalent to sums or unions of patch descriptors.
++5. Match input preprocessing, normalization, GT coordinate orientation and inference before comparing metrics. Only then assess whether gradient-only's tight-radius advantage and PERS-only's unconstrained-distance advantage generalize across new regions/seasons.
++6. Reserve a separate development region for selecting subsequent models/losses and keep final external test regions locked and unavailable for tuning. Original pretraining geography remains a limitation unless independently reconstructed.
++
++## LXXXVI.3 Initial read-only WTK inventory workpack — proposed, not executed on Spark
++
++Prepared `Phase7_LXXXVI_WTK_Region_Inventory_20261015.zip` containing `phase7_lxxxvi_update/scripts/phase7_region_inventory.py`, `region_candidates.json`, README, SHA256SUMS and this additive master-notes patch. The script has `--mode preflight` (offline only), `--mode probe` (WTK HSDS coordinate/datetime access only) and `--mode verify` (offline output/source hashes). It never reads meteorological field arrays or computes SR/PD/MT results.
++
++The proposed targets span Rocky Mountains, Plains, inland Gulf/Southeast, upper Midwest and Western basin environments; the program resolves their actual native-grid rectangles and prints a provisional disjoint subset. Four seasonal weeks each in 2010 and 2012 are candidate timestamps, **not locked evaluation periods**. The remote probe must reproduce the existing WTK reference near row 970, column 2352; a mismatch causes a fail-closed error. An 80-grid-cell buffer is used as a screening heuristic, not a meteorological independence claim. The report output, when run, is isolated under `ttk_runs_fixed/topology_finetuning/phase7_lxxxvi_region_inventory_20261015/` and cannot overwrite existing outputs.
++
++Subsequent experiment, after observing and approving the inventory: a small, matched full-500×500 six-model inference pilot, with validation of source geometry, temporally disjoint samples, and comparison of original 160×160, multi-tile, and separate full-field topology scales. **No result, geographic generalization, or new regional extraction is claimed here.**

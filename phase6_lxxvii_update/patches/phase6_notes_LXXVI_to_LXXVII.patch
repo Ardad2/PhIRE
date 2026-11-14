@@ -1,0 +1,55 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38389,4 +38389,52 @@
+ 
+ Plan an isolated all-168 canonical extraction only for new Phase 6 gradient-only, CV-only, PERS-only reconstructed speed fields (reusing the frozen Phase 5E canonical GT/CNN/F1 PDs if their provenance is verified). Retain 160×160 top-left `wind_speed`, explicit indices 0..167 (`--samples` must be passed), matched TTK settings, and separate output directories. Run corrected GUDHI distances, then independently validate merge-tree distance conventions and apply the validated Phase 5E locality solver to all four matched fine-tuning cells. Never call the original wrapper's superseded TTK `pd_distance` a corrected bottleneck distance. Preserve all archived outputs and frozen releases.
+ 
+ No new 168-sample candidate PD/MT/locality results, or numerical Part LXXVI outputs, are claimed at this point.
++
++---
++
++# Part LXXVII — Phase 6 canonical Phase5E reference verified, new-arm PD extraction workpack prepared (October 14, 2026)
++
++## LXXVII.1 Observed Spark result (Part LXXVI execution)
++
++The researcher installed the LXXVI workpack, all four SHA-256 manifest checks passed, the Python script compiled, and the LXXV→LXXVI Git patch applied cleanly. Both actual Spark numerical gates completed with exit status 0.
++
++**Metric gate**:
++
++```text
++[HIST-NEW-GT] D0 historical/new total=967/968, zero=3/4; positive_multiset_equal=True
++[HIST-NEW-GT] D1 historical/new total=871/871, zero=2/2; positive_multiset_equal=True
++[METRIC] historical-CNN: dB=3.09147167206 W2inf=17.4678134343 W22=21.0247316731
++[METRIC] new-GT-vs-gradient: dB=2.58057403564 W2inf=15.6249480697 W22=18.6702768797
++[METRIC] historical-GT-vs-gradient: same three distances as new GT
++[METRIC] positive-only-GT-vs-gradient: same three distances as new GT
++[INVARIANT] all six corrected-distance differences zero
++[METRIC-GATE] PASS
++Metric gate exit: 0
++```
++
++The CNN-to-gradient-only sample-0 reductions are approximately 16.5% bottleneck, 10.5% W2inf and 11.2% W22, descriptive for **sample 0 only**. The extra zero-persistence GT D0 point is mathematically and empirically inert to all three tested persistence distances; its historical cause was not established.
++
++**Phase5E gate**:
++
++```text
++[PHASE5E] root=spatial_pd/phase5e_all168_canonical_pd count_pd_port0=672
++[PHASE5E] GT 168/168, CNN_SR 168/168, UV_SR 168/168, F1_SR 168/168
++phase5e_GT_s0 SHA256 = 85db754ceac029a8deeea85896c03af9993fc953a323a1000d8b9c1b310638af
++new gradient-only GT_s0 SHA256 = same hash (byte-identical)
++[PHASE5E-NEW-GT] D0 968/968, D1 871/871, both whole diagrams exact
++[PHASE5E-GATE] PASS
++Phase5E reuse gate exit: 0
++```
++
++Canonical C-order Phase5E GT PDs can therefore be reused as the fixed ground-truth reference for new-arm persistence extraction, subject to the same sample provenance and extraction settings. The frozen baseline CNN/F1 SR diagrams are reuse candidates; no Phase 6 dataset-wide comparison has yet been computed.
++
++## LXXVII.2 Prepared isolated extraction (not yet executed on Spark)
++
++The accompanying bundle `Phase6_LXXVII_NewArms_Canonical_PD_20261014.zip` provides `scripts/phase6_canonical_newarms_pd.py`, a staged driver to extract **only** the 3×168 newly fine-tuned SR persistence diagrams, and `scripts/phase6_pilot_pd_gudhi_gate.py` to validate three new sample-0 PDs and reproduce the frozen gradient-only corrected metric regression before scaling.
++
++Dataset methods: gradient-only `candidateF_grad_pairzero_expanded2688`, CV-only `candidateF_grad_CV_only_expanded2688`, PERS-only `candidateF_grad_PERS_only_expanded2688`. Uses the corrected 168-array fixed benchmark, canonical speed writer with `--samples` explicitly specified, 160×160 top-left crop, scalar `wind_speed`, and TTK `ttkPersistenceDiagramCmd -t 1`. The extraction writes under an isolated `ttk_runs_fixed/topology_finetuning/phase6_lxxvii_canonical_pd_newarms_20261014/` root and reuses `spatial_pd/phase5e_all168_canonical_pd/pd/phase5_GT_s<i>_speed_p160_x0_y0_pd_port_0.vtu` read-only.
++
++Stages: `--mode preflight` (read-only SHA, source shape/finiteness/index, Phase5E reference checks), `--mode pilot` (only index 0), isolated sample-0 GUDHI continuity gate, `--mode full` (resumable indices 0..167), and `--mode verify` (read-only inventory/VTI validation). Manifests encode source array checksums, driver/checkpoint-independent extraction script hash, writer checksum and settings. The full run requires the three-arm GUDHI pilot marker tied to current PD hashes.
++
++This new extraction package was syntax-checked and its static naming/manifest behavior checked locally, but the actual Docker/TTK run was **not** performed in the chat container. No new candidate dataset-wide PD/MT/locality metrics are claimed. The historical `pd_distance` stage is omitted entirely; a future corrected 504-comparison GUDHI sweep must be independently computed. Do not modify frozen Phase 5E, historical CNN, F1, preprints, or model checkpoints.

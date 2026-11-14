@@ -1,0 +1,70 @@
+--- a/dataset_generation_and_repair_notes.md
++++ b/dataset_generation_and_repair_notes.md
+@@ -38151,3 +38151,67 @@
+ - For a future manuscript figure, characterize the trade-off honestly: gradient-only = best pointwise fidelity; CV-only and PERS-only = stronger selected structural proxies, with PERS-only leading WPD distribution/bias; F1 = strongest gradient W1 and PSD among these four fine-tuned cells. No claim of individual CV/PERS contributions to true topology can be made until the matched corrected topological results exist.
+ 
+ **Status at the close of LXXII:** Three newly trained arms, plus archived full F1, are now available with **all four scalar/domain evaluations**. SSIM, new-arm corrected PD/MT, spatially constrained persistence and uncertainty analysis remain incomplete. The failed wrong-base LXVII→LXXI Git patch did not update the repository; use the bundled **LXX→LXXII cumulative patch** only after its `git apply --check` succeeds.
++
++---
++
++# Part LXXIII — Phase 6: topology preflight and isolated sample-0 extraction pilot prepared (October 14, 2026)
++
++**Status:** Preflight evidence supplied from Spark and reviewed. **The sample-0 pilot is prepared but has not yet been run.** The existing three trained arms and four scalar/domain reports remain unchanged. No new candidate PD/MT distance, corrected PD audit, or locality metric is yet reported.
++
++## Preflight observed on `spark-345b` in `~/PhIRE`
++
++| Check | Observed output | Interpretation |
++|---|---|---|
++| `bash -n scripts/run_candidate_topology_pipeline.sh` | `Shell syntax: PASS` | Shell syntax valid; not an execution test |
++| `docker image inspect phire-ttk:latest` | `sha256:858d3154edb75c098ccda15f9f812eecbd0d102af77055906d42a67a390d5c86` | Required extraction image present |
++| `df -h .` | `/dev/nvme0n1p2`: 3.6T total; 980G used; 2.5T available; 29% used | No immediate disk-space obstacle evident; future output volume unmeasured |
++| Gradient-only input | `dataGT.npy`, `dataSR.npy` each 641M, `idx.npy` 1.5K | All three files exist |
++| CV-only input | `dataGT.npy`, `dataSR.npy` each 641M, `idx.npy` 1.5K | All three files exist |
++| PERS-only input | `dataGT.npy`, `dataSR.npy` each 641M, `idx.npy` 1.5K | All three files exist |
++| Corrected-PD historical audit | `$HOME/phire_runtime_audit_20260809_221548/recompute_pd_w22/w22_full_sweep.py` (30K), `w22_full_sweep.csv` (6.9M) | Existing auditor and historical output found; NOT yet applied to new arms |
++| Pipeline SHA-256 | `830be1026b33a39ea7a15d193980baa0a249e90bbb9a2c6b07a480abec67646f` | `scripts/run_candidate_topology_pipeline.sh` |
++| Historical distance-script SHA-256 | `6a0a3277ff19998a4d781002bd5db7d8072ea9c83d950921a4e23ba7710cde75` | `scripts/compute_composite_tree_distance.py` — preservation/identification only, NOT a corrected-PD reference |
++
++Earlier run logs independently validated all 168 index positions, exact benchmark GT/input alignment, finite outputs and shape checks. This preflight checks **file presence**, not hashes or contents. Do not infer that the files were successfully extracted or that the historical audit CSV contains these three new candidates.
++
++## Why isolate Stage 1/2 instead of calling the entire historical wrapper?
++
++The current `scripts/run_candidate_topology_pipeline.sh` couples (1) `scripts/convert_phire_to_vti.py`, (2) TTK `ttkPersistenceDiagramCmd`/`ttkMergeTreeCmd`, (3) `scripts/compute_composite_tree_distance.py`, and (4–5) legacy summary/reporting. Its Stage 3 calls `ttkBottleneckDistance` and writes the historical `pd_distance` outputs. Those outputs cannot substitute for the later independently audited, corrected persistence distances. **Do not use `bash scripts/run_candidate_topology_pipeline.sh --n-samples 1` as a corrected-distance pilot**: its later stages are not the audited pipeline. Reuse only its VTI and TTK extraction conventions.
++
++The reviewed `scripts/convert_phire_to_vti.py` generates speed from physical `[u,v]`, crops `160 × 160` at `(x0,y0)=(0,0)`, creates active scalar array **`wind_speed`**, and writes VTK points in correct row-major/`x`-fastest orientation. The script's exact output naming pattern for the first field is `<method>_<GT|SR>_s0_speed_p160_x0_y0.vti`. Preserve all these conventions for baseline/F1/new-arm comparability.
++
++## Prepared pilot — sample 0 of gradient-only (`CV=0,PERS=0`)
++
++The delivered (not yet executed on Spark) helper script:
++
++- `scripts/phase6_topology_s0_extraction_pilot.sh`
++
++was shell syntax-checked with `bash -n`. It creates only a **new, isolated** directory:
++
++```
++ttk_runs_fixed/topology_finetuning/
++  candidateF_grad_pairzero_expanded2688_s0_extraction_pilot_20261014/
++    vti/
++    pd/
++    mt/
++```
++
++It reads existing `data_out/wind_finetune_candidateF_grad_pairzero_expanded2688/dataGT.npy`, `dataSR.npy`, `idx.npy` without editing them, writes only sample 0 GT and SR `160×160` speed VTI files via Docker, reopens both VTI files in the same image, checks `(160,160,1)`, active point array `wind_speed`, numerical fidelity (maximum error and `np.testing.assert_allclose`), and **spatial orientation against NumPy**. It then extracts each field's PD port 0 and MT ports 0/1/2 using the same `ttkPersistenceDiagramCmd`/`ttkMergeTreeCmd`, `-t 1`, `-a wind_speed` conventions as the main wrapper. It refuses to declare success when expected files are absent or empty; it skips complete existing results to support safe reruns. It does not run Stage 3/5 or generate any historical PD/MT distance.
++
++From `~/PhIRE`, after transferring the companion bundle and extracting to `phase6_lxxiii_update/`, run:
++
++```bash
++cd ~/PhIRE
++bash -n phase6_lxxiii_update/scripts/phase6_topology_s0_extraction_pilot.sh
++mkdir -p logs
++set -o pipefail
++bash phase6_lxxiii_update/scripts/phase6_topology_s0_extraction_pilot.sh \
++  2>&1 | tee logs/phase6_topology_s0_extraction_pilot_20261014.log
++printf 'Pilot exit status: %s\n' "$?"
++```
++
++A successful run should print two lines `[PASS] GT` and `[PASS] SR`, each including a maximum VTI round-trip difference; produce **two PD port-0 files** and **six MT port files** (three each for GT and SR); print `[PILOT] PASS`; and exit 0. **These are expected outcomes, not observed outcomes as of this note.** Preserve actual output and any warnings or mismatches verbatim when the user reports them.
++
++## Corrected-distance follow-up (not yet executed)
++
++After the small pilot, verify exact pairs and persistence arrays, inspect the local `w22_full_sweep.py` CLI/source and archived manifest/environment (do not assume it supports newly named methods without modification), then establish a corrected-GUDHI comparison for the single test field. Only after this succeeds should all 168 GT/SR fields be extracted for the three new arms and the corrected-PD, audited MT and Phase 5E locality comparisons performed with their frozen conventions. The historical `w22_full_sweep.csv` is a benchmark reference, not new-arm output. For scientific reporting, preserve method/sample indices, per-file hashes, extracted diagram conventions and the audit's exact distance definitions.
