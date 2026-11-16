@@ -4577,6 +4577,23 @@ shows that fixed persistence-pair supervision is feasible but not enough to impr
 final true topology metrics. These results motivate specifically merge-tree-aware
 proxies or learned MT-distance surrogates.
 
+## November 14, 2026 provenance clarification — active Candidate Dpd run, unrecovered executed source
+
+**Scope and evidence:** This is an additive provenance erratum to the historical Candidate Dpd section, recorded after the November 14 Spark read-only inspection. It does **not** alter the original experimental outputs, archived measurements, source code, checkpoints, or the chronologically recorded interpretation above. For the later infrastructure limitations, see **Part XIII.1 and XIII.6**.
+
+The actual Spark training log `logs/wind_finetune_candidateDpd_expanded672.log` confirms that the May 27, 2026 **Candidate Dpd** experiment included a nonzero PD loss, rather than merely monitoring it:
+
+- Line 18: `lambda_pd = 0.001904` (the log describes this as genuine PD training).
+- Line 26: `pd_every = 1`; line 46 states `L_PD` was included in `L_total` every step.
+- Lines 37–38: initial PD gradient checks passed, including 80/256 nonzero entries; lines 48, 66, and 84 report per-epoch PD gradient checks.
+- On Spark, `models_fixed/topology_finetuning/wind_finetune_candidateDpd_expanded672/refiner_final.pt` was present (81 KiB as displayed by `ls -lh`, last-modified May 27 at 22:32). Checkpoint file hashes and contents were **not** independently audited in this confirmation.
+
+**Unresolved source provenance:** As inspected on November 14, `scripts/run_candidateDpd_expanded672_pd_refiner.py` on GitHub `master`, and the separately uploaded copy bearing that filename, set `LAMBDA_PD = 0.0` and set `MODEL_DIR`, `OUT_DIR`, and `LOG_PATH` to **candidateD**, not candidateDpd. Grepping available `scripts/` and `phase6_workpack/` Python files on Spark found the value `0.001904` only in a diagnostic comment, not in the active code assignment. This is not the executed active-Dpd source version. The original executed Python source revision has **not yet been recovered or cryptographically matched** to the logged run. Do not reconstruct it by silently editing the archived candidateD script or report the current committed script as the exact source of Candidate Dpd.
+
+**Interpretation after Part XIII:** The active training run is supported by its log, but its historical negative final-TTK results are **inconclusive as evidence against direct PD supervision** because the earlier PyTorch vector reconstruction loss was computed in unnormalized physical units (Part XIII records an approximately 29-fold difference on tested tensors), materially changing the relative loss weights. The VTI flattening/orientation problem also compromised TTK-based critical-pair workflows; its precise impact on Dpd's **PyTorch cubical-complex training loss** should not be asserted without a source-specific audit, because Dpd did not train by extracting TTK VTI critical pairs. The original Dpd experiment was not documented as rerun with corrected loss normalization. Historical numerical results remain preserved as observations but must not be presented as a controlled negative result. This method also differs from the proposed native-TensorFlow, dynamically rematched TTK persistence-loss pilot.
+
+**Follow-up (unexecuted):** Recover the exact active-Dpd Python revision if feasible; record script SHA-256, log/checkpoint hashes, configuration, commit provenance and source/output alignment. This is a historical reproducibility item, **not a prerequisite for starting the separate Phase 8 pilot**.
+
 ---
 
 # Part IX — Candidate E2-expanded-672 faithful TTK critical-pair expansion
@@ -39375,3 +39392,32 @@ Region-week subset from the user's eight-week printout (four-digit rounding):
 - Original model weights, release tags, benchmark repair lineage, split manifests and earlier Phase 5E/6/7 outputs remain immutable. Append future completion evidence with dates and exact PASS markers; do not edit retrospective “prepared but pending” entries as if they were false at the time.
 
 **Last evidence checkpoint for this note:** October 21, 2026 — CVIII numeric compute PASS 7/7; independent verify PASS 2/7 in the observed log; eight-week manifest global `W22` summary computed locally on Spark and pasted; CIX/CX final stages not yet confirmed.
+
+---
+
+# Part CXII — Phase 8 dynamic persistence-loss pilot: audit protocol and design record (November 14, 2026)
+
+## CXI.1 Status and experimental boundary
+
+**Status: DESIGN ONLY.** This entry records decisions and proposed validation gates discussed November 14, 2026. No new TensorFlow/TTK optimizer step, dynamic diagram loss, benchmark evaluation, checkpoint, numerical result, code patch, or new geographical data extraction has been run or validated in this entry. Existing Phase 6 models/checkpoints, published release, the original 168-field benchmark, the Phase 7 protocol, and locked external regions remain untouched.
+
+The proposed implementation starts from the **native TF1-compatible PhIRE Candidate F runner** `scripts/run_candidateF_expanded2688_finetune.py` (documented Git blob `b7c5359952a4e2cf30e2b6f4341c66bcbe7ee7c8`), retaining `sr_network.py` and `PhIREGANs.py`. The Phase 6 wrapper `scripts/run_candidateF_cv_pers_ablation.py` (documented Git blob `e934081477e2277d70a578ae50e020cb9ae47deb`) exercises the original fixed-pair training path and is a comparison/control reference. Preserve the tagged/released sources; any experimental implementation must use a **new, distinct entry point and output namespace**.
+
+## CXI.2 Planned dynamic-diagram mechanism
+
+- Use the existing `tf.gather_nd` / placeholder / per-sample-index feed approach for critical vertex values. Unlike the archived GT-fixed E2 constraints, dynamically recompute the **predicted** speed-field persistence diagram and matching from the model's current forward-pass prediction.
+- Run a forward pass on each sampled training field (160×160 top-left scalar-speed crop, with the correct physical-unit wind-speed normalization), extract its TTK diagram, match it to the corresponding precomputed GT diagram, construct birth/death critical-index and target-value feeds, then execute the TF1 training step using that prediction-dependent matching. Do not backpropagate through external TTK or silently reuse GT vertex indices in place of predicted ones.
+- Explicitly separate diagram matched-pair costs, predicted-to-diagonal costs and GT-to-diagonal costs for the chosen squared Euclidean-ground W₂,₂ objective. The midpoint is the correct Euclidean diagonal projection; auxiliary constraints on unmatched **GT** fixed locations are an additional surrogate term, not part of the ordinary W₂,₂ gradient. Recompute matchings at the stated cadence and label any approximate loss as such.
+- Confirm H0/H1 family choices, finite/essential pairs, zero-persistence policy, filtering/truncation, units, spatial orientation and Euclidean-versus-L-infinity ground metric against the **independently validated evaluation implementation**. The final evaluation uses its existing audited convention; any training-time threshold or top-k approximation must be separately named and reported, not silently treated as identical to unfiltered W₂,₂.
+
+## CXI.3 Pilot acceptance criteria — pending, not measured
+
+1. Benchmark wall-clock time and peak resource use for **one 160×160 TTK diagram and matching** (including transfer/serialization), before selecting batch size and match-refresh cadence.
+2. Test synthetic counterexamples: a spurious predicted peak absent from GT (should incur diagonal penalty), and a spatially displaced peak (should demonstrate the distinction between diagram-coordinate matching and spatial/fixed-index supervision). Include matched-feature, diagonal and empty-diagram sanity tests and gradient checks. Displacement alone does **not** imply a PD-distance penalty if persistence coordinates remain identical.
+3. Check the matching cost and piecewise gradient construction against an independent GUDHI W₂,₂ numeric reference on controlled diagrams and representative real training crops; record any approximation or normalization separately.
+4. Smoke-test on a small, documented subset of the existing 2,688-example **training** set before comparing recon-only / gradient-only, gradient-plus-fixed-pair, gradient-plus-dynamic-PD and combined losses under controlled initializations. Keep the 168-field historical benchmark out of training and tuning; use distinct development data for selection.
+5. For analysis, report global corrected PD metrics and persistence-stratified matching/diagonal costs, pointwise fidelity, and spatial-locality behavior. The original CNN is the principal baseline; controls are used to attribute improvements. Preserve the original Phase 7 region-week aggregation and sealed external partition.
+
+## CXI.4 Standing audit procedure for every subsequent update
+
+For each code/data/experiment change, append a **dated, immutable entry** distinguishing **planned**, **synthetically tested**, **Spark-run**, **verified**, and **scientifically interpreted** status. Record: purpose/hypothesis; exact repository commit, affected scripts and SHA-256; environment and commands; training/development/test split and data lineage; configuration and seeds; baseline/checkpoint identities; generated outputs and checksums; acceptance tests, numerical comparisons and failure logs; method limitations and next gates. Cite exact existing paths and *actual* observed checksums; never invent hashes or treat a workpack's offline fixture pass as a real Spark execution. Preserve earlier entries rather than rewriting their historical status; add dated errata that point back to them. Keep code and data outputs collision-safe, versioned and isolated, and never modify frozen tags, checkpoints, or sealed evaluation assets to repair an experiment.
