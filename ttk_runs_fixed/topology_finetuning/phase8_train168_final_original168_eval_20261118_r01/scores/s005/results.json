@@ -1,0 +1,74 @@
+{
+  "arms": {
+    "cnn": {
+      "L_grad": 0.7956985235214233,
+      "L_uv": 0.04346515238285065,
+      "W22": 23.629367549144387,
+      "W2inf": 19.095736494021647,
+      "dB": 4.681084632873535,
+      "speed_crop_MAE_mps": 1.3931314442679286
+    },
+    "dynamic": {
+      "L_grad": 0.7621389627456665,
+      "L_uv": 0.038506727665662766,
+      "W22": 21.89300522821015,
+      "W2inf": 17.71139686297227,
+      "dB": 3.0852508544921875,
+      "speed_crop_MAE_mps": 1.3524927915656009
+    },
+    "fixed": {
+      "L_grad": 0.7702831625938416,
+      "L_uv": 0.03943862020969391,
+      "W22": 23.18294358624217,
+      "W2inf": 18.805490984669454,
+      "dB": 4.447613716125488,
+      "speed_crop_MAE_mps": 1.353705597189255
+    },
+    "grad": {
+      "L_grad": 0.7749161124229431,
+      "L_uv": 0.036192186176776886,
+      "W22": 24.998350626088335,
+      "W2inf": 19.878964072521732,
+      "dB": 3.195291042327881,
+      "speed_crop_MAE_mps": 1.317599500892684
+    }
+  },
+  "sample": 5,
+  "timings": {
+    "cnn": {
+      "backend": "docker",
+      "seconds": 0.378554,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 600 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1319 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.008s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/cnn_pd_port_0.vtu'...\n",
+      "vtu_bytes": 63253
+    },
+    "dynamic": {
+      "backend": "docker",
+      "seconds": 0.392438,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1014 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2119 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.008s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_pd_port_0.vtu'...\n",
+      "vtu_bytes": 98833
+    },
+    "fixed": {
+      "backend": "docker",
+      "seconds": 0.399656,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 885 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1821 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/fixed_pd_port_0.vtu'...\n",
+      "vtu_bytes": 85381
+    },
+    "grad": {
+      "backend": "docker",
+      "seconds": 0.389439,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 837 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1817 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/grad_pd_port_0.vtu'...\n",
+      "vtu_bytes": 85189
+    },
+    "gt": {
+      "backend": "docker",
+      "seconds": 0.393092,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 909 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1943 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.008s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/gt_pd_port_0.vtu'...\n",
+      "vtu_bytes": 87861
+    }
+  }
+}

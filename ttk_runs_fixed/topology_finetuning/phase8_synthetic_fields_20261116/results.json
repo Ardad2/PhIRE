@@ -1,0 +1,174 @@
+{
+  "comparisons": {
+    "displaced": {
+      "W22": 0.1260366148309748,
+      "canonical_metrics": {
+        "W22": 0.1260366148309748,
+        "W2inf": 0.08912134502477928,
+        "dB": 0.08911991119384766
+      },
+      "dimensions": {
+        "D0": {
+          "gt_finite_positive": 2,
+          "gt_to_diagonal": 2,
+          "matched": 0,
+          "matching_seconds": 4.075304605066776e-05,
+          "squared_cost": 5.111356529141631e-07,
+          "sr_finite_positive": 2,
+          "sr_to_diagonal": 2,
+          "w22": 0.0007149375167902178
+        },
+        "D1": {
+          "gt_finite_positive": 1,
+          "gt_to_diagonal": 0,
+          "matched": 1,
+          "matching_seconds": 3.8128113374114037e-05,
+          "squared_cost": 0.015884717142398586,
+          "sr_finite_positive": 1,
+          "sr_to_diagonal": 0,
+          "w22": 0.12603458708782517
+        }
+      },
+      "fixed_gt_vertex_proxy": {
+        "cv_mse": 71.9999975921342,
+        "gt_endpoint_changed_count": 2,
+        "pers_mse": 142.5126838247545,
+        "selected_gt_pairs": 1
+      },
+      "matching_seconds": 7.88811594247818e-05
+    },
+    "identity": {
+      "W22": 0.0,
+      "canonical_metrics": {
+        "W22": 0.0,
+        "W2inf": 0.0,
+        "dB": 0.0
+      },
+      "dimensions": {
+        "D0": {
+          "gt_finite_positive": 2,
+          "gt_to_diagonal": 0,
+          "matched": 2,
+          "matching_seconds": 8.715293370187283e-05,
+          "squared_cost": 0.0,
+          "sr_finite_positive": 2,
+          "sr_to_diagonal": 0,
+          "w22": 0.0
+        },
+        "D1": {
+          "gt_finite_positive": 1,
+          "gt_to_diagonal": 0,
+          "matched": 1,
+          "matching_seconds": 4.7615962103009224e-05,
+          "squared_cost": 0.0,
+          "sr_finite_positive": 1,
+          "sr_to_diagonal": 0,
+          "w22": 0.0
+        }
+      },
+      "fixed_gt_vertex_proxy": {
+        "cv_mse": 0.0,
+        "gt_endpoint_changed_count": 0,
+        "pers_mse": 0.0,
+        "selected_gt_pairs": 1
+      },
+      "matching_seconds": 0.00013476889580488205
+    },
+    "spurious": {
+      "W22": 6.3467759066828195,
+      "canonical_metrics": {
+        "W22": 6.3467759066828195,
+        "W2inf": 4.48784828228682,
+        "dB": 4.487848281860352
+      },
+      "dimensions": {
+        "D0": {
+          "gt_finite_positive": 2,
+          "gt_to_diagonal": 0,
+          "matched": 2,
+          "matching_seconds": 4.312093369662762e-05,
+          "squared_cost": 7.655700073883054e-09,
+          "sr_finite_positive": 3,
+          "sr_to_diagonal": 1,
+          "w22": 8.749685750861601e-05
+        },
+        "D1": {
+          "gt_finite_positive": 1,
+          "gt_to_diagonal": 0,
+          "matched": 1,
+          "matching_seconds": 4.238402470946312e-05,
+          "squared_cost": 40.28156440199382,
+          "sr_finite_positive": 2,
+          "sr_to_diagonal": 1,
+          "w22": 6.346775906079702
+        }
+      },
+      "fixed_gt_vertex_proxy": {
+        "cv_mse": 0.0,
+        "gt_endpoint_changed_count": 0,
+        "pers_mse": 0.0,
+        "selected_gt_pairs": 1
+      },
+      "matching_seconds": 8.550495840609074e-05
+    }
+  },
+  "files_sha256": {
+    "fields/displaced.npy": "661edd996252bb416d69becb5a65e062b12dc201cd82901591dd3525a57035ec",
+    "fields/gt.npy": "30981c904dbcd94eb6971f835b143e015cd128c3d7e33e3be80a8e8183b229a7",
+    "fields/identity.npy": "30981c904dbcd94eb6971f835b143e015cd128c3d7e33e3be80a8e8183b229a7",
+    "fields/spurious.npy": "752be8764234bce66c8fa25296738360c8032f0c0e14fae6d6937497b2e615c5",
+    "pd/displaced_pd_port_0.vtu": "bfceaafa249a114fdf514e2f320fb03506ff18e7eb3f0617a059d808adb3aa8c",
+    "pd/gt_pd_port_0.vtu": "0ac99c5be529aa083ab8f7720bfaa330b2dc8524124f8723009e48602fc9a1e3",
+    "pd/identity_pd_port_0.vtu": "0ac99c5be529aa083ab8f7720bfaa330b2dc8524124f8723009e48602fc9a1e3",
+    "pd/spurious_pd_port_0.vtu": "96c0587ec0e6bfe282a8cba4c1b6d701b692f9a360810a857efbf0aa534bde00",
+    "vti/displaced.vti": "19f1bd2f1d70b7a4a843cf8320cb892d1eee59a9236509e3e78fa6ef89358aa2",
+    "vti/gt.vti": "d520a7275d53334ecf8f4184ea4fcf2c163ee1195424851519e34afcf404934a",
+    "vti/identity.vti": "d520a7275d53334ecf8f4184ea4fcf2c163ee1195424851519e34afcf404934a",
+    "vti/spurious.vti": "168ef38a6490ae9d7a0956400b32c109295fc33ca15539e2576ca6f274368d30"
+  },
+  "gt_selected_fixed_pairs": 1,
+  "gudhi_version": "3.13.0",
+  "interpretation": {
+    "displaced": "Pure PD W22 is location-blind; a displaced peak can have a small PD distance even when GT-vertex supervision detects displacement.",
+    "important": "No gradient or TensorFlow optimizer step was tested; matching assignments must be translated to prediction-dependent critical-vertex targets next.",
+    "spurious": "The extra peak is outside fixed GT endpoint locations, but incurs a predicted-PD matching/diagonal penalty."
+  },
+  "schema": "phase8-synthetic-fields-v1",
+  "source_hashes": {
+    "/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py": "04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6c",
+    "phase6_lxxvii_update/scripts/phase6_pilot_pd_gudhi_gate.py": "ad11e7802672d0a11c2f7f839e62623bca95afd338d4144ab3bf2bc1df9bc1fe",
+    "phase8_ttk_w22_timing_pilot_20261116.py": "a4ba4e9d6d22eb30ff830312db10e78e2e5a86492dc325e09369517dd67f900a",
+    "scripts/extract_ttk_pd_critical_pairs.py": "c31dfc567ba1a6831203289ad65cbbbad036f407d10063e65127f75f0a6dca91"
+  },
+  "ttk_backend": "docker",
+  "ttk_timing": {
+    "displaced": {
+      "backend": "docker",
+      "seconds": 0.359001,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1 saddle-max pairs ...........\u001b[34;1m [0.000s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 4 persistence pairs ..........\u001b[34;1m [0.000s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.005s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/displaced_pd_port_0.vtu'...\n",
+      "vtu_bytes": 3265
+    },
+    "gt": {
+      "backend": "docker",
+      "seconds": 0.377089,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1 saddle-max pairs ...........\u001b[34;1m [0.000s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 4 persistence pairs ..........\u001b[34;1m [0.000s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.006s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/gt_pd_port_0.vtu'...\n",
+      "vtu_bytes": 3261
+    },
+    "identity": {
+      "backend": "docker",
+      "seconds": 0.362071,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1 saddle-max pairs ...........\u001b[34;1m [0.000s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 4 persistence pairs ..........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.009s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/identity_pd_port_0.vtu'...\n",
+      "vtu_bytes": 3261
+    },
+    "spurious": {
+      "backend": "docker",
+      "seconds": 0.351137,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2 saddle-max pairs ...........\u001b[34;1m [0.000s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 6 persistence pairs ..........\u001b[34;1m [0.000s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.005s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/spurious_pd_port_0.vtu'...\n",
+      "vtu_bytes": 3381
+    }
+  }
+}

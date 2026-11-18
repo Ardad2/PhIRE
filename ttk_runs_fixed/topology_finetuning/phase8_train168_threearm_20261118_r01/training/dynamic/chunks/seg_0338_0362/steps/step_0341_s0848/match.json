@@ -1,0 +1,42 @@
+{
+  "artifact_hashes": {
+    "dynamic_before.npy": "6353b7070b58d3ff2aadfedb37eca0189bb0a64ffbe5dc54458edab2eae9fc64",
+    "feed.npz": "1bca10c097a82ca5521b7093509841ed8bb7e4f116b8b65dec405f6a79787e89",
+    "pd/dynamic_before_pd_port_0.vtu": "32403da4f4dc13185ec3cb5ec2ea8f08a9a0812d1c94a741bc05f1cb297341e8",
+    "vti/dynamic_before.vti": "de6b9c45374d27a84ff040f2464620a7d3c9791a50bef0e0642810f76ed0f629"
+  },
+  "canonical_W22": 32.505499235447644,
+  "matched_squared_cost": 1056.6074809229078,
+  "note": "NEW predicted diagram and NEW matching computed for this update.",
+  "pairs": 2112,
+  "per_dim": {
+    "D0": {
+      "W22": 25.082314822513695,
+      "count_gt": 1192,
+      "count_pred": 1077,
+      "gt_to_diagonal": 353,
+      "matched": 839,
+      "matching_seconds": 0.462264,
+      "sr_to_diagonal": 238
+    },
+    "D1": {
+      "W22": 20.675709508744728,
+      "count_gt": 1014,
+      "count_pred": 1035,
+      "gt_to_diagonal": 225,
+      "matched": 789,
+      "matching_seconds": 0.359586,
+      "sr_to_diagonal": 246
+    }
+  },
+  "prediction_sha256": "6353b7070b58d3ff2aadfedb37eca0189bb0a64ffbe5dc54458edab2eae9fc64",
+  "sample": 848,
+  "ttk": {
+    "backend": "docker",
+    "seconds": 0.314138,
+    "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+    "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1035 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2113 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.007s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+    "vtu_bytes": 98553
+  },
+  "unmapped_raw_pairs": 0
+}

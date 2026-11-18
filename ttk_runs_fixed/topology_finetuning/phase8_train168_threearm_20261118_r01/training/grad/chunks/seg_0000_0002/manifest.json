@@ -1,0 +1,54 @@
+{
+  "arm": "grad",
+  "checkpoint_note": "Full TF1 generator and Adam-slot variables",
+  "complete_optimizer_state": true,
+  "end": 2,
+  "hashes": {
+    "steps/step_0000_s0008/step.json": "ee1a594b1474b0f0103b789761529437ccdf44225125f604f638a29b632cb124",
+    "steps/step_0001_s0176/step.json": "4cf461e1886d930b449c17bc4e9a46e3ec7ecef131b02003518062ab88a96e03",
+    "tf_state.data-00000-of-00001": "ab40c89b8bf7862c9f0551eed93d1396d2f127c0ab6f30cca75d0c093df409da",
+    "tf_state.index": "62c1788ee9bd283595339c0d5249136b06e25b36f2f853ff14d3419d34504482"
+  },
+  "initial_model_digest": "45e1e022f1a20bf38075e96db9ea536035f55b6734fcecf5cbbfd47c70d56008",
+  "model_digest_end": "ebc535f32182e1f92e1a59d2a7a69515884adbbace5b1785241bddf40e960bd5",
+  "plan_sha256": "35937c8a2174ac3f274b33456b34a23a29e783f7a0d2f5af56e862c9a1e6dae1",
+  "previous_manifest_sha256": null,
+  "schema": "phase8-train168-threearm-freshmatch-r01-chunk",
+  "start": 0,
+  "steps": [
+    {
+      "J_frozen_W22_squared": 0.0,
+      "L_grad_after": 0.3356704115867615,
+      "L_grad_before": 0.3358164429664612,
+      "L_uv_after": 0.01996477320790291,
+      "L_uv_before": 0.02001623623073101,
+      "PD_grad_norm_unscaled": 0.0,
+      "arm": "grad",
+      "base_grad_norm": 0.2350284308195114,
+      "combined_grad_norm": 0.2350284308195114,
+      "epoch": 0,
+      "index": 8,
+      "lambda_times_PD_to_base_grad_ratio": 0.0,
+      "match_source": {},
+      "speed_crop_mae_mps_after": 1.0699863591510803,
+      "step": 0
+    },
+    {
+      "J_frozen_W22_squared": 0.0,
+      "L_grad_after": 0.3488427400588989,
+      "L_grad_before": 0.34895357489585876,
+      "L_uv_after": 0.022616123780608177,
+      "L_uv_before": 0.022651802748441696,
+      "PD_grad_norm_unscaled": 0.0,
+      "arm": "grad",
+      "base_grad_norm": 0.18953119218349457,
+      "combined_grad_norm": 0.18953119218349457,
+      "epoch": 0,
+      "index": 176,
+      "lambda_times_PD_to_base_grad_ratio": 0.0,
+      "match_source": {},
+      "speed_crop_mae_mps_after": 0.8710190699007945,
+      "step": 1
+    }
+  ]
+}

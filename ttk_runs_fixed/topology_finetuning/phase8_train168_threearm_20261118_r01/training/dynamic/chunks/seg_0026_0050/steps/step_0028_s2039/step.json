@@ -1,0 +1,58 @@
+{
+  "J_frozen_W22_squared": 196.420166015625,
+  "L_grad_after": 0.27666401863098145,
+  "L_grad_before": 0.27675583958625793,
+  "L_uv_after": 0.017127521336078644,
+  "L_uv_before": 0.01713515631854534,
+  "PD_grad_norm_unscaled": 15738.693359375,
+  "arm": "dynamic",
+  "base_grad_norm": 0.27531740069389343,
+  "combined_grad_norm": 0.3488217294216156,
+  "epoch": 0,
+  "index": 2039,
+  "lambda_times_PD_to_base_grad_ratio": 0.5716563253796579,
+  "match_source": {
+    "artifact_hashes": {
+      "dynamic_before.npy": "01b49a0f3ab3498efd84ca7650dcfe3aff0048797b13034e89c5da3d3c91f487",
+      "feed.npz": "cad35fa711c8b987f18a926c6f59c71a292546fad3aa17614fee223b002dd173",
+      "pd/dynamic_before_pd_port_0.vtu": "10872aa0d73ffe56ec494e9110e94050ee38cf51e3fbd1d98e89a20b46cb94ad",
+      "vti/dynamic_before.vti": "5661ad8b3352362c538e60c6b9dbce2f766d368bd6d71e55d9a8ac78f3d8ca56"
+    },
+    "canonical_W22": 14.01499755488061,
+    "matched_squared_cost": 196.42015855362376,
+    "note": "NEW predicted diagram and NEW matching computed for this update.",
+    "pairs": 1442,
+    "per_dim": {
+      "D0": {
+        "W22": 11.164771354735018,
+        "count_gt": 1118,
+        "count_pred": 761,
+        "gt_to_diagonal": 429,
+        "matched": 689,
+        "matching_seconds": 0.081074,
+        "sr_to_diagonal": 72
+      },
+      "D1": {
+        "W22": 8.471601800120085,
+        "count_gt": 1058,
+        "count_pred": 681,
+        "gt_to_diagonal": 437,
+        "matched": 621,
+        "matching_seconds": 0.059052,
+        "sr_to_diagonal": 60
+      }
+    },
+    "prediction_sha256": "01b49a0f3ab3498efd84ca7650dcfe3aff0048797b13034e89c5da3d3c91f487",
+    "sample": 2039,
+    "ttk": {
+      "backend": "docker",
+      "seconds": 0.344625,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 681 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1443 persistence pairs .......\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.012s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+      "vtu_bytes": 68633
+    },
+    "unmapped_raw_pairs": 0
+  },
+  "speed_crop_mae_mps_after": 0.7734939013794064,
+  "step": 28
+}

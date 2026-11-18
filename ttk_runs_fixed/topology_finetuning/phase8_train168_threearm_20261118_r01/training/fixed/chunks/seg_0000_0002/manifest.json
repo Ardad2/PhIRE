@@ -1,0 +1,58 @@
+{
+  "arm": "fixed",
+  "checkpoint_note": "Full TF1 generator and Adam-slot variables",
+  "complete_optimizer_state": true,
+  "end": 2,
+  "hashes": {
+    "steps/step_0000_s0008/step.json": "a45a4cb44e60143570009a2db560bbcd4c0955d6fe0a5abbae3ce533283dae5a",
+    "steps/step_0001_s0176/step.json": "90fa555e678b93edcfc5b24e6756228504ba0cd6308c681edc9027f783438c98",
+    "tf_state.data-00000-of-00001": "569bc64c990cdf71479dc2087f3ab7ede3b518b90222671810f9644f997272e1",
+    "tf_state.index": "6e04a23c64ab3884cba16fb1e2782072941ba9a2c9214a00b82ea6561d88601b"
+  },
+  "initial_model_digest": "45e1e022f1a20bf38075e96db9ea536035f55b6734fcecf5cbbfd47c70d56008",
+  "model_digest_end": "5f44a47e3f9f7ea465c4244c236893bd8374ec7d7a8131461305d5ae3dd2ade1",
+  "plan_sha256": "35937c8a2174ac3f274b33456b34a23a29e783f7a0d2f5af56e862c9a1e6dae1",
+  "previous_manifest_sha256": null,
+  "schema": "phase8-train168-threearm-freshmatch-r01-chunk",
+  "start": 0,
+  "steps": [
+    {
+      "J_frozen_W22_squared": 944.1846313476562,
+      "L_grad_after": 0.33542951941490173,
+      "L_grad_before": 0.3358164429664612,
+      "L_uv_after": 0.019994568079710007,
+      "L_uv_before": 0.02001623623073101,
+      "PD_grad_norm_unscaled": 25582.13671875,
+      "arm": "fixed",
+      "base_grad_norm": 0.2350284308195114,
+      "combined_grad_norm": 0.385302871465683,
+      "epoch": 0,
+      "index": 8,
+      "lambda_times_PD_to_base_grad_ratio": 1.0884698770080137,
+      "match_source": {
+        "initial_pair_sha256": "4d2dcf87c24f34019d051346116fad2ac08d0845007003d6f83d609af5c55a66"
+      },
+      "speed_crop_mae_mps_after": 1.070588515867712,
+      "step": 0
+    },
+    {
+      "J_frozen_W22_squared": 512.8244018554688,
+      "L_grad_after": 0.3484579920768738,
+      "L_grad_before": 0.3487304151058197,
+      "L_uv_after": 0.022647259756922722,
+      "L_uv_before": 0.022666431963443756,
+      "PD_grad_norm_unscaled": 14906.2138671875,
+      "arm": "fixed",
+      "base_grad_norm": 0.18978582322597504,
+      "combined_grad_norm": 0.2491043508052826,
+      "epoch": 0,
+      "index": 176,
+      "lambda_times_PD_to_base_grad_ratio": 0.785422936961888,
+      "match_source": {
+        "initial_pair_sha256": "1897bcd9dea3bfd1bf64655a325ca828b4a3b89e8b50aae5c50981c061d20314"
+      },
+      "speed_crop_mae_mps_after": 0.8713976402374101,
+      "step": 1
+    }
+  ]
+}

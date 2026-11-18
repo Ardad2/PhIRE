@@ -1,0 +1,35 @@
+{
+  "W22": 20.67308637707457,
+  "caveat": "Passing validates a frozen, locally matched surrogate gradient; no optimization improvement claim.",
+  "checkpoint_hashes": {
+    "/home/adadhwal/PhIRE/models/wind_mr-hr/trained_cnn/cnn.data-00000-of-00001": "cd0909314dee5c9fdf474de061424eb6fff5b7e1e228522c213475489b5ca98e",
+    "/home/adadhwal/PhIRE/models/wind_mr-hr/trained_cnn/cnn.index": "e5ee08bd24450fb95987867bae76c00e53077de6dbd7f76de579e5316bd20ce2"
+  },
+  "elapsed_seconds": 1.131571,
+  "generator_weight_grad_global_norm": 12975.7861328125,
+  "gudhi_W22_squared": 427.37650085223095,
+  "max_abs_gt_speed_change": 2.384185791015625e-07,
+  "max_abs_pred_speed_change": 0.0,
+  "max_abs_tf_vs_numpy_grad": 4.76837158203125e-07,
+  "no_optimizer": true,
+  "no_weights_written": true,
+  "normalized_uv_loss": 0.013026410713791847,
+  "sample_index": 0,
+  "schema": "phase8-tf1-gradient-check-v1",
+  "source_hashes": {
+    "/home/adadhwal/PhIRE/PhIREGANs.py": "516ce202968ab6c566bd83f9fc4dca44e434d7376a3fb622f4a6b78d3c620f48",
+    "/home/adadhwal/PhIRE/phase6_lxxvii_update/scripts/phase6_pilot_pd_gudhi_gate.py": "ad11e7802672d0a11c2f7f839e62623bca95afd338d4144ab3bf2bc1df9bc1fe",
+    "/home/adadhwal/PhIRE/phase8_matching_vertex_gradient_gate_20261116.py": "30d93dfc4f2ece61d1dc5611bdb61ce209f0f2ff8686079fd2ff99d0a60855c5",
+    "/home/adadhwal/PhIRE/phase8_tf1_dynamic_single_batch_gate_20261116_v2.py": "70589d22790d9281c4887f33c5dd8ea6c416aab5750ec285a32a5cc2ae0d59c6",
+    "/home/adadhwal/PhIRE/phase8_ttk_w22_timing_pilot_20261116.py": "a4ba4e9d6d22eb30ff830312db10e78e2e5a86492dc325e09369517dd67f900a",
+    "/home/adadhwal/PhIRE/scripts/extract_ttk_pd_critical_pairs.py": "c31dfc567ba1a6831203289ad65cbbbad036f407d10063e65127f75f0a6dca91",
+    "/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py": "7ac9453799044985a0d79a62729036979eb4b7e12e0033fdb5b0ec4d91ba726a",
+    "/home/adadhwal/PhIRE/sr_network.py": "972bd9d3adce4744a7b74eee715256357c3117eef0045aae43a561c38af14976",
+    "/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py": "04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6c"
+  },
+  "status": "PASS_FORWARD_MATCH_GATHER_GRAD_NO_TRAIN",
+  "tf_J": 427.37646484375,
+  "tf_to_normalized_uv_loss_ratio": 32808.459232078465,
+  "upstream_forward_sha256": "c1a68ec480fe6c7643d33eb73f5278c6c1d1d8f82f1493793726ee766702a90d",
+  "upstream_match_sha256": "14f2584fced4de16e526b136a916b339d3c55347f96f5b0fbc62035ee6475b52"
+}

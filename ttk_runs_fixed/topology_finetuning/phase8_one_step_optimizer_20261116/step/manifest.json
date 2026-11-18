@@ -1,0 +1,85 @@
+{
+  "arms": {
+    "baseline": {
+      "initial": {
+        "J_frozen": 427.37646484375,
+        "L_grad": 0.19142979383468628,
+        "L_uv": 0.013026410713791847,
+        "PD_grad_norm_unscaled": 12975.7861328125,
+        "base_grad_norm": 0.17414306104183197,
+        "base_loss": 0.02259790152311325,
+        "dynamic_grad_norm": 0.21124672889709473,
+        "dynamic_loss": 0.026871666312217712
+      },
+      "max_abs_change_in_speed": 0.01811695098876953,
+      "post": {
+        "J_frozen": 426.4759521484375,
+        "L_grad": 0.19126155972480774,
+        "L_uv": 0.012998665682971478,
+        "PD_grad_norm_unscaled": 13310.642578125,
+        "base_grad_norm": 0.1674087792634964,
+        "base_loss": 0.02256174385547638,
+        "dynamic_grad_norm": 0.19677510857582092,
+        "dynamic_loss": 0.02682650275528431
+      }
+    },
+    "dynamic": {
+      "initial": {
+        "J_frozen": 427.37646484375,
+        "L_grad": 0.19142979383468628,
+        "L_uv": 0.013026410713791847,
+        "PD_grad_norm_unscaled": 12975.7861328125,
+        "base_grad_norm": 0.17414306104183197,
+        "base_loss": 0.02259790152311325,
+        "dynamic_grad_norm": 0.21124672889709473,
+        "dynamic_loss": 0.026871666312217712
+      },
+      "max_abs_change_in_speed": 0.03227341175079346,
+      "post": {
+        "J_frozen": 424.4991455078125,
+        "L_grad": 0.19118742644786835,
+        "L_uv": 0.013009374029934406,
+        "PD_grad_norm_unscaled": 13006.3779296875,
+        "base_grad_norm": 0.1696629524230957,
+        "base_loss": 0.02256874553859234,
+        "dynamic_grad_norm": 0.19998346269130707,
+        "dynamic_loss": 0.02681373804807663
+      }
+    }
+  },
+  "checkpoint_hashes": {
+    "/home/adadhwal/PhIRE/models/wind_mr-hr/trained_cnn/cnn.data-00000-of-00001": "cd0909314dee5c9fdf474de061424eb6fff5b7e1e228522c213475489b5ca98e",
+    "/home/adadhwal/PhIRE/models/wind_mr-hr/trained_cnn/cnn.index": "e5ee08bd24450fb95987867bae76c00e53077de6dbd7f76de579e5316bd20ce2"
+  },
+  "elapsed_seconds": 9.507447,
+  "initial_parameter_sha256": "45e1e022f1a20bf38075e96db9ea536035f55b6734fcecf5cbbfd47c70d56008",
+  "lambda_dynamic_squared_W22": 1e-05,
+  "lambda_grad": 0.05,
+  "learning_rate": 1e-06,
+  "limitations": [
+    "Frozen matching and critical vertices held fixed for ONE optimizer step",
+    "Not a run of fully dynamic re-matching during training",
+    "No data split conclusion from one training sample",
+    "Raw W22 squared was not pruned or divided by number of diagram pairs",
+    "True poststep W22 must be recomputed using --mode compare in gudhi-audit"
+  ],
+  "model_checkpoint_written": false,
+  "n_optimizer_updates_per_arm": 1,
+  "n_training_samples": 1,
+  "no_heldout_samples": true,
+  "output_hashes": {
+    "baseline_speed_after.npy": "db24ea8cbe16571fd6806341f93f4a2b9da32c680d030613a60633300fa9757e",
+    "dynamic_speed_after.npy": "ee980472ab84d42eb971afb2c807756ed153b4d4f560ae1da623f66c26ae0df7"
+  },
+  "schema": "phase8-frozen-matching-one-step-v1",
+  "source_hashes": {
+    "new_script": "4a0feb931c0bf07d8c31309e3b78932550cecc51a4241a998e607dc8ed80e282",
+    "upstream_feed": "7f6225a3198377b3af7bca469637fed87dd9437e0c7ccd363291ec93d787d42a",
+    "upstream_forward_manifest": "c1a68ec480fe6c7643d33eb73f5278c6c1d1d8f82f1493793726ee766702a90d",
+    "upstream_match_manifest": "14f2584fced4de16e526b136a916b339d3c55347f96f5b0fbc62035ee6475b52",
+    "upstream_tfcheck_report": "3c8b9bd278c3c170e362c65abb87e46c11c87fb057d02890fabc7f7fffccade1",
+    "v2_script": "70589d22790d9281c4887f33c5dd8ea6c416aab5750ec285a32a5cc2ae0d59c6"
+  },
+  "status": "ONE_STEP_COMPLETED_TRUE_W22_NOT_YET_EVALUATED",
+  "train_sample_index": 0
+}

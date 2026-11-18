@@ -1,0 +1,1554 @@
+{
+  "arm": "dynamic",
+  "checkpoint_note": "Full TF1 generator and Adam-slot variables",
+  "complete_optimizer_state": true,
+  "end": 434,
+  "hashes": {
+    "steps/step_0410_s1748/dynamic_before.npy": "4beb8f02ba09e72ee8e0c49413fd83abc9d67695ccaf93b81fe8e90f249412a9",
+    "steps/step_0410_s1748/feed.npz": "ba3bcbd5a91da0f36e1f96f49cfe315569e35d35477f67ed9bb9794bedb738e3",
+    "steps/step_0410_s1748/match.json": "2e0da78c7db1dcf89383b65c1afa20f3d8d44a54c690bcb43aa1d5cc81aad2a1",
+    "steps/step_0410_s1748/pd/dynamic_before_pd_port_0.vtu": "29ecb184a6b812266c78848299d014dda2dda2bedc93a277c321a05ae4cda702",
+    "steps/step_0410_s1748/step.json": "e926dd0877dd71279a138abb4bbff5ffbd478c306b9e6471159b75fe09cb1089",
+    "steps/step_0410_s1748/vti/dynamic_before.vti": "ab4288872b7f766c5062f7d41df814f69895f10a0eb8295f6ddaaf031b694557",
+    "steps/step_0411_s1923/dynamic_before.npy": "72e58cbcbb99d79c94903e5a70cfdf8b7d3ab6e0f505638e03373bb86a67c3d5",
+    "steps/step_0411_s1923/feed.npz": "746628b45f6019d5eed9cd9fab76b9398ff9d1bb1cb96a9c384541ca419f1182",
+    "steps/step_0411_s1923/match.json": "ee55161d18caea607b01c0322ecff6f2d464a9cf3ca9e6e2a15858e48da711eb",
+    "steps/step_0411_s1923/pd/dynamic_before_pd_port_0.vtu": "c8d84133101915f6234a072e7250923f0c6c1eb90c5a1d4c580f55438421a933",
+    "steps/step_0411_s1923/step.json": "0a5d0b0ff505d016efb767b6390b906b767e684927a129313e4d4eadacc73dcf",
+    "steps/step_0411_s1923/vti/dynamic_before.vti": "e07b46c3bf9a0175034b33899f2005bf1e800b313143812bc65c9492529ed128",
+    "steps/step_0412_s2084/dynamic_before.npy": "5f157a5067e2bb7d2388d6f65f5a28c5a446291be05e49f88174e2c6ef31850c",
+    "steps/step_0412_s2084/feed.npz": "36deeebcec10055e19f2a6c51639684ba0f02483c5dd36573a2c4b368b41ddc4",
+    "steps/step_0412_s2084/match.json": "c1b70a8bc6f45741afaa95a60b8c6ba85bf9c56c0881f3b2d064a74b5ddf59d8",
+    "steps/step_0412_s2084/pd/dynamic_before_pd_port_0.vtu": "a3e90c49af8381ba24018a239b0a2ad4ad030eb56d5ba1699470c203c48a9ee3",
+    "steps/step_0412_s2084/step.json": "61a81e9e97a60d1a87103160db71dd5994ca27bb4171b4dec64e4877d9e86864",
+    "steps/step_0412_s2084/vti/dynamic_before.vti": "c57ace5204c3e39d1e865fc76201054b9c11e31d008524aeda24e2251e7e13ba",
+    "steps/step_0413_s2259/dynamic_before.npy": "cc363a606989caaf49a29e6ced8bb8ab9854ce0328fefcd5fb18260faf8fafa5",
+    "steps/step_0413_s2259/feed.npz": "ac985d73898570e7394a355aa6a226324f3bb9a8f333d63f643fdbaa39718425",
+    "steps/step_0413_s2259/match.json": "f7140f603925a8e8a481c98e699b574ed6461335574e80a28f74a7bdea3f9494",
+    "steps/step_0413_s2259/pd/dynamic_before_pd_port_0.vtu": "9766aebacbcd54b01c9b780b96696d2e9836f04384236c22d930894330e20228",
+    "steps/step_0413_s2259/step.json": "060e1a170dfbec7704c574b82a0b04a7480a1f9103c1eacdc8b6c05a312df6c3",
+    "steps/step_0413_s2259/vti/dynamic_before.vti": "2bc7e1752f2595af5906ed099bc03a05ccca8bd84685dd1b5b61fe4215d26384",
+    "steps/step_0414_s2420/dynamic_before.npy": "16646d85b98d5ecb7f0aedf93b2e520b351234db71b93a674480899d7b32b6e2",
+    "steps/step_0414_s2420/feed.npz": "db3d86de305d4a42ebb7e3207bc018fbf33cdd9bbb38163a0b4bf78b6367db26",
+    "steps/step_0414_s2420/match.json": "2f19994b05c2b68abd74dd029acd810ae51da5458dd909632962c5187d78a3b2",
+    "steps/step_0414_s2420/pd/dynamic_before_pd_port_0.vtu": "8d3ead995a80ae3ee5a7f2757e5ebe49c25d8b07ef39b4ed0e7315361f3d4b13",
+    "steps/step_0414_s2420/step.json": "a648bd5de3895edae7cab399eaf13ca38adc4ff1ea0b0e7a212fc6819a1b5bae",
+    "steps/step_0414_s2420/vti/dynamic_before.vti": "9bab8851bf684d7911a102b5438a80ac208aab8d6b90cf63eb24d64d80c75902",
+    "steps/step_0415_s2595/dynamic_before.npy": "20a2b5ceb74eb1cb2c83571d9cc271ada0fa6d6eb09a072a3f8adc2b9d155913",
+    "steps/step_0415_s2595/feed.npz": "b3972a9a1dcf3e13306e98fd5b40f277191e427bf2e41fb8d2d89e03d43cedbd",
+    "steps/step_0415_s2595/match.json": "b038848f98fa7a0e784f98629211b542674bea844a4af6e686a8a0decff79e14",
+    "steps/step_0415_s2595/pd/dynamic_before_pd_port_0.vtu": "06a4dec2659bc0a6ec596df531e9723991b07ccb4fb3ae8d3f41d76fe41b1771",
+    "steps/step_0415_s2595/step.json": "7c34e61fb8e8c8cc19b47ac9829c3efce342894985d88d9d698745002129ac94",
+    "steps/step_0415_s2595/vti/dynamic_before.vti": "5c6c3e5e4735106e647360ca21aa6590492953f575ef2320c226ebb2ff028a0e",
+    "steps/step_0416_s0084/dynamic_before.npy": "323491caf46286b13479784d30cbc92f032c51bca90c0247a9e8cbbbcd112913",
+    "steps/step_0416_s0084/feed.npz": "28ee73acc3acd8a627897aa8048cf960d71fe5a6b017f3c4e7776422167d63af",
+    "steps/step_0416_s0084/match.json": "c46f9c96f3108f23ca58d0ec05db0edd065a66e94a66383ad0d2aaabdfef5547",
+    "steps/step_0416_s0084/pd/dynamic_before_pd_port_0.vtu": "b79fd3422f89c1250627ac47649f66a32cd0f6114fc3bc2d0073266aec9d792a",
+    "steps/step_0416_s0084/step.json": "300c3abdd7dad56304175dde57a967e116006da913e605c20dceb589bfebdb74",
+    "steps/step_0416_s0084/vti/dynamic_before.vti": "b7cc6722b5ef4155d82d805c6d1e20587422f794242e4af06f6a852af8d800af",
+    "steps/step_0417_s0260/dynamic_before.npy": "1e14da8b53ddc3ddbca8dd54fd2251e31f5fdb60b78ba7bba61a3d51c0216c3b",
+    "steps/step_0417_s0260/feed.npz": "3a870dc2e684aed721b9034daa101ad0fb2aca5b97b996578b98b2b2231d5a85",
+    "steps/step_0417_s0260/match.json": "c1a7893fdf388b74fa9578d4151d27fb441c7a0bb9cf6472019adc067681efa2",
+    "steps/step_0417_s0260/pd/dynamic_before_pd_port_0.vtu": "0a4be376755b8197683b9c917dcb8b6a39eb98332c850bb47eec148a3f64c316",
+    "steps/step_0417_s0260/step.json": "8b710de68eea1be0e70748a71c24bcf32e894109fa994a373c23ff9bc52f74ba",
+    "steps/step_0417_s0260/vti/dynamic_before.vti": "3026e24c7224f6f7cc5a9833d83f68ebdb248b0d331a625e72bdf2f0206a64f8",
+    "steps/step_0418_s0420/dynamic_before.npy": "0f2757e99fbbf1e6702289287b792d304131e37f11440fd5f70f9f10dda5883a",
+    "steps/step_0418_s0420/feed.npz": "745df279490edd8c8fc4504698aa5a10eb864cf78d8f19287929b6accbc46e1e",
+    "steps/step_0418_s0420/match.json": "68ff7e484c65d47a103e9150ba3adfee00725caa218e64fac56e90449efe126a",
+    "steps/step_0418_s0420/pd/dynamic_before_pd_port_0.vtu": "1d299c545170ee4a48f87613d16fb7de28831c23d42212a712c44d178527c78a",
+    "steps/step_0418_s0420/step.json": "7a314d6a3062c80f670a6323b1b12b8a70b9f1f18d59dd666c32cd4720894a1f",
+    "steps/step_0418_s0420/vti/dynamic_before.vti": "daedf5a9689b158303756e6a0daaf628cad58e55dcfb99552a2ed22ebf94588e",
+    "steps/step_0419_s0596/dynamic_before.npy": "41ace02459f3f35354fcccd0a5a30e1a7b4ea14c8a6aa0b7e9e323ccb19b518d",
+    "steps/step_0419_s0596/feed.npz": "0f01628b3539b3b58d6f135f9e97938a8c06f80c5c8ba6b048dc759651dd3891",
+    "steps/step_0419_s0596/match.json": "fdece3890abdecd21b67b8e3a391e430e07fe45545de83606e8ed20013202e2c",
+    "steps/step_0419_s0596/pd/dynamic_before_pd_port_0.vtu": "2f4b8f7aa60c3ef371d98f81b3157bd91488391d56eb9f3de62b349d4442650e",
+    "steps/step_0419_s0596/step.json": "3138890f028f8aefee13c620736fd862639f601603a651a67f87c95b3747d5ce",
+    "steps/step_0419_s0596/vti/dynamic_before.vti": "4a493183fa1301cbed54e393e6711a6afe463b3bba4423f2ce84983c7fbc09fc",
+    "steps/step_0420_s0756/dynamic_before.npy": "98f59fde1758f0effcd4bafb8202a06d834886d495fedb99f2e088669274eb16",
+    "steps/step_0420_s0756/feed.npz": "2222130ed6044aea6329cba2589947915b730807f321df119508861764113c89",
+    "steps/step_0420_s0756/match.json": "5ac1071c68577a07ca63fc4be9683b8e17de5e4b41c3d8f0fbdc6af917267e6b",
+    "steps/step_0420_s0756/pd/dynamic_before_pd_port_0.vtu": "00f7e490c0de5e88a1b8dbd3f4a1d7cda4f980dafdb99277fbc7d87f93b4a292",
+    "steps/step_0420_s0756/step.json": "3cb2633f9db9461283bf0429850a8eab95104cb3f1e2270e0771bdc716cd7376",
+    "steps/step_0420_s0756/vti/dynamic_before.vti": "8c136cb4172093ad500b46205b0b6e2a91a50590614754064caf996897414880",
+    "steps/step_0421_s0932/dynamic_before.npy": "e30a8d6ed84ee76f084a5cc92770e9db590b2eddc3d77053604f6b8e22207f27",
+    "steps/step_0421_s0932/feed.npz": "04af0152cd77a8bf173c521a9acf15555064b2ef3ea14b2c0be8cb0456d5105d",
+    "steps/step_0421_s0932/match.json": "dfdc0a619f4abd56b08878295eeedd8a3c169bc75af9ce6a0f5fe754def8d5e3",
+    "steps/step_0421_s0932/pd/dynamic_before_pd_port_0.vtu": "ec05484b8692d3402c19fedd7ca55e66fc7c45ab49e322e66791c1a6177bb51e",
+    "steps/step_0421_s0932/step.json": "6ba6b2861d1a351d9cbee8ed6e9cb1cbeb2f97644743a7558393fcd0f0b06a3a",
+    "steps/step_0421_s0932/vti/dynamic_before.vti": "085662d1d8d035d608760e94ed35d818f0de88bfa432fd23870aa2a3791732d2",
+    "steps/step_0422_s1092/dynamic_before.npy": "0f18504c7c6ea7b00bac3ad547e771732a29c62711234ba5010e40a0769a9515",
+    "steps/step_0422_s1092/feed.npz": "5c67a85d12b228f0f6be8ba8364171400d397a6eab59cfbed4199d4bda174af7",
+    "steps/step_0422_s1092/match.json": "0c73ed148d635313178bdfe8b8d9c333347f31276db5387968a4045b5920c427",
+    "steps/step_0422_s1092/pd/dynamic_before_pd_port_0.vtu": "b8832190a401a83316d79c9f584d0e7e494ae98f5ded34148fb5d1baa477d04d",
+    "steps/step_0422_s1092/step.json": "ceb5363c36d6af9e5c7924cbda36a7534793fb3ae10fc5cf902be3c1347c96da",
+    "steps/step_0422_s1092/vti/dynamic_before.vti": "6e85d4f233f2c253d9c45da813fd92ccf8bca0c52f37da06986bedbb05db57ca",
+    "steps/step_0423_s1268/dynamic_before.npy": "fb076154bf25dda96fed141731999dcb0eb4857d999ba9051b500b91295039c8",
+    "steps/step_0423_s1268/feed.npz": "67e48ddeeddb6341734c52bca8f1311e1b74895628341989397c5498769a1dea",
+    "steps/step_0423_s1268/match.json": "16308a07b161d366ee43162d9ba046f5ab0cdbacbb6bb9b01eed6f5b229f6625",
+    "steps/step_0423_s1268/pd/dynamic_before_pd_port_0.vtu": "e152d21b5d0be0a3f48e6d9c4f3ba4b6f2bb807d856c330968aa0266b21f0a05",
+    "steps/step_0423_s1268/step.json": "eb2497a6294371256da9dea3c66a3e72a98eec5ec5bdb2a6afb13215d63106a1",
+    "steps/step_0423_s1268/vti/dynamic_before.vti": "88c04732812c79661def7934e372728f97c2f5729070214117c8bd12efaebadf",
+    "steps/step_0424_s1428/dynamic_before.npy": "92eaa70d4582711ad58dcfec285085e6f7acec8ba86656c041868c8df4207df2",
+    "steps/step_0424_s1428/feed.npz": "ef67dc9d29f432cde05afa0d12f6c719cbd6976510cbb539359558a8be306c3c",
+    "steps/step_0424_s1428/match.json": "4a5c3ef8dbeca29887e6ecac22281560c2d5b5a460c77a599d1497287205bc6b",
+    "steps/step_0424_s1428/pd/dynamic_before_pd_port_0.vtu": "11c058fb90894ebbd9abbdd59bf79aec28c3dd4eee969b1cb5c035609bb16879",
+    "steps/step_0424_s1428/step.json": "f9ae2cab29036effe8aa915da99c9ad17e7b7679c8aec0a7cd7dbe5b9f85ecc5",
+    "steps/step_0424_s1428/vti/dynamic_before.vti": "7b0e6419f25db646d91db636e7eb2d3b377b6c6c220c7c7afca8540413d38c14",
+    "steps/step_0425_s1604/dynamic_before.npy": "625c012335cb32c18b00349080259a0e71e06cbee8b7ad6bba9624fc59b60c7d",
+    "steps/step_0425_s1604/feed.npz": "2f613ff8ec59d46c6dd695022f459d407b4b56017a4325fffd03e1ad42d1cf9f",
+    "steps/step_0425_s1604/match.json": "d4717e5bfd0ab09609ade0e78973e896c541f6874166723808105d191b50838d",
+    "steps/step_0425_s1604/pd/dynamic_before_pd_port_0.vtu": "c63fb6f28cc645d29b90b5fe96de97d6de9900d8642f44ef70000c2e7c6638ba",
+    "steps/step_0425_s1604/step.json": "773add53a16a70b7885a716aebe3cbaa8e76311f5e506146a29ba5feb08f8e67",
+    "steps/step_0425_s1604/vti/dynamic_before.vti": "0826df30af09f06664536fe86708f129c8bee3e441ddbf071295da86a192b775",
+    "steps/step_0426_s1764/dynamic_before.npy": "4050ebd338ce4700be6c7bbf559344caa018680e3c772b826112a05b2c778cdd",
+    "steps/step_0426_s1764/feed.npz": "69a53f0c0c10d1713434c0f31dc6dca3e215a237a223244375692ac6dd871857",
+    "steps/step_0426_s1764/match.json": "62bb4386d3a4bae727168536dcf6e0fc54b50248def422a54f0b810bcd125c7b",
+    "steps/step_0426_s1764/pd/dynamic_before_pd_port_0.vtu": "c43e480e4ef578511a5db0f9c4008ec454c333ff1c4b14bc5e6f8c765d33742a",
+    "steps/step_0426_s1764/step.json": "d0d2c694e82ca21367e79c6ac41b99b27307062798445dfd43476744b34a24ad",
+    "steps/step_0426_s1764/vti/dynamic_before.vti": "c10c4507464afbab29c613db1c6f8bdb6424ccdf092283bc9ad9fa8b03566c7a",
+    "steps/step_0427_s1940/dynamic_before.npy": "85e4266f90637481b88d96264b8b8c6fea14ed1288bd9db355b643d2dabcea50",
+    "steps/step_0427_s1940/feed.npz": "ab9eb459711fb284c9434663a3e09ca03869e0f171ecc636c038d738d4bb4967",
+    "steps/step_0427_s1940/match.json": "6731c7086b17b5fe8029cdedc00650538ebeffab84952a845073fbdfb87669d5",
+    "steps/step_0427_s1940/pd/dynamic_before_pd_port_0.vtu": "caea8eba7029da39c26f62618b3853cdb5db301cdf2118c32d407504f140119c",
+    "steps/step_0427_s1940/step.json": "bd6c1d085579f2297c3ecdc00ac26894ea6216a59ee88d310e4662417d00df97",
+    "steps/step_0427_s1940/vti/dynamic_before.vti": "0d52e5fc09d32b6d5d4489cdd857cf7030d76c655c8f6bd72aedbe81d85555b9",
+    "steps/step_0428_s2100/dynamic_before.npy": "750da2b5c11b5de2fddee217e70c0b632482f9d3ff2cb6dd2b6b734822934ca3",
+    "steps/step_0428_s2100/feed.npz": "40b123f3d67d48ebb2209c8f4b864478cd31cc092deeca20fa9e3150047f9a89",
+    "steps/step_0428_s2100/match.json": "040e44a787ae5b05e2b96772053fc17ac18d48b901aeca530097dedaf4d5f2dd",
+    "steps/step_0428_s2100/pd/dynamic_before_pd_port_0.vtu": "2e585348b87347989fc5c8648be8cf5ee35fe12e80e928167ee4306a2a7fd91c",
+    "steps/step_0428_s2100/step.json": "640e3cc30a63e985cacbf0f96e63f567a374b59f58b60076dcdc76a91b743ada",
+    "steps/step_0428_s2100/vti/dynamic_before.vti": "1f5ad607769c04762796845cbc52601b69b94de8e35205e523a0bc573e58dea3",
+    "steps/step_0429_s2276/dynamic_before.npy": "a34d1b8118507404819aab7dc690d01ed547868b6ec2ecba8636f088592618c1",
+    "steps/step_0429_s2276/feed.npz": "5d889d496de83a47788a7efc39f7ba11282035dec28946d604c77ffc95990da5",
+    "steps/step_0429_s2276/match.json": "fdc7314778ba1412de2d6949db7e3e8a01fd099e3e3df532749abf875a8bb889",
+    "steps/step_0429_s2276/pd/dynamic_before_pd_port_0.vtu": "d8439175b23a385873971369a88e871d59018011fe18a43a02ed84923adaeb6a",
+    "steps/step_0429_s2276/step.json": "5b837bd5da1fcb9413e1ea9f250f8ff627106dc919a1c21a997889c9bfda511f",
+    "steps/step_0429_s2276/vti/dynamic_before.vti": "f643bdf8fe89a3408442b0dd9b5afe49fac069fcdd0c4c12e47fa50e179eefa1",
+    "steps/step_0430_s2436/dynamic_before.npy": "9ff7a6ebca91d56dec0e058b5bb0eab1573e379cb869ad03eae80422a00bf01a",
+    "steps/step_0430_s2436/feed.npz": "2ef4ff4911f8defc97f587ac8b52c1a67b7f770304192497158c5394efb6a926",
+    "steps/step_0430_s2436/match.json": "71c85e9446f155437a4ada3736b35958e708f51a1148605ae02f6c6d4ee67cf2",
+    "steps/step_0430_s2436/pd/dynamic_before_pd_port_0.vtu": "c586735b0b5062e781fb860569bb55ac58ed49a790f9ae1f15f1b9af56992e9c",
+    "steps/step_0430_s2436/step.json": "520dd718d289ec4c2bdd959a22ba252f18d390f8c71cf70be13a91d684440df3",
+    "steps/step_0430_s2436/vti/dynamic_before.vti": "a00e3d57fb6893a1142eaa2105c51ef6b582b100c59764c64a7731ad743a522d",
+    "steps/step_0431_s2612/dynamic_before.npy": "7495f2575e6dd7d8d62120d6522290d38486a51fefac1e88dd95c7536ceb75e1",
+    "steps/step_0431_s2612/feed.npz": "fd3a28b42c249dd06bcf35f58889732b10d23b2823f1de2709826ac68386cd1d",
+    "steps/step_0431_s2612/match.json": "798d450726f472a86abb15361e62f4e7ca2a08e1d66558c169dbc20b6b8b4974",
+    "steps/step_0431_s2612/pd/dynamic_before_pd_port_0.vtu": "2a789ea19a11aca22c54e3e2e0cd696767f3fc3e949c276d76120923e1ecb5dd",
+    "steps/step_0431_s2612/step.json": "9cd3d4a8ba811d432a622ef3179dc3e8a4707db32a022d768bd9a5e0da431a3e",
+    "steps/step_0431_s2612/vti/dynamic_before.vti": "3ca558cedac1b9dcb8d5305ec60982220b41432aad3a9ce198304ffdeeeb3c59",
+    "steps/step_0432_s0099/dynamic_before.npy": "e620591b25365e21017944217e2d1ba0f528ff2ebacd54abe6f72f2516b6fcb2",
+    "steps/step_0432_s0099/feed.npz": "aa9be6a6eed154a152a852e821593f1f974ac48bb5bb0917206e45dc1ab9f67e",
+    "steps/step_0432_s0099/match.json": "0b091169803fd6209718393c06693c6e29f31a30d57c8ecc5b26a64a1a7a4287",
+    "steps/step_0432_s0099/pd/dynamic_before_pd_port_0.vtu": "7f174081c41d29364b7dae3f7ae0a1b98566099dc17c232d28c8cefd3dc9581a",
+    "steps/step_0432_s0099/step.json": "7e822094a6eccffe4e18edccefdb7c61b99c05eddc3df538d90297e62c22875a",
+    "steps/step_0432_s0099/vti/dynamic_before.vti": "29af90b4a4e5d855df22c31e53f42be60ef22c11b9666615a53b7d11933678e6",
+    "steps/step_0433_s0277/dynamic_before.npy": "a7b1fe3a78d4f5b642575d526d368cbbf7d23653aaf4d409b0728409980c9eeb",
+    "steps/step_0433_s0277/feed.npz": "cfcd20500a1e9d93e7d475703010f979a5d4ef5cd6033d33fa6b201d36fe93a2",
+    "steps/step_0433_s0277/match.json": "d326d8c1cf17760460bb2b0558636c697764f6ddffbdcebfa9feb9bb8ab95fa2",
+    "steps/step_0433_s0277/pd/dynamic_before_pd_port_0.vtu": "8b7c12eecbea97a4ed1a130d99b4bb99a753f8c305b0a95ee960d11c8ccfdbac",
+    "steps/step_0433_s0277/step.json": "7f8a9d4014b0b09e7f3981dcf6cda0939de03d359151b20489333cbcebab4c90",
+    "steps/step_0433_s0277/vti/dynamic_before.vti": "86de7dd7fee700ade3ff68148a6fcf83c44c475f91179d097f742ecd82718e8b",
+    "tf_state.data-00000-of-00001": "9c36fdcc0668e9a170ef632d3c0a05b4c3cb0ec02378133b2989bbb1a0d203c2",
+    "tf_state.index": "d43c9d4c86418c2cf56f5be5af0526139bae8b0eb8dffbcf60bf87d9c5d8f2b3"
+  },
+  "initial_model_digest": "45e1e022f1a20bf38075e96db9ea536035f55b6734fcecf5cbbfd47c70d56008",
+  "model_digest_end": "888e4352dd8a358a713fd844593461864ee8f5f14e1662bc6deb15f03fc6d417",
+  "plan_sha256": "35937c8a2174ac3f274b33456b34a23a29e783f7a0d2f5af56e862c9a1e6dae1",
+  "previous_manifest_sha256": "3a3658a87223ea8b5ec9f08b394a38b4440818ab86f858b6565af036b413a02c",
+  "schema": "phase8-train168-threearm-freshmatch-r01-chunk",
+  "start": 410,
+  "steps": [
+    {
+      "J_frozen_W22_squared": 484.9112548828125,
+      "L_grad_after": 0.27866458892822266,
+      "L_grad_before": 0.27872827649116516,
+      "L_uv_after": 0.026411941275000572,
+      "L_uv_before": 0.026417715474963188,
+      "PD_grad_norm_unscaled": 27672.90625,
+      "arm": "dynamic",
+      "base_grad_norm": 0.22470955550670624,
+      "combined_grad_norm": 0.4120388329029083,
+      "epoch": 2,
+      "index": 1748,
+      "lambda_times_PD_to_base_grad_ratio": 1.2314966396332945,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "4beb8f02ba09e72ee8e0c49413fd83abc9d67695ccaf93b81fe8e90f249412a9",
+          "feed.npz": "ba3bcbd5a91da0f36e1f96f49cfe315569e35d35477f67ed9bb9794bedb738e3",
+          "pd/dynamic_before_pd_port_0.vtu": "29ecb184a6b812266c78848299d014dda2dda2bedc93a277c321a05ae4cda702",
+          "vti/dynamic_before.vti": "ab4288872b7f766c5062f7d41df814f69895f10a0eb8295f6ddaaf031b694557"
+        },
+        "canonical_W22": 22.020701075369658,
+        "matched_squared_cost": 484.91127446460564,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2057,
+        "per_dim": {
+          "D0": {
+            "W22": 16.022798309470154,
+            "count_gt": 1338,
+            "count_pred": 1135,
+            "gt_to_diagonal": 346,
+            "matched": 992,
+            "matching_seconds": 0.21578,
+            "sr_to_diagonal": 143
+          },
+          "D1": {
+            "W22": 15.105668147580472,
+            "count_gt": 1128,
+            "count_pred": 922,
+            "gt_to_diagonal": 401,
+            "matched": 727,
+            "matching_seconds": 0.25361,
+            "sr_to_diagonal": 195
+          }
+        },
+        "prediction_sha256": "4beb8f02ba09e72ee8e0c49413fd83abc9d67695ccaf93b81fe8e90f249412a9",
+        "sample": 1748,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.318622,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 922 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2058 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.007s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 96301
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.2169946231355424,
+      "step": 410
+    },
+    {
+      "J_frozen_W22_squared": 212.83729553222656,
+      "L_grad_after": 0.2532866299152374,
+      "L_grad_before": 0.2533160448074341,
+      "L_uv_after": 0.016927586868405342,
+      "L_uv_before": 0.016929468140006065,
+      "PD_grad_norm_unscaled": 20801.900390625,
+      "arm": "dynamic",
+      "base_grad_norm": 0.14785727858543396,
+      "combined_grad_norm": 0.20504960417747498,
+      "epoch": 2,
+      "index": 1923,
+      "lambda_times_PD_to_base_grad_ratio": 1.406890522376643,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "72e58cbcbb99d79c94903e5a70cfdf8b7d3ab6e0f505638e03373bb86a67c3d5",
+          "feed.npz": "746628b45f6019d5eed9cd9fab76b9398ff9d1bb1cb96a9c384541ca419f1182",
+          "pd/dynamic_before_pd_port_0.vtu": "c8d84133101915f6234a072e7250923f0c6c1eb90c5a1d4c580f55438421a933",
+          "vti/dynamic_before.vti": "e07b46c3bf9a0175034b33899f2005bf1e800b313143812bc65c9492529ed128"
+        },
+        "canonical_W22": 14.588942984409089,
+        "matched_squared_cost": 212.83725832465817,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 1724,
+        "per_dim": {
+          "D0": {
+            "W22": 12.266015729939474,
+            "count_gt": 985,
+            "count_pred": 919,
+            "gt_to_diagonal": 209,
+            "matched": 776,
+            "matching_seconds": 0.129724,
+            "sr_to_diagonal": 143
+          },
+          "D1": {
+            "W22": 7.898234962016298,
+            "count_gt": 909,
+            "count_pred": 805,
+            "gt_to_diagonal": 267,
+            "matched": 642,
+            "matching_seconds": 0.121648,
+            "sr_to_diagonal": 163
+          }
+        },
+        "prediction_sha256": "72e58cbcbb99d79c94903e5a70cfdf8b7d3ab6e0f505638e03373bb86a67c3d5",
+        "sample": 1923,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.34939,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 805 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1725 persistence pairs .......\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.012s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 81669
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.8437295256697689,
+      "step": 411
+    },
+    {
+      "J_frozen_W22_squared": 107.25482177734375,
+      "L_grad_after": 0.12614433467388153,
+      "L_grad_before": 0.12617139518260956,
+      "L_uv_after": 0.010724655352532864,
+      "L_uv_before": 0.01072603091597557,
+      "PD_grad_norm_unscaled": 15427.482421875,
+      "arm": "dynamic",
+      "base_grad_norm": 0.15005037188529968,
+      "combined_grad_norm": 0.1961994767189026,
+      "epoch": 2,
+      "index": 2084,
+      "lambda_times_PD_to_base_grad_ratio": 1.0281535612366197,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "5f157a5067e2bb7d2388d6f65f5a28c5a446291be05e49f88174e2c6ef31850c",
+          "feed.npz": "36deeebcec10055e19f2a6c51639684ba0f02483c5dd36573a2c4b368b41ddc4",
+          "pd/dynamic_before_pd_port_0.vtu": "a3e90c49af8381ba24018a239b0a2ad4ad030eb56d5ba1699470c203c48a9ee3",
+          "vti/dynamic_before.vti": "c57ace5204c3e39d1e865fc76201054b9c11e31d008524aeda24e2251e7e13ba"
+        },
+        "canonical_W22": 10.356390826758243,
+        "matched_squared_cost": 107.25483087687024,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 3297,
+        "per_dim": {
+          "D0": {
+            "W22": 7.855217207391639,
+            "count_gt": 1431,
+            "count_pred": 1697,
+            "gt_to_diagonal": 114,
+            "matched": 1317,
+            "matching_seconds": 0.405138,
+            "sr_to_diagonal": 380
+          },
+          "D1": {
+            "W22": 6.749103168663273,
+            "count_gt": 1285,
+            "count_pred": 1600,
+            "gt_to_diagonal": 148,
+            "matched": 1137,
+            "matching_seconds": 0.664329,
+            "sr_to_diagonal": 463
+          }
+        },
+        "prediction_sha256": "5f157a5067e2bb7d2388d6f65f5a28c5a446291be05e49f88174e2c6ef31850c",
+        "sample": 2084,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.337621,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1600 saddle-max pairs ........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 3298 persistence pairs .......\u001b[34;1m [0.005s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 150945
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.4120113202161156,
+      "step": 412
+    },
+    {
+      "J_frozen_W22_squared": 365.9296569824219,
+      "L_grad_after": 0.48587605357170105,
+      "L_grad_before": 0.48593389987945557,
+      "L_uv_after": 0.033235907554626465,
+      "L_uv_before": 0.03324573114514351,
+      "PD_grad_norm_unscaled": 23157.505859375,
+      "arm": "dynamic",
+      "base_grad_norm": 0.2540844678878784,
+      "combined_grad_norm": 0.3499279320240021,
+      "epoch": 2,
+      "index": 2259,
+      "lambda_times_PD_to_base_grad_ratio": 0.9114097391263551,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "cc363a606989caaf49a29e6ced8bb8ab9854ce0328fefcd5fb18260faf8fafa5",
+          "feed.npz": "ac985d73898570e7394a355aa6a226324f3bb9a8f333d63f643fdbaa39718425",
+          "pd/dynamic_before_pd_port_0.vtu": "9766aebacbcd54b01c9b780b96696d2e9836f04384236c22d930894330e20228",
+          "vti/dynamic_before.vti": "2bc7e1752f2595af5906ed099bc03a05ccca8bd84685dd1b5b61fe4215d26384"
+        },
+        "canonical_W22": 19.129287792179323,
+        "matched_squared_cost": 365.92965296214254,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 1717,
+        "per_dim": {
+          "D0": {
+            "W22": 14.85517374643631,
+            "count_gt": 834,
+            "count_pred": 858,
+            "gt_to_diagonal": 137,
+            "matched": 697,
+            "matching_seconds": 0.127258,
+            "sr_to_diagonal": 161
+          },
+          "D1": {
+            "W22": 12.052114519834694,
+            "count_gt": 816,
+            "count_pred": 859,
+            "gt_to_diagonal": 111,
+            "matched": 705,
+            "matching_seconds": 0.099304,
+            "sr_to_diagonal": 154
+          }
+        },
+        "prediction_sha256": "cc363a606989caaf49a29e6ced8bb8ab9854ce0328fefcd5fb18260faf8fafa5",
+        "sample": 2259,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.330917,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 859 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1718 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.007s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 81225
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.4482592264760752,
+      "step": 413
+    },
+    {
+      "J_frozen_W22_squared": 75.62627410888672,
+      "L_grad_after": 0.11305106431245804,
+      "L_grad_before": 0.11306315660476685,
+      "L_uv_after": 0.01036341954022646,
+      "L_uv_before": 0.010365751571953297,
+      "PD_grad_norm_unscaled": 16864.408203125,
+      "arm": "dynamic",
+      "base_grad_norm": 0.17030015587806702,
+      "combined_grad_norm": 0.1736096292734146,
+      "epoch": 2,
+      "index": 2420,
+      "lambda_times_PD_to_base_grad_ratio": 0.9902755588315331,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "16646d85b98d5ecb7f0aedf93b2e520b351234db71b93a674480899d7b32b6e2",
+          "feed.npz": "db3d86de305d4a42ebb7e3207bc018fbf33cdd9bbb38163a0b4bf78b6367db26",
+          "pd/dynamic_before_pd_port_0.vtu": "8d3ead995a80ae3ee5a7f2757e5ebe49c25d8b07ef39b4ed0e7315361f3d4b13",
+          "vti/dynamic_before.vti": "9bab8851bf684d7911a102b5438a80ac208aab8d6b90cf63eb24d64d80c75902"
+        },
+        "canonical_W22": 8.696336271134209,
+        "matched_squared_cost": 75.62626459807628,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 3788,
+        "per_dim": {
+          "D0": {
+            "W22": 6.366362298068944,
+            "count_gt": 1547,
+            "count_pred": 1873,
+            "gt_to_diagonal": 132,
+            "matched": 1415,
+            "matching_seconds": 0.595628,
+            "sr_to_diagonal": 458
+          },
+          "D1": {
+            "W22": 5.924162019253926,
+            "count_gt": 1436,
+            "count_pred": 1915,
+            "gt_to_diagonal": 143,
+            "matched": 1293,
+            "matching_seconds": 0.977662,
+            "sr_to_diagonal": 622
+          }
+        },
+        "prediction_sha256": "16646d85b98d5ecb7f0aedf93b2e520b351234db71b93a674480899d7b32b6e2",
+        "sample": 2420,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.32999,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1915 saddle-max pairs ........\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 3789 persistence pairs .......\u001b[34;1m [0.006s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 171845
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.4046645893738605,
+      "step": 414
+    },
+    {
+      "J_frozen_W22_squared": 642.7063598632812,
+      "L_grad_after": 0.3338788151741028,
+      "L_grad_before": 0.3339718282222748,
+      "L_uv_after": 0.023019205778837204,
+      "L_uv_before": 0.023022882640361786,
+      "PD_grad_norm_unscaled": 40519.2734375,
+      "arm": "dynamic",
+      "base_grad_norm": 0.25501343607902527,
+      "combined_grad_norm": 0.5286855101585388,
+      "epoch": 2,
+      "index": 2595,
+      "lambda_times_PD_to_base_grad_ratio": 1.5889073948614856,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "20a2b5ceb74eb1cb2c83571d9cc271ada0fa6d6eb09a072a3f8adc2b9d155913",
+          "feed.npz": "b3972a9a1dcf3e13306e98fd5b40f277191e427bf2e41fb8d2d89e03d43cedbd",
+          "pd/dynamic_before_pd_port_0.vtu": "06a4dec2659bc0a6ec596df531e9723991b07ccb4fb3ae8d3f41d76fe41b1771",
+          "vti/dynamic_before.vti": "5c6c3e5e4735106e647360ca21aa6590492953f575ef2320c226ebb2ff028a0e"
+        },
+        "canonical_W22": 25.351654302855838,
+        "matched_squared_cost": 642.7063767029509,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2182,
+        "per_dim": {
+          "D0": {
+            "W22": 19.12131571650315,
+            "count_gt": 956,
+            "count_pred": 1176,
+            "gt_to_diagonal": 282,
+            "matched": 674,
+            "matching_seconds": 0.343077,
+            "sr_to_diagonal": 502
+          },
+          "D1": {
+            "W22": 16.645770068137992,
+            "count_gt": 857,
+            "count_pred": 1006,
+            "gt_to_diagonal": 219,
+            "matched": 638,
+            "matching_seconds": 0.246579,
+            "sr_to_diagonal": 368
+          }
+        },
+        "prediction_sha256": "20a2b5ceb74eb1cb2c83571d9cc271ada0fa6d6eb09a072a3f8adc2b9d155913",
+        "sample": 2595,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.291045,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1006 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2183 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.007s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 100533
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.2388658136199229,
+      "step": 415
+    },
+    {
+      "J_frozen_W22_squared": 374.9205322265625,
+      "L_grad_after": 0.551578164100647,
+      "L_grad_before": 0.5516459941864014,
+      "L_uv_after": 0.029514849185943604,
+      "L_uv_before": 0.029524674639105797,
+      "PD_grad_norm_unscaled": 28432.1328125,
+      "arm": "dynamic",
+      "base_grad_norm": 0.2737060487270355,
+      "combined_grad_norm": 0.4423857629299164,
+      "epoch": 2,
+      "index": 84,
+      "lambda_times_PD_to_base_grad_ratio": 1.0387835031316792,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "323491caf46286b13479784d30cbc92f032c51bca90c0247a9e8cbbbcd112913",
+          "feed.npz": "28ee73acc3acd8a627897aa8048cf960d71fe5a6b017f3c4e7776422167d63af",
+          "pd/dynamic_before_pd_port_0.vtu": "b79fd3422f89c1250627ac47649f66a32cd0f6114fc3bc2d0073266aec9d792a",
+          "vti/dynamic_before.vti": "b7cc6722b5ef4155d82d805c6d1e20587422f794242e4af06f6a852af8d800af"
+        },
+        "canonical_W22": 19.362866672342367,
+        "matched_squared_cost": 374.92059976024495,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2918,
+        "per_dim": {
+          "D0": {
+            "W22": 15.016313294406201,
+            "count_gt": 1095,
+            "count_pred": 1598,
+            "gt_to_diagonal": 148,
+            "matched": 947,
+            "matching_seconds": 0.689436,
+            "sr_to_diagonal": 651
+          },
+          "D1": {
+            "W22": 12.224194894353854,
+            "count_gt": 1012,
+            "count_pred": 1320,
+            "gt_to_diagonal": 259,
+            "matched": 753,
+            "matching_seconds": 0.632817,
+            "sr_to_diagonal": 567
+          }
+        },
+        "prediction_sha256": "323491caf46286b13479784d30cbc92f032c51bca90c0247a9e8cbbbcd112913",
+        "sample": 84,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.331289,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1320 saddle-max pairs ........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2919 persistence pairs .......\u001b[34;1m [0.005s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 133553
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.7900530227275158,
+      "step": 416
+    },
+    {
+      "J_frozen_W22_squared": 214.74093627929688,
+      "L_grad_after": 0.20844347774982452,
+      "L_grad_before": 0.2084633708000183,
+      "L_uv_after": 0.01806940697133541,
+      "L_uv_before": 0.018072575330734253,
+      "PD_grad_norm_unscaled": 25563.890625,
+      "arm": "dynamic",
+      "base_grad_norm": 0.19887153804302216,
+      "combined_grad_norm": 0.23567478358745575,
+      "epoch": 2,
+      "index": 260,
+      "lambda_times_PD_to_base_grad_ratio": 1.2854474238274223,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "1e14da8b53ddc3ddbca8dd54fd2251e31f5fdb60b78ba7bba61a3d51c0216c3b",
+          "feed.npz": "3a870dc2e684aed721b9034daa101ad0fb2aca5b97b996578b98b2b2231d5a85",
+          "pd/dynamic_before_pd_port_0.vtu": "0a4be376755b8197683b9c917dcb8b6a39eb98332c850bb47eec148a3f64c316",
+          "vti/dynamic_before.vti": "3026e24c7224f6f7cc5a9833d83f68ebdb248b0d331a625e72bdf2f0206a64f8"
+        },
+        "canonical_W22": 14.654041425282417,
+        "matched_squared_cost": 214.74093946963842,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 3083,
+        "per_dim": {
+          "D0": {
+            "W22": 9.814790550999042,
+            "count_gt": 783,
+            "count_pred": 1486,
+            "gt_to_diagonal": 44,
+            "matched": 739,
+            "matching_seconds": 0.47622,
+            "sr_to_diagonal": 747
+          },
+          "D1": {
+            "W22": 10.881673425255558,
+            "count_gt": 746,
+            "count_pred": 1597,
+            "gt_to_diagonal": 45,
+            "matched": 701,
+            "matching_seconds": 0.543392,
+            "sr_to_diagonal": 896
+          }
+        },
+        "prediction_sha256": "1e14da8b53ddc3ddbca8dd54fd2251e31f5fdb60b78ba7bba61a3d51c0216c3b",
+        "sample": 260,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.309329,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1597 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 3084 persistence pairs .......\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.008s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 140961
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.7849626486189664,
+      "step": 417
+    },
+    {
+      "J_frozen_W22_squared": 373.1929931640625,
+      "L_grad_after": 0.36527571082115173,
+      "L_grad_before": 0.365335613489151,
+      "L_uv_after": 0.02075847052037716,
+      "L_uv_before": 0.02076124958693981,
+      "PD_grad_norm_unscaled": 34125.35546875,
+      "arm": "dynamic",
+      "base_grad_norm": 0.20297321677207947,
+      "combined_grad_norm": 0.46222543716430664,
+      "epoch": 2,
+      "index": 420,
+      "lambda_times_PD_to_base_grad_ratio": 1.6812738158980691,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "0f2757e99fbbf1e6702289287b792d304131e37f11440fd5f70f9f10dda5883a",
+          "feed.npz": "745df279490edd8c8fc4504698aa5a10eb864cf78d8f19287929b6accbc46e1e",
+          "pd/dynamic_before_pd_port_0.vtu": "1d299c545170ee4a48f87613d16fb7de28831c23d42212a712c44d178527c78a",
+          "vti/dynamic_before.vti": "daedf5a9689b158303756e6a0daaf628cad58e55dcfb99552a2ed22ebf94588e"
+        },
+        "canonical_W22": 19.318204190605712,
+        "matched_squared_cost": 373.19300959074144,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2047,
+        "per_dim": {
+          "D0": {
+            "W22": 13.794985731991842,
+            "count_gt": 996,
+            "count_pred": 1082,
+            "gt_to_diagonal": 156,
+            "matched": 840,
+            "matching_seconds": 0.225392,
+            "sr_to_diagonal": 242
+          },
+          "D1": {
+            "W22": 13.523734018534885,
+            "count_gt": 900,
+            "count_pred": 965,
+            "gt_to_diagonal": 182,
+            "matched": 718,
+            "matching_seconds": 0.227282,
+            "sr_to_diagonal": 247
+          }
+        },
+        "prediction_sha256": "0f2757e99fbbf1e6702289287b792d304131e37f11440fd5f70f9f10dda5883a",
+        "sample": 420,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.328103,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 965 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2048 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 95505
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.8895460807054769,
+      "step": 418
+    },
+    {
+      "J_frozen_W22_squared": 223.14389038085938,
+      "L_grad_after": 0.26759618520736694,
+      "L_grad_before": 0.2676374614238739,
+      "L_uv_after": 0.016204550862312317,
+      "L_uv_before": 0.0162071380764246,
+      "PD_grad_norm_unscaled": 20414.083984375,
+      "arm": "dynamic",
+      "base_grad_norm": 0.6331279873847961,
+      "combined_grad_norm": 0.5380697846412659,
+      "epoch": 2,
+      "index": 596,
+      "lambda_times_PD_to_base_grad_ratio": 0.32243218418913355,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "41ace02459f3f35354fcccd0a5a30e1a7b4ea14c8a6aa0b7e9e323ccb19b518d",
+          "feed.npz": "0f01628b3539b3b58d6f135f9e97938a8c06f80c5c8ba6b048dc759651dd3891",
+          "pd/dynamic_before_pd_port_0.vtu": "2f4b8f7aa60c3ef371d98f81b3157bd91488391d56eb9f3de62b349d4442650e",
+          "vti/dynamic_before.vti": "4a493183fa1301cbed54e393e6711a6afe463b3bba4423f2ce84983c7fbc09fc"
+        },
+        "canonical_W22": 14.938001661424552,
+        "matched_squared_cost": 223.1438942719015,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2751,
+        "per_dim": {
+          "D0": {
+            "W22": 9.529867190621454,
+            "count_gt": 1158,
+            "count_pred": 1423,
+            "gt_to_diagonal": 136,
+            "matched": 1022,
+            "matching_seconds": 0.402803,
+            "sr_to_diagonal": 401
+          },
+          "D1": {
+            "W22": 11.503283225489993,
+            "count_gt": 1073,
+            "count_pred": 1328,
+            "gt_to_diagonal": 221,
+            "matched": 852,
+            "matching_seconds": 0.539872,
+            "sr_to_diagonal": 476
+          }
+        },
+        "prediction_sha256": "41ace02459f3f35354fcccd0a5a30e1a7b4ea14c8a6aa0b7e9e323ccb19b518d",
+        "sample": 596,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.33097,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1328 saddle-max pairs ........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2752 persistence pairs .......\u001b[34;1m [0.005s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 126893
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.718890038584359,
+      "step": 419
+    },
+    {
+      "J_frozen_W22_squared": 798.081298828125,
+      "L_grad_after": 0.595596969127655,
+      "L_grad_before": 0.5956946015357971,
+      "L_uv_after": 0.034944407641887665,
+      "L_uv_before": 0.034958094358444214,
+      "PD_grad_norm_unscaled": 34808.86328125,
+      "arm": "dynamic",
+      "base_grad_norm": 0.33942919969558716,
+      "combined_grad_norm": 0.5279598832130432,
+      "epoch": 2,
+      "index": 756,
+      "lambda_times_PD_to_base_grad_ratio": 1.02551175068226,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "98f59fde1758f0effcd4bafb8202a06d834886d495fedb99f2e088669274eb16",
+          "feed.npz": "2222130ed6044aea6329cba2589947915b730807f321df119508861764113c89",
+          "pd/dynamic_before_pd_port_0.vtu": "00f7e490c0de5e88a1b8dbd3f4a1d7cda4f980dafdb99277fbc7d87f93b4a292",
+          "vti/dynamic_before.vti": "8c136cb4172093ad500b46205b0b6e2a91a50590614754064caf996897414880"
+        },
+        "canonical_W22": 28.2503327351828,
+        "matched_squared_cost": 798.0812987577497,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2161,
+        "per_dim": {
+          "D0": {
+            "W22": 22.432648800816445,
+            "count_gt": 1029,
+            "count_pred": 1206,
+            "gt_to_diagonal": 173,
+            "matched": 856,
+            "matching_seconds": 0.261116,
+            "sr_to_diagonal": 350
+          },
+          "D1": {
+            "W22": 17.171417164222905,
+            "count_gt": 911,
+            "count_pred": 955,
+            "gt_to_diagonal": 229,
+            "matched": 682,
+            "matching_seconds": 0.290031,
+            "sr_to_diagonal": 273
+          }
+        },
+        "prediction_sha256": "98f59fde1758f0effcd4bafb8202a06d834886d495fedb99f2e088669274eb16",
+        "sample": 756,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.332024,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 955 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2162 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 99277
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.0234696313296445,
+      "step": 420
+    },
+    {
+      "J_frozen_W22_squared": 273.44915771484375,
+      "L_grad_after": 0.22701264917850494,
+      "L_grad_before": 0.22709649801254272,
+      "L_uv_after": 0.016018345952033997,
+      "L_uv_before": 0.016027864068746567,
+      "PD_grad_norm_unscaled": 17922.71875,
+      "arm": "dynamic",
+      "base_grad_norm": 0.3696335554122925,
+      "combined_grad_norm": 0.3793870806694031,
+      "epoch": 2,
+      "index": 932,
+      "lambda_times_PD_to_base_grad_ratio": 0.48487802277606656,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "e30a8d6ed84ee76f084a5cc92770e9db590b2eddc3d77053604f6b8e22207f27",
+          "feed.npz": "04af0152cd77a8bf173c521a9acf15555064b2ef3ea14b2c0be8cb0456d5105d",
+          "pd/dynamic_before_pd_port_0.vtu": "ec05484b8692d3402c19fedd7ca55e66fc7c45ab49e322e66791c1a6177bb51e",
+          "vti/dynamic_before.vti": "085662d1d8d035d608760e94ed35d818f0de88bfa432fd23870aa2a3791732d2"
+        },
+        "canonical_W22": 16.536298474929563,
+        "matched_squared_cost": 273.4491746114643,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2137,
+        "per_dim": {
+          "D0": {
+            "W22": 9.744498876631559,
+            "count_gt": 945,
+            "count_pred": 1093,
+            "gt_to_diagonal": 143,
+            "matched": 802,
+            "matching_seconds": 0.201037,
+            "sr_to_diagonal": 291
+          },
+          "D1": {
+            "W22": 13.360161260077815,
+            "count_gt": 872,
+            "count_pred": 1044,
+            "gt_to_diagonal": 132,
+            "matched": 740,
+            "matching_seconds": 0.220107,
+            "sr_to_diagonal": 304
+          }
+        },
+        "prediction_sha256": "e30a8d6ed84ee76f084a5cc92770e9db590b2eddc3d77053604f6b8e22207f27",
+        "sample": 932,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.330991,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1044 saddle-max pairs ........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2138 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 99285
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.021399078015238,
+      "step": 421
+    },
+    {
+      "J_frozen_W22_squared": 376.9773254394531,
+      "L_grad_after": 0.38231122493743896,
+      "L_grad_before": 0.3823946416378021,
+      "L_uv_after": 0.022783754393458366,
+      "L_uv_before": 0.022786011919379234,
+      "PD_grad_norm_unscaled": 23772.587890625,
+      "arm": "dynamic",
+      "base_grad_norm": 0.35660117864608765,
+      "combined_grad_norm": 0.5112188458442688,
+      "epoch": 2,
+      "index": 1092,
+      "lambda_times_PD_to_base_grad_ratio": 0.6666435590842043,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "0f18504c7c6ea7b00bac3ad547e771732a29c62711234ba5010e40a0769a9515",
+          "feed.npz": "5c67a85d12b228f0f6be8ba8364171400d397a6eab59cfbed4199d4bda174af7",
+          "pd/dynamic_before_pd_port_0.vtu": "b8832190a401a83316d79c9f584d0e7e494ae98f5ded34148fb5d1baa477d04d",
+          "vti/dynamic_before.vti": "6e85d4f233f2c253d9c45da813fd92ccf8bca0c52f37da06986bedbb05db57ca"
+        },
+        "canonical_W22": 19.415903893531404,
+        "matched_squared_cost": 376.977320279487,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2542,
+        "per_dim": {
+          "D0": {
+            "W22": 12.25212818898335,
+            "count_gt": 1095,
+            "count_pred": 1319,
+            "gt_to_diagonal": 190,
+            "matched": 905,
+            "matching_seconds": 0.342291,
+            "sr_to_diagonal": 414
+          },
+          "D1": {
+            "W22": 15.061961321274447,
+            "count_gt": 947,
+            "count_pred": 1223,
+            "gt_to_diagonal": 199,
+            "matched": 748,
+            "matching_seconds": 0.316249,
+            "sr_to_diagonal": 475
+          }
+        },
+        "prediction_sha256": "0f18504c7c6ea7b00bac3ad547e771732a29c62711234ba5010e40a0769a9515",
+        "sample": 1092,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.314705,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1223 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2543 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.008s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 117077
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.98464281210443,
+      "step": 422
+    },
+    {
+      "J_frozen_W22_squared": 145.90435791015625,
+      "L_grad_after": 0.1966979056596756,
+      "L_grad_before": 0.19671909511089325,
+      "L_uv_after": 0.016342397779226303,
+      "L_uv_before": 0.016345646232366562,
+      "PD_grad_norm_unscaled": 23384.66796875,
+      "arm": "dynamic",
+      "base_grad_norm": 0.256909042596817,
+      "combined_grad_norm": 0.2113020420074463,
+      "epoch": 2,
+      "index": 1268,
+      "lambda_times_PD_to_base_grad_ratio": 0.9102314084541191,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "fb076154bf25dda96fed141731999dcb0eb4857d999ba9051b500b91295039c8",
+          "feed.npz": "67e48ddeeddb6341734c52bca8f1311e1b74895628341989397c5498769a1dea",
+          "pd/dynamic_before_pd_port_0.vtu": "e152d21b5d0be0a3f48e6d9c4f3ba4b6f2bb807d856c330968aa0266b21f0a05",
+          "vti/dynamic_before.vti": "88c04732812c79661def7934e372728f97c2f5729070214117c8bd12efaebadf"
+        },
+        "canonical_W22": 12.079087578976049,
+        "matched_squared_cost": 145.9043561193813,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 3785,
+        "per_dim": {
+          "D0": {
+            "W22": 8.141267169775219,
+            "count_gt": 1402,
+            "count_pred": 2195,
+            "gt_to_diagonal": 86,
+            "matched": 1316,
+            "matching_seconds": 1.958043,
+            "sr_to_diagonal": 879
+          },
+          "D1": {
+            "W22": 8.923235153850518,
+            "count_gt": 1266,
+            "count_pred": 1590,
+            "gt_to_diagonal": 165,
+            "matched": 1101,
+            "matching_seconds": 0.664199,
+            "sr_to_diagonal": 489
+          }
+        },
+        "prediction_sha256": "fb076154bf25dda96fed141731999dcb0eb4857d999ba9051b500b91295039c8",
+        "sample": 1268,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.349624,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1590 saddle-max pairs ........\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 3786 persistence pairs .......\u001b[34;1m [0.006s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.015s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 172529
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.46441946243867277,
+      "step": 423
+    },
+    {
+      "J_frozen_W22_squared": 283.4558410644531,
+      "L_grad_after": 0.26436012983322144,
+      "L_grad_before": 0.26439017057418823,
+      "L_uv_after": 0.015051228925585747,
+      "L_uv_before": 0.015053980052471161,
+      "PD_grad_norm_unscaled": 19646.326171875,
+      "arm": "dynamic",
+      "base_grad_norm": 0.19626979529857635,
+      "combined_grad_norm": 0.20008911192417145,
+      "epoch": 2,
+      "index": 1428,
+      "lambda_times_PD_to_base_grad_ratio": 1.0009857167267096,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "92eaa70d4582711ad58dcfec285085e6f7acec8ba86656c041868c8df4207df2",
+          "feed.npz": "ef67dc9d29f432cde05afa0d12f6c719cbd6976510cbb539359558a8be306c3c",
+          "pd/dynamic_before_pd_port_0.vtu": "11c058fb90894ebbd9abbdd59bf79aec28c3dd4eee969b1cb5c035609bb16879",
+          "vti/dynamic_before.vti": "7b0e6419f25db646d91db636e7eb2d3b377b6c6c220c7c7afca8540413d38c14"
+        },
+        "canonical_W22": 16.836147178859136,
+        "matched_squared_cost": 283.4558552942831,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2434,
+        "per_dim": {
+          "D0": {
+            "W22": 9.480836655873212,
+            "count_gt": 969,
+            "count_pred": 1351,
+            "gt_to_diagonal": 158,
+            "matched": 811,
+            "matching_seconds": 0.450028,
+            "sr_to_diagonal": 540
+          },
+          "D1": {
+            "W22": 13.912928812182479,
+            "count_gt": 927,
+            "count_pred": 1083,
+            "gt_to_diagonal": 140,
+            "matched": 787,
+            "matching_seconds": 0.257325,
+            "sr_to_diagonal": 296
+          }
+        },
+        "prediction_sha256": "92eaa70d4582711ad58dcfec285085e6f7acec8ba86656c041868c8df4207df2",
+        "sample": 1428,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.310163,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1083 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2435 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.007s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 111981
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.7062074079405284,
+      "step": 424
+    },
+    {
+      "J_frozen_W22_squared": 259.59661865234375,
+      "L_grad_after": 0.3396368622779846,
+      "L_grad_before": 0.3396676480770111,
+      "L_uv_after": 0.030029727146029472,
+      "L_uv_before": 0.03003547713160515,
+      "PD_grad_norm_unscaled": 18140.3828125,
+      "arm": "dynamic",
+      "base_grad_norm": 0.5169929265975952,
+      "combined_grad_norm": 0.491575688123703,
+      "epoch": 2,
+      "index": 1604,
+      "lambda_times_PD_to_base_grad_ratio": 0.35088261133250837,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "625c012335cb32c18b00349080259a0e71e06cbee8b7ad6bba9624fc59b60c7d",
+          "feed.npz": "2f613ff8ec59d46c6dd695022f459d407b4b56017a4325fffd03e1ad42d1cf9f",
+          "pd/dynamic_before_pd_port_0.vtu": "c63fb6f28cc645d29b90b5fe96de97d6de9900d8642f44ef70000c2e7c6638ba",
+          "vti/dynamic_before.vti": "0826df30af09f06664536fe86708f129c8bee3e441ddbf071295da86a192b775"
+        },
+        "canonical_W22": 16.112002154806294,
+        "matched_squared_cost": 259.5966138091793,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 1696,
+        "per_dim": {
+          "D0": {
+            "W22": 10.958949000776066,
+            "count_gt": 911,
+            "count_pred": 908,
+            "gt_to_diagonal": 198,
+            "matched": 713,
+            "matching_seconds": 0.149487,
+            "sr_to_diagonal": 195
+          },
+          "D1": {
+            "W22": 11.810929270589678,
+            "count_gt": 878,
+            "count_pred": 788,
+            "gt_to_diagonal": 220,
+            "matched": 658,
+            "matching_seconds": 0.086955,
+            "sr_to_diagonal": 130
+          }
+        },
+        "prediction_sha256": "625c012335cb32c18b00349080259a0e71e06cbee8b7ad6bba9624fc59b60c7d",
+        "sample": 1604,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.325856,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 788 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1697 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 79861
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.9495612153341062,
+      "step": 425
+    },
+    {
+      "J_frozen_W22_squared": 312.7367858886719,
+      "L_grad_after": 0.22201810777187347,
+      "L_grad_before": 0.22205081582069397,
+      "L_uv_after": 0.01628759130835533,
+      "L_uv_before": 0.016290541738271713,
+      "PD_grad_norm_unscaled": 16639.587890625,
+      "arm": "dynamic",
+      "base_grad_norm": 0.12416625767946243,
+      "combined_grad_norm": 0.17022284865379333,
+      "epoch": 2,
+      "index": 1764,
+      "lambda_times_PD_to_base_grad_ratio": 1.3401054522864349,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "4050ebd338ce4700be6c7bbf559344caa018680e3c772b826112a05b2c778cdd",
+          "feed.npz": "69a53f0c0c10d1713434c0f31dc6dca3e215a237a223244375692ac6dd871857",
+          "pd/dynamic_before_pd_port_0.vtu": "c43e480e4ef578511a5db0f9c4008ec454c333ff1c4b14bc5e6f8c765d33742a",
+          "vti/dynamic_before.vti": "c10c4507464afbab29c613db1c6f8bdb6424ccdf092283bc9ad9fa8b03566c7a"
+        },
+        "canonical_W22": 17.684364620045237,
+        "matched_squared_cost": 312.7367569489705,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2022,
+        "per_dim": {
+          "D0": {
+            "W22": 10.875228596862842,
+            "count_gt": 883,
+            "count_pred": 1127,
+            "gt_to_diagonal": 138,
+            "matched": 745,
+            "matching_seconds": 0.199495,
+            "sr_to_diagonal": 382
+          },
+          "D1": {
+            "W22": 13.945112225460376,
+            "count_gt": 879,
+            "count_pred": 895,
+            "gt_to_diagonal": 194,
+            "matched": 685,
+            "matching_seconds": 0.221727,
+            "sr_to_diagonal": 210
+          }
+        },
+        "prediction_sha256": "4050ebd338ce4700be6c7bbf559344caa018680e3c772b826112a05b2c778cdd",
+        "sample": 1764,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.319156,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 895 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2023 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 94297
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.7954469607281499,
+      "step": 426
+    },
+    {
+      "J_frozen_W22_squared": 367.50140380859375,
+      "L_grad_after": 0.25334668159484863,
+      "L_grad_before": 0.253376305103302,
+      "L_uv_after": 0.02303309552371502,
+      "L_uv_before": 0.02303851954638958,
+      "PD_grad_norm_unscaled": 28319.9453125,
+      "arm": "dynamic",
+      "base_grad_norm": 0.19307152926921844,
+      "combined_grad_norm": 0.3127835988998413,
+      "epoch": 2,
+      "index": 1940,
+      "lambda_times_PD_to_base_grad_ratio": 1.4668110528616958,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "85e4266f90637481b88d96264b8b8c6fea14ed1288bd9db355b643d2dabcea50",
+          "feed.npz": "ab9eb459711fb284c9434663a3e09ca03869e0f171ecc636c038d738d4bb4967",
+          "pd/dynamic_before_pd_port_0.vtu": "caea8eba7029da39c26f62618b3853cdb5db301cdf2118c32d407504f140119c",
+          "vti/dynamic_before.vti": "0d52e5fc09d32b6d5d4489cdd857cf7030d76c655c8f6bd72aedbe81d85555b9"
+        },
+        "canonical_W22": 19.170327855749427,
+        "matched_squared_cost": 367.5014733181409,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2504,
+        "per_dim": {
+          "D0": {
+            "W22": 14.054862825711801,
+            "count_gt": 1220,
+            "count_pred": 1297,
+            "gt_to_diagonal": 234,
+            "matched": 986,
+            "matching_seconds": 0.481834,
+            "sr_to_diagonal": 311
+          },
+          "D1": {
+            "W22": 13.036959041407878,
+            "count_gt": 1115,
+            "count_pred": 1207,
+            "gt_to_diagonal": 260,
+            "matched": 855,
+            "matching_seconds": 0.59438,
+            "sr_to_diagonal": 352
+          }
+        },
+        "prediction_sha256": "85e4266f90637481b88d96264b8b8c6fea14ed1288bd9db355b643d2dabcea50",
+        "sample": 1940,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.328574,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1207 saddle-max pairs ........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2505 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 115877
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.9336254032206489,
+      "step": 427
+    },
+    {
+      "J_frozen_W22_squared": 201.65052795410156,
+      "L_grad_after": 0.1589791625738144,
+      "L_grad_before": 0.1590060144662857,
+      "L_uv_after": 0.011372383683919907,
+      "L_uv_before": 0.011373546905815601,
+      "PD_grad_norm_unscaled": 16488.07421875,
+      "arm": "dynamic",
+      "base_grad_norm": 0.10910345613956451,
+      "combined_grad_norm": 0.23093673586845398,
+      "epoch": 2,
+      "index": 2100,
+      "lambda_times_PD_to_base_grad_ratio": 1.5112329895084673,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "750da2b5c11b5de2fddee217e70c0b632482f9d3ff2cb6dd2b6b734822934ca3",
+          "feed.npz": "40b123f3d67d48ebb2209c8f4b864478cd31cc092deeca20fa9e3150047f9a89",
+          "pd/dynamic_before_pd_port_0.vtu": "2e585348b87347989fc5c8648be8cf5ee35fe12e80e928167ee4306a2a7fd91c",
+          "vti/dynamic_before.vti": "1f5ad607769c04762796845cbc52601b69b94de8e35205e523a0bc573e58dea3"
+        },
+        "canonical_W22": 14.200370664033596,
+        "matched_squared_cost": 201.65052695605584,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 3178,
+        "per_dim": {
+          "D0": {
+            "W22": 11.690112405875844,
+            "count_gt": 1138,
+            "count_pred": 1664,
+            "gt_to_diagonal": 109,
+            "matched": 1029,
+            "matching_seconds": 0.645127,
+            "sr_to_diagonal": 635
+          },
+          "D1": {
+            "W22": 8.06174912372828,
+            "count_gt": 1062,
+            "count_pred": 1514,
+            "gt_to_diagonal": 199,
+            "matched": 863,
+            "matching_seconds": 0.597031,
+            "sr_to_diagonal": 651
+          }
+        },
+        "prediction_sha256": "750da2b5c11b5de2fddee217e70c0b632482f9d3ff2cb6dd2b6b734822934ca3",
+        "sample": 2100,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.328289,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1514 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 3179 persistence pairs .......\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.008s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 144829
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.6019431437825551,
+      "step": 428
+    },
+    {
+      "J_frozen_W22_squared": 163.23825073242188,
+      "L_grad_after": 0.23439636826515198,
+      "L_grad_before": 0.23442821204662323,
+      "L_uv_after": 0.019229276105761528,
+      "L_uv_before": 0.019233109429478645,
+      "PD_grad_norm_unscaled": 19822.150390625,
+      "arm": "dynamic",
+      "base_grad_norm": 0.19651785492897034,
+      "combined_grad_norm": 0.24153274297714233,
+      "epoch": 2,
+      "index": 2276,
+      "lambda_times_PD_to_base_grad_ratio": 1.0086691816267557,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "a34d1b8118507404819aab7dc690d01ed547868b6ec2ecba8636f088592618c1",
+          "feed.npz": "5d889d496de83a47788a7efc39f7ba11282035dec28946d604c77ffc95990da5",
+          "pd/dynamic_before_pd_port_0.vtu": "d8439175b23a385873971369a88e871d59018011fe18a43a02ed84923adaeb6a",
+          "vti/dynamic_before.vti": "f643bdf8fe89a3408442b0dd9b5afe49fac069fcdd0c4c12e47fa50e179eefa1"
+        },
+        "canonical_W22": 12.776473233850828,
+        "matched_squared_cost": 163.23827358692324,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 3655,
+        "per_dim": {
+          "D0": {
+            "W22": 6.99319980894934,
+            "count_gt": 955,
+            "count_pred": 1754,
+            "gt_to_diagonal": 45,
+            "matched": 910,
+            "matching_seconds": 0.779345,
+            "sr_to_diagonal": 844
+          },
+          "D1": {
+            "W22": 10.692680895239395,
+            "count_gt": 895,
+            "count_pred": 1901,
+            "gt_to_diagonal": 107,
+            "matched": 788,
+            "matching_seconds": 0.97824,
+            "sr_to_diagonal": 1113
+          }
+        },
+        "prediction_sha256": "a34d1b8118507404819aab7dc690d01ed547868b6ec2ecba8636f088592618c1",
+        "sample": 2276,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.319252,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1901 saddle-max pairs ........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 3656 persistence pairs .......\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.008s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 165905
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.545708877928555,
+      "step": 429
+    },
+    {
+      "J_frozen_W22_squared": 372.20703125,
+      "L_grad_after": 0.3962256610393524,
+      "L_grad_before": 0.3962559700012207,
+      "L_uv_after": 0.020870773121714592,
+      "L_uv_before": 0.02087479643523693,
+      "PD_grad_norm_unscaled": 38472.51171875,
+      "arm": "dynamic",
+      "base_grad_norm": 0.18078681826591492,
+      "combined_grad_norm": 0.35219186544418335,
+      "epoch": 2,
+      "index": 2436,
+      "lambda_times_PD_to_base_grad_ratio": 2.128059561409047,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "9ff7a6ebca91d56dec0e058b5bb0eab1573e379cb869ad03eae80422a00bf01a",
+          "feed.npz": "2ef4ff4911f8defc97f587ac8b52c1a67b7f770304192497158c5394efb6a926",
+          "pd/dynamic_before_pd_port_0.vtu": "c586735b0b5062e781fb860569bb55ac58ed49a790f9ae1f15f1b9af56992e9c",
+          "vti/dynamic_before.vti": "a00e3d57fb6893a1142eaa2105c51ef6b582b100c59764c64a7731ad743a522d"
+        },
+        "canonical_W22": 19.29266785560307,
+        "matched_squared_cost": 372.2070338194143,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 2227,
+        "per_dim": {
+          "D0": {
+            "W22": 14.081368936740981,
+            "count_gt": 1090,
+            "count_pred": 1158,
+            "gt_to_diagonal": 159,
+            "matched": 931,
+            "matching_seconds": 0.320914,
+            "sr_to_diagonal": 227
+          },
+          "D1": {
+            "W22": 13.187952147850934,
+            "count_gt": 956,
+            "count_pred": 1069,
+            "gt_to_diagonal": 163,
+            "matched": 793,
+            "matching_seconds": 0.328393,
+            "sr_to_diagonal": 276
+          }
+        },
+        "prediction_sha256": "9ff7a6ebca91d56dec0e058b5bb0eab1573e379cb869ad03eae80422a00bf01a",
+        "sample": 2436,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.334259,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1069 saddle-max pairs ........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 2228 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 103733
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.0705569679389009,
+      "step": 430
+    },
+    {
+      "J_frozen_W22_squared": 646.8865356445312,
+      "L_grad_after": 0.2618864178657532,
+      "L_grad_before": 0.26197299361228943,
+      "L_uv_after": 0.018677446991205215,
+      "L_uv_before": 0.018683461472392082,
+      "PD_grad_norm_unscaled": 31617.111328125,
+      "arm": "dynamic",
+      "base_grad_norm": 0.8744455575942993,
+      "combined_grad_norm": 0.7262114882469177,
+      "epoch": 2,
+      "index": 2612,
+      "lambda_times_PD_to_base_grad_ratio": 0.3615675218833214,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "7495f2575e6dd7d8d62120d6522290d38486a51fefac1e88dd95c7536ceb75e1",
+          "feed.npz": "fd3a28b42c249dd06bcf35f58889732b10d23b2823f1de2709826ac68386cd1d",
+          "pd/dynamic_before_pd_port_0.vtu": "2a789ea19a11aca22c54e3e2e0cd696767f3fc3e949c276d76120923e1ecb5dd",
+          "vti/dynamic_before.vti": "3ca558cedac1b9dcb8d5305ec60982220b41432aad3a9ce198304ffdeeeb3c59"
+        },
+        "canonical_W22": 25.433964978625653,
+        "matched_squared_cost": 646.8865769866567,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 3621,
+        "per_dim": {
+          "D0": {
+            "W22": 18.079232925139127,
+            "count_gt": 942,
+            "count_pred": 1883,
+            "gt_to_diagonal": 121,
+            "matched": 821,
+            "matching_seconds": 1.193917,
+            "sr_to_diagonal": 1062
+          },
+          "D1": {
+            "W22": 17.889323949566165,
+            "count_gt": 860,
+            "count_pred": 1738,
+            "gt_to_diagonal": 132,
+            "matched": 728,
+            "matching_seconds": 0.839288,
+            "sr_to_diagonal": 1010
+          }
+        },
+        "prediction_sha256": "7495f2575e6dd7d8d62120d6522290d38486a51fefac1e88dd95c7536ceb75e1",
+        "sample": 2612,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.338608,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 1738 saddle-max pairs ........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 3622 persistence pairs .......\u001b[34;1m [0.005s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 163593
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.0628568438463843,
+      "step": 431
+    },
+    {
+      "J_frozen_W22_squared": 689.7302856445312,
+      "L_grad_after": 0.5627533793449402,
+      "L_grad_before": 0.5628578066825867,
+      "L_uv_after": 0.0319051519036293,
+      "L_uv_before": 0.03190869837999344,
+      "PD_grad_norm_unscaled": 28590.384765625,
+      "arm": "dynamic",
+      "base_grad_norm": 0.3543666899204254,
+      "combined_grad_norm": 0.4596651494503021,
+      "epoch": 2,
+      "index": 99,
+      "lambda_times_PD_to_base_grad_ratio": 0.8068022638370751,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "e620591b25365e21017944217e2d1ba0f528ff2ebacd54abe6f72f2516b6fcb2",
+          "feed.npz": "aa9be6a6eed154a152a852e821593f1f974ac48bb5bb0917206e45dc1ab9f67e",
+          "pd/dynamic_before_pd_port_0.vtu": "7f174081c41d29364b7dae3f7ae0a1b98566099dc17c232d28c8cefd3dc9581a",
+          "vti/dynamic_before.vti": "29af90b4a4e5d855df22c31e53f42be60ef22c11b9666615a53b7d11933678e6"
+        },
+        "canonical_W22": 26.262717152951446,
+        "matched_squared_cost": 689.7303181229528,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 1874,
+        "per_dim": {
+          "D0": {
+            "W22": 18.39167200911217,
+            "count_gt": 952,
+            "count_pred": 1019,
+            "gt_to_diagonal": 175,
+            "matched": 777,
+            "matching_seconds": 0.255236,
+            "sr_to_diagonal": 242
+          },
+          "D1": {
+            "W22": 18.74771220616453,
+            "count_gt": 876,
+            "count_pred": 855,
+            "gt_to_diagonal": 251,
+            "matched": 625,
+            "matching_seconds": 0.237966,
+            "sr_to_diagonal": 230
+          }
+        },
+        "prediction_sha256": "e620591b25365e21017944217e2d1ba0f528ff2ebacd54abe6f72f2516b6fcb2",
+        "sample": 99,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.325677,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 855 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1875 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 87501
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 0.9575742805225309,
+      "step": 432
+    },
+    {
+      "J_frozen_W22_squared": 834.5117797851562,
+      "L_grad_after": 0.5755182504653931,
+      "L_grad_before": 0.5756969451904297,
+      "L_uv_after": 0.04097028449177742,
+      "L_uv_before": 0.04097583889961243,
+      "PD_grad_norm_unscaled": 30685.416015625,
+      "arm": "dynamic",
+      "base_grad_norm": 1.0708200931549072,
+      "combined_grad_norm": 1.0569523572921753,
+      "epoch": 2,
+      "index": 277,
+      "lambda_times_PD_to_base_grad_ratio": 0.28655995728673705,
+      "match_source": {
+        "artifact_hashes": {
+          "dynamic_before.npy": "a7b1fe3a78d4f5b642575d526d368cbbf7d23653aaf4d409b0728409980c9eeb",
+          "feed.npz": "cfcd20500a1e9d93e7d475703010f979a5d4ef5cd6033d33fa6b201d36fe93a2",
+          "pd/dynamic_before_pd_port_0.vtu": "8b7c12eecbea97a4ed1a130d99b4bb99a753f8c305b0a95ee960d11c8ccfdbac",
+          "vti/dynamic_before.vti": "86de7dd7fee700ade3ff68148a6fcf83c44c475f91179d097f742ecd82718e8b"
+        },
+        "canonical_W22": 28.8879179102806,
+        "matched_squared_cost": 834.5118018229568,
+        "note": "NEW predicted diagram and NEW matching computed for this update.",
+        "pairs": 1825,
+        "per_dim": {
+          "D0": {
+            "W22": 20.565390370656623,
+            "count_gt": 1087,
+            "count_pred": 994,
+            "gt_to_diagonal": 251,
+            "matched": 836,
+            "matching_seconds": 0.179897,
+            "sr_to_diagonal": 158
+          },
+          "D1": {
+            "W22": 20.28734876945766,
+            "count_gt": 869,
+            "count_pred": 831,
+            "gt_to_diagonal": 232,
+            "matched": 637,
+            "matching_seconds": 0.175676,
+            "sr_to_diagonal": 194
+          }
+        },
+        "prediction_sha256": "a7b1fe3a78d4f5b642575d526d368cbbf7d23653aaf4d409b0728409980c9eeb",
+        "sample": 277,
+        "ttk": {
+          "backend": "docker",
+          "seconds": 0.32745,
+          "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+          "stdout_tail": "[DiscreteMorseSandwich] \u001b[0mComputed 831 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1826 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_before_pd_port_0.vtu'...\n",
+          "vtu_bytes": 85717
+        },
+        "unmapped_raw_pairs": 0
+      },
+      "speed_crop_mae_mps_after": 1.134792357069091,
+      "step": 433
+    }
+  ]
+}

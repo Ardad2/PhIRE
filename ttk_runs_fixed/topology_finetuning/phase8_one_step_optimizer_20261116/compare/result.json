@@ -1,0 +1,96 @@
+{
+  "initial_w22": 20.67308637707457,
+  "note": "One-step observations only; dynamic matching was NOT recomputed inside the optimizer step.",
+  "output_hashes": {
+    "pd/baseline_pd_port_0.vtu": "0721b8450363a95a8baf8cc22df025bab5007d80ae98baac5391a96d41538bb2",
+    "pd/dynamic_pd_port_0.vtu": "8d3a9d365049bee96e3117d16494ac9dc482bd4c18617bbcbc64103e49e04b32",
+    "pd/gt_pd_port_0.vtu": "ce792f704dee68b905bf681ea04b9faaced9ec5e8433a6ff2d50c63a6e33cfab",
+    "vti/baseline.vti": "0bc0015bcea00062fcf8c92088867b4c6a540e2c2d174dac91f114a8d13f75cb",
+    "vti/dynamic.vti": "0e0c154d8b56bd6423233fec3eabce65b8535adedaf0864e3dd440160d293a8e",
+    "vti/gt.vti": "da5ca54914c03c028223117bd3d2857c89c6a31c62a57137569c8c124d595d41"
+  },
+  "schema": "phase8-one-step-true-w22-comparison-v1",
+  "scores": {
+    "baseline": {
+      "W22_squared": 426.44508823791875,
+      "canonical_w22": 20.65054692345747,
+      "per_dimension": {
+        "D0": {
+          "cost_squared": 315.36579166466004,
+          "gt_to_diagonal": 431,
+          "matched": 545,
+          "n_gt": 976,
+          "n_pred": 624,
+          "sr_to_diagonal": 79,
+          "w22": 17.758541372102048
+        },
+        "D1": {
+          "cost_squared": 111.07929657325874,
+          "gt_to_diagonal": 385,
+          "matched": 506,
+          "n_gt": 891,
+          "n_pred": 563,
+          "sr_to_diagonal": 57,
+          "w22": 10.539416329819158
+        }
+      }
+    },
+    "dynamic": {
+      "W22_squared": 424.4464905002283,
+      "canonical_w22": 20.602099177031167,
+      "per_dimension": {
+        "D0": {
+          "cost_squared": 313.9709892984433,
+          "gt_to_diagonal": 427,
+          "matched": 549,
+          "n_gt": 976,
+          "n_pred": 619,
+          "sr_to_diagonal": 70,
+          "w22": 17.7192265434596
+        },
+        "D1": {
+          "cost_squared": 110.47550120178528,
+          "gt_to_diagonal": 378,
+          "matched": 513,
+          "n_gt": 891,
+          "n_pred": 565,
+          "sr_to_diagonal": 52,
+          "w22": 10.510732667220934
+        }
+      }
+    }
+  },
+  "source_hashes": {
+    "new_script": "4a0feb931c0bf07d8c31309e3b78932550cecc51a4241a998e607dc8ed80e282",
+    "upstream_feed": "7f6225a3198377b3af7bca469637fed87dd9437e0c7ccd363291ec93d787d42a",
+    "upstream_forward_manifest": "c1a68ec480fe6c7643d33eb73f5278c6c1d1d8f82f1493793726ee766702a90d",
+    "upstream_match_manifest": "14f2584fced4de16e526b136a916b339d3c55347f96f5b0fbc62035ee6475b52",
+    "upstream_tfcheck_report": "3c8b9bd278c3c170e362c65abb87e46c11c87fb057d02890fabc7f7fffccade1",
+    "v2_script": "70589d22790d9281c4887f33c5dd8ea6c416aab5750ec285a32a5cc2ae0d59c6"
+  },
+  "status": "RECOMPUTED_CANONICAL_W22_NO_IMPROVEMENT_REQUIRED",
+  "ttk_times": {
+    "baseline": {
+      "backend": "docker",
+      "seconds": 0.377214,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 563 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1188 persistence pairs .......\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.012s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/baseline_pd_port_0.vtu'...\n",
+      "vtu_bytes": 57113
+    },
+    "dynamic": {
+      "backend": "docker",
+      "seconds": 0.356292,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 565 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1185 persistence pairs .......\u001b[34;1m [0.003s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/dynamic_pd_port_0.vtu'...\n",
+      "vtu_bytes": 57041
+    },
+    "gt": {
+      "backend": "docker",
+      "seconds": 0.394063,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 896 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1876 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.013s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/gt_pd_port_0.vtu'...\n",
+      "vtu_bytes": 82797
+    }
+  },
+  "upstream_step_manifest_sha256": "cb4dbff72ea78e64686671cb3bfedf37485c31e821f2a3d1ccfcdbb72da0411d"
+}

@@ -1,0 +1,190 @@
+{
+  "limitations": [
+    "All four evaluation fields are from the expanded 2688 training pool, not external test.",
+    "No optimizer updates used evaluation examples; however all share spatial crop.",
+    "Pretrained CNN may have been developed on other historical data.",
+    "One fixed four-field selection, eight optimizer steps; no significance claim.",
+    "Training was faithfully replayed using archived, originally fresh per-step matchings.",
+    "Scores use canonical Phase6 TTK/GUDHI H0,H1 and unpruned diagrams."
+  ],
+  "rows": [
+    {
+      "arms": {
+        "cnn": {
+          "L_grad": 0.22590596973896027,
+          "L_uv": 0.01631360501050949,
+          "W22": 14.454486189862221,
+          "W2inf": 11.494319560621493,
+          "dB": 1.8605579137802124,
+          "speed_crop_MAE_mps": 0.8845601302292198
+        },
+        "control": {
+          "L_grad": 0.22544151544570923,
+          "L_uv": 0.016211122274398804,
+          "W22": 14.364097766505322,
+          "W2inf": 11.443669777681434,
+          "dB": 1.8801499605178833,
+          "speed_crop_MAE_mps": 0.8838825491152238
+        },
+        "dynamic": {
+          "L_grad": 0.2255457192659378,
+          "L_uv": 0.01629868894815445,
+          "W22": 14.204610238402774,
+          "W2inf": 11.363890053598496,
+          "dB": 1.7752515077590942,
+          "speed_crop_MAE_mps": 0.8866618545621168
+        }
+      },
+      "dynamic_minus_control_W22": -0.15948752810254874,
+      "provenance": {
+        "sample_idx": 672,
+        "season": "spring_1",
+        "timestamp": "20070401000000",
+        "wtk_time_index": 2160
+      },
+      "sample_idx": 672
+    },
+    {
+      "arms": {
+        "cnn": {
+          "L_grad": 0.26134467124938965,
+          "L_uv": 0.0241228174418211,
+          "W22": 13.128503838470788,
+          "W2inf": 10.092111103470025,
+          "dB": 1.4618244171142578,
+          "speed_crop_MAE_mps": 0.646748896840727
+        },
+        "control": {
+          "L_grad": 0.26080241799354553,
+          "L_uv": 0.02396460622549057,
+          "W22": 13.055755171108757,
+          "W2inf": 10.042330242771392,
+          "dB": 1.4566688537597656,
+          "speed_crop_MAE_mps": 0.6460739155369811
+        },
+        "dynamic": {
+          "L_grad": 0.2604813873767853,
+          "L_uv": 0.02401917614042759,
+          "W22": 13.018160842167527,
+          "W2inf": 10.023276890469312,
+          "dB": 1.4685678482055664,
+          "speed_crop_MAE_mps": 0.6469959522760473
+        }
+      },
+      "dynamic_minus_control_W22": -0.03759432894123016,
+      "provenance": {
+        "sample_idx": 1344,
+        "season": "summer_1",
+        "timestamp": "20070701000000",
+        "wtk_time_index": 4344
+      },
+      "sample_idx": 1344
+    },
+    {
+      "arms": {
+        "cnn": {
+          "L_grad": 0.32517173886299133,
+          "L_uv": 0.016724353656172752,
+          "W22": 18.535270496590595,
+          "W2inf": 14.754574932859432,
+          "dB": 2.1714213490486145,
+          "speed_crop_MAE_mps": 0.7646906754293014
+        },
+        "control": {
+          "L_grad": 0.32415470480918884,
+          "L_uv": 0.016684656962752342,
+          "W22": 18.46640505218318,
+          "W2inf": 14.725674551031704,
+          "dB": 2.1488598585128784,
+          "speed_crop_MAE_mps": 0.7651252489292528
+        },
+        "dynamic": {
+          "L_grad": 0.3236185610294342,
+          "L_uv": 0.016774984076619148,
+          "W22": 18.360565894746685,
+          "W2inf": 14.662175500511875,
+          "dB": 2.1467577815055847,
+          "speed_crop_MAE_mps": 0.7674051020597108
+        }
+      },
+      "dynamic_minus_control_W22": -0.10583915743649541,
+      "provenance": {
+        "sample_idx": 2016,
+        "season": "fall_1",
+        "timestamp": "20071001000000",
+        "wtk_time_index": 6552
+      },
+      "sample_idx": 2016
+    },
+    {
+      "arms": {
+        "cnn": {
+          "L_grad": 0.6110401153564453,
+          "L_uv": 0.027606410905718803,
+          "W22": 22.115529819679413,
+          "W2inf": 17.427607073728332,
+          "dB": 2.476540505886078,
+          "speed_crop_MAE_mps": 0.9302844019094482
+        },
+        "control": {
+          "L_grad": 0.6087671518325806,
+          "L_uv": 0.02751954086124897,
+          "W22": 22.025126270261303,
+          "W2inf": 17.37957846028553,
+          "dB": 2.466709792613983,
+          "speed_crop_MAE_mps": 0.9298783609713428
+        },
+        "dynamic": {
+          "L_grad": 0.6063317060470581,
+          "L_uv": 0.02770777978003025,
+          "W22": 21.820440247432103,
+          "W2inf": 17.251642947710835,
+          "dB": 2.429346740245819,
+          "speed_crop_MAE_mps": 0.9335956466081552
+        }
+      },
+      "dynamic_minus_control_W22": -0.20468602282920045,
+      "provenance": {
+        "sample_idx": 2520,
+        "season": "fall_4",
+        "timestamp": "20071022000000",
+        "wtk_time_index": 7056
+      },
+      "sample_idx": 2520
+    }
+  ],
+  "schema": "phase8-cross-season-out-of-pilot-r01-scores",
+  "summary": {
+    "dynamic_better_count": 4,
+    "dynamic_worse_count": 0,
+    "mean_dynamic_minus_control_W22": -0.1269017593273687,
+    "mean_metrics": {
+      "cnn": {
+        "L_grad": 0.35586562380194664,
+        "L_uv": 0.021191796753555536,
+        "W22": 17.058447586150752,
+        "W2inf": 13.44215316766982,
+        "dB": 1.9925860464572906,
+        "speed_crop_MAE_mps": 0.8065710261021741
+      },
+      "control": {
+        "L_grad": 0.35479144752025604,
+        "L_uv": 0.02109498158097267,
+        "W22": 16.97784606501464,
+        "W2inf": 13.397813257942515,
+        "dB": 1.9880971163511276,
+        "speed_crop_MAE_mps": 0.8062400186382002
+      },
+      "dynamic": {
+        "L_grad": 0.35399434342980385,
+        "L_uv": 0.02120015723630786,
+        "W22": 16.85094430568727,
+        "W2inf": 13.325246348072628,
+        "dB": 1.9549809694290161,
+        "speed_crop_MAE_mps": 0.8086646388765075
+      }
+    },
+    "no_claim_of_independent_generalization": true,
+    "sample_count": 4
+  }
+}

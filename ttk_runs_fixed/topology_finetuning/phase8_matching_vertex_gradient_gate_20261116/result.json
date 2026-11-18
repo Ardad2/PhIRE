@@ -1,0 +1,165 @@
+{
+  "caveats": [
+    "Pair-critical-vertex mapping may be ambiguous on real fields; this test fails closed.",
+    "This is a fixed-assignment local surrogate derivative, not a derivative of the TTK/GUDHI algorithms.",
+    "Unmatched GT diagonal costs are constant; a separate GT reconstruction term may be required.",
+    "No TF1 training, model weights, or held-out benchmark data were used."
+  ],
+  "input_results_sha256": "6e48dc5d57643f54e6404eed668752bc2e7271bb0badd683a3d6717599f12a5c",
+  "results": {
+    "displaced": {
+      "W22": 0.12603627766206238,
+      "dimensions": {
+        "D0": {
+          "W22": 0.0007149375167902178,
+          "counts": {
+            "gt_to_diagonal": 2,
+            "sr_to_diagonal": 2
+          },
+          "finite_difference": {
+            "eps": 0.0001,
+            "max_abs_gradient_error": 2.9566193243679706e-16,
+            "nonzero_field_gradient_entries": 4,
+            "unique_predicted_critical_vertices": 4,
+            "worst_vid": 15780
+          },
+          "n_gt_positive": 2,
+          "n_pred_positive": 2,
+          "pair_types": {
+            "0": 2
+          },
+          "vertex_surrogate_squared": 5.111356529141631e-07
+        },
+        "D1": {
+          "W22": 0.12603458708782517,
+          "counts": {
+            "matched": 1
+          },
+          "finite_difference": {
+            "eps": 0.0001,
+            "max_abs_gradient_error": 4.0858982863767324e-13,
+            "nonzero_field_gradient_entries": 2,
+            "unique_predicted_critical_vertices": 2,
+            "worst_vid": 13375
+          },
+          "n_gt_positive": 1,
+          "n_pred_positive": 1,
+          "pair_types": {
+            "1": 1
+          },
+          "vertex_surrogate_squared": 0.015884632151255573
+        }
+      },
+      "gradient_max_abs": 0.1782398223876953,
+      "gradient_nonzero_count": 6,
+      "unmapped_finite_raw_pairs": 0,
+      "vertex_surrogate_squared": 0.015885143286908487
+    },
+    "identity": {
+      "W22": 4.76837158203125e-07,
+      "dimensions": {
+        "D0": {
+          "W22": 0.0,
+          "counts": {
+            "matched": 2
+          },
+          "finite_difference": {
+            "eps": 0.0001,
+            "max_abs_gradient_error": 4.4408845546134397e-16,
+            "nonzero_field_gradient_entries": 0,
+            "unique_predicted_critical_vertices": 4,
+            "worst_vid": 10306
+          },
+          "n_gt_positive": 2,
+          "n_pred_positive": 2,
+          "pair_types": {
+            "0": 2
+          },
+          "vertex_surrogate_squared": 0.0
+        },
+        "D1": {
+          "W22": 0.0,
+          "counts": {
+            "matched": 1
+          },
+          "finite_difference": {
+            "eps": 0.0001,
+            "max_abs_gradient_error": 4.4408845546134397e-16,
+            "nonzero_field_gradient_entries": 1,
+            "unique_predicted_critical_vertices": 2,
+            "worst_vid": 10623
+          },
+          "n_gt_positive": 1,
+          "n_pred_positive": 1,
+          "pair_types": {
+            "1": 1
+          },
+          "vertex_surrogate_squared": 2.2737367544323206e-13
+        }
+      },
+      "gradient_max_abs": 9.5367431640625e-07,
+      "gradient_nonzero_count": 1,
+      "unmapped_finite_raw_pairs": 0,
+      "vertex_surrogate_squared": 2.2737367544323206e-13
+    },
+    "spurious": {
+      "W22": 6.346776243857625,
+      "dimensions": {
+        "D0": {
+          "W22": 8.749685750861601e-05,
+          "counts": {
+            "matched": 2,
+            "sr_to_diagonal": 1
+          },
+          "finite_difference": {
+            "eps": 0.0001,
+            "max_abs_gradient_error": 4.4408018365521844e-16,
+            "nonzero_field_gradient_entries": 2,
+            "unique_predicted_critical_vertices": 6,
+            "worst_vid": 10306
+          },
+          "n_gt_positive": 2,
+          "n_pred_positive": 3,
+          "pair_types": {
+            "0": 3
+          },
+          "vertex_surrogate_squared": 7.655700073883054e-09
+        },
+        "D1": {
+          "W22": 6.346775906079702,
+          "counts": {
+            "matched": 1,
+            "sr_to_diagonal": 1
+          },
+          "finite_difference": {
+            "eps": 0.0001,
+            "max_abs_gradient_error": 1.6143530956469476e-11,
+            "nonzero_field_gradient_entries": 3,
+            "unique_predicted_critical_vertices": 4,
+            "worst_vid": 8376
+          },
+          "n_gt_positive": 1,
+          "n_pred_positive": 2,
+          "pair_types": {
+            "1": 2
+          },
+          "vertex_surrogate_squared": 40.2815686819398
+        }
+      },
+      "gradient_max_abs": 8.975697040557861,
+      "gradient_nonzero_count": 5,
+      "unmapped_finite_raw_pairs": 0,
+      "vertex_surrogate_squared": 40.2815686895955
+    }
+  },
+  "schema": "phase8-matching-vertex-gradient-v1",
+  "sources_sha256": {
+    "/home/adadhwal/PhIRE/phase6_lxxvii_update/scripts/phase6_pilot_pd_gudhi_gate.py": "ad11e7802672d0a11c2f7f839e62623bca95afd338d4144ab3bf2bc1df9bc1fe",
+    "/home/adadhwal/PhIRE/phase8_synthetic_field_gate_20261116.py": "116600f98cbe6591ff32d046ab673084fa22e5a50b9de49f1423f67497d591ff",
+    "/home/adadhwal/PhIRE/phase8_ttk_w22_timing_pilot_20261116.py": "a4ba4e9d6d22eb30ff830312db10e78e2e5a86492dc325e09369517dd67f900a",
+    "/home/adadhwal/PhIRE/scripts/extract_ttk_pd_critical_pairs.py": "c31dfc567ba1a6831203289ad65cbbbad036f407d10063e65127f75f0a6dca91",
+    "/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py": "04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6c"
+  },
+  "status": "nontraining-local-fixed-assignment-gradient-only",
+  "synthetic_dir": "ttk_runs_fixed/topology_finetuning/phase8_synthetic_fields_20261116"
+}

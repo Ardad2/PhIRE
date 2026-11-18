@@ -1,0 +1,1725 @@
+{
+  "batch_size": 1,
+  "checkpoint_hashes": {
+    "/home/adadhwal/PhIRE/models/wind_mr-hr/trained_cnn/cnn.data-00000-of-00001": "cd0909314dee5c9fdf474de061424eb6fff5b7e1e228522c213475489b5ca98e",
+    "/home/adadhwal/PhIRE/models/wind_mr-hr/trained_cnn/cnn.index": "e5ee08bd24450fb95987867bae76c00e53077de6dbd7f76de579e5316bd20ce2"
+  },
+  "dynamic_policy": "new TTK/GUDHI predicted pairs before EVERY update",
+  "epochs": 3,
+  "fixed_policy": "pretrained CNN initial predicted PD pairs AND vertex indices frozen",
+  "lambda_grad": 0.05,
+  "lambda_w22_squared": 1e-05,
+  "lr": 1e-06,
+  "no_geographic_test_access": true,
+  "note": "Train from expanded 2688 pool; original 168 benchmark remains evaluation-only.",
+  "optimizer": "independent Adam, zero-initialized per arm",
+  "reference_benchmark_report_sha256": "debdd79bb20abad235479653d6ba2b6ea2109921d965c5758da8530e00b6a622",
+  "reference_benchmark_tfrecord_sha256": "8e742d8c778b59b06d06f4946f112085d8472d5488be06526b773cc41bac8f58",
+  "schema": "phase8-train168-threearm-freshmatch-r01-plan",
+  "source_hashes": {
+    "/home/adadhwal/PhIRE/PhIREGANs.py": "516ce202968ab6c566bd83f9fc4dca44e434d7376a3fb622f4a6b78d3c620f48",
+    "/home/adadhwal/PhIRE/phase6_lxxvii_update/scripts/phase6_pilot_pd_gudhi_gate.py": "ad11e7802672d0a11c2f7f839e62623bca95afd338d4144ab3bf2bc1df9bc1fe",
+    "/home/adadhwal/PhIRE/phase8_matching_vertex_gradient_gate_20261116.py": "30d93dfc4f2ece61d1dc5611bdb61ce209f0f2ff8686079fd2ff99d0a60855c5",
+    "/home/adadhwal/PhIRE/phase8_temporal_out_of_pilot_eval_20261117.py": "a0319a9e64b9bd1b13216cc0bafbd6c2d122709f56f4f63769e6e5dd661868c0",
+    "/home/adadhwal/PhIRE/phase8_tf1_dynamic_single_batch_gate_20261116_v2.py": "70589d22790d9281c4887f33c5dd8ea6c416aab5750ec285a32a5cc2ae0d59c6",
+    "/home/adadhwal/PhIRE/phase8_tf1_multisample_rematch_pilot_20261116.py": "429f8785b7d993aadea7e88ae34d3ed940cf487a2aa60de65987ece49f1998bd",
+    "/home/adadhwal/PhIRE/phase8_tf1_one_step_optimizer_gate_20261116.py": "4a0feb931c0bf07d8c31309e3b78932550cecc51a4241a998e607dc8ed80e282",
+    "/home/adadhwal/PhIRE/phase8_train168_threearm_dynamic_pd_20261118.py": "6dccfd25f10a85ac09dcde6425c5de2ee6cf2bf622da9e12bec800adf8301fa2",
+    "/home/adadhwal/PhIRE/phase8_ttk_w22_timing_pilot_20261116.py": "a4ba4e9d6d22eb30ff830312db10e78e2e5a86492dc325e09369517dd67f900a",
+    "/home/adadhwal/PhIRE/scripts/extract_ttk_pd_critical_pairs.py": "c31dfc567ba1a6831203289ad65cbbbad036f407d10063e65127f75f0a6dca91",
+    "/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py": "7ac9453799044985a0d79a62729036979eb4b7e12e0033fdb5b0ec4d91ba726a",
+    "/home/adadhwal/PhIRE/sr_network.py": "972bd9d3adce4744a7b74eee715256357c3117eef0045aae43a561c38af14976",
+    "/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py": "04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6c"
+  },
+  "step_order": [
+    8,
+    176,
+    344,
+    512,
+    680,
+    848,
+    1016,
+    1184,
+    1352,
+    1520,
+    1688,
+    1856,
+    2024,
+    2192,
+    2360,
+    2528,
+    23,
+    193,
+    359,
+    529,
+    695,
+    865,
+    1031,
+    1201,
+    1367,
+    1537,
+    1703,
+    1873,
+    2039,
+    2209,
+    2375,
+    2545,
+    38,
+    210,
+    374,
+    546,
+    710,
+    882,
+    1046,
+    1218,
+    1382,
+    1554,
+    1718,
+    1890,
+    2054,
+    2226,
+    2390,
+    2562,
+    53,
+    226,
+    389,
+    562,
+    725,
+    898,
+    1061,
+    1234,
+    1397,
+    1570,
+    1733,
+    1906,
+    2069,
+    2242,
+    2405,
+    2578,
+    68,
+    243,
+    404,
+    579,
+    740,
+    915,
+    1076,
+    1251,
+    1412,
+    1587,
+    1748,
+    1923,
+    2084,
+    2259,
+    2420,
+    2595,
+    84,
+    260,
+    420,
+    596,
+    756,
+    932,
+    1092,
+    1268,
+    1428,
+    1604,
+    1764,
+    1940,
+    2100,
+    2276,
+    2436,
+    2612,
+    99,
+    277,
+    435,
+    613,
+    771,
+    949,
+    1107,
+    1285,
+    1443,
+    1621,
+    1779,
+    1957,
+    2115,
+    2293,
+    2451,
+    2629,
+    114,
+    293,
+    450,
+    629,
+    786,
+    965,
+    1122,
+    1301,
+    1458,
+    1637,
+    1794,
+    1973,
+    2130,
+    2309,
+    2466,
+    2645,
+    129,
+    310,
+    465,
+    646,
+    801,
+    982,
+    1137,
+    1318,
+    1473,
+    1654,
+    1809,
+    1990,
+    2145,
+    2326,
+    2481,
+    2662,
+    144,
+    327,
+    480,
+    663,
+    816,
+    999,
+    1152,
+    1335,
+    1488,
+    1671,
+    1824,
+    2007,
+    2160,
+    2343,
+    2496,
+    2679,
+    159,
+    495,
+    831,
+    1167,
+    1503,
+    1839,
+    2175,
+    2511,
+    8,
+    176,
+    344,
+    512,
+    680,
+    848,
+    1016,
+    1184,
+    1352,
+    1520,
+    1688,
+    1856,
+    2024,
+    2192,
+    2360,
+    2528,
+    23,
+    193,
+    359,
+    529,
+    695,
+    865,
+    1031,
+    1201,
+    1367,
+    1537,
+    1703,
+    1873,
+    2039,
+    2209,
+    2375,
+    2545,
+    38,
+    210,
+    374,
+    546,
+    710,
+    882,
+    1046,
+    1218,
+    1382,
+    1554,
+    1718,
+    1890,
+    2054,
+    2226,
+    2390,
+    2562,
+    53,
+    226,
+    389,
+    562,
+    725,
+    898,
+    1061,
+    1234,
+    1397,
+    1570,
+    1733,
+    1906,
+    2069,
+    2242,
+    2405,
+    2578,
+    68,
+    243,
+    404,
+    579,
+    740,
+    915,
+    1076,
+    1251,
+    1412,
+    1587,
+    1748,
+    1923,
+    2084,
+    2259,
+    2420,
+    2595,
+    84,
+    260,
+    420,
+    596,
+    756,
+    932,
+    1092,
+    1268,
+    1428,
+    1604,
+    1764,
+    1940,
+    2100,
+    2276,
+    2436,
+    2612,
+    99,
+    277,
+    435,
+    613,
+    771,
+    949,
+    1107,
+    1285,
+    1443,
+    1621,
+    1779,
+    1957,
+    2115,
+    2293,
+    2451,
+    2629,
+    114,
+    293,
+    450,
+    629,
+    786,
+    965,
+    1122,
+    1301,
+    1458,
+    1637,
+    1794,
+    1973,
+    2130,
+    2309,
+    2466,
+    2645,
+    129,
+    310,
+    465,
+    646,
+    801,
+    982,
+    1137,
+    1318,
+    1473,
+    1654,
+    1809,
+    1990,
+    2145,
+    2326,
+    2481,
+    2662,
+    144,
+    327,
+    480,
+    663,
+    816,
+    999,
+    1152,
+    1335,
+    1488,
+    1671,
+    1824,
+    2007,
+    2160,
+    2343,
+    2496,
+    2679,
+    159,
+    495,
+    831,
+    1167,
+    1503,
+    1839,
+    2175,
+    2511,
+    8,
+    176,
+    344,
+    512,
+    680,
+    848,
+    1016,
+    1184,
+    1352,
+    1520,
+    1688,
+    1856,
+    2024,
+    2192,
+    2360,
+    2528,
+    23,
+    193,
+    359,
+    529,
+    695,
+    865,
+    1031,
+    1201,
+    1367,
+    1537,
+    1703,
+    1873,
+    2039,
+    2209,
+    2375,
+    2545,
+    38,
+    210,
+    374,
+    546,
+    710,
+    882,
+    1046,
+    1218,
+    1382,
+    1554,
+    1718,
+    1890,
+    2054,
+    2226,
+    2390,
+    2562,
+    53,
+    226,
+    389,
+    562,
+    725,
+    898,
+    1061,
+    1234,
+    1397,
+    1570,
+    1733,
+    1906,
+    2069,
+    2242,
+    2405,
+    2578,
+    68,
+    243,
+    404,
+    579,
+    740,
+    915,
+    1076,
+    1251,
+    1412,
+    1587,
+    1748,
+    1923,
+    2084,
+    2259,
+    2420,
+    2595,
+    84,
+    260,
+    420,
+    596,
+    756,
+    932,
+    1092,
+    1268,
+    1428,
+    1604,
+    1764,
+    1940,
+    2100,
+    2276,
+    2436,
+    2612,
+    99,
+    277,
+    435,
+    613,
+    771,
+    949,
+    1107,
+    1285,
+    1443,
+    1621,
+    1779,
+    1957,
+    2115,
+    2293,
+    2451,
+    2629,
+    114,
+    293,
+    450,
+    629,
+    786,
+    965,
+    1122,
+    1301,
+    1458,
+    1637,
+    1794,
+    1973,
+    2130,
+    2309,
+    2466,
+    2645,
+    129,
+    310,
+    465,
+    646,
+    801,
+    982,
+    1137,
+    1318,
+    1473,
+    1654,
+    1809,
+    1990,
+    2145,
+    2326,
+    2481,
+    2662,
+    144,
+    327,
+    480,
+    663,
+    816,
+    999,
+    1152,
+    1335,
+    1488,
+    1671,
+    1824,
+    2007,
+    2160,
+    2343,
+    2496,
+    2679,
+    159,
+    495,
+    831,
+    1167,
+    1503,
+    1839,
+    2175,
+    2511
+  ],
+  "steps_per_arm": 504,
+  "training_indices": [
+    8,
+    176,
+    344,
+    512,
+    680,
+    848,
+    1016,
+    1184,
+    1352,
+    1520,
+    1688,
+    1856,
+    2024,
+    2192,
+    2360,
+    2528,
+    23,
+    193,
+    359,
+    529,
+    695,
+    865,
+    1031,
+    1201,
+    1367,
+    1537,
+    1703,
+    1873,
+    2039,
+    2209,
+    2375,
+    2545,
+    38,
+    210,
+    374,
+    546,
+    710,
+    882,
+    1046,
+    1218,
+    1382,
+    1554,
+    1718,
+    1890,
+    2054,
+    2226,
+    2390,
+    2562,
+    53,
+    226,
+    389,
+    562,
+    725,
+    898,
+    1061,
+    1234,
+    1397,
+    1570,
+    1733,
+    1906,
+    2069,
+    2242,
+    2405,
+    2578,
+    68,
+    243,
+    404,
+    579,
+    740,
+    915,
+    1076,
+    1251,
+    1412,
+    1587,
+    1748,
+    1923,
+    2084,
+    2259,
+    2420,
+    2595,
+    84,
+    260,
+    420,
+    596,
+    756,
+    932,
+    1092,
+    1268,
+    1428,
+    1604,
+    1764,
+    1940,
+    2100,
+    2276,
+    2436,
+    2612,
+    99,
+    277,
+    435,
+    613,
+    771,
+    949,
+    1107,
+    1285,
+    1443,
+    1621,
+    1779,
+    1957,
+    2115,
+    2293,
+    2451,
+    2629,
+    114,
+    293,
+    450,
+    629,
+    786,
+    965,
+    1122,
+    1301,
+    1458,
+    1637,
+    1794,
+    1973,
+    2130,
+    2309,
+    2466,
+    2645,
+    129,
+    310,
+    465,
+    646,
+    801,
+    982,
+    1137,
+    1318,
+    1473,
+    1654,
+    1809,
+    1990,
+    2145,
+    2326,
+    2481,
+    2662,
+    144,
+    327,
+    480,
+    663,
+    816,
+    999,
+    1152,
+    1335,
+    1488,
+    1671,
+    1824,
+    2007,
+    2160,
+    2343,
+    2496,
+    2679,
+    159,
+    495,
+    831,
+    1167,
+    1503,
+    1839,
+    2175,
+    2511
+  ],
+  "training_manifest_sha256": "cf97bed1053ae1006d430f86207df9397fa1bec298ffed11b2317d46cdaa1701",
+  "training_tfrecord_mtime_ns": 1780090821321968288,
+  "training_tfrecord_sha256": "41afeb10049aa69e7c73695e05b7daf04669cbf61dfaf7ecc603087f4cc86b17",
+  "training_tfrecord_size": 11182526080,
+  "training_wtk": [
+    {
+      "sample_idx": 8,
+      "season": "winter_1",
+      "timestamp": "20070115080000",
+      "wtk_time_index": 344
+    },
+    {
+      "sample_idx": 176,
+      "season": "winter_2",
+      "timestamp": "20070122080000",
+      "wtk_time_index": 512
+    },
+    {
+      "sample_idx": 344,
+      "season": "winter_3",
+      "timestamp": "20070129080000",
+      "wtk_time_index": 680
+    },
+    {
+      "sample_idx": 512,
+      "season": "winter_4",
+      "timestamp": "20070205080000",
+      "wtk_time_index": 848
+    },
+    {
+      "sample_idx": 680,
+      "season": "spring_1",
+      "timestamp": "20070401080000",
+      "wtk_time_index": 2168
+    },
+    {
+      "sample_idx": 848,
+      "season": "spring_2",
+      "timestamp": "20070408080000",
+      "wtk_time_index": 2336
+    },
+    {
+      "sample_idx": 1016,
+      "season": "spring_3",
+      "timestamp": "20070415080000",
+      "wtk_time_index": 2504
+    },
+    {
+      "sample_idx": 1184,
+      "season": "spring_4",
+      "timestamp": "20070422080000",
+      "wtk_time_index": 2672
+    },
+    {
+      "sample_idx": 1352,
+      "season": "summer_1",
+      "timestamp": "20070701080000",
+      "wtk_time_index": 4352
+    },
+    {
+      "sample_idx": 1520,
+      "season": "summer_2",
+      "timestamp": "20070708080000",
+      "wtk_time_index": 4520
+    },
+    {
+      "sample_idx": 1688,
+      "season": "summer_3",
+      "timestamp": "20070715080000",
+      "wtk_time_index": 4688
+    },
+    {
+      "sample_idx": 1856,
+      "season": "summer_4",
+      "timestamp": "20070722080000",
+      "wtk_time_index": 4856
+    },
+    {
+      "sample_idx": 2024,
+      "season": "fall_1",
+      "timestamp": "20071001080000",
+      "wtk_time_index": 6560
+    },
+    {
+      "sample_idx": 2192,
+      "season": "fall_2",
+      "timestamp": "20071008080000",
+      "wtk_time_index": 6728
+    },
+    {
+      "sample_idx": 2360,
+      "season": "fall_3",
+      "timestamp": "20071015080000",
+      "wtk_time_index": 6896
+    },
+    {
+      "sample_idx": 2528,
+      "season": "fall_4",
+      "timestamp": "20071022080000",
+      "wtk_time_index": 7064
+    },
+    {
+      "sample_idx": 23,
+      "season": "winter_1",
+      "timestamp": "20070115230000",
+      "wtk_time_index": 359
+    },
+    {
+      "sample_idx": 193,
+      "season": "winter_2",
+      "timestamp": "20070123010000",
+      "wtk_time_index": 529
+    },
+    {
+      "sample_idx": 359,
+      "season": "winter_3",
+      "timestamp": "20070129230000",
+      "wtk_time_index": 695
+    },
+    {
+      "sample_idx": 529,
+      "season": "winter_4",
+      "timestamp": "20070206010000",
+      "wtk_time_index": 865
+    },
+    {
+      "sample_idx": 695,
+      "season": "spring_1",
+      "timestamp": "20070401230000",
+      "wtk_time_index": 2183
+    },
+    {
+      "sample_idx": 865,
+      "season": "spring_2",
+      "timestamp": "20070409010000",
+      "wtk_time_index": 2353
+    },
+    {
+      "sample_idx": 1031,
+      "season": "spring_3",
+      "timestamp": "20070415230000",
+      "wtk_time_index": 2519
+    },
+    {
+      "sample_idx": 1201,
+      "season": "spring_4",
+      "timestamp": "20070423010000",
+      "wtk_time_index": 2689
+    },
+    {
+      "sample_idx": 1367,
+      "season": "summer_1",
+      "timestamp": "20070701230000",
+      "wtk_time_index": 4367
+    },
+    {
+      "sample_idx": 1537,
+      "season": "summer_2",
+      "timestamp": "20070709010000",
+      "wtk_time_index": 4537
+    },
+    {
+      "sample_idx": 1703,
+      "season": "summer_3",
+      "timestamp": "20070715230000",
+      "wtk_time_index": 4703
+    },
+    {
+      "sample_idx": 1873,
+      "season": "summer_4",
+      "timestamp": "20070723010000",
+      "wtk_time_index": 4873
+    },
+    {
+      "sample_idx": 2039,
+      "season": "fall_1",
+      "timestamp": "20071001230000",
+      "wtk_time_index": 6575
+    },
+    {
+      "sample_idx": 2209,
+      "season": "fall_2",
+      "timestamp": "20071009010000",
+      "wtk_time_index": 6745
+    },
+    {
+      "sample_idx": 2375,
+      "season": "fall_3",
+      "timestamp": "20071015230000",
+      "wtk_time_index": 6911
+    },
+    {
+      "sample_idx": 2545,
+      "season": "fall_4",
+      "timestamp": "20071023010000",
+      "wtk_time_index": 7081
+    },
+    {
+      "sample_idx": 38,
+      "season": "winter_1",
+      "timestamp": "20070116140000",
+      "wtk_time_index": 374
+    },
+    {
+      "sample_idx": 210,
+      "season": "winter_2",
+      "timestamp": "20070123180000",
+      "wtk_time_index": 546
+    },
+    {
+      "sample_idx": 374,
+      "season": "winter_3",
+      "timestamp": "20070130140000",
+      "wtk_time_index": 710
+    },
+    {
+      "sample_idx": 546,
+      "season": "winter_4",
+      "timestamp": "20070206180000",
+      "wtk_time_index": 882
+    },
+    {
+      "sample_idx": 710,
+      "season": "spring_1",
+      "timestamp": "20070402140000",
+      "wtk_time_index": 2198
+    },
+    {
+      "sample_idx": 882,
+      "season": "spring_2",
+      "timestamp": "20070409180000",
+      "wtk_time_index": 2370
+    },
+    {
+      "sample_idx": 1046,
+      "season": "spring_3",
+      "timestamp": "20070416140000",
+      "wtk_time_index": 2534
+    },
+    {
+      "sample_idx": 1218,
+      "season": "spring_4",
+      "timestamp": "20070423180000",
+      "wtk_time_index": 2706
+    },
+    {
+      "sample_idx": 1382,
+      "season": "summer_1",
+      "timestamp": "20070702140000",
+      "wtk_time_index": 4382
+    },
+    {
+      "sample_idx": 1554,
+      "season": "summer_2",
+      "timestamp": "20070709180000",
+      "wtk_time_index": 4554
+    },
+    {
+      "sample_idx": 1718,
+      "season": "summer_3",
+      "timestamp": "20070716140000",
+      "wtk_time_index": 4718
+    },
+    {
+      "sample_idx": 1890,
+      "season": "summer_4",
+      "timestamp": "20070723180000",
+      "wtk_time_index": 4890
+    },
+    {
+      "sample_idx": 2054,
+      "season": "fall_1",
+      "timestamp": "20071002140000",
+      "wtk_time_index": 6590
+    },
+    {
+      "sample_idx": 2226,
+      "season": "fall_2",
+      "timestamp": "20071009180000",
+      "wtk_time_index": 6762
+    },
+    {
+      "sample_idx": 2390,
+      "season": "fall_3",
+      "timestamp": "20071016140000",
+      "wtk_time_index": 6926
+    },
+    {
+      "sample_idx": 2562,
+      "season": "fall_4",
+      "timestamp": "20071023180000",
+      "wtk_time_index": 7098
+    },
+    {
+      "sample_idx": 53,
+      "season": "winter_1",
+      "timestamp": "20070117050000",
+      "wtk_time_index": 389
+    },
+    {
+      "sample_idx": 226,
+      "season": "winter_2",
+      "timestamp": "20070124100000",
+      "wtk_time_index": 562
+    },
+    {
+      "sample_idx": 389,
+      "season": "winter_3",
+      "timestamp": "20070131050000",
+      "wtk_time_index": 725
+    },
+    {
+      "sample_idx": 562,
+      "season": "winter_4",
+      "timestamp": "20070207100000",
+      "wtk_time_index": 898
+    },
+    {
+      "sample_idx": 725,
+      "season": "spring_1",
+      "timestamp": "20070403050000",
+      "wtk_time_index": 2213
+    },
+    {
+      "sample_idx": 898,
+      "season": "spring_2",
+      "timestamp": "20070410100000",
+      "wtk_time_index": 2386
+    },
+    {
+      "sample_idx": 1061,
+      "season": "spring_3",
+      "timestamp": "20070417050000",
+      "wtk_time_index": 2549
+    },
+    {
+      "sample_idx": 1234,
+      "season": "spring_4",
+      "timestamp": "20070424100000",
+      "wtk_time_index": 2722
+    },
+    {
+      "sample_idx": 1397,
+      "season": "summer_1",
+      "timestamp": "20070703050000",
+      "wtk_time_index": 4397
+    },
+    {
+      "sample_idx": 1570,
+      "season": "summer_2",
+      "timestamp": "20070710100000",
+      "wtk_time_index": 4570
+    },
+    {
+      "sample_idx": 1733,
+      "season": "summer_3",
+      "timestamp": "20070717050000",
+      "wtk_time_index": 4733
+    },
+    {
+      "sample_idx": 1906,
+      "season": "summer_4",
+      "timestamp": "20070724100000",
+      "wtk_time_index": 4906
+    },
+    {
+      "sample_idx": 2069,
+      "season": "fall_1",
+      "timestamp": "20071003050000",
+      "wtk_time_index": 6605
+    },
+    {
+      "sample_idx": 2242,
+      "season": "fall_2",
+      "timestamp": "20071010100000",
+      "wtk_time_index": 6778
+    },
+    {
+      "sample_idx": 2405,
+      "season": "fall_3",
+      "timestamp": "20071017050000",
+      "wtk_time_index": 6941
+    },
+    {
+      "sample_idx": 2578,
+      "season": "fall_4",
+      "timestamp": "20071024100000",
+      "wtk_time_index": 7114
+    },
+    {
+      "sample_idx": 68,
+      "season": "winter_1",
+      "timestamp": "20070117200000",
+      "wtk_time_index": 404
+    },
+    {
+      "sample_idx": 243,
+      "season": "winter_2",
+      "timestamp": "20070125030000",
+      "wtk_time_index": 579
+    },
+    {
+      "sample_idx": 404,
+      "season": "winter_3",
+      "timestamp": "20070131200000",
+      "wtk_time_index": 740
+    },
+    {
+      "sample_idx": 579,
+      "season": "winter_4",
+      "timestamp": "20070208030000",
+      "wtk_time_index": 915
+    },
+    {
+      "sample_idx": 740,
+      "season": "spring_1",
+      "timestamp": "20070403200000",
+      "wtk_time_index": 2228
+    },
+    {
+      "sample_idx": 915,
+      "season": "spring_2",
+      "timestamp": "20070411030000",
+      "wtk_time_index": 2403
+    },
+    {
+      "sample_idx": 1076,
+      "season": "spring_3",
+      "timestamp": "20070417200000",
+      "wtk_time_index": 2564
+    },
+    {
+      "sample_idx": 1251,
+      "season": "spring_4",
+      "timestamp": "20070425030000",
+      "wtk_time_index": 2739
+    },
+    {
+      "sample_idx": 1412,
+      "season": "summer_1",
+      "timestamp": "20070703200000",
+      "wtk_time_index": 4412
+    },
+    {
+      "sample_idx": 1587,
+      "season": "summer_2",
+      "timestamp": "20070711030000",
+      "wtk_time_index": 4587
+    },
+    {
+      "sample_idx": 1748,
+      "season": "summer_3",
+      "timestamp": "20070717200000",
+      "wtk_time_index": 4748
+    },
+    {
+      "sample_idx": 1923,
+      "season": "summer_4",
+      "timestamp": "20070725030000",
+      "wtk_time_index": 4923
+    },
+    {
+      "sample_idx": 2084,
+      "season": "fall_1",
+      "timestamp": "20071003200000",
+      "wtk_time_index": 6620
+    },
+    {
+      "sample_idx": 2259,
+      "season": "fall_2",
+      "timestamp": "20071011030000",
+      "wtk_time_index": 6795
+    },
+    {
+      "sample_idx": 2420,
+      "season": "fall_3",
+      "timestamp": "20071017200000",
+      "wtk_time_index": 6956
+    },
+    {
+      "sample_idx": 2595,
+      "season": "fall_4",
+      "timestamp": "20071025030000",
+      "wtk_time_index": 7131
+    },
+    {
+      "sample_idx": 84,
+      "season": "winter_1",
+      "timestamp": "20070118120000",
+      "wtk_time_index": 420
+    },
+    {
+      "sample_idx": 260,
+      "season": "winter_2",
+      "timestamp": "20070125200000",
+      "wtk_time_index": 596
+    },
+    {
+      "sample_idx": 420,
+      "season": "winter_3",
+      "timestamp": "20070201120000",
+      "wtk_time_index": 756
+    },
+    {
+      "sample_idx": 596,
+      "season": "winter_4",
+      "timestamp": "20070208200000",
+      "wtk_time_index": 932
+    },
+    {
+      "sample_idx": 756,
+      "season": "spring_1",
+      "timestamp": "20070404120000",
+      "wtk_time_index": 2244
+    },
+    {
+      "sample_idx": 932,
+      "season": "spring_2",
+      "timestamp": "20070411200000",
+      "wtk_time_index": 2420
+    },
+    {
+      "sample_idx": 1092,
+      "season": "spring_3",
+      "timestamp": "20070418120000",
+      "wtk_time_index": 2580
+    },
+    {
+      "sample_idx": 1268,
+      "season": "spring_4",
+      "timestamp": "20070425200000",
+      "wtk_time_index": 2756
+    },
+    {
+      "sample_idx": 1428,
+      "season": "summer_1",
+      "timestamp": "20070704120000",
+      "wtk_time_index": 4428
+    },
+    {
+      "sample_idx": 1604,
+      "season": "summer_2",
+      "timestamp": "20070711200000",
+      "wtk_time_index": 4604
+    },
+    {
+      "sample_idx": 1764,
+      "season": "summer_3",
+      "timestamp": "20070718120000",
+      "wtk_time_index": 4764
+    },
+    {
+      "sample_idx": 1940,
+      "season": "summer_4",
+      "timestamp": "20070725200000",
+      "wtk_time_index": 4940
+    },
+    {
+      "sample_idx": 2100,
+      "season": "fall_1",
+      "timestamp": "20071004120000",
+      "wtk_time_index": 6636
+    },
+    {
+      "sample_idx": 2276,
+      "season": "fall_2",
+      "timestamp": "20071011200000",
+      "wtk_time_index": 6812
+    },
+    {
+      "sample_idx": 2436,
+      "season": "fall_3",
+      "timestamp": "20071018120000",
+      "wtk_time_index": 6972
+    },
+    {
+      "sample_idx": 2612,
+      "season": "fall_4",
+      "timestamp": "20071025200000",
+      "wtk_time_index": 7148
+    },
+    {
+      "sample_idx": 99,
+      "season": "winter_1",
+      "timestamp": "20070119030000",
+      "wtk_time_index": 435
+    },
+    {
+      "sample_idx": 277,
+      "season": "winter_2",
+      "timestamp": "20070126130000",
+      "wtk_time_index": 613
+    },
+    {
+      "sample_idx": 435,
+      "season": "winter_3",
+      "timestamp": "20070202030000",
+      "wtk_time_index": 771
+    },
+    {
+      "sample_idx": 613,
+      "season": "winter_4",
+      "timestamp": "20070209130000",
+      "wtk_time_index": 949
+    },
+    {
+      "sample_idx": 771,
+      "season": "spring_1",
+      "timestamp": "20070405030000",
+      "wtk_time_index": 2259
+    },
+    {
+      "sample_idx": 949,
+      "season": "spring_2",
+      "timestamp": "20070412130000",
+      "wtk_time_index": 2437
+    },
+    {
+      "sample_idx": 1107,
+      "season": "spring_3",
+      "timestamp": "20070419030000",
+      "wtk_time_index": 2595
+    },
+    {
+      "sample_idx": 1285,
+      "season": "spring_4",
+      "timestamp": "20070426130000",
+      "wtk_time_index": 2773
+    },
+    {
+      "sample_idx": 1443,
+      "season": "summer_1",
+      "timestamp": "20070705030000",
+      "wtk_time_index": 4443
+    },
+    {
+      "sample_idx": 1621,
+      "season": "summer_2",
+      "timestamp": "20070712130000",
+      "wtk_time_index": 4621
+    },
+    {
+      "sample_idx": 1779,
+      "season": "summer_3",
+      "timestamp": "20070719030000",
+      "wtk_time_index": 4779
+    },
+    {
+      "sample_idx": 1957,
+      "season": "summer_4",
+      "timestamp": "20070726130000",
+      "wtk_time_index": 4957
+    },
+    {
+      "sample_idx": 2115,
+      "season": "fall_1",
+      "timestamp": "20071005030000",
+      "wtk_time_index": 6651
+    },
+    {
+      "sample_idx": 2293,
+      "season": "fall_2",
+      "timestamp": "20071012130000",
+      "wtk_time_index": 6829
+    },
+    {
+      "sample_idx": 2451,
+      "season": "fall_3",
+      "timestamp": "20071019030000",
+      "wtk_time_index": 6987
+    },
+    {
+      "sample_idx": 2629,
+      "season": "fall_4",
+      "timestamp": "20071026130000",
+      "wtk_time_index": 7165
+    },
+    {
+      "sample_idx": 114,
+      "season": "winter_1",
+      "timestamp": "20070119180000",
+      "wtk_time_index": 450
+    },
+    {
+      "sample_idx": 293,
+      "season": "winter_2",
+      "timestamp": "20070127050000",
+      "wtk_time_index": 629
+    },
+    {
+      "sample_idx": 450,
+      "season": "winter_3",
+      "timestamp": "20070202180000",
+      "wtk_time_index": 786
+    },
+    {
+      "sample_idx": 629,
+      "season": "winter_4",
+      "timestamp": "20070210050000",
+      "wtk_time_index": 965
+    },
+    {
+      "sample_idx": 786,
+      "season": "spring_1",
+      "timestamp": "20070405180000",
+      "wtk_time_index": 2274
+    },
+    {
+      "sample_idx": 965,
+      "season": "spring_2",
+      "timestamp": "20070413050000",
+      "wtk_time_index": 2453
+    },
+    {
+      "sample_idx": 1122,
+      "season": "spring_3",
+      "timestamp": "20070419180000",
+      "wtk_time_index": 2610
+    },
+    {
+      "sample_idx": 1301,
+      "season": "spring_4",
+      "timestamp": "20070427050000",
+      "wtk_time_index": 2789
+    },
+    {
+      "sample_idx": 1458,
+      "season": "summer_1",
+      "timestamp": "20070705180000",
+      "wtk_time_index": 4458
+    },
+    {
+      "sample_idx": 1637,
+      "season": "summer_2",
+      "timestamp": "20070713050000",
+      "wtk_time_index": 4637
+    },
+    {
+      "sample_idx": 1794,
+      "season": "summer_3",
+      "timestamp": "20070719180000",
+      "wtk_time_index": 4794
+    },
+    {
+      "sample_idx": 1973,
+      "season": "summer_4",
+      "timestamp": "20070727050000",
+      "wtk_time_index": 4973
+    },
+    {
+      "sample_idx": 2130,
+      "season": "fall_1",
+      "timestamp": "20071005180000",
+      "wtk_time_index": 6666
+    },
+    {
+      "sample_idx": 2309,
+      "season": "fall_2",
+      "timestamp": "20071013050000",
+      "wtk_time_index": 6845
+    },
+    {
+      "sample_idx": 2466,
+      "season": "fall_3",
+      "timestamp": "20071019180000",
+      "wtk_time_index": 7002
+    },
+    {
+      "sample_idx": 2645,
+      "season": "fall_4",
+      "timestamp": "20071027050000",
+      "wtk_time_index": 7181
+    },
+    {
+      "sample_idx": 129,
+      "season": "winter_1",
+      "timestamp": "20070120090000",
+      "wtk_time_index": 465
+    },
+    {
+      "sample_idx": 310,
+      "season": "winter_2",
+      "timestamp": "20070127220000",
+      "wtk_time_index": 646
+    },
+    {
+      "sample_idx": 465,
+      "season": "winter_3",
+      "timestamp": "20070203090000",
+      "wtk_time_index": 801
+    },
+    {
+      "sample_idx": 646,
+      "season": "winter_4",
+      "timestamp": "20070210220000",
+      "wtk_time_index": 982
+    },
+    {
+      "sample_idx": 801,
+      "season": "spring_1",
+      "timestamp": "20070406090000",
+      "wtk_time_index": 2289
+    },
+    {
+      "sample_idx": 982,
+      "season": "spring_2",
+      "timestamp": "20070413220000",
+      "wtk_time_index": 2470
+    },
+    {
+      "sample_idx": 1137,
+      "season": "spring_3",
+      "timestamp": "20070420090000",
+      "wtk_time_index": 2625
+    },
+    {
+      "sample_idx": 1318,
+      "season": "spring_4",
+      "timestamp": "20070427220000",
+      "wtk_time_index": 2806
+    },
+    {
+      "sample_idx": 1473,
+      "season": "summer_1",
+      "timestamp": "20070706090000",
+      "wtk_time_index": 4473
+    },
+    {
+      "sample_idx": 1654,
+      "season": "summer_2",
+      "timestamp": "20070713220000",
+      "wtk_time_index": 4654
+    },
+    {
+      "sample_idx": 1809,
+      "season": "summer_3",
+      "timestamp": "20070720090000",
+      "wtk_time_index": 4809
+    },
+    {
+      "sample_idx": 1990,
+      "season": "summer_4",
+      "timestamp": "20070727220000",
+      "wtk_time_index": 4990
+    },
+    {
+      "sample_idx": 2145,
+      "season": "fall_1",
+      "timestamp": "20071006090000",
+      "wtk_time_index": 6681
+    },
+    {
+      "sample_idx": 2326,
+      "season": "fall_2",
+      "timestamp": "20071013220000",
+      "wtk_time_index": 6862
+    },
+    {
+      "sample_idx": 2481,
+      "season": "fall_3",
+      "timestamp": "20071020090000",
+      "wtk_time_index": 7017
+    },
+    {
+      "sample_idx": 2662,
+      "season": "fall_4",
+      "timestamp": "20071027220000",
+      "wtk_time_index": 7198
+    },
+    {
+      "sample_idx": 144,
+      "season": "winter_1",
+      "timestamp": "20070121000000",
+      "wtk_time_index": 480
+    },
+    {
+      "sample_idx": 327,
+      "season": "winter_2",
+      "timestamp": "20070128150000",
+      "wtk_time_index": 663
+    },
+    {
+      "sample_idx": 480,
+      "season": "winter_3",
+      "timestamp": "20070204000000",
+      "wtk_time_index": 816
+    },
+    {
+      "sample_idx": 663,
+      "season": "winter_4",
+      "timestamp": "20070211150000",
+      "wtk_time_index": 999
+    },
+    {
+      "sample_idx": 816,
+      "season": "spring_1",
+      "timestamp": "20070407000000",
+      "wtk_time_index": 2304
+    },
+    {
+      "sample_idx": 999,
+      "season": "spring_2",
+      "timestamp": "20070414150000",
+      "wtk_time_index": 2487
+    },
+    {
+      "sample_idx": 1152,
+      "season": "spring_3",
+      "timestamp": "20070421000000",
+      "wtk_time_index": 2640
+    },
+    {
+      "sample_idx": 1335,
+      "season": "spring_4",
+      "timestamp": "20070428150000",
+      "wtk_time_index": 2823
+    },
+    {
+      "sample_idx": 1488,
+      "season": "summer_1",
+      "timestamp": "20070707000000",
+      "wtk_time_index": 4488
+    },
+    {
+      "sample_idx": 1671,
+      "season": "summer_2",
+      "timestamp": "20070714150000",
+      "wtk_time_index": 4671
+    },
+    {
+      "sample_idx": 1824,
+      "season": "summer_3",
+      "timestamp": "20070721000000",
+      "wtk_time_index": 4824
+    },
+    {
+      "sample_idx": 2007,
+      "season": "summer_4",
+      "timestamp": "20070728150000",
+      "wtk_time_index": 5007
+    },
+    {
+      "sample_idx": 2160,
+      "season": "fall_1",
+      "timestamp": "20071007000000",
+      "wtk_time_index": 6696
+    },
+    {
+      "sample_idx": 2343,
+      "season": "fall_2",
+      "timestamp": "20071014150000",
+      "wtk_time_index": 6879
+    },
+    {
+      "sample_idx": 2496,
+      "season": "fall_3",
+      "timestamp": "20071021000000",
+      "wtk_time_index": 7032
+    },
+    {
+      "sample_idx": 2679,
+      "season": "fall_4",
+      "timestamp": "20071028150000",
+      "wtk_time_index": 7215
+    },
+    {
+      "sample_idx": 159,
+      "season": "winter_1",
+      "timestamp": "20070121150000",
+      "wtk_time_index": 495
+    },
+    {
+      "sample_idx": 495,
+      "season": "winter_3",
+      "timestamp": "20070204150000",
+      "wtk_time_index": 831
+    },
+    {
+      "sample_idx": 831,
+      "season": "spring_1",
+      "timestamp": "20070407150000",
+      "wtk_time_index": 2319
+    },
+    {
+      "sample_idx": 1167,
+      "season": "spring_3",
+      "timestamp": "20070421150000",
+      "wtk_time_index": 2655
+    },
+    {
+      "sample_idx": 1503,
+      "season": "summer_1",
+      "timestamp": "20070707150000",
+      "wtk_time_index": 4503
+    },
+    {
+      "sample_idx": 1839,
+      "season": "summer_3",
+      "timestamp": "20070721150000",
+      "wtk_time_index": 4839
+    },
+    {
+      "sample_idx": 2175,
+      "season": "fall_1",
+      "timestamp": "20071007150000",
+      "wtk_time_index": 6711
+    },
+    {
+      "sample_idx": 2511,
+      "season": "fall_3",
+      "timestamp": "20071021150000",
+      "wtk_time_index": 7047
+    }
+  ]
+}

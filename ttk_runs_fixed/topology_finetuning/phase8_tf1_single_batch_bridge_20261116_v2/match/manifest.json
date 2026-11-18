@@ -1,0 +1,76 @@
+{
+  "canonical_W22": 20.67308637707457,
+  "caveats": [
+    "No TTK/GUDHI backpropagation; fixed-pair-assignment local surrogate.",
+    "Ambiguous real-field critical point mapping causes a deliberate stop.",
+    "No top-K truncation or persistence threshold beyond zero persistence."
+  ],
+  "gt_diagonal_cost_constant": 31.57859728867259,
+  "matching_squared_cost": 427.37650085223095,
+  "n_pred_pairs": 1187,
+  "output_hashes": {
+    "feed.npz": "7f6225a3198377b3af7bca469637fed87dd9437e0c7ccd363291ec93d787d42a",
+    "pd/gt_pd_port_0.vtu": "ce792f704dee68b905bf681ea04b9faaced9ec5e8433a6ff2d50c63a6e33cfab",
+    "pd/sr_pd_port_0.vtu": "e285e5f9c54b5f35f83919c70588159952a3347372c9df2fb71b58da6e8b51eb",
+    "vti/gt.vti": "da5ca54914c03c028223117bd3d2857c89c6a31c62a57137569c8c124d595d41",
+    "vti/sr.vti": "72215f5c75cf0c6db5df287250f71377bdf6e275947d2a3f03d8de25a2816e8b"
+  },
+  "per_dim": {
+    "D0": {
+      "counts": {
+        "gt_to_diagonal": 429,
+        "matched": 547,
+        "sr_to_diagonal": 77
+      },
+      "distance": 17.771834071179164,
+      "matching_seconds": 0.120502,
+      "n_gt": 976,
+      "n_sr": 624,
+      "squared_cost": 315.8380865113843
+    },
+    "D1": {
+      "counts": {
+        "gt_to_diagonal": 382,
+        "matched": 509,
+        "sr_to_diagonal": 54
+      },
+      "distance": 10.561174844706517,
+      "matching_seconds": 0.062555,
+      "n_gt": 891,
+      "n_sr": 563,
+      "squared_cost": 111.53841434084666
+    }
+  },
+  "schema": "phase8-tf1-dynamic-match-v1",
+  "source_hashes": {
+    "/home/adadhwal/PhIRE/PhIREGANs.py": "516ce202968ab6c566bd83f9fc4dca44e434d7376a3fb622f4a6b78d3c620f48",
+    "/home/adadhwal/PhIRE/phase6_lxxvii_update/scripts/phase6_pilot_pd_gudhi_gate.py": "ad11e7802672d0a11c2f7f839e62623bca95afd338d4144ab3bf2bc1df9bc1fe",
+    "/home/adadhwal/PhIRE/phase8_matching_vertex_gradient_gate_20261116.py": "30d93dfc4f2ece61d1dc5611bdb61ce209f0f2ff8686079fd2ff99d0a60855c5",
+    "/home/adadhwal/PhIRE/phase8_tf1_dynamic_single_batch_gate_20261116_v2.py": "70589d22790d9281c4887f33c5dd8ea6c416aab5750ec285a32a5cc2ae0d59c6",
+    "/home/adadhwal/PhIRE/phase8_ttk_w22_timing_pilot_20261116.py": "a4ba4e9d6d22eb30ff830312db10e78e2e5a86492dc325e09369517dd67f900a",
+    "/home/adadhwal/PhIRE/scripts/extract_ttk_pd_critical_pairs.py": "c31dfc567ba1a6831203289ad65cbbbad036f407d10063e65127f75f0a6dca91",
+    "/home/adadhwal/PhIRE/scripts/run_candidateF_expanded2688_finetune.py": "7ac9453799044985a0d79a62729036979eb4b7e12e0033fdb5b0ec4d91ba726a",
+    "/home/adadhwal/PhIRE/sr_network.py": "972bd9d3adce4744a7b74eee715256357c3117eef0045aae43a561c38af14976",
+    "/home/adadhwal/phire_runtime_audit_20260809_221548/recompute_pd/canonical_pd_pilot.py": "04fc80702b71b6bd14e172f178c0ea9c6c77f6ef3b715e0d9e29653a1262ca6c"
+  },
+  "status": "PASS_FULL_CANONICAL_MATCHING_NO_TRAIN",
+  "train_sample_index": 0,
+  "ttk": {
+    "gt": {
+      "backend": "docker",
+      "seconds": 0.521109,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 896 saddle-max pairs .........\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1876 persistence pairs .......\u001b[34;1m [0.004s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.014s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/gt_pd_port_0.vtu'...\n",
+      "vtu_bytes": 82797
+    },
+    "sr": {
+      "backend": "docker",
+      "seconds": 0.355048,
+      "stderr_tail": "\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m No pre-existing order for array:\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m   `wind_speed`.\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m TIP: run `ttkArrayPreconditioning` first\n\u001b[32;1m[PersistenceDiagram] \u001b[0m\u001b[33;1m[WARNING]\u001b[0m for improved performances :)\n",
+      "stdout_tail": "\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 563 saddle-max pairs .........\u001b[34;1m [0.001s|1T|100%]\u001b[0m\n\u001b[32;1m[DiscreteMorseSandwich] \u001b[0mComputed 1188 persistence pairs .......\u001b[34;1m [0.002s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mComplete .................................\u001b[34;1m [0.007s|1T|100%]\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0m===========================================================\u001b[34;1m\u001b[0m\n\u001b[32;1m[PersistenceDiagram] \u001b[0mWriting output file `/work/pd/sr_pd_port_0.vtu'...\n",
+      "vtu_bytes": 57177
+    }
+  },
+  "unmapped_raw_pairs": 0,
+  "upstream_manifest_sha256": "c1a68ec480fe6c7643d33eb73f5278c6c1d1d8f82f1493793726ee766702a90d"
+}
